@@ -21,6 +21,7 @@ const app = express();
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.ADMIN_FRONTEND_URL,
+  "http://192.168.0.104:5173",
 ]
   .filter(Boolean)
   .flatMap((origin) => origin.split(","))

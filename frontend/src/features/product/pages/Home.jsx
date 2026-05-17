@@ -8,8 +8,6 @@ import Footer from "../../../Components/layout/Footer.jsx";
 import { getProducts } from "../api/productApi";
 
 import { IoIosArrowForward } from "react-icons/io";
-import { CiSearch } from "react-icons/ci";
-
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination, A11y, Autoplay } from "swiper/modules";
 
@@ -129,57 +127,8 @@ const Home = () => {
     [loading, hasMore, page, fetchProducts],
   );
 
-  //SEARCH PLACEHOLDER
-  const placeholderWords = ["Electronics", "Book", "Cycle"];
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [fade, setFade] = useState(true);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFade(false);
-      setTimeout(() => {
-        setPlaceholderIndex((p) => (p + 1) % placeholderWords.length);
-        setFade(true);
-      }, 300);
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <motion.div className="w-full bg-white dark:bg-[#131313] relative">
-      {/* <Header bagUrl={"/bag.webp"} darkUrl={"/bluebag.png"} /> */}
-      {/* search bar */}
-      <div className="flex items-center bg-white rounded-md pr-2 shadow-md outline outline-2 outline-neutral-200 hover:shadow-md transition ease-in-out duration-200 sm:hidden mr-5 ml-5 mt-2 font-poppins dark:bg-[#1A1D20] dark:outline-1 dark:outline-neutral-400">
-        <input
-          className="rounded-xl px-4 outline-none w-full placeholder:text-[#AAB9C5] dark:placeholder:text-[#EAEAEA] text-black dark:text-white py-[1.4vh] text-sm placeholder-transparent relative z-10 bg-transparent dark:outline-none"
-          type="text"
-          name="search"
-          id="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search products"
-        />
-        {/* Animated Placeholder Text */}
-        {search === "" && (
-          <span
-            className={`absolute left-9 lg:left-6 flex items-center gap-1 text-sm`}
-          >
-            <span className="text-[#AAB9C5] dark:text-[#EAEAEA]">
-              Search for
-            </span>
-            <span
-              className={` text-[#364EF2] pointer-events-none transition-opacity duration-500 z-0 ${
-                fade ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              {placeholderWords[placeholderIndex]}
-            </span>
-          </span>
-        )}
-        <CiSearch size={22} className="text-[#64707D] size-6 mr-3" />
-      </div>
-
       <div className="flex flex-col">
         {/* Blue banner code */}
         <motion.div

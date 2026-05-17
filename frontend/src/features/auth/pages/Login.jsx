@@ -68,8 +68,10 @@ function Login() {
     const params = new URLSearchParams(location.search);
     if (params.get("oauth") === "success" || params.get("auth") === "success") {
       localStorage.setItem("isAuthenticated", "true");
-      fetchUserProfile();
-      navigate("/");
+      setTimeout(async () => {
+        await fetchUserProfile();
+        navigate("/");
+      }, 300);
     }
   }, [location.search, navigate, fetchUserProfile]);
 

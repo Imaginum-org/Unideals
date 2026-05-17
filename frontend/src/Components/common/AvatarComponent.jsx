@@ -51,10 +51,25 @@ const AvatarComponent = ({
   const backgroundColor = useMemo(() => stringToColor(name), [name]);
 
   const sizeStyles = {
-    small: { container: "w-8 h-8", text: "text-xs" },
-    medium: { container: "w-12 h-12", text: "text-sm" },
-    large: { container: "w-16 h-16", text: "text-lg" },
-    xlarge: { container: "w-20 h-20", text: "text-2xl" },
+    small: {
+      container: "w-7 h-7",
+      text: "text-[10px]",
+    },
+
+    medium: {
+      container: "w-11 h-11",
+      text: "text-xs",
+    },
+
+    large: {
+      container: "w-20 h-20",
+      text: "text-base",
+    },
+
+    xlarge: {
+      container: "w-20 h-20",
+      text: "text-2xl",
+    },
   };
 
   const currentSize = sizeStyles[size] || sizeStyles.large;
