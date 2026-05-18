@@ -13,8 +13,8 @@ function AuthPageRightPart() {
         hidden md:flex
         h-full min-h-0 shrink-0 overflow-hidden
         bg-white dark:bg-[#131313]
-        p-2 md:p-3 lg:p-4 xl:p-3 2xl:p-6
-        md:w-[56%] lg:w-[64%] xl:w-[59%] 2xl:w-[62%]
+        p-2 md:p-2 lg:p-4 xl:p-3 2xl:p-3
+        md:w-[56%] lg:w-[59%] xl:w-[59%] 2xl:w-[59%]
       "
     >
       <div className="relative flex h-full w-full overflow-hidden rounded-2xl bg-[#3b3bf2] text-white">
