@@ -91,6 +91,17 @@ const userSchema = new Schema(
       default: null,
     },
 
+    oauth_login_token: {
+      type: String,
+      select: false,
+      default: "",
+    },
+
+    oauth_login_expiry: {
+      type: Date,
+      default: null,
+    },
+
     last_login_date: {
       type: Date,
       default: null,

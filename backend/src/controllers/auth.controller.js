@@ -7,11 +7,13 @@ import generatedAccessToken from "../utils/generatedAccessToken.js";
 import generatedRefreshToken from "../utils/generatedRefreshToken.js";
 import verifyEmailTempplate from "../utils/templates/verifyEmailTemplate.js";
 import forgotPaswordTemplate from "../utils/templates/forgotPaswordTemplate.js";
+import { USER_STATUS } from "../config/constants.js";
 import {
   clearAuthCookies,
   loginWithPassword,
   refreshSession,
   revokeRefreshToken,
+  sanitizeAuthUser,
   setAuthCookies,
 } from "../services/auth.service.js";
 
@@ -227,16 +229,97 @@ export const googleAuthCallbackController = async (req, res) => {
       await user.save();
     }
 
-    const accesstoken = await generatedAccessToken(user._id);
-    const refreshtoken = await generatedRefreshToken(user._id);
+    const oauthLoginCode = crypto.randomBytes(32).toString("hex");
+    const hashedOauthLoginCode = crypto
+      .createHash("sha256")
+      .update(oauthLoginCode)
+      .digest("hex");
 
-    setAuthCookies(res, accesstoken, refreshtoken, true);
-    // Let the frontend login page finish client-side auth state setup.
-    return res.redirect(`${process.env.FRONTEND_URL}/login?oauth=success`);
+    await userModel.findByIdAndUpdate(user._id, {
+      oauth_login_token: hashedOauthLoginCode,
+      oauth_login_expiry: new Date(Date.now() + 2 * 60 * 1000),
+    });
+
+    const redirectUrl = new URL(`${process.env.FRONTEND_URL}/login`);
+    redirectUrl.searchParams.set("oauth_code", oauthLoginCode);
+
+    return res.redirect(redirectUrl.toString());
   } catch (error) {
     console.error("Google auth callback error:", error);
     return res.status(500).json({
       message: "Google authentication failed.",
+      success: false,
+      error: true,
+    });
+  }
+};
+
+export const exchangeGoogleOAuthCodeController = async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({
+        message: "OAuth login code is required",
+        success: false,
+        error: true,
+      });
+    }
+
+    const hashedOauthLoginCode = crypto
+      .createHash("sha256")
+      .update(code)
+      .digest("hex");
+
+    const user = await userModel.findOne({
+      oauth_login_token: hashedOauthLoginCode,
+      oauth_login_expiry: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        message: "Google login session expired. Please try again.",
+        success: false,
+        error: true,
+      });
+    }
+
+    if (user.status !== USER_STATUS.ACTIVE) {
+      const statusLabel =
+        user.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
+
+      return res.status(403).json({
+        message: `Your account is ${statusLabel}. Please contact support.`,
+        success: false,
+        error: true,
+        accountBlocked: true,
+        accountStatus: user.status,
+      });
+    }
+
+    user.oauth_login_token = "";
+    user.oauth_login_expiry = null;
+    user.last_login_date = new Date();
+    await user.save();
+
+    const accessToken = await generatedAccessToken(user._id);
+    const refreshToken = await generatedRefreshToken(user._id);
+
+    setAuthCookies(res, accessToken, refreshToken);
+
+    return res.status(200).json({
+      message: "Google login successful",
+      success: true,
+      error: false,
+      data: {
+        accessToken,
+        refreshToken,
+        user: sanitizeAuthUser(user),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || "Google login failed",
       success: false,
       error: true,
     });

@@ -42,41 +42,6 @@ export const UserProvider = ({ children }) => {
     }
   }, []);
 
-  // Fetch user profile
-  const fetchUserProfile = useCallback(async () => {
-    if (hasFetchedRef.current) return;
-
-    const authStatus = localStorage.getItem("isAuthenticated");
-    if (authStatus !== "true") return;
-
-    hasFetchedRef.current = true;
-
-    try {
-      setLoading(true);
-
-      const response = await axios.get("/api/user/userProfile");
-
-      if (response.data.success) {
-        const user = response.data.user;
-
-        setUserDetails(user);
-        setIsLoggedIn(true);
-
-        // cache
-        localStorage.setItem("cachedUserDetails", JSON.stringify(user));
-        localStorage.setItem("isAuthenticated", "true");
-      }
-    } catch (error) {
-      if (error.response?.status === 401) {
-        clearUserData();
-      } else {
-        console.error("Fetch user error:", error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   // Update user
   const updateUserDetails = useCallback((updatedFields) => {
     setUserDetails((prev) => {
@@ -102,7 +67,49 @@ export const UserProvider = ({ children }) => {
 
     localStorage.removeItem("cachedUserDetails");
     localStorage.removeItem("isAuthenticated");
+    localStorage.removeItem("accessToken");
   }, []);
+
+  // Fetch user profile
+  const fetchUserProfile = useCallback(async () => {
+    if (hasFetchedRef.current) return Boolean(userDetails);
+
+    const authStatus = localStorage.getItem("isAuthenticated");
+    if (authStatus !== "true") return false;
+
+    hasFetchedRef.current = true;
+
+    try {
+      setLoading(true);
+
+      const response = await axios.get("/api/user/userProfile");
+
+      if (response.data.success) {
+        const user = response.data.user;
+
+        setUserDetails(user);
+        setIsLoggedIn(true);
+
+        // cache
+        localStorage.setItem("cachedUserDetails", JSON.stringify(user));
+        localStorage.setItem("isAuthenticated", "true");
+
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        clearUserData();
+      } else {
+        console.error("Fetch user error:", error);
+      }
+
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [clearUserData, userDetails]);
 
   // Auto-fetch
   useEffect(() => {

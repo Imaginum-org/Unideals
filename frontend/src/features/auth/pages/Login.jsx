@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { loginUser } from "../api/authApi.js";
+import { exchangeGoogleOAuthCode, loginUser } from "../api/authApi.js";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
@@ -23,14 +23,82 @@ function Login() {
   const { fetchUserProfile } = useUser();
 
   useEffect(() => {
+    let isActive = true;
+
+    const completeGoogleLogin = async (oauthCode) => {
+      clearFormMessage();
+      setIsSubmitting(true);
+
+      try {
+        const response = await exchangeGoogleOAuthCode({ code: oauthCode });
+        const accessToken = response.data?.data?.accessToken;
+
+        if (accessToken) {
+          localStorage.setItem("accessToken", accessToken);
+        }
+
+        localStorage.setItem("isAuthenticated", "true");
+        const profileLoaded = await fetchUserProfile();
+
+        if (!isActive) return;
+
+        if (profileLoaded) {
+          toast.success(response.data.message || "Logged in with Google");
+          navigate("/", { replace: true });
+        } else {
+          localStorage.removeItem("isAuthenticated");
+          localStorage.removeItem("accessToken");
+          setFormMessage({
+            variant: "error",
+            text: "Google login could not be verified. Please try again.",
+          });
+        }
+      } catch (error) {
+        if (!isActive) return;
+
+        localStorage.removeItem("isAuthenticated");
+        localStorage.removeItem("accessToken");
+        setFormMessage({
+          variant: "error",
+          text:
+            error.response?.data?.message ||
+            "Google login failed. Please try again.",
+        });
+      } finally {
+        if (isActive) setIsSubmitting(false);
+      }
+    };
+
     const params = new URLSearchParams(location.search);
+
+    const oauthCode = params.get("oauth_code");
+    if (oauthCode) {
+      completeGoogleLogin(oauthCode);
+      return () => {
+        isActive = false;
+      };
+    }
+
     if (params.get("oauth") === "success" || params.get("auth") === "success") {
       localStorage.setItem("isAuthenticated", "true");
-      setTimeout(async () => {
-        await fetchUserProfile();
-        navigate("/");
-      }, 300);
+      fetchUserProfile().then((profileLoaded) => {
+        if (!isActive) return;
+
+        if (profileLoaded) {
+          navigate("/", { replace: true });
+        } else {
+          localStorage.removeItem("isAuthenticated");
+          setFormMessage({
+            variant: "error",
+            text: "Google login could not be verified. Please try again.",
+          });
+        }
+      });
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [location.search, navigate, fetchUserProfile]);
 
   const handleLogin = async (e) => {
@@ -42,6 +110,11 @@ function Login() {
       const response = await loginUser({ email, password });
 
       if (response.data.success) {
+        const accessToken = response.data?.data?.accessToken;
+        if (accessToken) {
+          localStorage.setItem("accessToken", accessToken);
+        }
+
         toast.success(response.data.message || "Logged in successfully!");
         localStorage.setItem("isAuthenticated", "true");
         await fetchUserProfile();

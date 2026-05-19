@@ -18,7 +18,7 @@ function AuthBrandLogo() {
         className="mb-1 block h-7 w-6  size-5 md:hidden sm:h-7.5 sm:w-6"
         alt="image"
       />
-      <span className="text-xl md:text-lg lg:text-xl font-semibold text-[#000000] dark:text-white">
+      <span className="text-xl md:text-lg lg:text-xl font-semibold  dark:text-white">
         Unideals
       </span>
     </Link>

@@ -13,6 +13,10 @@ export const refreshToken = () => {
   return axios.post(`${AUTH_BASE_PATH}/refresh-token`);
 };
 
+export const exchangeGoogleOAuthCode = (data) => {
+  return axios.post(`${AUTH_BASE_PATH}/google/exchange`, data);
+};
+
 export const logoutUser = () => {
   return axios.get(`${AUTH_BASE_PATH}/logoutUser`);
 };

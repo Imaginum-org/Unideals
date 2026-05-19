@@ -10,6 +10,7 @@ import {
   resendVerificationController,
   googleAuthRedirectController,
   googleAuthCallbackController,
+  exchangeGoogleOAuthCodeController,
   refreshAccessTokenController,
   checkEmailVerificationController,
 } from "../controllers/auth.controller.js";
@@ -22,6 +23,7 @@ authRouter.post("/login", loginController);
 
 authRouter.get("/google", googleAuthRedirectController);
 authRouter.get("/google/callback", googleAuthCallbackController);
+authRouter.post("/google/exchange", exchangeGoogleOAuthCodeController);
 
 authRouter.post("/verify-email", verifyEmailController);
 authRouter.get("/check-verification", checkEmailVerificationController);

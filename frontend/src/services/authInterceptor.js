@@ -17,6 +17,7 @@ const addRefreshSubscriber = (callback) => {
 const clearStoredAuth = () => {
   localStorage.removeItem("isAuthenticated");
   localStorage.removeItem("cachedUserDetails");
+  localStorage.removeItem("accessToken");
 };
 
 const notifyAccountBlocked = (payload = {}) => {
@@ -66,6 +67,9 @@ instance.interceptors.response.use(
 
         if (response.data.success) {
           const { accessToken } = response.data.data;
+          if (accessToken) {
+            localStorage.setItem("accessToken", accessToken);
+          }
 
           isRefreshing = false;
           onRefreshed(accessToken);
@@ -88,5 +92,15 @@ instance.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+instance.interceptors.request.use((config) => {
+  const accessToken = localStorage.getItem("accessToken");
+
+  if (accessToken && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return config;
+});
 
 export default instance;
