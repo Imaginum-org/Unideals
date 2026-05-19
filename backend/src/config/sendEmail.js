@@ -14,7 +14,8 @@ const sendEmail = async ({ sendTo, subject, html }) => {
   }
   try {
     const { data, error } = await resend.emails.send({
-      from: "Campus Mart <onboarding@resend.dev>",
+      from: "Campus Mart <onboarding@unideals.in>",       // MUST be your verified domain
+      reply_to: "imaginum.org@gmail.com",            // Users will reply to your real inbox!
       to: sendTo,
       subject: subject,
       html: html,
