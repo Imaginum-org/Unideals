@@ -25,6 +25,7 @@ import Wishlist from "../features/user/pages/Wishlist.jsx";
 import Myorders from "../features/user/pages/Myorders.jsx";
 import ContactUs from "../features/user/pages/ContactUs.jsx";
 import Termscondition from "../features/user/pages/Termscondition.jsx";
+import PrivacyPolicy from "../features/legal/pages/PrivacyPolicy.jsx";
 
 import Chat from "../features/chat/pages/Chat.jsx";
 import Notification from "../features/notification/pages/Notification.jsx";
@@ -49,6 +50,8 @@ export default function AppRoutes() {
         <Route path="/product/:id" element={<ProductDescription />} />
         <Route path="/category/:categoryName" element={<ProductCategory />} />
         <Route path="/price" element={<PricingModel />} />
+        <Route path="/termscondition" element={<Termscondition />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       </Route>
 
       {/* PROTECTED WITH HEADER */}
@@ -62,7 +65,6 @@ export default function AppRoutes() {
           <Route path="/upload" element={<ProductListing />} />
           <Route path="/productlisted" element={<ProductListed />} />
           <Route path="/contact" element={<ContactUs />} />
-          <Route path="/termscondition" element={<Termscondition />} />
         </Route>
       </Route>
     </Routes>

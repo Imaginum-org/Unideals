@@ -6,6 +6,7 @@ import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo";
+import LegalAgreementModal from "../components/LegalAgreementModal";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import SignInwithGoogle from "../components/signinWithGoogle";
 import {
@@ -20,6 +21,8 @@ function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formMessage, setFormMessage] = useState(null);
+  const [legalTab, setLegalTab] = useState(null);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
 
   const navigate = useNavigate();
   const strength = getPasswordStrength(password);
@@ -74,6 +77,18 @@ function Signup() {
 
   return (
     <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-white dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden">
+      {legalTab ? (
+        <LegalAgreementModal
+          activeTab={legalTab}
+          onTabChange={setLegalTab}
+          onClose={() => setLegalTab(null)}
+          onAccept={() => {
+            setAcceptedLegal(true);
+            setLegalTab(null);
+          }}
+        />
+      ) : null}
+
       {/* ── LEFT PANEL ── */}
       <div className="relative flex min-h-[100dvh] w-full flex-col bg-white font-poppins dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
         <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-white dark:md:bg-[#131313] md:text-[#111827]">
@@ -232,23 +247,27 @@ function Signup() {
                 <input
                   type="checkbox"
                   required
+                  checked={acceptedLegal}
+                  onChange={(event) => setAcceptedLegal(event.target.checked)}
                   className="mt-0.2 size-3.5 rounded border-slate-300/50 text-[#393AF2] focus:ring-[#393AF2] md:mt-[0.2vh] xl:mt-[0.1vh] md:size-2.5 lg:size-3 xl:size-3 shrink-0  2xl:size-3 2xl:mt-[0.19vh]"
                 />
                 <span>
                   I agree to the{" "}
-                  <Link
-                    to="/termscondition"
+                  <button
+                    type="button"
+                    onClick={() => setLegalTab("terms")}
                     className="font-medium text-[#393AF2]"
                   >
                     Terms & Conditions
-                  </Link>{" "}
+                  </button>{" "}
                   and{" "}
-                  <Link
-                    to="/termscondition"
+                  <button
+                    type="button"
+                    onClick={() => setLegalTab("privacy")}
                     className="font-medium text-[#393AF2]"
                   >
                     Privacy Policy
-                  </Link>
+                  </button>
                   .
                 </span>
               </label>

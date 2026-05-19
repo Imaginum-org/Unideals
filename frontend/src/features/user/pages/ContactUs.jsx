@@ -239,16 +239,7 @@ function ContactUs() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-sm sm:flex">
-                      <div className="rounded-2xl bg-white/14 px-4 py-3 backdrop-blur">
-                        <p className="text-white/70">Typical reply</p>
-                        <p className="mt-1 font-semibold">Within 24h</p>
-                      </div>
-                      <div className="rounded-2xl bg-white/14 px-4 py-3 backdrop-blur">
-                        <p className="text-white/70">Priority routing</p>
-                        <p className="mt-1 font-semibold">Enabled</p>
-                      </div>
-                    </div>
+
                   </div>
                 </div>
 
@@ -309,33 +300,6 @@ function ContactUs() {
                         </select>
                       </Field>
 
-                      <Field
-                        label="Order/Product reference"
-                        icon={<MdOutlineReceiptLong />}
-                      >
-                        <input
-                          value={reference}
-                          onChange={(event) => setReference(event.target.value)}
-                          className="contact-input"
-                          placeholder="Optional ID, product name, or chat name"
-                        />
-                      </Field>
-
-                      <Field label="Preferred reply" icon={<MdOutlineChat />}>
-                        <select
-                          value={replyMethod}
-                          onChange={(event) =>
-                            setReplyMethod(event.target.value)
-                          }
-                          className="contact-input appearance-none"
-                        >
-                          {replyMethods.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
                     </div>
 
                     <Field label="Subject" required icon={<MdOutlineSubject />}>
