@@ -3,7 +3,7 @@ const forgotPasswordTemplate = ({ name, resetUrl }) => {
     <div style="font-family: 'Inter', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);">
       
       <div style="background-color: #F8FAFC; border-bottom: 1px solid #F1F5F9; padding: 32px 20px; text-align: center;">
-        <h1 style="color: #364EF2; font-size: 28px; font-weight: 600; margin: 0; letter-spacing: -0.5px;">Campus Mart</h1>
+        <h1 style="color: #364EF2; font-size: 28px; font-weight: 600; margin: 0; letter-spacing: -0.5px;">Unideals</h1>
       </div>
 
       <div style="padding: 40px 32px; text-align: center;">

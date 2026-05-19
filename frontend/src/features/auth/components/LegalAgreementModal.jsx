@@ -16,7 +16,7 @@ function LegalAgreementModal({ activeTab, onTabChange, onClose, onAccept }) {
               id="legal-agreement-title"
               className="font-figtree text-base font-semibold sm:text-lg"
             >
-              Campus Mart Legal
+              Unideals Legal
             </h2>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-[#D6D6D6]">
               Review the policies before creating your account.

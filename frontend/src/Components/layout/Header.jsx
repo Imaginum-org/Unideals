@@ -275,7 +275,7 @@ const Header = ({ isChat }) => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-xl dark:border-neutral-800 dark:bg-[#131313]">
+      <nav className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-xl dark:border-neutral-800 dark:bg-[#131313] font-figtree">
         <div className="mx-auto flex h-14 sm:h-16 w-full max-w-[1400px] items-center justify-between px-6 sm:px-8 md:px-11 lg:px-14 2xl:px-0">
           {/* Mobile Navbar */}
           <div className="flex w-full items-center justify-between sm:hidden">
@@ -287,7 +287,7 @@ const Header = ({ isChat }) => {
               />
 
               <span className="text-base font-medium text-[#000000] dark:text-white">
-                Campus Mart
+                Unideals
               </span>
             </Link>
 
@@ -769,7 +769,7 @@ const Header = ({ isChat }) => {
               />
 
               <span className="text-xl md:text-lg lg:text-xl font-semibold text-[#000000] dark:text-white">
-                Campus Mart
+                Unideals
               </span>
             </Link>
 

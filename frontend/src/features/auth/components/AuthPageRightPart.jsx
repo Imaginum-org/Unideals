@@ -137,7 +137,7 @@ function AuthPageRightPart() {
                 >
                   <img
                     src={HomepagePreview}
-                    alt="Campus Mart marketplace preview"
+                    alt="image"
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                 </div>

@@ -34,7 +34,7 @@ function SignInwithGoogle({ className = "" }) {
     <button
       type="button"
       onClick={handleGoogleSignIn}
-      className={`flex h-[6.3vh] w-full items-center justify-center gap-2 rounded-xl border border-slate-300/30 bg-white text-sm font-semibold text-gray-700 shadow-[0_0.0625rem_0.125rem_rgba(0,0,0,0.05)] transition hover:border-slate-300 hover:bg-[#F9FAFB] dark:border-[#363A42] dark:bg-[#1A1D20] dark:text-white dark:hover:bg-[#20242A] sm:h-11 md:h-10 md:rounded-xl md:text-xs lg:h-10 lg:text-sm xl:h-[6.4vh] xl:text-[0.8rem] 2xl:h-[6.4vh] 2xl:text-[0.85rem] ${className}`}
+      className={`flex h-[6.3vh] w-full items-center justify-center gap-2 rounded-xl border border-slate-300/30 bg-white text-sm font-semibold text-gray-700 shadow-[0_0.0625rem_0.125rem_rgba(0,0,0,0.05)] transition hover:border-slate-300 hover:bg-[#F9FAFB] dark:border-[#363A42] dark:bg-[#1A1D20] dark:text-white dark:hover:bg-[#20242A] sm:h-11 md:h-10 md:rounded-xl md:text-xs lg:h-10 lg:text-sm xl:h-[6.4vh] xl:text-[0.8rem] 2xl:h-[6.4vh] 2xl:text-[0.85rem] font-figtree ${className}`}
     >
       <GoogleIcon />
       Google

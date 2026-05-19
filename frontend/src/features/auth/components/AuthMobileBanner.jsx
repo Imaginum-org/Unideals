@@ -28,7 +28,7 @@ function AuthMobileBanner({ taglines = defaultTaglines }) {
   }, [taglines.length]);
 
   return (
-    <div className="mt-[3vh] flex shrink-0 flex-col items-center gap-3 sm:mt-[4vh] md:hidden">
+    <div className="mt-[3vh] flex shrink-0 flex-col items-center gap-3 sm:mt-[4vh] md:hidden font-figtree">
       <p
         className={`text-center text-[0.8rem] font-medium transition-opacity duration-300 sm:text-[0.75rem] ${
           fade ? "opacity-90" : "opacity-0"

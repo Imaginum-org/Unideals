@@ -1,7 +1,7 @@
 {
   "name": "campus-mart-backend",
   "version": "1.0.0",
-  "description": "Backend API for Campus Mart - a marketplace platform",
+  "description": "Backend API for Unideals - a marketplace platform",
   "main": "server.js",
   "type": "module",
   "scripts": {

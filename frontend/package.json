@@ -2,7 +2,7 @@
   "name": "campus-mart-frontend",
   "private": true,
   "version": "1.0.0",
-  "description": "Frontend for Campus Mart marketplace",
+  "description": "Frontend for Unideals marketplace",
   "type": "module",
   "scripts": {
     "dev": "vite",

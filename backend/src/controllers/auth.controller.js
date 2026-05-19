@@ -79,7 +79,7 @@ export const registerUserController = async (req, res) => {
 
     await sendEmail({
       sendTo: email,
-      subject: "Verify your email for Campus Mart",
+      subject: "Verify your email for Unideals",
       html: verifyEmailTempplate({
         name: existingUser ? existingUser.name : name,
         url: verifyEmailUrl,
@@ -389,7 +389,7 @@ export const forgotPasswordController = async (req, res) => {
     // 5. Send the email
     await sendEmail({
       sendTo: email,
-      subject: "Reset your Campus Mart password",
+      subject: "Reset your Unideals password",
       html: forgotPaswordTemplate({
         user: user.name,
         resetUrl: resetUrl, // Pass the URL instead of the OTP
@@ -525,7 +525,7 @@ export const resendVerificationController = async (req, res) => {
     const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
     await sendEmail({
       sendTo: email,
-      subject: "Verify your email for Campus Mart",
+      subject: "Verify your email for Unideals",
       html: verifyEmailTempplate({ name: user.name, url: verifyEmailUrl }),
     });
 

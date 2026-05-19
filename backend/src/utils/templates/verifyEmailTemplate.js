@@ -27,7 +27,7 @@ const verifyEmailTemplate = ({ name, url }) => {
               <table border="0" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="color: #364EF2; font-size: 28px; font-weight: 600; font-family: 'Poppins', Arial, sans-serif;">
-                    Campus Mart
+                    Unideals
                   </td>
                 </tr>
               </table>
@@ -72,7 +72,7 @@ const verifyEmailTemplate = ({ name, url }) => {
               </table>
 
               <p style="margin: 0; color: #94A3B8; font-size: 12px; line-height: 18px; text-align: center;">
-                This link will expire in 24 hours. If you didn't create an account with Campus Mart, you can safely delete this email.
+                This link will expire in 24 hours. If you didn't create an account with Unideals, you can safely delete this email.
               </p>
             </td>
           </tr>
@@ -80,7 +80,7 @@ const verifyEmailTemplate = ({ name, url }) => {
           <tr>
             <td align="center" bgcolor="#F8FAFC" style="padding: 32px; border-top: 1px solid #F1F5F9;">
               <p style="margin: 0 0 16px 0; color: #94A3B8; font-size: 12px; line-height: 16px; text-align: center;">
-                © 2026 Campus Mart Inc. All rights reserved.<br/>
+                © 2026 Unideals Inc. All rights reserved.<br/>
                 Vellore, India
               </p>
               <p style="margin: 0; color: #94A3B8; font-size: 12px; font-weight: 500; text-align: center;">

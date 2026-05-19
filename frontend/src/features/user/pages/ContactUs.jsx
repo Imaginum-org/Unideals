@@ -56,7 +56,7 @@ const priorityOptions = [
 
 const replyMethods = [
   { value: "email", label: "Email" },
-  { value: "chat", label: "Campus Mart chat" },
+  { value: "chat", label: "Unideals chat" },
   { value: "either", label: "Either works" },
 ];
 
@@ -178,7 +178,7 @@ function ContactUs() {
           priority: selectedPriority,
           preferred_reply: selectedReplyMethod,
           reference: cleanReference,
-          subject: `Campus Mart Support: ${cleanSubject}`,
+          subject: `Unideals Support: ${cleanSubject}`,
           user_subject: cleanSubject,
           message: fullMessage,
           user_message: cleanMessage,
@@ -228,7 +228,7 @@ function ContactUs() {
                     <div>
                       <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
                         <MdEmail className="text-base" />
-                        Campus Mart Support
+                        Unideals Support
                       </div>
                       <h1 className="font-poppins text-2xl font-semibold tracking-normal sm:text-3xl">
                         How can we help?
@@ -238,8 +238,6 @@ function ContactUs() {
                         with the right context.
                       </p>
                     </div>
-
-
                   </div>
                 </div>
 
@@ -299,7 +297,6 @@ function ContactUs() {
                           ))}
                         </select>
                       </Field>
-
                     </div>
 
                     <Field label="Subject" required icon={<MdOutlineSubject />}>

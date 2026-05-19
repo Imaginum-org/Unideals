@@ -28,7 +28,7 @@ const Footer = () => {
               className="flex items-center gap-2 text-xl font-bold lg:text-2xl"
             >
               <img src="/whitebag.png" alt="logo" className="w-5 h-5" />
-              <h1> Campus Mart</h1>
+              <h1> Unideals</h1>
             </Link>
 
             <h1 className="flex items-center gap-2 md:text-xl text-sm lg:text-lg font-poppins">
@@ -148,7 +148,7 @@ const Footer = () => {
       {/* Footer Bottom */}
       <div className="border-t border-white/30 mt-10 pt-4 md:text-sm text-sm pb-4 text-white flex flex-col md:flex-row md:items-center justify-between">
         <p className="hover:underline cursor-default">
-          © 2025 All rights reserved
+          © 2026 All rights reserved
         </p>
 
         <p className="text-[3.5vw] hidden md:block sm:text-base mt-1">

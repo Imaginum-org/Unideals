@@ -191,7 +191,7 @@ const Home = () => {
                   </p>
                   <Link
                     to="/upload"
-                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.7vh] px-4 font-robotoFlex duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
+                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.7vh] px-4 font-figtree duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
                   >
                     Sell Now
                   </Link>
@@ -240,7 +240,7 @@ const Home = () => {
                   </p>
                   <Link
                     to="/upload"
-                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.8vh] px-5 font-robotoFlex duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
+                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.8vh] px-5 font-figtree duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
                   >
                     Explore Now
                   </Link>
@@ -284,7 +284,7 @@ const Home = () => {
                   </p>
                   <Link
                     to="/upload"
-                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.8vh] px-5 font-robotoFlex duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
+                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.8vh] px-5 font-figtree duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
                   >
                     Trade Now
                   </Link>
@@ -322,15 +322,15 @@ const Home = () => {
             {/* Left Text Section */}
             <div className="flex flex-col lg:pl-14 pl-6 w-3/4 justify-center md:pl-10">
               <motion.h1 className="font-extrabold text-[clamp(0.65rem,1.3vw,1.4rem)] md:text-[1rem] lg:text-[1.1rem] text-black font-figtree dark:text-[#B2B2B2] tracking-tight xl:tracking-normal xl:text-[1.3rem]">
-                Sell Faster on Campus Mart
+                Sell Faster on Unideals
               </motion.h1>
-              <motion.h1 className="text-[#364EF2] font-extrabold md:font-bold md:text-[1.2rem] lg:text-[1.3rem] tracking-tight text-[0.7rem] font-inter lg:mt-1 dark:text-white uppercase xl:text-[1.5rem]">
+              <motion.h1 className="text-[#364EF2] font-extrabold md:font-bold md:text-[1.2rem] lg:text-[1.3rem] tracking-tight text-[0.7rem] font-figtree lg:mt-1 dark:text-white uppercase xl:text-[1.5rem]">
                 Make Your Listing Stand Out
               </motion.h1>
-              <motion.h3 className="hidden md:block text-[clamp(0.85rem,1.4vw,1.2rem)] lg:text-[1rem] text-black tracking-tight font-medium font-inter dark:text-[#C9C9C9] xl:text-[1.2rem]">
+              <motion.h3 className="hidden md:block text-[clamp(0.85rem,1.4vw,1.2rem)] lg:text-[1rem] text-black tracking-tight font-medium font-figtree dark:text-[#C9C9C9] xl:text-[1.2rem]">
                 Increase exposure and connect with interested buyers faster.
               </motion.h3>
-              <motion.h3 className="md:hidden text-[clamp(0.55rem,1.4vw,1.2rem)] text-black font-medium font-inter dark:text-[#C9C9C9]">
+              <motion.h3 className="md:hidden text-[clamp(0.55rem,1.4vw,1.2rem)] text-black font-medium font-figtree dark:text-[#C9C9C9]">
                 Reach more interested buyers and sell faster
               </motion.h3>
             </div>
@@ -338,10 +338,10 @@ const Home = () => {
             {/* Right Price Section */}
             <div className="flex items-end w-1/3 lg:gap-3 xl:gap-3 gap-2 justify-end lg:pr-12 pr-2 pt-3 md:pt-4">
               <motion.div className="text-right flex flex-col">
-                <h1 className="text-black/85 lg:text-[1rem] xl:text-[1.1rem] text-[0.5rem] font-medium font-inter md:text-sm dark:text-[#CBCBCB]">
+                <h1 className="text-black/85 lg:text-[1rem] xl:text-[1.1rem] text-[0.5rem] font-medium font-figtree md:text-sm dark:text-[#CBCBCB]">
                   Boost my
                 </h1>
-                <span className="lg:text-[1.4rem] md:text-[1.3rem] xl:text-2xl font-semibold text-[0.75rem] text-black font-firaSans md:text-2xl mt-[-0.4vh] xl:text-[1.5rem] lg:mt-[-0.3vh] dark:text-white">
+                <span className="lg:text-[1.4rem] md:text-[1.3rem] xl:text-2xl font-semibold text-[0.75rem] text-black font-figtree md:text-2xl mt-[-0.4vh] xl:text-[1.5rem] lg:mt-[-0.3vh] dark:text-white">
                   Product
                 </span>
               </motion.div>
@@ -364,7 +364,7 @@ const Home = () => {
         {/* Category section */}
         <div className="flex w-[90vw] flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-12 mt-5">
           <div className="lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
-            <h1 className="font-semibold xl:font-medium font-poppins md:tracking-wide dark:text-white">
+            <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white">
               Categories
             </h1>
           </div>
@@ -393,7 +393,7 @@ const Home = () => {
 
         {/* Products section */}
         <div className="w-full lg:mt-12 mt-6 flex flex-col lg:gap-4 xl:gap-6 gap-2">
-          <h1 className="font-semibold xl:font-medium font-poppins md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
+          <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
             Popular Products
           </h1>
           <div className="w-full flex flex-wrap lg:shrink-0 mt-1 lg:gap-4 xl:gap-6 md:gap-3 gap-1">
