@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import emailjs from "@emailjs/browser";
 import { Toaster, toast } from "react-hot-toast";
@@ -9,10 +9,7 @@ import {
   MdEmail,
   MdHelp,
   MdOutlineArrowForward,
-  MdOutlineChat,
   MdOutlineLocalOffer,
-  MdOutlinePerson,
-  MdOutlineReceiptLong,
   MdOutlineSubject,
 } from "react-icons/md";
 
@@ -89,10 +86,8 @@ const getOptionLabel = (options, value) =>
 function ContactUs() {
   const { userDetails } = useUser();
   const [contactType, setContactType] = useState("");
-  const [priority, setPriority] = useState("normal");
+  const [priority, setPriority] = useState("");
   const [replyMethod, setReplyMethod] = useState("email");
-  const [name, setName] = useState(userDetails?.name || "");
-  const [email, setEmail] = useState(userDetails?.email || "");
   const [subject, setSubject] = useState("");
   const [reference, setReference] = useState("");
   const [message, setMessage] = useState("");
@@ -102,24 +97,13 @@ function ContactUs() {
   const selectedContactType = getOptionLabel(contactTypes, contactType);
   const selectedPriority = getOptionLabel(priorityOptions, priority);
   const selectedReplyMethod = getOptionLabel(replyMethods, replyMethod);
-
-  useEffect(() => {
-    if (userDetails?.name) setName((current) => current || userDetails.name);
-    if (userDetails?.email) setEmail((current) => current || userDetails.email);
-  }, [userDetails?.email, userDetails?.name]);
-
-  const messagePreview = useMemo(() => {
-    const trimmed = message.trim();
-    if (!trimmed) return "Tell us what happened and what you need help with.";
-    return trimmed.length > 88 ? `${trimmed.slice(0, 88)}...` : trimmed;
-  }, [message]);
+  const senderName = userDetails?.name?.trim() || "Campus Mart user";
+  const senderEmail = userDetails?.email?.trim() || "";
 
   const resetForm = () => {
     setContactType("");
     setPriority("normal");
     setReplyMethod("email");
-    setName(userDetails?.name || "");
-    setEmail(userDetails?.email || "");
     setSubject("");
     setReference("");
     setMessage("");
@@ -128,14 +112,13 @@ function ContactUs() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (
-      !name.trim() ||
-      !email.trim() ||
-      !contactType ||
-      !subject.trim() ||
-      !message.trim()
-    ) {
+    if (!contactType || !subject.trim() || !message.trim()) {
       toast("Please complete the required fields.");
+      return;
+    }
+
+    if (!senderEmail) {
+      toast.error("We could not read your account email. Please log in again.");
       return;
     }
 
@@ -149,8 +132,8 @@ function ContactUs() {
     const cleanMessage = message.trim();
 
     const fullMessage = [
-      `Sender name: ${name.trim()}`,
-      `Sender email: ${email.trim()}`,
+      `Sender name: ${senderName}`,
+      `Sender email: ${senderEmail}`,
       `Contact type: ${selectedContactType}`,
       `Priority: ${selectedPriority}`,
       `Preferred reply: ${selectedReplyMethod}`,
@@ -168,12 +151,12 @@ function ContactUs() {
         EMAILJS_TEMPLATE_ID,
         {
           to_email: SUPPORT_EMAIL,
-          from_name: name.trim(),
-          sender_name: name.trim(),
-          user_name: name.trim(),
-          from_email: email.trim(),
-          sender_email: email.trim(),
-          reply_to: email.trim(),
+          from_name: senderName,
+          sender_name: senderName,
+          user_name: senderName,
+          from_email: senderEmail,
+          sender_email: senderEmail,
+          reply_to: senderEmail,
           contact_type: selectedContactType,
           priority: selectedPriority,
           preferred_reply: selectedReplyMethod,
@@ -244,83 +227,80 @@ function ContactUs() {
                 <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-8">
                   <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field
-                        label="Your name"
+                      <AuthLikeField
+                        label="Contact type"
                         required
-                        icon={<MdOutlinePerson />}
+                        icon={<MdHelp />}
+                        active={Boolean(contactType)}
                       >
-                        <input
-                          value={name}
-                          onChange={(event) => setName(event.target.value)}
-                          className="contact-input"
-                          placeholder="Enter your name"
-                        />
-                      </Field>
-
-                      <Field label="Email address" required icon={<MdEmail />}>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(event) => setEmail(event.target.value)}
-                          className="contact-input"
-                          placeholder="you@example.com"
-                        />
-                      </Field>
-
-                      <Field label="Contact type" required icon={<MdHelp />}>
                         <select
                           value={contactType}
                           onChange={(event) =>
                             setContactType(event.target.value)
                           }
-                          className="contact-input appearance-none"
+                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
                         >
-                          <option value="">Select a contact type</option>
+                          {/* This empty, disabled, hidden option prevents the text overlap */}
+                          <option value="" disabled hidden></option>
+
                           {contactTypes.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
                           ))}
                         </select>
-                      </Field>
-
-                      <Field label="Priority" icon={<MdAccessTime />}>
+                      </AuthLikeField>
+                      <AuthLikeField
+                        label="Priority"
+                        icon={<MdAccessTime />}
+                        active={Boolean(priority)}
+                      >
                         <select
                           value={priority}
                           onChange={(event) => setPriority(event.target.value)}
-                          className="contact-input appearance-none"
+                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
                         >
+                          {/* This empty, disabled, hidden option prevents the text overlap */}
+                          <option value="" disabled hidden></option>
+
                           {priorityOptions.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label} - {option.hint}
                             </option>
                           ))}
                         </select>
-                      </Field>
+                      </AuthLikeField>
                     </div>
 
-                    <Field label="Subject" required icon={<MdOutlineSubject />}>
+                    <AuthLikeField
+                      label="Subject"
+                      required
+                      icon={<MdOutlineSubject />}
+                      active={Boolean(subject)}
+                    >
                       <input
                         value={subject}
                         onChange={(event) => setSubject(event.target.value)}
-                        className="contact-input"
-                        placeholder="Short summary of the issue"
+                        className="h-[6.3vh] min-h-12 w-full rounded-xl border border-transparent bg-slate-50 pl-10 pr-3 text-[0.8125rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
+                        placeholder=" "
                       />
-                    </Field>
+                    </AuthLikeField>
 
-                    <Field
+                    <AuthLikeField
                       label="Message"
                       required
                       icon={<MdOutlineLocalOffer />}
+                      active={Boolean(message)}
+                      multiline
                     >
                       <textarea
                         rows="6"
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
-                        className="contact-input min-h-[9rem] resize-none py-3 leading-6"
-                        placeholder="Describe what happened, what you tried, and what outcome you need."
+                        className="min-h-[9rem] w-full resize-none rounded-xl border border-transparent bg-slate-50 pb-3 pl-10 pr-4 pt-8 text-[0.8125rem] leading-6 text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
+                        placeholder=" "
                       />
-                    </Field>
+                    </AuthLikeField>
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
@@ -338,36 +318,6 @@ function ContactUs() {
                   </form>
 
                   <aside className="space-y-4">
-                    <div className="rounded-2xl border border-[#E7E9FF] bg-[#F7F8FF] p-5 dark:border-[#2A2D35] dark:bg-[#131313]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#364EF2]">
-                        Message preview
-                      </p>
-                      <h2 className="mt-3 font-poppins text-lg font-semibold text-slate-950 dark:text-white">
-                        {subject.trim() || "No subject yet"}
-                      </h2>
-                      <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                        <p>
-                          <span className="font-medium text-slate-950 dark:text-white">
-                            From:
-                          </span>{" "}
-                          {name.trim() || "Your name"}
-                        </p>
-                        <p>
-                          <span className="font-medium text-slate-950 dark:text-white">
-                            Type:
-                          </span>{" "}
-                          {selectedContactType || "Not selected"}
-                        </p>
-                        <p>
-                          <span className="font-medium text-slate-950 dark:text-white">
-                            Priority:
-                          </span>{" "}
-                          {selectedPriority}
-                        </p>
-                        <p className="leading-6">{messagePreview}</p>
-                      </div>
-                    </div>
-
                     <div className="rounded-2xl border border-[#E7E9FF] bg-white p-5 dark:border-[#2A2D35] dark:bg-[#131313]">
                       <h2 className="font-poppins text-lg font-semibold text-slate-950 dark:text-white">
                         Quick tips
@@ -443,15 +393,36 @@ function ContactUs() {
   );
 }
 
-function Field({ label, required = false, icon, children }) {
+function AuthLikeField({
+  label,
+  required = false,
+  icon,
+  active,
+  multiline = false,
+  children,
+}) {
   return (
     <label className="block">
-      <span className="mb-2 flex items-center gap-2 font-poppins text-sm font-medium text-slate-800 dark:text-white">
-        <span className="text-lg text-[#364EF2]">{icon}</span>
-        {label}
-        {required ? <span className="text-[#364EF2]">*</span> : null}
+      <span className="relative block group">
+        <span
+          className={`absolute left-3 z-10 text-lg text-gray-500 transition group-focus-within:text-[#393AF2] ${
+            multiline ? "top-6" : "top-1/2 -translate-y-1/2"
+          }`}
+        >
+          {icon}
+        </span>
+        <span
+          className={`pointer-events-none absolute left-10 z-10 px-1 font-figtree transition-all duration-200 ${
+            active
+              ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+              : `${multiline ? "top-7" : "top-1/2 -translate-y-1/2"} text-[0.75rem] text-gray-500/80`
+          } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
+        >
+          {label}
+          {required ? " *" : ""}
+        </span>
+        {children}
       </span>
-      {children}
     </label>
   );
 }
