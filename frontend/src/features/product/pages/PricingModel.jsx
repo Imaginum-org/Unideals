@@ -1,64 +1,167 @@
-// import Header from "../../../Components/Header";
 import toast, { Toaster } from "react-hot-toast";
-import { CircleCheck } from "lucide-react";
-import { LuDot } from "react-icons/lu";
-// import bag from "../assets/bag.png";
-// import bluebag from "../assets/bluebag.png";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 const PricingModel = () => {
-  const handlePurchase = () => {
+  // Shared primary brand color used across cards, buttons, and highlights.
+  const PRIMARY_BLUE = "#410ef9";
+
+  // Handles upgrade actions until the payment flow is connected.
+  const handleUpgrade = () => {
     toast("Coming Soon!", { id: "pricing-toast" });
   };
 
+  // Pricing cards data.
   const plans = [
     {
-      title: "Current",
-      desc: "Perfect for exploring the platform and listing your first few items.",
+      name: "Free",
+      price: "0",
+      buttonText: "Current",
+      buttonDisabled: true,
+      footerTitle: "Start for free",
+      footerSubtitle: "It all yours",
       features: [
-        "List up to 5 products for free",
-        "Access basic buyer/seller features",
-        "Track orders and listings",
-        "Get community support",
+        "7 Listings / Month",
+        "2 Images per Product",
+        "Basic Analytics",
+        "AI Sellability Score (First 2)",
+        "3 Boosts (30 mins each)",
       ],
-      price: "Free",
-      status: "Activated",
-      isGradient: false,
-      isActive: true,
     },
     {
-      title: "Pro",
-      desc: "For active sellers and buyers looking to expand. Ideal for users who want additional perks and tools to grow their sales.",
-      features: [
-        "Unlimited product listings",
-        "Advanced product tracking",
-        "Priority support",
-        "In-app messaging and notifications",
-        "Access to detailed analytics",
-      ],
-      price: "49",
-      status: "Continue",
-      isGradient: true,
-      isActive: false,
-      tag: "Popular",
-    },
-    {
-      title: "Pro Plus",
-      desc: "Ideal for users who want additional perks and tools to grow their sales.",
-      features: [
-        "Everything in Growth Plan",
-        "Featured product placement",
-        "Exclusive promotional tools",
-        "Advanced analytics and insights",
-      ],
+      name: "Pro",
       price: "99",
-      status: "Continue",
-      isGradient: false,
-      isActive: false,
+      buttonText: "Upgrade Now",
+      highlighted: true,
+      footerTitle: "Best for active seller",
+      footerSubtitle: "Time to become leader",
+      features: [
+        "25 Listings / Month",
+        "5 Images per Product",
+        "Advanced Analytics",
+        "Full AI Sellability Score",
+        "10 Trending Boosts (2 hrs each)",
+      ],
+    },
+    {
+      name: "Pro Plus",
+      price: "199",
+      buttonText: "Upgrade Now",
+      footerTitle: "For Serious sellers",
+      footerSubtitle: "here no one s above you",
+      features: [
+        "Unlimited Listings",
+        "8 Images per Product",
+        "Pro Plus Badge",
+        "Deep Analytics Insights",
+        "Unlimited Boosts (4 hrs each)",
+      ],
     },
   ];
 
+  // Detailed comparison table data.
+  const comparisonRows = [
+    { feature: "Monthly Uploads", free: "7", pro: "25", proPlus: "Unlimited" },
+    { feature: "Images per Product", free: "2", pro: "5", proPlus: "8" },
+    {
+      feature: "Search Ranking",
+      free: "Normal",
+      pro: "Higher",
+      proPlus: "Highest",
+    },
+    { feature: "Chat with Buyers", free: true, pro: true, proPlus: "Priority" },
+    { feature: "Wishlist Support", free: true, pro: true, proPlus: true },
+    { feature: "Basic Analytics", free: true, pro: true, proPlus: true },
+    {
+      feature: "Advanced Analytics",
+      free: false,
+      pro: true,
+      proPlus: true,
+      featureHighlight: true,
+    },
+    {
+      feature: "AI Sellability Score",
+      free: "Limited",
+      pro: "Full",
+      proPlus: "Advanced",
+    },
+    {
+      feature: "Seller Badge",
+      free: false,
+      pro: "PRO",
+      proPlus: "PRO PLUS",
+      pill: true,
+    },
+    {
+      feature: "Trending Placement",
+      free: false,
+      pro: "Limited",
+      proPlus: "Guaranteed",
+      orangeDot: true,
+    },
+  ];
+
+  // Converts table values into icons, pills, dotted labels, or styled text.
+  const renderComparisonValue = (value, plan, row) => {
+    if (value === true) {
+      return (
+        <CheckCircle2
+          aria-label="Included"
+          className="mx-auto size-4 fill-emerald-500 text-white"
+        />
+      );
+    }
+
+    if (value === false) {
+      return (
+        <XCircle
+          aria-label="Not included"
+          className="mx-auto size-4 text-slate-300 dark:text-slate-500"
+          strokeWidth={1.8}
+        />
+      );
+    }
+
+    if (row?.pill) {
+      return (
+        <span
+          className={`inline-flex max-w-full rounded-full px-3 py-1 text-[11px] font-semibold font-poppins ${
+            plan === "pro"
+              ? "bg-indigo-100 text-[#3300ff]"
+              : "bg-orange-100 text-orange-500"
+          }`}
+        >
+          {value}
+        </span>
+      );
+    }
+
+    if (row?.orangeDot && plan === "proPlus") {
+      return (
+        <span className="inline-flex max-w-full items-center justify-center gap-2 font-semibold font-poppins text-orange-500">
+          <span className="size-2 shrink-0 rounded-full border-2 border-orange-500" />
+          <span className="break-words">{value}</span>
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className={`break-words font-medium font-poppins ${
+          plan === "pro"
+            ? "text-[#3300ff]"
+            : plan === "proPlus"
+              ? "text-orange-500"
+              : "text-slate-500 dark:text-slate-300"
+        }`}
+      >
+        {value}
+      </span>
+    );
+  };
+
   return (
-    <div className="flex flex-col relative w-full min-h-screen overflow-hidden dark:bg-[#131313]">
+    <main className="min-h-screen overflow-hidden bg-white px-4 py-10 text-slate-900 dark:bg-[#131313] sm:px-6 lg:px-8">
+      {/* Toast notification container */}
       <Toaster
         position="top-center"
         toastOptions={{
@@ -67,126 +170,222 @@ const PricingModel = () => {
         }}
       />
 
-      {/* <Header bagUrl={bag} darkUrl={bluebag} /> */}
+      {/* Pricing hero and plan cards */}
+      <section className="mx-auto max-w-7xl">
+        {/* Page heading */}
+        <div className="text-center">
+          <span className="inline-flex rounded-full border border-[#3300ff]/30 bg-[#3300ff]/5 px-4 py-2 text-sm font-semibold font-poppins text-[#3300ff]">
+            Plans and Pricing
+          </span>
 
-      {/* Decorative Image */}
-      <img
-        className="absolute w-[28vw] h-[50vh] bottom-[-35vh] left-[-11vw] hidden xl:block"
-        src="/assets/Group_114.png"
-        alt="background-shape"
-      />
+          <h1 className="mx-auto mt-6 max-w-4xl text-3xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-4xl lg:text-5xl font-robotoFlex">
+            Choose Your Plan to{" "}
+            <span className="text-[#3300ff]">Sell Smarter</span>
+          </h1>
 
-      {/* Heading Section */}
-      <div className="text-center mt-9 px-4">
-        <h1 className="text-[#353535] dark:text-white font-bold text-[5vw] sm:text-3xl md:text-2xl xl:text-2xl font-robotoFlex leading-tight">
-          Find the Perfect Plan for Your Needs!
-        </h1>
-        <p className="text-[#8F8F8F] w- dark:text-[#848484] mt-2 text-[3.5vw] sm:text-xl md:text-lg xl:text-base font-poppins">
-          Select from flexible plans designed for students, sellers, and buyers.
-          Whether you&apos;re just getting started <br /> or need advanced
-          features, we&apos;ve got you covered!
-        </p>
-      </div>
+          <p className="mx-auto mt-4 max-w-2xl text-base font-medium text-slate-500 dark:text-[#848484] sm:text-lg font-poppins">
+            Designed to help you stand out, sell more, and grow faster.
+          </p>
+        </div>
 
-      {/* Cards Section */}
-      <div className="w-full flex flex-col xl:flex-row items-center justify-center gap-6 px-4 md:px-12 xl:px-32 mt-10 mb-14">
-        {plans.map((plan, index) => (
-          <div
-            key={index}
-            className={`
-              w-[85vw] sm:w-[65vw] md:w-[50vw] xl:w-[28vw]
-              rounded-xl shadow-md p-5 flex flex-col gap-4
-              ${
-                plan.isGradient
-                  ? "bg-gradient-to-bl from-[#464ff2] to-[#282d8c] text-white"
-                  : "bg-white dark:bg-[#1A1D20] text-black dark:text-white dark:shadow-none dark:outline dark:outline-1 dark:outline-offset-[-0.95px] dark:outline-[#D7D7D7]"
-              }
-            `}
-          >
-            {/* Title and Optional Tag */}
-            <div className="flex items-center gap-2">
-              <div
-                className={`${
-                  plan.isGradient
-                    ? "bg-white text-black"
-                    : "bg-gradient-to-br from-indigo-600 to-blue-600 text-white"
-                } font-semibold rounded-md px-7 py-[0.8vh] text-sm w-fit`}
-              >
-                {plan.title}
-              </div>
-              {plan.tag && (
-                <span className="text-base font-semibold text-[#FFE500]">
-                  {plan.tag}
-                </span>
-              )}
-            </div>
-
-            {/* Description */}
-            <p
-              className={`${
-                plan.isGradient
-                  ? "text-white"
-                  : "text-neutral-500 dark:text-[#D7D7D7]"
-              } text-sm lg:text-base`}
+        {/* Pricing cards */}
+        <div className="mt-14 grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:items-center">
+          {plans.map((plan) => (
+            <article
+              key={plan.name}
+              className={`relative flex h-full min-h-[520px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-200/70 dark:border-white/10 dark:bg-[#1A1D20] dark:shadow-none ${
+                plan.highlighted ? "lg:-translate-y-3" : ""
+              }`}
             >
-              {plan.desc}
-            </p>
+              {/* Card top accent / Most Popular banner with curved lower edge */}
+              {plan.highlighted ? (
+                <div
+                  className="relative h-16"
+                  style={{ backgroundColor: PRIMARY_BLUE }}
+                >
+                  <div className="pt-3 text-center text-sm font-semibold text-white font-poppins">
+                    Most Popular
+                  </div>
 
-            {/* Features */}
-            <ul className="mt-2 space-y-2 text-sm lg:text-base">
-              {plan.features.map((feature, i) => (
-                <li key={i} className="flex items-center">
-                  {plan.isGradient ? (
-                    <CircleCheck size={18} className="mr-2" />
-                  ) : (
-                    <LuDot size={24} />
-                  )}
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-
-            {/* Price and Button */}
-            <div className="mt-8">
-              <h2
-                className={`text-3xl md:text-4xl font-tiltWarp ${
-                  plan.isGradient ? "text-white" : "text-black dark:text-white"
-                }`}
-              >
-                {plan.price === "Free" ? (
-                  "Free"
-                ) : (
-                  <>
-                    <span className="xl:text-4xl text-3xl font-roboto pr-1">
-                      ₹
-                    </span>
-                    <span className="xl:text-5xl text-4xl">{plan.price}</span>
-                  </>
-                )}
-              </h2>
-              <hr className="border-[#8e8e8e] my-2" />
-
-              {plan.isActive ? (
-                <div className="border border-[#8e8e8e] rounded-md py-2 text-center text-sm mt-2 xl:text-base">
-                  {plan.status}
+                  {/* Curved white body overlay under the Pro banner */}
+                  <div className="absolute bottom-[-1px] left-0 right-0 h-8 rounded-t-xl bg-white dark:bg-[#1A1D20]" />
                 </div>
               ) : (
-                <button
-                  onClick={handlePurchase}
-                  className={`${
-                    plan.isGradient
-                      ? "bg-white text-black"
-                      : "bg-gradient-to-r from-indigo-600 to-blue-600 text-white"
-                  } rounded-md py-2 text-sm xl:text-base w-full font-semibold`}
+                <div
+                  className="relative h-7"
+                  style={{ backgroundColor: PRIMARY_BLUE }}
                 >
-                  {plan.status}
-                </button>
+                  {/* Curved white body overlay under the top strip */}
+                  <div className="absolute bottom-[-1px] left-0 right-0 h-5 rounded-t-xl bg-white dark:bg-[#1A1D20]" />
+                </div>
               )}
+
+              <div className="flex flex-1 flex-col p-7">
+                {/* Plan title and price */}
+                <h2 className="text-lg font-semibold text-[#3300ff] font-robotoFlex">
+                  {plan.name}
+                </h2>
+
+                <div className="mt-4 flex flex-wrap items-end gap-2">
+                  <span className="text-5xl font-medium tracking-normal text-slate-950 dark:text-white font-tiltWarp">
+                    ₹{plan.price}
+                  </span>
+                  <span className="pb-2 text-sm font-medium text-slate-500 dark:text-[#D7D7D7] font-poppins">
+                    /month
+                  </span>
+                </div>
+
+                {/* Card action button */}
+                <button
+                  type="button"
+                  onClick={handleUpgrade}
+                  disabled={plan.buttonDisabled}
+                  aria-disabled={plan.buttonDisabled}
+                  style={
+                    plan.highlighted
+                      ? { backgroundColor: PRIMARY_BLUE }
+                      : undefined
+                  }
+                  className={`mt-8 h-12 w-full rounded-lg px-4 text-sm font-semibold transition font-poppins disabled:cursor-default ${
+                    plan.highlighted
+                      ? "text-white shadow-lg shadow-indigo-200 hover:opacity-90"
+                      : "bg-slate-50 text-[#3300ff] hover:bg-[#3300ff]/5 dark:bg-white/5"
+                  }`}
+                >
+                  {plan.buttonText}
+                </button>
+
+                {/* Card feature list */}
+                <ul className="mt-8 space-y-4">
+                  {plan.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className="flex items-start gap-3 text-sm font-medium leading-5 text-slate-600 dark:text-[#D7D7D7] font-poppins"
+                    >
+                      <CheckCircle2
+                        className="mt-0.5 size-4 shrink-0 text-white"
+                        fill={PRIMARY_BLUE}
+                        strokeWidth={2.5}
+                      />
+                      <span className="break-words">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Card footer message */}
+                <div className="mt-auto pt-9">
+                  <div className="rounded-xl bg-[#3300ff]/5 px-5 py-4 text-center dark:bg-white/5">
+                    <p className="font-semibold text-[#3300ff] font-robotoFlex">
+                      {plan.footerTitle}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-400 font-poppins">
+                      {plan.footerSubtitle}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* Detailed comparison section */}
+      <section className="mx-auto mt-20 max-w-7xl bg-slate-50 px-4 py-16 dark:bg-[#181818] sm:px-8 lg:px-10">
+        {/* Section heading */}
+        <div className="text-center">
+          <h2 className="text-3xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-4xl font-robotoFlex">
+            Detailed Comparison
+          </h2>
+          <p className="mt-4 text-base font-medium text-slate-500 dark:text-[#848484] font-poppins">
+            See exactly what you get with each plan.
+          </p>
+        </div>
+
+        {/* Scroll wrapper protects the table on small screens */}
+        <div className="mt-14 overflow-x-auto overflow-y-visible pb-4 pt-10">
+          <div className="relative min-w-[780px]">
+            {/* Rounded Pro column highlight with soft aura */}
+            <div className="pointer-events-none absolute left-[54%] top-[-40px] z-10 h-[calc(100%+40px)] w-[20%] rounded-2xl border-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] shadow-[0_0_42px_rgba(51,0,255,0.25)]" />
+
+            {/* Popular tab aligned exactly with the Pro column */}
+            <div className="absolute left-[54%] top-[-40px] z-30 h-11 w-[20%] rounded-t-2xl bg-[#3300ff] text-center text-sm font-medium leading-[44px] text-white font-poppins">
+              Popular
             </div>
+
+            {/* Comparison table */}
+            <table className="relative z-20 w-full table-fixed overflow-hidden rounded-xl bg-white text-left shadow-xl shadow-slate-200 dark:bg-[#1A1D20] dark:shadow-none">
+              <colgroup>
+                <col className="w-[32%]" />
+                <col className="w-[22%]" />
+                <col className="w-[20%]" />
+                <col className="w-[26%]" />
+              </colgroup>
+
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-white/10">
+                  <th className="px-7 py-6 text-sm font-semibold text-slate-900 dark:text-white font-poppins">
+                    Features
+                  </th>
+                  <th className="px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
+                    Free
+                  </th>
+                  <th className="border-x-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
+                    Pro
+                  </th>
+                  <th className="px-7 py-6 text-center text-sm font-semibold text-orange-500 font-poppins">
+                    Pro Plus
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {comparisonRows.map((row, index) => {
+                  const isLastRow = index === comparisonRows.length - 1;
+
+                  return (
+                    <tr
+                      key={row.feature}
+                      className="border-b border-slate-100 last:border-0 dark:border-white/10"
+                    >
+                      <td
+                        className={`px-7 py-6 text-sm font-medium leading-5 font-poppins ${
+                          row.featureHighlight
+                            ? "text-[#3300ff]"
+                            : "text-slate-700 dark:text-[#D7D7D7]"
+                        }`}
+                      >
+                        {row.feature}
+                      </td>
+
+                      <td className="px-7 py-6 text-center text-sm">
+                        {renderComparisonValue(row.free, "free", row)}
+                      </td>
+
+                      <td
+                        className={`border-x-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] px-7 py-6 text-center text-sm font-semibold ${
+                          isLastRow ? "rounded-b-2xl border-b-4" : ""
+                        }`}
+                      >
+                        {renderComparisonValue(row.pro, "pro", row)}
+                      </td>
+
+                      <td className="px-7 py-6 text-center text-sm font-semibold">
+                        {renderComparisonValue(row.proPlus, "proPlus", row)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+
+        {/* Payment note */}
+        <p className="mt-6 text-center text-sm font-medium text-slate-500 dark:text-[#848484] font-poppins">
+          * Prices are in INR. Payments are secured by Razorpay.
+        </p>
+      </section>
+    </main>
   );
 };
 
