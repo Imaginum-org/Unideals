@@ -4,6 +4,7 @@ import emailjs from "@emailjs/browser";
 import { Toaster, toast } from "react-hot-toast";
 import Loading from "../../../Components/ui/ContactLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
+import { Lightbulb, Sparkles } from "lucide-react";
 import {
   MdAccessTime,
   MdEmail,
@@ -51,10 +52,10 @@ const priorityOptions = [
   { value: "urgent", label: "Urgent", hint: "Blocking issue" },
 ];
 
-const replyMethods = [
-  { value: "email", label: "Email" },
-  { value: "chat", label: "Unideals chat" },
-  { value: "either", label: "Either works" },
+const quickTips = [
+  "Include an order or product reference when possible.",
+  "Use urgent only for blocked payments or safety issues.",
+  "Tell us what result would solve the problem.",
 ];
 
 const faqs = [
@@ -96,7 +97,6 @@ function ContactUs() {
 
   const selectedContactType = getOptionLabel(contactTypes, contactType);
   const selectedPriority = getOptionLabel(priorityOptions, priority);
-  const selectedReplyMethod = getOptionLabel(replyMethods, replyMethod);
   const senderName = userDetails?.name?.trim() || "Campus Mart user";
   const senderEmail = userDetails?.email?.trim() || "";
 
@@ -294,10 +294,10 @@ function ContactUs() {
                       multiline
                     >
                       <textarea
-                        rows="6"
+                        rows="2"
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
-                        className="min-h-[9rem] w-full resize-none rounded-xl border border-transparent bg-slate-50 pb-3 pl-10 pr-4 pt-8 text-[0.8125rem] leading-6 text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
+                        className="min-h-[5.7rem] w-full resize-none rounded-xl border border-transparent bg-slate-50 pb-3 pl-10 pr-4 pt-6 text-[0.8125rem] leading-6 text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
                         placeholder=" "
                       />
                     </AuthLikeField>
@@ -317,19 +317,31 @@ function ContactUs() {
                     </div>
                   </form>
 
-                  <aside className="space-y-4">
-                    <div className="rounded-2xl border border-[#E7E9FF] bg-white p-5 dark:border-[#2A2D35] dark:bg-[#131313]">
-                      <h2 className="font-poppins text-lg font-semibold text-slate-950 dark:text-white">
-                        Quick tips
-                      </h2>
-                      <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                        <li>
-                          Include an order or product reference when possible.
-                        </li>
-                        <li>
-                          Use urgent only for blocked payments or safety issues.
-                        </li>
-                        <li>Tell us what result would solve the problem.</li>
+                  <aside className="space-y-3">
+                    <div className="rounded-2xl bg-[#F0F0FF] px-6 py-5 dark:border dark:border-[#2A2D35] dark:bg-[#1A1D20]">
+                      {/* Header */}
+                      <div className="mb-3 flex items-center gap-2.5">
+                        <div className="relative">
+                          <Lightbulb className="h-5 w-5 fill-[#3838EC] text-[#3838EC] dark:fill-indigo-400 dark:text-indigo-400" />
+                          <Sparkles className="absolute -right-2 -top-1 h-2.5 w-2.5 text-[#3838EC] dark:text-indigo-400" />
+                        </div>
+                        <h2 className="font-['Figtree'] text-base font-semibold uppercase leading-6 text-black dark:text-white">
+                          Quick tips
+                        </h2>
+                      </div>
+
+                      {/* Custom Bullet List */}
+                      <ul className="flex flex-col gap-1">
+                        {quickTips.map((tip, index) => (
+                          <li key={index} className="flex items-start gap-2.5">
+                            <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600/60 dark:bg-indigo-500/60">
+                              <Sparkles className="h-3 w-3 text-white" />
+                            </div>
+                            <span className="font-['Figtree'] text-[0.85rem] font-normal leading-6 text-black dark:text-slate-300">
+                              {tip}
+                            </span>
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   </aside>
@@ -406,7 +418,7 @@ function AuthLikeField({
       <span className="relative block group">
         <span
           className={`absolute left-3 z-10 text-lg text-gray-500 transition group-focus-within:text-[#393AF2] ${
-            multiline ? "top-6" : "top-1/2 -translate-y-1/2"
+            multiline ? "top-7" : "top-1/2 -translate-y-1/2"
           }`}
         >
           {icon}
