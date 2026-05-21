@@ -203,7 +203,7 @@ function ContactUs() {
           <main className="w-full overflow-y-auto bg-[#FBFBFB] px-4 py-6 dark:bg-[#131313] md:w-[63%] md:px-7 lg:w-[72%] xl:w-[73.5%] xl:px-10">
             <div className="mx-auto max-w-6xl">
               <section className="overflow-hidden rounded-3xl border border-[#E7E9FF] bg-white shadow-[0_18px_45px_rgba(36,49,148,0.08)] dark:border-[#282A2C] dark:bg-[#1A1D20]">
-                <div className="relative bg-gradient-to-r from-[#364EF2] via-[#4545F4] to-[#2367E8] px-5 py-6 text-white sm:px-7 lg:px-8">
+                <div className="relative bg-gradient-to-r from-[#364EF2] via-[#4545F4] to-[#2367E8] px-5 py-6 text-white sm:px-7 lg:px-8 overflow-hidden">
                   <div className="absolute right-[-3rem] top-[-3rem] h-36 w-36 rounded-full bg-white/10" />
                   <div className="absolute bottom-[-4rem] left-[32%] h-32 w-32 rounded-full bg-white/10" />
 
@@ -238,7 +238,7 @@ function ContactUs() {
                           onChange={(event) =>
                             setContactType(event.target.value)
                           }
-                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
+                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#131313] dark:text-white dark:focus:bg-[#1A1D20]"
                         >
                           {/* This empty, disabled, hidden option prevents the text overlap */}
                           <option value="" disabled hidden></option>
@@ -258,7 +258,7 @@ function ContactUs() {
                         <select
                           value={priority}
                           onChange={(event) => setPriority(event.target.value)}
-                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
+                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#131313] dark:text-white dark:focus:bg-[#1A1D20]"
                         >
                           {/* This empty, disabled, hidden option prevents the text overlap */}
                           <option value="" disabled hidden></option>
@@ -281,7 +281,7 @@ function ContactUs() {
                       <input
                         value={subject}
                         onChange={(event) => setSubject(event.target.value)}
-                        className="h-[6.3vh] min-h-12 w-full rounded-xl border border-transparent bg-slate-50 pl-10 pr-3 text-[0.8125rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
+                        className="h-[6.3vh] min-h-12 w-full rounded-xl border border-transparent bg-slate-50 pl-10 pr-3 text-[0.8125rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#131313] dark:text-white dark:focus:bg-[#1A1D20]"
                         placeholder=" "
                       />
                     </AuthLikeField>
@@ -297,7 +297,7 @@ function ContactUs() {
                         rows="2"
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
-                        className="min-h-[5.7rem] w-full resize-none rounded-xl border border-transparent bg-slate-50 pb-3 pl-10 pr-4 pt-6 text-[0.8125rem] leading-6 text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
+                        className="min-h-[5.7rem] w-full resize-none rounded-xl border border-transparent bg-slate-50 pb-3 pl-10 pr-4 pt-6 text-[0.8125rem] leading-6 text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#131313] dark:text-white dark:focus:bg-[#1A1D20]"
                         placeholder=" "
                       />
                     </AuthLikeField>
@@ -318,7 +318,7 @@ function ContactUs() {
                   </form>
 
                   <aside className="space-y-3">
-                    <div className="rounded-2xl bg-[#F0F0FF] px-6 py-5 dark:border dark:border-[#2A2D35] dark:bg-[#1A1D20]">
+                    <div className="rounded-2xl bg-[#F0F0FF] px-6 py-5 dark:border dark:border-[#2A2D35] dark:bg-[#131313]">
                       {/* Header */}
                       <div className="mb-3 flex items-center gap-2.5">
                         <div className="relative">
