@@ -57,11 +57,10 @@ export const registerUserController = async (req, res) => {
         verifyTokenEmail: verifyToken,
       });
 
-      responseMessage = "Account exists but is unverified. We just resent your verification email!";
+      responseMessage =
+        "Account exists but is unverified. We just resent your verification email!";
       statusCode = 200;
-    } 
-
-    else {
+    } else {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       await userModel.create({
@@ -72,7 +71,8 @@ export const registerUserController = async (req, res) => {
         is_email_verified: false,
       });
 
-      responseMessage = "Account created successfully. Please check your email to verify.";
+      responseMessage =
+        "Account created successfully. Please check your email to verify.";
       statusCode = 201;
     }
 
@@ -90,7 +90,6 @@ export const registerUserController = async (req, res) => {
       error: false,
       success: true,
     });
-    
   } catch (err) {
     console.error("Registration Error:", err);
     return res.status(500).json({
@@ -473,8 +472,8 @@ export const forgotPasswordController = async (req, res) => {
       sendTo: email,
       subject: "Reset your Unideals password",
       html: forgotPaswordTemplate({
-        user: user.name,
-        resetUrl: resetUrl, // Pass the URL instead of the OTP
+        name: user.name,
+        resetUrl,
       }),
     });
 

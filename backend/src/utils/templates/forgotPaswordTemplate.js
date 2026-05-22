@@ -3,16 +3,16 @@ const forgotPasswordTemplate = ({ name, resetUrl }) => {
     <div style="font-family: 'Inter', 'Poppins', Arial, sans-serif; max-width: 480px; margin: 0 auto; background-color: #ffffff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);">
       
       <div style="border-bottom: 1px solid #F1F5F9; padding: 32px 20px; text-align: center; border-top: 4px solid #2563EB; background-image: url('https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/HorizontalBorder.png?updatedAt=1779453128090'); background-size: cover; background-position: center;">
-        <h1 style="color: #2563EB; font-size: 24px; font-weight: 700; margin: 0; display: inline-block; background-color: rgba(255, 255, 255, 0.95); padding: 8px 16px; border-radius: 8px; align-items: center;">
-          <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Group%2014.png" alt="Logo" style="height: 24px; vertical-align: middle; margin-right: 8px;" />Campus Mart
+        <h1 style="color: #2563EB; font-size: 24px; font-weight: 700; margin: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background-color: rgba(255, 255, 255, 0.95); padding: 8px 16px; border-radius: 8px;">
+          <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Group%2014.png" alt="Logo" style="display: inline-block; height: 24px; vertical-align: middle; margin: 0;" />Campus Mart
         </h1>
       </div>
 
       <div style="padding: 32px 24px; text-align: center;">
         
         <div style="width: 64px; height: 64px; background-color: #EFF6FF; border-radius: 50%; margin: 0 auto 20px auto; position: relative; display: inline-flex; align-items: center; justify-content: center;">
-          <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Icon.svg" alt="Icon" style="width: 32px; height: 32px;" />
-          <div style="position: absolute; bottom: 0; right: -4px; background-color: #22C55E; color: white; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; font-size: 12px; font-weight: bold; border: 2px solid white;">
+          <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Icon.svg" alt="Icon" style="display: block; width: 32px; height: 32px;" />
+          <div style="position: absolute; bottom: -6px; right: -6px; display: inline-flex; align-items: center; justify-content: center; background-color: #22C55E; color: white; border-radius: 50%; width: 24px; height: 24px; font-size: 12px; font-weight: bold; border: 2px solid white; line-height: 1;">
             ✓
           </div>
         </div>

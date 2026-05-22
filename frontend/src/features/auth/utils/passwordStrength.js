@@ -1,54 +1,59 @@
-const LETTER = /[a-zA-Z]/;
-const SPECIAL = /[^a-zA-Z0-9]/;
+const UPPER = /[A-Z]/;
+const LOWER = /[a-z]/;
+const NUMBER = /[0-9]/;
+const SPECIAL = /[^A-Za-z0-9]/;
 
-/**
- * @param {string} password
- * @returns {null | { level: string; widthPct: number; barClass: string; emoji: string; message: string }}
- */
 export function getPasswordStrength(password) {
   if (!password) return null;
 
-  const hasLen = password.length >= 8;
-  const hasLetter = LETTER.test(password);
-  const hasSpecial = SPECIAL.test(password);
+  let score = 0;
 
-  if (!hasLen) {
+  if (password.length >= 8) score++;
+  if (UPPER.test(password)) score++;
+  if (LOWER.test(password)) score++;
+  if (NUMBER.test(password)) score++;
+  if (SPECIAL.test(password)) score++;
+
+  if (score <= 2) {
     return {
       level: "weak",
       widthPct: 25,
-      barClass: "bg-rose-400 dark:bg-rose-500",
+      barClass: "bg-rose-400",
       emoji: "😠",
-      message: "Weak. Must contain at least 8 characters",
+      message: "Weak",
     };
   }
-  if (!hasLetter) {
+
+  if (score === 3) {
     return {
-      level: "soso",
+      level: "fair",
       widthPct: 50,
-      barClass: "bg-amber-400 dark:bg-amber-500",
+      barClass: "bg-amber-400",
       emoji: "😐",
-      message: "So-so. Must contain at least 1 letter",
+      message: "Fair",
     };
   }
-  if (!hasSpecial) {
+
+  if (score === 4) {
     return {
-      level: "almost",
+      level: "good",
       widthPct: 75,
-      barClass: "bg-sky-400 dark:bg-sky-500",
+      barClass: "bg-sky-400",
       emoji: "😏",
-      message: "Almost. Must contain special symbol",
+      message: "Good",
     };
   }
+
   return {
-    level: "awesome",
+    level: "strong",
     widthPct: 100,
-    barClass: "bg-emerald-500 dark:bg-emerald-500",
+    barClass: "bg-emerald-500",
     emoji: "😎",
-    message: "Awesome! You have a secure password",
+    message: "Strong",
   };
 }
 
 export function isPasswordStrongEnough(password) {
   const s = getPasswordStrength(password);
-  return Boolean(s && s.level === "awesome");
+  return Boolean(s && (s.level === "good" || s.level === "strong"));
 }

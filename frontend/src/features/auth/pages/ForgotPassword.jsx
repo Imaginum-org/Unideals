@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { forgotPassword } from "../api/authApi";
@@ -12,9 +12,26 @@ function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [formMessage, setFormMessage] = useState(null);
 
   const clearFormMessage = () => setFormMessage(null);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setResendCooldown((prev) => Math.max(prev - 1, 0));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,6 +60,7 @@ function ForgotPassword() {
             response.data.message ||
             "If an account exists for this email, we’ve sent a reset link. Check your inbox.",
         });
+        setResendCooldown(120);
         window.setTimeout(() => setIsSubmitted(true), 900);
       }
     } catch (error) {
@@ -60,7 +78,7 @@ function ForgotPassword() {
   // Smart Error Parsing Logic
   const isError = formMessage?.variant === "error";
   const errorText = formMessage?.text?.toLowerCase() || "";
-  
+
   // Highlight email if the error explicitly mentions 'email'
   const hasEmailError = isError && errorText.includes("email");
 
@@ -205,11 +223,18 @@ function ForgotPassword() {
                       setFormMessage(null);
                       setIsSubmitted(false);
                     }}
-                    className="font-semibold text-[#393AF2] transition hover:text-[#2426C7]"
+                    disabled={resendCooldown > 0}
+                    className="font-semibold text-[#393AF2] transition hover:text-[#2426C7] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Try again
                   </button>
                 </p>
+                {resendCooldown > 0 ? (
+                  <p className="mt-2 text-center text-[0.7rem] text-gray-500 dark:text-gray-400">
+                    You can request another reset link in{" "}
+                    {formatTimer(resendCooldown)}.
+                  </p>
+                ) : null}
 
                 {/* Back to login */}
                 <div className="mt-5 md:mt-4 flex justify-center w-full xl:mt-[3vh]">

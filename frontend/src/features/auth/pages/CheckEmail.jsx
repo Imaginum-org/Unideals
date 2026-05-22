@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { checkEmailVerification, resendVerification } from "../api/authApi";
 import checkemailicon from "../../../assets/checkemailicon.png";
@@ -18,9 +18,26 @@ function CheckEmail() {
 
   const [isResending, setIsResending] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [formMessage, setFormMessage] = useState(null);
 
   const clearFormMessage = () => setFormMessage(null);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setResendCooldown((prev) => Math.max(prev - 1, 0));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleResend = async () => {
     if (!email) {
@@ -42,6 +59,7 @@ function CheckEmail() {
             response.data.message ||
             "Verification email sent again. Check your inbox (and spam).",
         });
+        setResendCooldown(120);
       }
     } catch (error) {
       setFormMessage({
@@ -151,12 +169,22 @@ function CheckEmail() {
                   </span>
                   <button
                     onClick={handleResend}
-                    disabled={isResending}
+                    disabled={isResending || resendCooldown > 0}
                     className="font-semibold text-blue-700 transition-colors hover:text-[#2426C7] disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                   >
-                    {isResending ? "Sending..." : "Resend Email"}
+                    {isResending
+                      ? "Sending..."
+                      : resendCooldown > 0
+                        ? `Resend Email (${formatTimer(resendCooldown)})`
+                        : "Resend Email"}
                   </button>
                 </div>
+                {resendCooldown > 0 ? (
+                  <p className="mt-2 text-center text-[0.7rem] text-gray-500 dark:text-gray-400">
+                    You can resend another verification email in{" "}
+                    {formatTimer(resendCooldown)}.
+                  </p>
+                ) : null}
 
                 <div className="inline-flex items-start justify-start gap-3 rounded-xl bg-slate-100 p-4 outline outline-1 outline-offset-[-0.0625rem] outline-slate-300/10 transition-colors duration-300 dark:bg-[#1e1e1e] dark:outline-zinc-800 md:p-3 lg:p-4">
                   <div className="pt-1">
