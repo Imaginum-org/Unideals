@@ -3,7 +3,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 
 const PricingModel = () => {
   // Shared primary brand color used across cards, buttons, and highlights.
-  const PRIMARY_BLUE = "#410ef9";
+  const PRIMARY_BLUE = "#3838ec";
 
   // Handles upgrade actions until the payment flow is connected.
   const handleUpgrade = () => {
@@ -115,7 +115,7 @@ const PricingModel = () => {
       return (
         <XCircle
           aria-label="Not included"
-          className="mx-auto size-4 text-slate-300 dark:text-slate-500"
+          className="mx-auto size-4 text-red-400 dark:text-red-400"
           strokeWidth={1.8}
         />
       );
@@ -189,40 +189,42 @@ const PricingModel = () => {
         </div>
 
         {/* Pricing cards */}
-        <div className="mt-14 grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:items-center">
+        <div className="mt-14 grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:items-stretch">
           {plans.map((plan) => (
             <article
               key={plan.name}
-              className={`relative flex h-full min-h-[520px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-200/70 dark:border-white/10 dark:bg-[#1A1D20] dark:shadow-none ${
-                plan.highlighted ? "lg:-translate-y-3" : ""
+              className={`relative flex h-full min-h-[520px] flex-col overflow-hidden rounded-[24px] bg-white transition-all duration-300 ease-out dark:bg-[#1A1D20] ${
+                plan.highlighted
+                  ? "shadow-[0_0_0_1px_rgba(51,0,255,0.08),0_18px_45px_rgba(51,0,255,0.18),0_8px_22px_rgba(15,23,42,0.08)] hover:shadow-[0_0_0_1px_rgba(51,0,255,0.12),0_24px_60px_rgba(51,0,255,0.24),0_12px_30px_rgba(15,23,42,0.12)] dark:shadow-[0_0_0_1px_rgba(51,0,255,0.18),0_0_34px_rgba(51,0,255,0.30),0_18px_46px_rgba(0,0,0,0.45)] dark:hover:shadow-[0_0_0_1px_rgba(51,0,255,0.24),0_0_46px_rgba(51,0,255,0.42),0_24px_60px_rgba(0,0,0,0.55)] lg:-translate-y-3"
+                  : "shadow-xl shadow-slate-200/70 dark:shadow-none"
               }`}
             >
               {/* Card top accent / Most Popular banner with curved lower edge */}
               {plan.highlighted ? (
                 <div
-                  className="relative h-16"
+                  className="relative h-14 overflow-hidden rounded-t-[24px]"
                   style={{ backgroundColor: PRIMARY_BLUE }}
                 >
-                  <div className="pt-3 text-center text-sm font-semibold text-white font-poppins">
-                    Most Popular
+                  <div className="absolute left-0 top-0 z-10 flex h-9 w-full items-center justify-center text-center">
+                    <span className="text-sm font-semibold leading-none text-white font-poppins">
+                      Most Popular
+                    </span>
                   </div>
 
-                  {/* Curved white body overlay under the Pro banner */}
-                  <div className="absolute bottom-[-1px] left-0 right-0 h-8 rounded-t-xl bg-white dark:bg-[#1A1D20]" />
+                  <div className="absolute bottom-[-1px] left-0 right-0 h-6 rounded-t-[24px] bg-white dark:bg-[#1A1D20]" />
                 </div>
               ) : (
                 <div
-                  className="relative h-7"
+                  className="relative h-7 overflow-hidden rounded-t-[24px]"
                   style={{ backgroundColor: PRIMARY_BLUE }}
                 >
-                  {/* Curved white body overlay under the top strip */}
-                  <div className="absolute bottom-[-1px] left-0 right-0 h-5 rounded-t-xl bg-white dark:bg-[#1A1D20]" />
+                  <div className="absolute bottom-[-1px] left-0 right-0 h-5 rounded-t-[24px] bg-white dark:bg-[#1A1D20]" />
                 </div>
               )}
 
               <div className="flex flex-1 flex-col p-7">
                 {/* Plan title and price */}
-                <h2 className="text-lg font-semibold text-[#3300ff] font-robotoFlex">
+                <h2 className="text-xl font-semibold text-[#3300ff] font-robotoFlex">
                   {plan.name}
                 </h2>
 
@@ -238,18 +240,18 @@ const PricingModel = () => {
                 {/* Card action button */}
                 <button
                   type="button"
-                  onClick={handleUpgrade}
+                  onClick={plan.buttonDisabled ? undefined : handleUpgrade}
                   disabled={plan.buttonDisabled}
                   aria-disabled={plan.buttonDisabled}
                   style={
-                    plan.highlighted
-                      ? { backgroundColor: PRIMARY_BLUE }
-                      : undefined
+                    plan.buttonDisabled
+                      ? undefined
+                      : { backgroundColor: PRIMARY_BLUE }
                   }
-                  className={`mt-8 h-12 w-full rounded-lg px-4 text-sm font-semibold transition font-poppins disabled:cursor-default ${
-                    plan.highlighted
-                      ? "text-white shadow-lg shadow-indigo-200 hover:opacity-90"
-                      : "bg-slate-50 text-[#3300ff] hover:bg-[#3300ff]/5 dark:bg-white/5"
+                  className={`mt-8 h-12 w-full rounded-lg px-4 text-sm font-semibold transition font-poppins ${
+                    plan.buttonDisabled
+                      ? "cursor-default border border-[#3300ff]/25 bg-[#3300ff]/10 text-[#3300ff] shadow-none"
+                      : "text-white shadow-lg shadow-indigo-200 hover:opacity-90"
                   }`}
                 >
                   {plan.buttonText}
@@ -263,7 +265,7 @@ const PricingModel = () => {
                       className="flex items-start gap-3 text-sm font-medium leading-5 text-slate-600 dark:text-[#D7D7D7] font-poppins"
                     >
                       <CheckCircle2
-                        className="mt-0.5 size-4 shrink-0 text-white"
+                        className="mt-0.5 size-5 shrink-0 text-white"
                         fill={PRIMARY_BLUE}
                         strokeWidth={2.5}
                       />
@@ -304,12 +306,13 @@ const PricingModel = () => {
         {/* Scroll wrapper protects the table on small screens */}
         <div className="mt-14 overflow-x-auto overflow-y-visible pb-4 pt-10">
           <div className="relative min-w-[780px]">
-            {/* Rounded Pro column highlight with soft aura */}
-            <div className="pointer-events-none absolute left-[54%] top-[-40px] z-10 h-[calc(100%+40px)] w-[20%] rounded-2xl border-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] shadow-[0_0_42px_rgba(51,0,255,0.25)]" />
-
-            {/* Popular tab aligned exactly with the Pro column */}
-            <div className="absolute left-[54%] top-[-40px] z-30 h-11 w-[20%] rounded-t-2xl bg-[#3300ff] text-center text-sm font-medium leading-[44px] text-white font-poppins">
-              Popular
+            {/* Rounded Pro column highlight */}
+            <div className="pointer-events-none absolute left-[54%] top-[-40px] z-30 h-[calc(100%+40px)] w-[20%] rounded-2xl bg-[#3300ff]/[0.055] p-2">
+              <div className="h-full rounded-xl border-2 border-[#9f95ff] bg-[#3300ff]/[0.025] shadow-[inset_0_0_0_1px_rgba(51,0,255,0.08),0_0_22px_rgba(51,0,255,0.09)]">
+                <div className="h-10 rounded-t-lg bg-[#3300ff] text-center text-sm font-medium leading-10 text-white font-poppins">
+                  Popular
+                </div>
+              </div>
             </div>
 
             {/* Comparison table */}
@@ -329,7 +332,7 @@ const PricingModel = () => {
                   <th className="px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
                     Free
                   </th>
-                  <th className="border-x-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
+                  <th className="bg-[#3300ff]/[0.025] px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
                     Pro
                   </th>
                   <th className="px-7 py-6 text-center text-sm font-semibold text-orange-500 font-poppins">
@@ -339,47 +342,38 @@ const PricingModel = () => {
               </thead>
 
               <tbody>
-                {comparisonRows.map((row, index) => {
-                  const isLastRow = index === comparisonRows.length - 1;
-
-                  return (
-                    <tr
-                      key={row.feature}
-                      className="border-b border-slate-100 last:border-0 dark:border-white/10"
+                {comparisonRows.map((row) => (
+                  <tr
+                    key={row.feature}
+                    className="border-b border-slate-100 last:border-0 dark:border-white/10"
+                  >
+                    <td
+                      className={`px-7 py-6 text-sm font-medium leading-5 font-poppins ${
+                        row.featureHighlight
+                          ? "text-[#3300ff]"
+                          : "text-slate-700 dark:text-[#D7D7D7]"
+                      }`}
                     >
-                      <td
-                        className={`px-7 py-6 text-sm font-medium leading-5 font-poppins ${
-                          row.featureHighlight
-                            ? "text-[#3300ff]"
-                            : "text-slate-700 dark:text-[#D7D7D7]"
-                        }`}
-                      >
-                        {row.feature}
-                      </td>
+                      {row.feature}
+                    </td>
 
-                      <td className="px-7 py-6 text-center text-sm">
-                        {renderComparisonValue(row.free, "free", row)}
-                      </td>
+                    <td className="px-7 py-6 text-center text-sm">
+                      {renderComparisonValue(row.free, "free", row)}
+                    </td>
 
-                      <td
-                        className={`border-x-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] px-7 py-6 text-center text-sm font-semibold ${
-                          isLastRow ? "rounded-b-2xl border-b-4" : ""
-                        }`}
-                      >
-                        {renderComparisonValue(row.pro, "pro", row)}
-                      </td>
+                    <td className="bg-[#3300ff]/[0.025] px-7 py-6 text-center text-sm font-semibold">
+                      {renderComparisonValue(row.pro, "pro", row)}
+                    </td>
 
-                      <td className="px-7 py-6 text-center text-sm font-semibold">
-                        {renderComparisonValue(row.proPlus, "proPlus", row)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                    <td className="px-7 py-6 text-center text-sm font-semibold">
+                      {renderComparisonValue(row.proPlus, "proPlus", row)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
-
         {/* Payment note */}
         <p className="mt-6 text-center text-sm font-medium text-slate-500 dark:text-[#848484] font-poppins">
           * Prices are in INR. Payments are secured by Razorpay.
