@@ -4,7 +4,6 @@ import { HiOutlineTrash } from "react-icons/hi";
 import useProductListing from "../hooks/useProductListing";
 import { RiCameraAiLine } from "react-icons/ri";
 import { IoArrowForward } from "react-icons/io5";
-import { IoArrowBack } from "react-icons/io5";
 import { fileToBase64 } from "../utils/imageHelpers";
 
 const MAX_IMAGES = 3;
@@ -12,7 +11,7 @@ const MAX_IMAGES = 3;
 const ImagesStep = () => {
   const fileInputRef = useRef(null);
 
-  const { formData, updateField, nextStep, prevStep } = useProductListing();
+  const { formData, updateField, nextStep } = useProductListing();
 
   const [isDragging, setIsDragging] = useState(false);
 
@@ -21,59 +20,58 @@ const ImagesStep = () => {
     return formData.images.length > 0;
   }, [formData.images]);
 
-
   // PROCESS FILES
-const processFiles = async (files) => {
-  const fileArray = Array.from(files);
+  const processFiles = async (files) => {
+    const fileArray = Array.from(files);
 
-  const remainingSlots = MAX_IMAGES - formData.images.length;
+    const remainingSlots = MAX_IMAGES - formData.images.length;
 
-  if (remainingSlots <= 0) {
-    toast.error(`Maximum ${MAX_IMAGES} images allowed`);
+    if (remainingSlots <= 0) {
+      toast.error(`Maximum ${MAX_IMAGES} images allowed`);
 
-    return;
-  }
-
-  const selectedFiles = fileArray.slice(0, remainingSlots);
-
-  const validFiles = [];
-
-  const previewItems = [];
-
-  for (const file of selectedFiles) {
-    if (
-      !["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(
-        file.type,
-      )
-    ) {
-      toast.error("Only PNG, JPG & WEBP images are allowed");
-
-      continue;
+      return;
     }
 
-    try {
-      const base64 = await fileToBase64(file);
+    const selectedFiles = fileArray.slice(0, remainingSlots);
 
-      validFiles.push(file);
+    const validFiles = [];
 
-      previewItems.push({
-        id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+    const previewItems = [];
 
-        preview: base64,
-      });
-    } catch (error) {
-      console.error(error);
+    for (const file of selectedFiles) {
+      if (
+        !["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(
+          file.type,
+        )
+      ) {
+        toast.error("Only PNG, JPG & WEBP images are allowed");
 
-      toast.error("Failed to process image");
+        continue;
+      }
+
+      try {
+        const base64 = await fileToBase64(file);
+
+        validFiles.push(file);
+
+        previewItems.push({
+          id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+
+          preview: base64,
+        });
+      } catch (error) {
+        console.error(error);
+
+        toast.error("Failed to process image");
+      }
     }
-  }
 
-  if (validFiles.length === 0) return;
+    if (validFiles.length === 0) return;
 
-  updateField("images", [...formData.images, ...validFiles]);
+    updateField("images", [...formData.images, ...validFiles]);
 
-  updateField("imagePreviews", [...formData.imagePreviews, ...previewItems]);
-};
+    updateField("imagePreviews", [...formData.imagePreviews, ...previewItems]);
+  };
 
   // INPUT CHANGE
   const handleInputChange = (e) => {
@@ -307,14 +305,6 @@ const processFiles = async (files) => {
 
         {/* Buttons */}
         <div className="flex items-center gap-2 lg:gap-3">
-          {/* Back */}
-          <button
-            onClick={prevStep}
-            className="h-[54px] px-4 lg:px-8 rounded-xl border flex justify-center items-center border-[#D1D5DB] text-[#111827] font-semibold hover:bg-[#F9FAFB] transition-all duration-200 gap-2"
-          >
-            <IoArrowBack className="size-5" /> <span>Back</span>
-          </button>
-
           {/* Continue */}
           <button
             onClick={nextStep}

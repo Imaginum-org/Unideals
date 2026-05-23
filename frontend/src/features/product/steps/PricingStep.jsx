@@ -6,18 +6,10 @@ import axios from "../../../services/axiosInstance";
 import useProductListing from "../hooks/useProductListing";
 import { PRODUCT_PAYMENT_OPTIONS } from "../constants/productOptions";
 import { IoArrowForward } from "react-icons/io5";
-import { IoArrowBack } from "react-icons/io5";
-
-const meetupLocations = [
-  "Foodys",
-  "Main Gate",
-  "Library",
-  "Academic Block",
-  "Hostel Reception",
-];
+import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
 
 const PricingStep = () => {
-  const { formData, updateField, nextStep, prevStep } = useProductListing();
+  const { formData, updateField, nextStep } = useProductListing();
 
   const [loadingAddress, setLoadingAddress] = useState(false);
 
@@ -37,6 +29,7 @@ const PricingStep = () => {
         updateField("address", defaultAddress || null);
       } catch (error) {
         toast.error("Failed to fetch address");
+        console.log(error.message);
       } finally {
         setLoadingAddress(false);
       }
@@ -81,6 +74,7 @@ const PricingStep = () => {
           <div className="">
             <label className="text-sm font-bold uppercase tracking-wide text-[#111827]">
               Set Your Price
+              <RequiredAsterisk />
             </label>
 
             <div className="mt-2 flex items-center rounded-xl border border-[#E5E7EB] overflow-hidden h-[64px]">
@@ -107,6 +101,7 @@ const PricingStep = () => {
           <div className="">
             <label className="text-sm font-bold uppercase tracking-wide text-[#111827]">
               Original Price
+              <RequiredAsterisk />
             </label>
 
             <div className="mt-2 flex items-center rounded-2xl border border-[#E5E7EB] overflow-hidden h-[64px]">
@@ -133,7 +128,9 @@ const PricingStep = () => {
         {/* Negotiation */}
         <div className="mt-4 flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-[#111827]">Allow Negotiation</h3>
+            <h3 className="font-semibold text-[#111827]">
+              Allow Negotiation <RequiredAsterisk />
+            </h3>
 
             <p className="mt-1 text-sm text-[#6B7280]">
               Let buyers negotiate your price.
@@ -161,6 +158,7 @@ const PricingStep = () => {
 
             <h3 className="font-bold text-[#111827]">
               Preferred Payment Method
+              <RequiredAsterisk />
             </h3>
           </div>
 
@@ -216,6 +214,7 @@ const PricingStep = () => {
             <div>
               <label className="text-sm font-semibold text-[#374151]">
                 Campus / Area
+                <RequiredAsterisk />
               </label>
 
               <div className="mt-2 min-h-[110px] rounded-xl border bg-white p-4 flex flex-col justify-between">
@@ -237,6 +236,7 @@ const PricingStep = () => {
             <div>
               <label className="text-sm font-semibold text-[#374151]">
                 Pickup Address
+                <RequiredAsterisk />
               </label>
 
               <div className="mt-2 min-h-[110px] rounded-xl border bg-white p-4 flex flex-col justify-between">
@@ -300,6 +300,7 @@ const PricingStep = () => {
                 Terms & Conditions
               </a>
               .
+              <RequiredAsterisk />
             </p>
           </label>
         </div>
@@ -323,16 +324,7 @@ const PricingStep = () => {
         </div>
 
         {/* Buttons */}
-
         <div className="flex items-center gap-2 lg:gap-3">
-          {/* Back */}
-          <button
-            onClick={prevStep}
-            className="h-[54px] px-4 lg:px-8 rounded-xl border flex justify-center items-center border-[#D1D5DB] text-[#111827] font-semibold hover:bg-[#F9FAFB] transition-all duration-200 gap-2"
-          >
-            <IoArrowBack className="size-5" /> <span>Back</span>
-          </button>
-
           {/* Continue */}
           <button
             onClick={nextStep}

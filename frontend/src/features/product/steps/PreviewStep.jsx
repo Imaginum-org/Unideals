@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+// import { useMemo } from "react";
 import toast from "react-hot-toast";
 import { HiOutlinePencil } from "react-icons/hi";
 import { GoRocket } from "react-icons/go";
@@ -15,19 +15,19 @@ import { MdOutlineLocationOn } from "react-icons/md";
 const PreviewStep = () => {
   const navigate = useNavigate();
 
-  const { formData, prevStep, goToStep, loading, setLoading, resetForm } =
+  const { formData, goToStep, loading, setLoading, resetForm } =
     useProductListing();
 
   // DISCOUNT
-  const discountPercentage = useMemo(() => {
-    if (!formData.originalPrice || !formData.sellingPrice) return 0;
+  // const discountPercentage = useMemo(() => {
+  //   if (!formData.originalPrice || !formData.sellingPrice) return 0;
 
-    const original = Number(formData.originalPrice);
+  //   const original = Number(formData.originalPrice);
 
-    const selling = Number(formData.sellingPrice);
+  //   const selling = Number(formData.sellingPrice);
 
-    return Math.round(((original - selling) / original) * 100);
-  }, [formData.originalPrice, formData.sellingPrice]);
+  //   return Math.round(((original - selling) / original) * 100);
+  // }, [formData.originalPrice, formData.sellingPrice]);
 
   // SAVE DRAFT
   const handleSaveDraft = async () => {
@@ -66,6 +66,7 @@ const PreviewStep = () => {
       toast.success("Draft saved successfully");
     } catch (error) {
       toast.error("Failed to save draft");
+      console.log(error.message);
     } finally {
       setLoading(false);
     }

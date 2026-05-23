@@ -7,6 +7,7 @@ import {
   PRODUCT_CONDITION_OPTIONS,
   PRODUCT_USAGE_OPTIONS,
 } from "../constants/productOptions";
+import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
 
 const BasicInfoStep = () => {
   const { formData, updateField, nextStep } = useProductListing();
@@ -30,11 +31,11 @@ const BasicInfoStep = () => {
     control: (provided, state) => ({
       ...provided,
       minHeight: 56,
-      borderRadius: 18,
+      borderRadius: 12,
       borderColor: state.isFocused ? "#4F46E5" : "#E5E7EB",
       boxShadow: "none",
       paddingLeft: 6,
-
+      backgroundColor: "#F7F8FA",
       "&:hover": {
         borderColor: "#4F46E5",
       },
@@ -58,15 +59,16 @@ const BasicInfoStep = () => {
   };
 
   return (
-    <div className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-white shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 ">
+    <div className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-white shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 dark:bg-[#1A1D20] dark:text-white dark:border-0">
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* LEFT */}
         <div className="flex flex-col gap-6">
           {/* Product Name */}
           <div>
-            <label className="text-base font-semibold text-[#0F172A]">
+            <label className="text-base font-semibold text-[#0F172A] dark:text-white">
               Product Title
+              <RequiredAsterisk />
             </label>
 
             <input
@@ -75,14 +77,15 @@ const BasicInfoStep = () => {
               value={formData.title}
               onChange={(e) => updateField("title", e.target.value)}
               placeholder="e.g. Macbook Air M1"
-              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
+              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800 dark:border-0"
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="text-base font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827] dark:text-white">
               Category
+              <RequiredAsterisk />
             </label>
 
             <div className="mt-3">
@@ -99,15 +102,15 @@ const BasicInfoStep = () => {
                 onChange={(selected) =>
                   updateField("category", selected?.value || "")
                 }
-                className="bg-[#F7F8FA]"
               />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="text-base font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827] dark:text-white">
               Short Description
+              <RequiredAsterisk />
             </label>
 
             <textarea
@@ -115,7 +118,7 @@ const BasicInfoStep = () => {
               value={formData.description}
               onChange={(e) => updateField("description", e.target.value)}
               placeholder="Describe your product..."
-              className="mt-3 w-full h-[220px] rounded-xl border border-[#E5E7EB] p-5 resize-none outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
+              className="mt-3 w-full h-[220px] rounded-xl border border-[#E5E7EB] p-5 resize-none outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800 dark:border-0"
             />
 
             <div className="mt-1 flex justify-between text-sm text-[#94A3B8]">
@@ -130,7 +133,7 @@ const BasicInfoStep = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Brand */}
           <div>
-            <label className="text-base font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827] dark:text-white">
               Brand / Model
             </label>
 
@@ -139,13 +142,13 @@ const BasicInfoStep = () => {
               value={formData.brand}
               onChange={(e) => updateField("brand", e.target.value)}
               placeholder="e.g. Apple"
-              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
+              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800 dark:border-0"
             />
           </div>
 
           {/* Color */}
           <div>
-            <label className="text-base font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827] dark:text-white">
               Product Color
             </label>
 
@@ -154,14 +157,15 @@ const BasicInfoStep = () => {
               value={formData.color}
               onChange={(e) => updateField("color", e.target.value)}
               placeholder="e.g. Space Grey"
-              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
+              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800 dark:border-0"
             />
           </div>
 
           {/* Condition */}
           <div>
-            <label className="text-base font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827] dark:text-white">
               Product Condition
+              <RequiredAsterisk />
             </label>
 
             <div className="mt-3">
@@ -178,15 +182,15 @@ const BasicInfoStep = () => {
                 onChange={(selected) =>
                   updateField("condition", selected?.value || "")
                 }
-                className="bg-[#F7F8FA]"
               />
             </div>
           </div>
 
           {/* Usage */}
           <div>
-            <label className="text-base font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827] dark:text-white">
               Usage Duration
+              <RequiredAsterisk />
             </label>
 
             <div className="mt-3">
@@ -210,8 +214,9 @@ const BasicInfoStep = () => {
 
           {/* Purchase Date */}
           <div>
-            <label className="text-base font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827] dark:text-white">
               Date of Purchase
+              <RequiredAsterisk />
             </label>
 
             <input
@@ -219,7 +224,7 @@ const BasicInfoStep = () => {
               max={new Date().toISOString().split("T")[0]}
               value={formData.purchaseDate}
               onChange={(e) => updateField("purchaseDate", e.target.value)}
-              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
+              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800 dark:border-0"
             />
           </div>
         </div>

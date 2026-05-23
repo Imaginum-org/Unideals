@@ -55,12 +55,12 @@ const TipsCard = ({ step }) => {
   const currentTip = TIPS_DATA[step];
 
   return (
-    <div className="w-full rounded-xl border border-[#ECECEC] bg-[#F1F1FF] py-5 px-6 font-figtree">
+    <div className="w-full rounded-xl border border-[#ECECEC] bg-[#F1F1FF] py-5 px-6 font-figtree dark:bg-[#1A1D20] dark:text-white dark:border-0">
       {/* Top */}
       <div className="flex items-center gap-2 text-[#3838EC]">
         {currentTip.icon}
 
-        <h2 className="text-sm font-bold text-[#000000] uppercase tracking-wide">
+        <h2 className="text-sm font-bold text-[#000000] uppercase tracking-wide dark:text-white">
           {currentTip.title}
         </h2>
       </div>
@@ -74,9 +74,11 @@ const TipsCard = ({ step }) => {
       {/* Tips */}
       <div className="mt-4 flex flex-col justify-center gap-2">
         {currentTip.tips.map((tip, index) => (
-          <div key={index} className="flex items-center gap-3">
+          <div key={index} className="flex items-center gap-3 ">
             <MdStars className="text-[#3838EC]" />
-            <p className="text-[15px] leading-7 text-[#111827]">{tip}</p>
+            <p className="text-[15px] leading-7 text-[#111827] dark:text-white">
+              {tip}
+            </p>
           </div>
         ))}
       </div>

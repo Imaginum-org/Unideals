@@ -39,16 +39,29 @@ const ListingLayout = () => {
     }
   };
 
+  const { prevStep } = useProductListing();
+
   return (
     <div className="w-full min-h-screen bg-[#FAFAFA] dark:bg-[#131313] font-figtree">
       <div className="max-w-6xl w-full mx-auto px-7 sm:px-6 lg:px-8 xl:px-10 py-6 md:py-8">
         {/* Back */}
         <button
-          onClick={() => window.history.back()}
-          className="text-sm lg:text-base text-[#090A0B] dark:text-white flex items-center gap-2 font-medium"
+          onClick={() => {
+            if (step === 1) {
+              window.history.back();
+            } else {
+              prevStep();
+            }
+          }}
+          className="group inline-flex items-center gap-1 text-sm lg:text-base font-medium text-[#090A0B] dark:text-white"
         >
-          <IoArrowBack />
-          <span>Back</span>
+          <div className="flex items-center justify-center w-8 h-8  bg-white dark:bg-[#1A1A1A] transition-all duration-200 group-hover:text-[#4F46E5]">
+            <IoArrowBack className="size-4" />
+          </div>
+
+          <span className="transition-colors duration-200 group-hover:text-[#4F46E5]">
+            Back
+          </span>
         </button>
 
         {/* Header */}
