@@ -12,6 +12,7 @@ import {
   getSearchSuggestions,
   searchProducts,
   getMyProducts,
+  getMyDraftProducts,
   deleteProduct,
   unlistProduct,
   relistProduct,
@@ -33,6 +34,9 @@ router.get("/search-suggestions", getSearchSuggestions);
 
 // User's products (must be before :id)
 router.get("/user/my-products", auth, getMyProducts);
+
+// Draft
+router.get("/user/drafts", auth, getMyDraftProducts);
 
 router.get("/", getAllProducts);
 

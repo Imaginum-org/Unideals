@@ -27,12 +27,16 @@ export const updateProduct = (productId, data) => {
   return axios.patch(`/api/product/${productId}`, data);
 };
 
+export const getDraftProducts = () => {
+  return axios.get("/api/product/user/drafts");
+};
+
 // SAVE DRAFT
 export const saveDraftProduct = (data) => {
   return axios.post("/api/product", {
     ...data,
 
-    status: "unlisted",
+    status: "draft",
   });
 };
 

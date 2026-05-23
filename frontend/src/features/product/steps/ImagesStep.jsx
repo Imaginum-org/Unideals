@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-
 import toast from "react-hot-toast";
-
-import { HiOutlineTrash, HiOutlinePhotograph } from "react-icons/hi";
-
+import { HiOutlineTrash } from "react-icons/hi";
 import useProductListing from "../hooks/useProductListing";
+import { RiCameraAiLine } from "react-icons/ri";
+import { IoArrowForward } from "react-icons/io5";
+import { IoArrowBack } from "react-icons/io5";
+import { fileToBase64 } from "../utils/imageHelpers";
 
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 3;
 
 const ImagesStep = () => {
   const fileInputRef = useRef(null);
@@ -15,90 +16,77 @@ const ImagesStep = () => {
 
   const [isDragging, setIsDragging] = useState(false);
 
-  // =========================
   // VALIDATION
-  // =========================
-
   const isValid = useMemo(() => {
     return formData.images.length > 0;
   }, [formData.images]);
 
-  // =========================
-  // CLEANUP URLS
-  // =========================
 
-  useEffect(() => {
-    return () => {
-      formData.imagePreviews.forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
-    };
-  }, []);
-
-  // =========================
   // PROCESS FILES
-  // =========================
+const processFiles = async (files) => {
+  const fileArray = Array.from(files);
 
-  const processFiles = (files) => {
-    const fileArray = Array.from(files);
+  const remainingSlots = MAX_IMAGES - formData.images.length;
 
-    const remainingSlots = MAX_IMAGES - formData.images.length;
+  if (remainingSlots <= 0) {
+    toast.error(`Maximum ${MAX_IMAGES} images allowed`);
 
-    if (remainingSlots <= 0) {
-      toast.error(`Maximum ${MAX_IMAGES} images allowed`);
+    return;
+  }
 
-      return;
+  const selectedFiles = fileArray.slice(0, remainingSlots);
+
+  const validFiles = [];
+
+  const previewItems = [];
+
+  for (const file of selectedFiles) {
+    if (
+      !["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(
+        file.type,
+      )
+    ) {
+      toast.error("Only PNG, JPG & WEBP images are allowed");
+
+      continue;
     }
 
-    const selectedFiles = fileArray.slice(0, remainingSlots);
-
-    const validFiles = [];
-
-    const previewUrls = [];
-
-    selectedFiles.forEach((file) => {
-      if (
-        !["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(
-          file.type,
-        )
-      ) {
-        toast.error("Only PNG, JPG & WEBP images are allowed");
-
-        return;
-      }
+    try {
+      const base64 = await fileToBase64(file);
 
       validFiles.push(file);
 
-      previewUrls.push(URL.createObjectURL(file));
-    });
+      previewItems.push({
+        id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
 
-    if (validFiles.length === 0) return;
+        preview: base64,
+      });
+    } catch (error) {
+      console.error(error);
 
-    updateField("images", [...formData.images, ...validFiles]);
+      toast.error("Failed to process image");
+    }
+  }
 
-    updateField("imagePreviews", [...formData.imagePreviews, ...previewUrls]);
-  };
+  if (validFiles.length === 0) return;
 
-  // =========================
+  updateField("images", [...formData.images, ...validFiles]);
+
+  updateField("imagePreviews", [...formData.imagePreviews, ...previewItems]);
+};
+
   // INPUT CHANGE
-  // =========================
-
   const handleInputChange = (e) => {
     processFiles(e.target.files);
 
     e.target.value = null;
   };
 
-  // =========================
   // REMOVE IMAGE
-  // =========================
-
   const handleRemoveImage = (index) => {
     const updatedImages = [...formData.images];
 
     const updatedPreviews = [...formData.imagePreviews];
-
-    URL.revokeObjectURL(updatedPreviews[index]);
 
     updatedImages.splice(index, 1);
 
@@ -109,10 +97,31 @@ const ImagesStep = () => {
     updateField("imagePreviews", updatedPreviews);
   };
 
-  // =========================
-  // DRAG EVENTS
-  // =========================
+  const handleSetCover = (index) => {
+    if (index === 0) return;
 
+    const updatedPreviews = [...formData.imagePreviews];
+
+    const selectedPreview = updatedPreviews[index];
+
+    updatedPreviews.splice(index, 1);
+
+    updatedPreviews.unshift(selectedPreview);
+
+    const updatedImages = [...formData.images];
+
+    const selectedImage = updatedImages[index];
+
+    updatedImages.splice(index, 1);
+
+    updatedImages.unshift(selectedImage);
+
+    updateField("imagePreviews", updatedPreviews);
+
+    updateField("images", updatedImages);
+  };
+
+  // DRAG EVENTS
   const handleDragOver = (e) => {
     e.preventDefault();
 
@@ -135,13 +144,12 @@ const ImagesStep = () => {
     <div className="w-full rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
       {/* Header */}
       <div>
-        <h2 className="text-[1.8rem] font-bold text-[#111827] leading-tight">
-          Upload Product Images
-        </h2>
+        <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
+          Product Images
+        </h1>
 
-        <p className="mt-2 text-[#6B7280] text-sm md:text-base">
-          Add clear images to increase buyer trust and improve listing
-          engagement.
+        <p className="mt-2 xl:mt-1 text-[#475569] dark:text-[#A1A1AA] text-sm md:text-base">
+          Upload 1-3 high-quality photos to give buyers a complete view.
         </p>
       </div>
 
@@ -151,9 +159,9 @@ const ImagesStep = () => {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current.click()}
-        className={`mt-8 rounded-[28px] border-2 border-dashed p-8 md:p-10 transition-all duration-200 cursor-pointer
+        className={`mt-4 rounded-[28px] border-2 bg-[#F8FAFC] border-dashed p-8 md:p-10 transition-all duration-200 cursor-pointer
         
-        ${isDragging ? "border-[#4F46E5] bg-[#EEF2FF]" : "border-[#D1D5DB]"}`}
+        ${isDragging ? "border-[#4F46E5] bg-[#F8FAFC]" : "border-[#D1D5DB]"}`}
       >
         <input
           ref={fileInputRef}
@@ -166,34 +174,22 @@ const ImagesStep = () => {
 
         <div className="flex flex-col items-center justify-center text-center">
           {/* Icon */}
-          <div className="w-20 h-20 rounded-3xl bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5]">
-            <HiOutlinePhotograph size={40} />
+          <div className="w-14 h-14 rounded-3xl bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5]">
+            <RiCameraAiLine size={25} />
           </div>
 
           {/* Heading */}
-          <h3 className="mt-6 text-[1.4rem] font-bold text-[#111827]">
-            Upload Product Photos
+          <h3 className="mt-2 text-base xl:text-lg font-bold text-[#181C1F]">
+            Drag & drop or click to browse
           </h3>
 
           {/* Description */}
-          <p className="mt-3 max-w-md text-sm md:text-base text-[#6B7280] leading-7">
-            Drag and drop your images here or click to browse from your device.
+          <p className="mt-1 max-w-md text-sm md:text-base text-[#6B7280] leading-7">
+            Supports JPG, PNG and WEBP up to 10MB
           </p>
 
           {/* Info */}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <div className="rounded-full bg-[#F3F4F6] px-4 py-2 text-xs font-medium text-[#374151]">
-              PNG
-            </div>
-
-            <div className="rounded-full bg-[#F3F4F6] px-4 py-2 text-xs font-medium text-[#374151]">
-              JPG
-            </div>
-
-            <div className="rounded-full bg-[#F3F4F6] px-4 py-2 text-xs font-medium text-[#374151]">
-              WEBP
-            </div>
-
             <div className="rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-semibold text-[#4F46E5]">
               Max {MAX_IMAGES} images
             </div>
@@ -203,7 +199,7 @@ const ImagesStep = () => {
 
       {/* Uploaded Images */}
       {formData.imagePreviews.length > 0 && (
-        <div className="mt-10">
+        <div className="mt-5">
           {/* Top */}
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-[#111827]">
@@ -216,24 +212,43 @@ const ImagesStep = () => {
           </div>
 
           {/* Grid */}
-          <div className="mt-5 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-            {formData.imagePreviews.map((image, index) => (
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-4">
+            {formData.imagePreviews.map((imageItem, index) => (
               <div
-                key={index}
-                className="group relative rounded-[24px] overflow-hidden border border-[#ECECEC]"
+                key={imageItem.id}
+                className="group relative rounded-[24px] overflow-hidden border border-[#ECECEC] cursor-pointer"
               >
                 {/* Cover Badge */}
                 {index === 0 && (
-                  <div className="absolute top-3 left-3 z-10 rounded-full bg-[#4F46E5] px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                  <div className="absolute top-3 left-3 z-20 rounded-full bg-[#4F46E5] px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
                     Cover
                   </div>
                 )}
 
+                {/* Hover Badge */}
+                {index !== 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+
+                      handleSetCover(index);
+                    }}
+                    className="absolute top-3 left-3 z-20 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white opacity-0 group-hover:opacity-100 transition-all duration-200"
+                  >
+                    Set as cover
+                  </button>
+                )}
+
                 {/* Image */}
                 <img
-                  src={image}
+                  src={imageItem.preview}
                   alt={`Preview ${index}`}
-                  className="w-full aspect-square object-cover"
+                  loading="lazy"
+                  draggable={false}
+                  onError={(e) => {
+                    e.currentTarget.src = "/images/placeholder-image.png";
+                  }}
+                  className="w-full aspect-square object-cover select-none"
                 />
 
                 {/* Overlay */}
@@ -244,7 +259,7 @@ const ImagesStep = () => {
 
                       handleRemoveImage(index);
                     }}
-                    className="w-12 h-12 rounded-full bg-white text-red-500 flex items-center justify-center"
+                    className="w-12 h-12 rounded-full bg-white text-red-500 flex items-center justify-center shadow-lg"
                   >
                     <HiOutlineTrash size={22} />
                   </button>
@@ -252,18 +267,24 @@ const ImagesStep = () => {
               </div>
             ))}
           </div>
+
+          {/* Helper Text */}
+          <p className="mt-3 text-sm text-[#6B7280]">
+            Tap or hover on an image to make it the cover photo.
+          </p>
         </div>
       )}
 
       {/* Warning Card */}
-      <div className="mt-10 rounded-[24px] border border-[#FDE68A] bg-[#FEFCE8] p-5">
+      <div className="mt-7 rounded-[24px] border border-[#FDE68A] bg-[#FEFCE8] p-5">
         <h3 className="text-sm font-bold uppercase tracking-wide text-[#92400E]">
           Important
         </h3>
 
         <p className="mt-3 text-sm leading-7 text-[#78350F]">
-          Upload clear and authentic product photos. Listings with high-quality
-          images receive significantly better engagement and buyer trust.
+          Upload atleast 1 clear and authentic product photos. Listings with
+          high-quality images receive significantly better engagement and buyer
+          trust.
         </p>
       </div>
 
@@ -285,28 +306,29 @@ const ImagesStep = () => {
         </div>
 
         {/* Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 lg:gap-3">
           {/* Back */}
           <button
             onClick={prevStep}
-            className="h-[54px] px-8 rounded-2xl border border-[#D1D5DB] text-[#111827] font-semibold hover:bg-[#F9FAFB] transition-all duration-200"
+            className="h-[54px] px-4 lg:px-8 rounded-xl border flex justify-center items-center border-[#D1D5DB] text-[#111827] font-semibold hover:bg-[#F9FAFB] transition-all duration-200 gap-2"
           >
-            ← Back
+            <IoArrowBack className="size-5" /> <span>Back</span>
           </button>
 
           {/* Continue */}
           <button
             onClick={nextStep}
             disabled={!isValid}
-            className={`h-[54px] px-10 rounded-2xl font-semibold transition-all duration-200
-            
-            ${
-              isValid
-                ? "bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
-                : "bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed"
-            }`}
+            className={`h-[50px] lg:h-[54px] px-4 lg:px-8 rounded-xl flex justify-center items-center gap-2 font-semibold transition-all duration-200 text-base lg:text-lg
+          
+          ${
+            isValid
+              ? "bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
+              : "bg-[#3838EC] text-[#9CA3AF] cursor-not-allowed"
+          }`}
           >
-            Continue →
+            <span>Continue</span>
+            <IoArrowForward className="size-5" />
           </button>
         </div>
       </div>

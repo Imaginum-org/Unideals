@@ -25,20 +25,20 @@ const Stepper = () => {
                     ? "bg-[#16A34A]"
                     : isActive
                       ? "bg-[#4F46E5]"
-                      : "bg-[#E5E7EB]"
+                      : "bg-[#E6E8EC]"
                 }`}
               />
 
               {/* Label */}
               <p
-                className={`mt-3 text-center text-xs font-semibold tracking-wide uppercase
+                className={`mt-3 text-center text-xs font-medium tracking-wide uppercase
                 
                 ${
                   isCompleted
                     ? "text-[#16A34A]"
                     : isActive
-                      ? "text-[#4F46E5]"
-                      : "text-[#9CA3AF]"
+                      ? "text-[#2E3FDC]"
+                      : "text-[#757687]"
                 }`}
               >
                 {item.label}

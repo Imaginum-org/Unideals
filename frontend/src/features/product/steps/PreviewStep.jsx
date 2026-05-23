@@ -1,22 +1,16 @@
 import { useMemo } from "react";
-
 import toast from "react-hot-toast";
-
-import { HiOutlineLocationMarker, HiOutlinePencil } from "react-icons/hi";
-
+import { HiOutlinePencil } from "react-icons/hi";
+import { GoRocket } from "react-icons/go";
 import { FaRupeeSign } from "react-icons/fa";
-
 import { MdVerified } from "react-icons/md";
-
 import { useNavigate } from "react-router-dom";
-
 import axios from "../../../services/axiosInstance";
-
 import { uploadImage } from "../../../Utils/imageUpload";
-
 import useProductListing from "../hooks/useProductListing";
-
 import { saveDraftProduct } from "../api/productApi.js";
+import { RiGraduationCapLine } from "react-icons/ri";
+import { MdOutlineLocationOn } from "react-icons/md";
 
 const PreviewStep = () => {
   const navigate = useNavigate();
@@ -41,6 +35,7 @@ const PreviewStep = () => {
       setLoading(true);
 
       await saveDraftProduct({
+        status: "draft",
         title: formData.title,
 
         description: formData.description,
@@ -153,271 +148,246 @@ const PreviewStep = () => {
   };
 
   return (
-    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-white shadow-sm overflow-hidden">
-      {/* Top Banner */}
-      <div className="relative h-[260px] md:h-[380px] bg-[#F9FAFB]">
-        {formData.imagePreviews?.[0] ? (
-          <img
-            src={formData.imagePreviews[0]}
-            alt="Cover"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-[#9CA3AF]">
-            No Image
-          </div>
-        )}
-
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-
-        {/* Top Actions */}
-        <div className="absolute top-5 right-5 flex items-center gap-3">
-          <button
-            onClick={() => goToStep(1)}
-            className="h-11 px-5 rounded-2xl bg-white/90 backdrop-blur-md text-[#111827] font-semibold flex items-center gap-2"
-          >
-            <HiOutlinePencil size={18} />
-            Edit
-          </button>
+    <div className="w-full shadow-sm font-figtree">
+      {/* Success Banner */}
+      <div className="rounded-xl bg-[#F0F9F4] border border-[#D7F0DE] px-4 py-4 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+          <MdVerified className="text-[#16A34A]" size={24} />
         </div>
 
-        {/* Bottom Content */}
-        <div className="absolute bottom-0 left-0 w-full p-6 md:p-8">
-          {/* Category */}
-          <div className="inline-flex rounded-full bg-white/20 backdrop-blur-md px-4 py-2 text-xs font-bold uppercase tracking-wide text-white">
-            {formData.category?.replaceAll("_", " ")}
-          </div>
+        <div>
+          <h3 className="text-lg font-bold text-[#111827]">
+            Your listing is ready!
+          </h3>
 
-          {/* Title */}
-          <h1 className="mt-5 text-[2rem] md:text-[2.8rem] font-bold text-white leading-tight max-w-3xl">
-            {formData.title}
-          </h1>
-
-          {/* Price */}
-          <div className="mt-5 flex flex-wrap items-center gap-4">
-            <div className="flex items-center text-white">
-              <FaRupeeSign size={24} />
-
-              <span className="text-[2rem] font-bold">
-                {formData.sellingPrice}
-              </span>
-            </div>
-
-            {/* Original */}
-            <div className="text-white/70 line-through text-lg">
-              ₹{formData.originalPrice}
-            </div>
-
-            {/* Discount */}
-            {discountPercentage > 0 && (
-              <div className="rounded-full bg-[#DCFCE7] px-4 py-2 text-sm font-bold text-[#166534]">
-                {discountPercentage}% OFF
-              </div>
-            )}
-          </div>
+          <p className="mt-1 text-sm text-[#475569]">
+            Review your product details before publishing.
+          </p>
         </div>
       </div>
 
-      {/* Main */}
-      <div className="p-5 sm:p-7 md:p-8">
-        {/* Images */}
-        <div>
-          <h2 className="text-lg font-bold text-[#111827]">Product Gallery</h2>
-
-          <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {formData.imagePreviews.map((image, index) => (
-              <div
-                key={index}
-                className="rounded-[24px] overflow-hidden border border-[#ECECEC]"
-              >
-                <img
-                  src={image}
-                  alt={`Preview ${index}`}
-                  className="w-full aspect-square object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Content Grid */}
-        <div className="mt-10 grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-8">
+      {/* Main Product Card */}
+      <div className="mt-5 shadow-sm rounded-xl border bg-white p-4 md:p-8">
+        <div className="grid grid-cols-1 xl:grid-cols-[520px_1fr] gap-9">
           {/* LEFT */}
           <div>
-            {/* Description */}
-            <div>
-              <h2 className="text-lg font-bold text-[#111827]">
-                Product Description
-              </h2>
-
-              <p className="mt-5 text-[15px] leading-8 text-[#4B5563] whitespace-pre-line">
-                {formData.description}
-              </p>
+            {/* Main Image */}
+            <div className="overflow-hidden rounded-2xl border border-[#ECECEC]">
+              {formData.imagePreviews?.[0] ? (
+                <img
+                  src={formData.imagePreviews?.[0]?.preview}
+                  alt="Product"
+                  className="w-full aspect-square object-cover"
+                />
+              ) : (
+                <div className="w-full aspect-square bg-[#F9FAFB] flex items-center justify-center text-[#9CA3AF]">
+                  No Image
+                </div>
+              )}
             </div>
 
-            {/* Product Details */}
-            <div className="mt-10">
-              <h2 className="text-lg font-bold text-[#111827]">
-                Product Details
-              </h2>
-
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Card */}
-                {[
-                  {
-                    label: "Brand",
-                    value: formData.brand,
-                  },
-
-                  {
-                    label: "Color",
-                    value: formData.color,
-                  },
-
-                  {
-                    label: "Condition",
-
-                    value: formData.condition?.replaceAll("_", " "),
-                  },
-
-                  {
-                    label: "Usage Duration",
-
-                    value: formData.usageDuration?.replaceAll("_", " "),
-                  },
-
-                  {
-                    label: "Purchase Date",
-
-                    value: formData.purchaseDate,
-                  },
-
-                  {
-                    label: "Negotiable",
-
-                    value: formData.negotiable ? "Yes" : "No",
-                  },
-                ].map((item, index) => (
-                  <div
-                    key={index}
-                    className="rounded-[24px] border border-[#ECECEC] p-5"
-                  >
-                    <p className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">
-                      {item.label}
-                    </p>
-
-                    <h3 className="mt-3 text-lg font-semibold text-[#111827] capitalize">
-                      {item.value}
-                    </h3>
-                  </div>
-                ))}
-              </div>
+            {/* Thumbnails */}
+            <div className="mt-5 flex items-center gap-4 overflow-x-auto">
+              {formData.imagePreviews.map((image, index) => (
+                <button
+                  key={image.id}
+                  className={`w-[84px] h-[84px] rounded-2xl overflow-hidden border-2 transition-all duration-200 flex-shrink-0
+                    
+                    ${index === 0 ? "border-[#4F46E5]" : "border-[#ECECEC]"}`}
+                >
+                  <img
+                    src={image.preview}
+                    alt={`Preview ${index}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
             </div>
           </div>
 
           {/* RIGHT */}
-          <div className="flex flex-col gap-5">
-            {/* Seller Card */}
-            <div className="rounded-[28px] border border-[#ECECEC] p-6">
-              {/* Seller */}
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5] font-bold text-lg">
-                  CM
-                </div>
+          <div className="flex flex-col">
+            {/* Category */}
+            <div className="inline-flex self-start rounded-full bg-[#EEF2FF] px-4 py-1 text-xs font-bold uppercase tracking-wide text-[#4F46E5]">
+              {formData.category?.replaceAll("_", " ")}
+            </div>
 
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-[#111827]">Campus Mart</h3>
+            {/* Title */}
+            <h1 className="mt-4 text-[2rem] md:text-4xl leading-tight font-extrabold text-[#181C1F]">
+              {formData.title}
+            </h1>
 
-                    <MdVerified className="text-[#2563EB]" />
-                  </div>
+            {/* Price */}
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <div className="flex items-center text-[#2E3FDC]">
+                <FaRupeeSign size={26} />
 
-                  <p className="text-sm text-[#6B7280]">Verified Seller</p>
-                </div>
+                <span className="text-3xl font-extrabold leading-none">
+                  {formData.sellingPrice}
+                </span>
               </div>
 
-              {/* Pickup */}
-              <div className="mt-6 rounded-2xl bg-[#F9FAFB] p-5">
-                <div className="flex items-start gap-3">
-                  <HiOutlineLocationMarker
-                    size={22}
-                    className="text-[#4F46E5] mt-1"
-                  />
-
-                  <div>
-                    <h4 className="font-semibold text-[#111827]">
-                      Meetup Location
-                    </h4>
-
-                    <p className="mt-2 text-sm leading-7 text-[#6B7280]">
-                      {formData.meetupLocation}
-                    </p>
-                  </div>
+              {formData.originalPrice && (
+                <div className="text-2xl flex items-center text-[#9CA3AF] line-through font-normal">
+                  <FaRupeeSign size={22} />
+                  {formData.originalPrice}
                 </div>
-              </div>
+              )}
 
-              {/* Address */}
-              <div className="mt-5 rounded-2xl bg-[#F9FAFB] p-5">
-                <h4 className="font-semibold text-[#111827]">Pickup Address</h4>
+              {formData.negotiable && (
+                <div className="rounded-lg bg-[#EEF2FF] px-4 py-1 text-xs font-bold uppercase tracking-wide text-[#4F46E5] ml-7">
+                  Negotiable
+                </div>
+              )}
+            </div>
 
-                <p className="mt-3 text-sm leading-7 text-[#6B7280]">
-                  {formData.address?.address_line || formData.address?.line1}
-                  <br />
-                  {formData.address?.city}, {formData.address?.state}
-                  <br />
-                  {formData.address?.pincode}
+            {/* Divider */}
+            <div className="mt-8 border-t border-[#ECECEC]" />
+
+            {/* Meetup */}
+            <div className="mt-5 flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <RiGraduationCapLine size={20} className="text-[#2E3FDC]" />
+
+                <p className="text-[15px] text-[#454655]">
+                  Campus:{" "}
+                  <span className="font-semibold text-[#111827]">
+                    VIT Vellore
+                  </span>
                 </p>
               </div>
 
-              {/* Payment */}
-              <div className="mt-5 rounded-2xl border border-[#E5E7EB] p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">
-                  Preferred Payment
-                </p>
+              <div className="flex items-center gap-3">
+                <MdOutlineLocationOn size={20} className="text-[#2E3FDC]" />
 
-                <h4 className="mt-2 text-lg font-semibold capitalize text-[#111827]">
-                  {formData.paymentMethod}
-                </h4>
+                <p className="text-[15px] text-[#454655]">
+                  Meetup:{" "}
+                  <span className="font-semibold text-[#111827]">
+                    {formData.meetupLocation}
+                  </span>
+                </p>
               </div>
             </div>
 
-            {/* Save as Draft */}
+            {/* Description */}
+            <div className="mt-10">
+              <h2 className="text-base font-bold text-[#454655]">
+                About This Product
+              </h2>
+
+              <p className="mt-1 text-[15px] leading-8 text-[#454655] whitespace-pre-line">
+                {formData.description}
+              </p>
+            </div>
+
+            {/* Details */}
+            <div className="mt-10 grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-6">
+              <div>
+                <p className="text-sm font-semibold text-[#454655]">
+                  Product Condition
+                </p>
+
+                <p className="mt-2 text-[15px] font-semibold text-[#16A34A] capitalize">
+                  {formData.condition?.replaceAll("_", " ")}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-[#454655]">
+                  Usage Duration
+                </p>
+
+                <p className="mt-2 text-[15px] text-[#6B7280] capitalize">
+                  {formData.usageDuration?.replaceAll("_", " ")}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-[#454655]">
+                  Date of Purchase
+                </p>
+
+                <p className="mt-2 text-[15px] text-[#6B7280]">
+                  {formData.purchaseDate}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-[#454655]">
+                  Mode of Payment
+                </p>
+
+                <p className="mt-2 text-[15px] text-[#6B7280] capitalize">
+                  {formData.paymentMethod}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-[#454655]">Brand</p>
+
+                <p className="mt-2 text-[15px] text-[#6B7280] capitalize">
+                  {formData.brand || "N/A"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-[#454655]">Color</p>
+
+                <p className="mt-2 text-[15px] text-[#6B7280] capitalize">
+                  {formData.color || "N/A"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Actions */}
+        <div className="mt-14 flex flex-col items-center">
+          {/* Publish */}
+          <button
+            onClick={handlePublish}
+            disabled={loading}
+            className={`w-full max-w-[360px] h-[62px] rounded-2xl font-bold text-lg transition-all duration-200
+              
+              ${
+                loading
+                  ? "bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed"
+                  : "bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-xl shadow-indigo-200"
+              }`}
+          >
+            {loading ? (
+              <span>Publishing...</span>
+            ) : (
+              <div className="flex items-center gap-2 justify-center">
+                <span>Publish Now</span>
+                <GoRocket />
+              </div>
+            )}
+          </button>
+
+          {/* Bottom Links */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm">
+            <button
+              onClick={() => goToStep(1)}
+              className="flex items-center gap-2 text-[#4B5563] hover:text-[#111827]"
+            >
+              <HiOutlinePencil size={16} />
+              Edit Listing
+            </button>
+
+            <div className="w-[4px] h-[4px] rounded-full bg-[#D1D5DB]" />
+
             <button
               onClick={handleSaveDraft}
-              disabled={loading}
-              className="h-[54px] rounded-2xl border border-[#D1D5DB] bg-white px-6 font-semibold text-[#111827] hover:bg-[#F9FAFB] transition-all duration-200"
+              className="text-[#4B5563] hover:text-[#111827]"
             >
               Save as Draft
-            </button>
-
-            {/* Publish */}
-            <button
-              onClick={handlePublish}
-              disabled={loading}
-              className={`h-[60px] rounded-2xl font-bold text-lg transition-all duration-200
-                
-                ${
-                  loading
-                    ? "bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed"
-                    : "bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-xl shadow-indigo-200"
-                }`}
-            >
-              {loading ? "Publishing..." : "Publish Product"}
-            </button>
-
-            {/* Back */}
-            <button
-              onClick={prevStep}
-              className="h-[54px] rounded-2xl border border-[#D1D5DB] text-[#111827] font-semibold hover:bg-[#F9FAFB] transition-all duration-200"
-            >
-              ← Back
             </button>
           </div>
         </div>
       </div>
     </div>
   );
-};;
+};
 
 export default PreviewStep;

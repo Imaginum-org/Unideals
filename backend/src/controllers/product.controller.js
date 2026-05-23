@@ -187,3 +187,21 @@ export const relistProduct = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getMyDraftProducts = async (req, res, next) => {
+  try {
+    const userId = req.userId;
+
+    const drafts = await productService.getMyDraftProducts(userId);
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Draft products fetched successfully",
+
+      data: drafts,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

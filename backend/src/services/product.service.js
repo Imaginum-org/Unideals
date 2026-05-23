@@ -18,13 +18,19 @@ export const createProduct = async (data, user) => {
 
   const existingProduct = await Product.findOne({
     seller_id: user._id,
+    status: PRODUCT_STATUS.LISTED,
     category: data.category,
-    title: { $regex: `^${safeTitle}$`, $options: "i" },
+    title: {
+      $regex: `^${safeTitle}$`,
+      $options: "i",
+    },
     selling_price: {
       $gte: data.selling_price * 0.9,
       $lte: data.selling_price * 1.1,
     },
-    createdAt: { $gte: FIVE_MINUTES_AGO },
+    createdAt: {
+      $gte: FIVE_MINUTES_AGO,
+    },
     is_deleted: false,
   });
 
@@ -448,4 +454,16 @@ export const relistProduct = async (productId, userId) => {
 
   product.status = PRODUCT_STATUS.LISTED;
   return await product.save();
+};
+
+export const getMyDraftProducts = async (userId) => {
+  return await Product.find({
+    seller_id: userId,
+
+    status: PRODUCT_STATUS.DRAFT,
+
+    is_deleted: false,
+  })
+    .sort({ updatedAt: -1 })
+    .lean();
 };

@@ -1,9 +1,7 @@
 import { useMemo } from "react";
-
 import Select from "react-select";
-
+import { IoArrowForward } from "react-icons/io5";
 import useProductListing from "../hooks/useProductListing";
-
 import {
   PRODUCT_CATEGORY_OPTIONS,
   PRODUCT_CONDITION_OPTIONS,
@@ -13,10 +11,7 @@ import {
 const BasicInfoStep = () => {
   const { formData, updateField, nextStep } = useProductListing();
 
-  // =========================
-  // VALIDATION
-  // =========================
-
+  // Validation
   const isValid = useMemo(() => {
     return (
       formData.title?.trim() &&
@@ -30,10 +25,7 @@ const BasicInfoStep = () => {
     );
   }, [formData]);
 
-  // =========================
-  // SELECT STYLES
-  // =========================
-
+  // Select Styles
   const selectStyles = {
     control: (provided, state) => ({
       ...provided,
@@ -66,25 +58,14 @@ const BasicInfoStep = () => {
   };
 
   return (
-    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
-      {/* Header */}
-      <div>
-        <h2 className="text-[1.8rem] font-bold text-[#111827] leading-tight">
-          Product Details
-        </h2>
-
-        <p className="mt-2 text-[#6B7280] text-sm md:text-base">
-          Provide the basic details to help buyers find your product.
-        </p>
-      </div>
-
+    <div className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-white shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 ">
       {/* Main Grid */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* LEFT */}
         <div className="flex flex-col gap-6">
           {/* Product Name */}
           <div>
-            <label className="text-sm font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#0F172A]">
               Product Title
             </label>
 
@@ -94,37 +75,13 @@ const BasicInfoStep = () => {
               value={formData.title}
               onChange={(e) => updateField("title", e.target.value)}
               placeholder="e.g. Macbook Air M1"
-              className="mt-3 w-full h-[56px] rounded-2xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5]"
+              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
             />
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="text-sm font-semibold text-[#111827]">
-              Short Description
-            </label>
-
-            <textarea
-              maxLength={1000}
-              value={formData.description}
-              onChange={(e) => updateField("description", e.target.value)}
-              placeholder="Describe your product..."
-              className="mt-3 w-full h-[220px] rounded-2xl border border-[#E5E7EB] p-5 resize-none outline-none focus:border-[#4F46E5]"
-            />
-
-            <div className="mt-2 flex justify-between text-xs text-[#9CA3AF]">
-              <span>Describe the core functionality and value.</span>
-
-              <span>{formData.description.length}/1000</span>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT */}
-        <div className="flex flex-col gap-6">
           {/* Category */}
           <div>
-            <label className="text-sm font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827]">
               Category
             </label>
 
@@ -142,13 +99,38 @@ const BasicInfoStep = () => {
                 onChange={(selected) =>
                   updateField("category", selected?.value || "")
                 }
+                className="bg-[#F7F8FA]"
               />
             </div>
           </div>
 
+          {/* Description */}
+          <div>
+            <label className="text-base font-semibold text-[#111827]">
+              Short Description
+            </label>
+
+            <textarea
+              maxLength={1000}
+              value={formData.description}
+              onChange={(e) => updateField("description", e.target.value)}
+              placeholder="Describe your product..."
+              className="mt-3 w-full h-[220px] rounded-xl border border-[#E5E7EB] p-5 resize-none outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
+            />
+
+            <div className="mt-1 flex justify-between text-sm text-[#94A3B8]">
+              <span>Describe the core functionality and value.</span>
+
+              <span>{formData.description.length}/1000</span>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Brand */}
           <div>
-            <label className="text-sm font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827]">
               Brand / Model
             </label>
 
@@ -157,13 +139,13 @@ const BasicInfoStep = () => {
               value={formData.brand}
               onChange={(e) => updateField("brand", e.target.value)}
               placeholder="e.g. Apple"
-              className="mt-3 w-full h-[56px] rounded-2xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5]"
+              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
             />
           </div>
 
           {/* Color */}
           <div>
-            <label className="text-sm font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827]">
               Product Color
             </label>
 
@@ -172,13 +154,13 @@ const BasicInfoStep = () => {
               value={formData.color}
               onChange={(e) => updateField("color", e.target.value)}
               placeholder="e.g. Space Grey"
-              className="mt-3 w-full h-[56px] rounded-2xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5]"
+              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
             />
           </div>
 
           {/* Condition */}
           <div>
-            <label className="text-sm font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827]">
               Product Condition
             </label>
 
@@ -196,13 +178,14 @@ const BasicInfoStep = () => {
                 onChange={(selected) =>
                   updateField("condition", selected?.value || "")
                 }
+                className="bg-[#F7F8FA]"
               />
             </div>
           </div>
 
           {/* Usage */}
           <div>
-            <label className="text-sm font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827]">
               Usage Duration
             </label>
 
@@ -220,21 +203,23 @@ const BasicInfoStep = () => {
                 onChange={(selected) =>
                   updateField("usageDuration", selected?.value || "")
                 }
+                className="bg-[#F7F8FA]"
               />
             </div>
           </div>
 
           {/* Purchase Date */}
           <div>
-            <label className="text-sm font-semibold text-[#111827]">
+            <label className="text-base font-semibold text-[#111827]">
               Date of Purchase
             </label>
 
             <input
               type="date"
+              max={new Date().toISOString().split("T")[0]}
               value={formData.purchaseDate}
               onChange={(e) => updateField("purchaseDate", e.target.value)}
-              className="mt-3 w-full h-[56px] rounded-2xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5]"
+              className="mt-3 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA]"
             />
           </div>
         </div>
@@ -244,7 +229,7 @@ const BasicInfoStep = () => {
       <div className="mt-10 flex items-center justify-between">
         {/* Pagination */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[#9CA3AF]">Step 1 of 4</span>
+          <span className="text-base text-[#94A3B8]">Step 1 of 4</span>
 
           <div className="flex gap-1">
             <div className="w-7 h-[4px] rounded-full bg-[#4F46E5]" />
@@ -261,15 +246,16 @@ const BasicInfoStep = () => {
         <button
           onClick={nextStep}
           disabled={!isValid}
-          className={`h-[54px] px-10 rounded-2xl font-semibold transition-all duration-200
+          className={`h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-xl flex justify-center items-center gap-2 font-semibold transition-all duration-200 text-base lg:text-lg
           
           ${
             isValid
-              ? "bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
-              : "bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed"
+              ? "bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
+              : "bg-[#3838EC] text-[#9CA3AF] cursor-not-allowed"
           }`}
         >
-          Continue →
+          <span>Continue</span>
+          <IoArrowForward className="size-5" />
         </button>
       </div>
     </div>

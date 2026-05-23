@@ -6,7 +6,7 @@ import BasicInfoStep from "../../steps/BasicInfoStep";
 import ImagesStep from "../../steps/ImagesStep";
 import PricingStep from "../../steps/PricingStep";
 import PreviewStep from "../../steps/PreviewStep";
-
+import { IoArrowBack } from "react-icons/io5";
 import Stepper from "../stepper/Stepper";
 import TipsCard from "../shared/TipsCard";
 
@@ -40,42 +40,57 @@ const ListingLayout = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#FAFAFA] dark:bg-[#131313]">
-      <div className="max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 md:py-8">
+    <div className="w-full min-h-screen bg-[#FAFAFA] dark:bg-[#131313] font-figtree">
+      <div className="max-w-6xl w-full mx-auto px-7 sm:px-6 lg:px-8 xl:px-10 py-6 md:py-8">
         {/* Back */}
         <button
           onClick={() => window.history.back()}
-          className="text-sm text-[#111827] dark:text-white flex items-center gap-2"
+          className="text-sm lg:text-base text-[#090A0B] dark:text-white flex items-center gap-2 font-medium"
         >
-          ← Back
+          <IoArrowBack />
+          <span>Back</span>
         </button>
 
         {/* Header */}
         <div className="mt-7">
-          <h1 className="text-[2rem] md:text-[2.4rem] font-bold text-[#111827] dark:text-white leading-tight">
+          <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
             Sell Your Product
           </h1>
 
-          <p className="mt-2 text-[#6B7280] dark:text-[#A1A1AA] text-sm md:text-base">
+          <p className="mt-2 xl:mt-1 text-[#475569] dark:text-[#A1A1AA] text-sm md:text-base">
             Provide the basic details to help buyers find your product.
           </p>
         </div>
 
         {/* Stepper */}
-        <div className="mt-8">
+        <div className="mt-6">
           <Stepper />
         </div>
 
         {/* Main */}
-        <div className="mt-10 grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-8 items-start">
+        <div
+          className={`mt-8 grid grid-cols-1 gap-6 items-start ${
+            step !== 4 ? "xl:grid-cols-[1fr_320px]" : ""
+          }`}
+        >
           {/* LEFT */}
-          <div className="w-full max-w-[920px]">{renderStep()}</div>
+          <div className={`w-full ${step !== 4 ? "xl:max-w-[920px]" : ""}`}>
+            {renderStep()}
+          </div>
 
           {/* RIGHT */}
-          <div className="hidden xl:block sticky top-24">
+          {step !== 4 && (
+            <div className="hidden xl:block sticky top-24">
+              <TipsCard step={step} />
+            </div>
+          )}
+        </div>
+
+        {step !== 4 && (
+          <div className="xl:hidden mt-5">
             <TipsCard step={step} />
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

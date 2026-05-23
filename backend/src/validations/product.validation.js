@@ -5,31 +5,37 @@ import {
   PRODUCT_CONDITION,
   PRODUCT_PAYMENT,
   PRODUCT_USAGE_DURATION,
+  PRODUCT_STATUS,
 } from "../config/constants.js";
 
 export const createProductSchema = z
   .object({
+    status: z.enum(Object.values(PRODUCT_STATUS)).optional(),
+
     title: z
       .string()
       .trim()
       .min(3, "Title must be at least 3 characters")
-      .max(120, "Title cannot exceed 120 characters"),
+      .max(120, "Title cannot exceed 120 characters")
+      .optional(),
 
     description: z
       .string()
       .trim()
       .min(10, "Description must be at least 10 characters")
-      .max(2000, "Description cannot exceed 2000 characters"),
+      .max(2000, "Description cannot exceed 2000 characters")
+      .optional(),
 
-    category: z.enum(Object.values(PRODUCT_CATEGORIES)),
+    category: z.enum(Object.values(PRODUCT_CATEGORIES)).optional(),
 
-    condition: z.enum(Object.values(PRODUCT_CONDITION)),
+    condition: z.enum(Object.values(PRODUCT_CONDITION)).optional(),
 
     selling_price: z.coerce
       .number({
         invalid_type_error: "Selling price must be a number",
       })
-      .positive("Selling price must be greater than 0"),
+      .positive("Selling price must be greater than 0")
+      .optional(),
 
     original_price: z.coerce
       .number({
@@ -40,12 +46,12 @@ export const createProductSchema = z
 
     is_negotiable: z.boolean().optional(),
 
-    payment_preference: z.enum(Object.values(PRODUCT_PAYMENT)),
+    payment_preference: z.enum(Object.values(PRODUCT_PAYMENT)).optional(),
 
     images: z
       .array(z.string().url())
-      .min(1, "At least one image is required")
-      .max(3, "Maximum 3 images allowed"),
+      .max(3, "Maximum 3 images allowed")
+      .optional(),
 
     attributes: z
       .object({
@@ -69,29 +75,42 @@ export const createProductSchema = z
       })
       .optional(),
 
-    pickup_address_snapshot: z.object({
-      address_line: z.string().trim().min(3),
+    pickup_address_snapshot: z
+      .object({
+        address_line: z.string().trim().min(3).optional(),
 
-      city: z.string().trim().min(2),
+        city: z.string().trim().min(2).optional(),
 
-      state: z.string().trim().min(2),
+        state: z.string().trim().min(2).optional(),
 
-      pincode: z.string().regex(/^\d{6}$/, "Invalid pincode"),
+        pincode: z
+          .string()
+          .regex(/^\d{6}$/, "Invalid pincode")
+          .optional(),
 
-      mobile: z
-        .string()
-        .regex(/^[6-9]\d{9}$/, "Invalid mobile number")
-        .optional(),
+        mobile: z
+          .string()
+          .regex(/^[6-9]\d{9}$/, "Invalid mobile number")
+          .optional(),
 
-      additional_info: z.string().trim().max(300).optional(),
-    }),
+        additional_info: z.string().trim().max(300).optional(),
+      })
+      .optional(),
 
     image_file_ids: z.array(z.string().min(1)).optional(),
   })
   .refine(
-    (data) => !data.original_price || data.selling_price <= data.original_price,
+    (data) => {
+      if (data.original_price && data.selling_price) {
+        return data.selling_price <= data.original_price;
+      }
+
+      return true;
+    },
+
     {
       message: "Selling price cannot exceed original price",
+
       path: ["selling_price"],
     },
   );

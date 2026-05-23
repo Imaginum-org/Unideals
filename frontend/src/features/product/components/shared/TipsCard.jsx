@@ -1,14 +1,10 @@
-import {
-  HiOutlineLightBulb,
-  HiOutlinePhotograph,
-  HiOutlineCurrencyRupee,
-  HiOutlineClipboardCheck,
-} from "react-icons/hi";
+import { MdStars } from "react-icons/md";
+import { BsFillLightbulbFill } from "react-icons/bs";
 
 const TIPS_DATA = {
   1: {
-    icon: <HiOutlineClipboardCheck size={24} />,
-    title: "Tips for better listings",
+    icon: <BsFillLightbulbFill size={18} />,
+    title: "PRO TIP",
 
     tips: [
       "Use a descriptive product title.",
@@ -19,8 +15,8 @@ const TIPS_DATA = {
   },
 
   2: {
-    icon: <HiOutlinePhotograph size={24} />,
-    title: "Tips for better photos",
+    icon: <BsFillLightbulbFill size={18} />,
+    title: "PRO TIP",
 
     tips: [
       "Use natural lighting.",
@@ -31,8 +27,8 @@ const TIPS_DATA = {
   },
 
   3: {
-    icon: <HiOutlineCurrencyRupee size={24} />,
-    title: "Pricing tips",
+    icon: <BsFillLightbulbFill size={18} />,
+    title: "PRO TIP",
 
     tips: [
       "Keep pricing realistic.",
@@ -43,8 +39,8 @@ const TIPS_DATA = {
   },
 
   4: {
-    icon: <HiOutlineLightBulb size={24} />,
-    title: "Final review",
+    icon: <BsFillLightbulbFill size={18} />,
+    title: "PRO TIP",
 
     tips: [
       "Review all details carefully.",
@@ -59,22 +55,27 @@ const TipsCard = ({ step }) => {
   const currentTip = TIPS_DATA[step];
 
   return (
-    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-[#F5F3FF] p-6">
+    <div className="w-full rounded-xl border border-[#ECECEC] bg-[#F1F1FF] py-5 px-6 font-figtree">
       {/* Top */}
-      <div className="flex items-center gap-3 text-[#4F46E5]">
+      <div className="flex items-center gap-2 text-[#3838EC]">
         {currentTip.icon}
 
-        <h2 className="text-sm font-bold uppercase tracking-wide">
+        <h2 className="text-sm font-bold text-[#000000] uppercase tracking-wide">
           {currentTip.title}
         </h2>
       </div>
 
-      {/* Tips */}
-      <div className="mt-6 flex flex-col gap-5">
-        {currentTip.tips.map((tip, index) => (
-          <div key={index} className="flex items-start gap-3">
-            <div className="w-2 h-2 rounded-full bg-[#818CF8] mt-[9px]" />
+      <p className="text-xl font-semibold pr-14 lg:pr-9 mt-3">
+        Products with clear, descriptive titles receive{" "}
+        <span className="text-[#3838EC]">40% more interest</span> from potential
+        buyers.
+      </p>
 
+      {/* Tips */}
+      <div className="mt-4 flex flex-col justify-center gap-2">
+        {currentTip.tips.map((tip, index) => (
+          <div key={index} className="flex items-center gap-3">
+            <MdStars className="text-[#3838EC]" />
             <p className="text-[15px] leading-7 text-[#111827]">{tip}</p>
           </div>
         ))}
