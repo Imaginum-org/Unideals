@@ -1,413 +1,517 @@
-import { useState, useEffect } from "react";
-import { IoMdShareAlt } from "react-icons/io";
-import { EllipsisVertical, IndianRupee } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { MessageSquareMore } from "lucide-react";
-import { FaRegHeart, FaHeart } from "react-icons/fa";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import Footer from "../../../components/layout/Footer.jsx";
+import { useNavigate } from "react-router-dom";
+import {
+  Heart,
+  Share2,
+  MessageSquare,
+  Eye,
+  MapPin,
+  ShieldCheck,
+  Clock3,
+} from "lucide-react";
+import toast from "react-hot-toast"
+
+import { LuMessageSquareText } from "react-icons/lu";
+import { useParams, Link } from "react-router-dom";
+import { IoIosArrowForward } from "react-icons/io";
 import { getProductById } from "../api/productApi";
-import { useWishlist } from "../../../context/useWishlist.js";
+import { useWishlist } from "../../../context/useWishlist";
+import { HiOutlineBuildingLibrary } from "react-icons/hi2";
+import { MdLocationPin } from "react-icons/md";
+// condition
+import { GoChecklist } from "react-icons/go";
+//color
+import { IoColorPaletteOutline } from "react-icons/io5";
+
+//date of purchase
+import { IoCalendarOutline } from "react-icons/io5";
+import { FaArrowRight } from "react-icons/fa6";
 
 const FALLBACK_IMAGE = "/image10.png";
 
 const ProductDescription = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
-
-  const [report, setReport] = useState(false);
-
-  // Wishlist state
-  const [inWishlist, setInWishlist] = useState(false);
-  const [wishlistLoading, setWishlistLoading] = useState(false);
-
-  const { toggleWishlist, checkProductInWishlist } = useWishlist();
 
   const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const images =
-    product?.images?.length > 0 ? product.images : [FALLBACK_IMAGE];
 
   const [activeImage, setActiveImage] = useState("");
 
+  const [loading, setLoading] = useState(true);
+
+  const [inWishlist, setInWishlist] = useState(false);
+
+  const { toggleWishlist, checkProductInWishlist } = useWishlist();
+  const navigate = useNavigate();
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [id]);
-
-  useEffect(() => {
-    if (product?.images?.length > 0) {
-      setActiveImage(product.images[0]);
-    }
-  }, [product]);
-
-  // Wishlist check
-  useEffect(() => {
-    const checkWishlistStatus = async () => {
-      try {
-        const isInWish = await checkProductInWishlist(id);
-        setInWishlist(isInWish);
-      } catch (error) {
-        console.error("Error checking wishlist:", error);
-      }
-    };
-
-    if (id) {
-      checkWishlistStatus();
-    }
-  }, [id, checkProductInWishlist]);
-
-  //Fetch product
-  useEffect(() => {
-    let isMounted = true;
-
     const fetchProduct = async () => {
       try {
-        setLoading(true);
-
         const res = await getProductById(id);
 
-        if (isMounted) {
-          setProduct(res.data?.data);
+        const fetchedProduct = res?.data?.data;
+
+        setProduct(fetchedProduct);
+
+        if (fetchedProduct?.images?.length > 0) {
+          setActiveImage(fetchedProduct.images[0]);
         }
-      } catch (err) {
-        console.error("Product fetch error:", err);
-        setError("Failed to load product");
+      } catch (error) {
+        console.log(error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) fetchProduct();
-
-    return () => {
-      isMounted = false;
-    };
+    fetchProduct();
   }, [id]);
 
-  const handleReport = () => setReport((prev) => !prev);
+  useEffect(() => {
+    const checkWishlist = async () => {
+      const exists = await checkProductInWishlist(id);
 
-  const reportIssue = () => {
-    toast.success("Product Reported");
-    setReport(false);
-    setTimeout(() => navigate("/"), 800);
-  };
+      setInWishlist(exists);
+    };
 
-  // Wishlist handler
-  const handleWishlist = async () => {
-    if (wishlistLoading) return;
-
-    setWishlistLoading(true);
-
-    try {
-      const result = await toggleWishlist(id);
-      setInWishlist(result);
-
-      toast.success(result ? "Added to Wishlist" : "Removed from Wishlist");
-    } catch (error) {
-      toast.error("Failed to update wishlist");
-      console.error("Wishlist error:", error);
-    } finally {
-      setWishlistLoading(false);
-    }
-  };
+    checkWishlist();
+  }, [id]);
 
   const handleShare = async () => {
     try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(window.location.href);
-        toast.success("Link Copied!");
-      } else {
-        throw new Error("Clipboard not supported");
-      }
-    } catch {
-      toast.error("Copy failed");
+      await navigator.clipboard.writeText(window.location.href);
+
+      toast.success("Product link copied");
+    } catch (error) {
+      console.log(error);
+
+      toast.error("Failed to copy link");
     }
   };
+  const original = Number(product?.original_price);
+  const selling = Number(product?.selling_price);
+  const savedPricedPercentage = Math.round(
+    ((original - selling) / original) * 100,
+  );
 
   if (loading) {
-    return <div className="p-10 text-center">Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="p-10 text-center text-red-500">{error}</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA]">
+        Loading...
+      </div>
+    );
   }
 
   if (!product) {
-    return <div className="p-10 text-center">Product not found</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA]">
+        Product not found
+      </div>
+    );
   }
 
+  console.log(product);
+
+  const getRelativeTime = (date) => {
+    const now = new Date();
+
+    const created = new Date(date);
+
+    const diffInSeconds = Math.floor((now - created) / 1000);
+
+    const minutes = Math.floor(diffInSeconds / 60);
+
+    const hours = Math.floor(minutes / 60);
+
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days} day${days > 1 ? "s" : ""} ago`;
+    }
+
+    if (hours > 0) {
+      return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    }
+
+    if (minutes > 0) {
+      return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+    }
+
+    return "Just now";
+  };
+
+  const images =
+    product?.images?.length > 0 ? product.images : [FALLBACK_IMAGE];
+
   return (
-    <div className="w-full min-h-screen">
-      <div className="flex flex-col w-full xl:flex-row 2xl:min-h-screen dark:bg-[#131313] xl:pt-2">
-        <Toaster
-          position="top-center"
-          reverseOrder={false}
-          toastOptions={{
-            duration: 1500,
-            maxToasts: 1,
-          }}
-        />
+    <div className="w-full min-h-screen bg-[#F7F9FD] font-figtree">
+      <div className="w-full max-w-[1380px] mx-auto px-3 sm:px-4 md:px-5 lg:px-6 xl:px-0 pt-4 md:pt-6 xl:pt-4 text-[#454655]">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1 text-sm text-[#454655] mb-4 overflow-x-auto whitespace-nowrap font-semibold">
+          <button
+            onClick={() => navigate("/")}
+            className="hover:text-[#3838EC] transition-colors"
+          >
+            Home
+          </button>
 
-        {/* Left side */}
-        <div className="w-full mt-3 flex flex-col items-center xl:items-start gap-4 xl:w-1/3 xl:ml-5">
-          {/* Left top - images */}
-          <div className="rounded-2xl shadow-[0px_3.691620111465454px_12px_0px_rgba(102,102,102,0.10)] border pb-1 bg-white w-[93vw] xl:flex flex-col justify-center md:items-center xl:items-start xl:w-[28vw] dark:bg-[#1A1D20] dark:border-0 dark:shadow-xl">
-            {/* FIXED IMAGE VIEWPORT (ADDED) */}
-            <div className="w-full h-[360px] md:h-[420px] xl:h-[460px] flex items-center justify-center overflow-hidden">
-              <img
-                className="max-w-full max-h-full object-contain pl-5 pr-5 pt-3 rounded-xl md:mx-auto lg:mx-auto xl:mx-0"
-                src={activeImage || FALLBACK_IMAGE}
-                alt="Product"
-              />
-            </div>
+          <IoIosArrowForward size={12} />
 
-            {/* Thumbnails + share */}
-            <div className="flex pl-5 pb-3 pt-1 justify-between xl:w-full">
+          <button
+            onClick={() => navigate(`/category/${product?.category}`)}
+            className="capitalize font-semibold text-[#454655] hover:text-[#3838EC] transition-colors"
+          >
+            {product?.category.replaceAll("_", " ")}
+          </button>
+
+          <IoIosArrowForward size={12} />
+
+          <span className="font-bold text-black">{product?.title}</span>
+        </div>
+
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-[530px_1fr] gap-6 xl:gap-5">
+          {/* LEFT */}
+          <div className="flex flex-col gap-4">
+            {/* Image Card */}
+            <div className="bg-[#FFFFFF] rounded-xl border border-[#C9D1DC] p-3 md:p-4 xl:p-4">
+              {/* Main Image */}
+              <div className="relative overflow-hidden rounded-2xl">
+                <img
+                  src={activeImage}
+                  alt="Product"
+                  className="w-full aspect-[1/0.93] object-cover"
+                />
+                {/* Top Actions */}
+                <div className="absolute top-3 right-3 flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      toggleWishlist(id);
+
+                      setInWishlist(!inWishlist);
+                    }}
+                    className="w-10 h-10 md:w-11 md:h-11 lg:w-9 lg:h-9 rounded-full bg-white shadow-md flex items-center justify-center"
+                  >
+                    <Heart
+                      size={18}
+                      className={`transition-all duration-200 ${
+                        inWishlist
+                          ? "fill-red-500 text-red-500"
+                          : "text-[#181C1F]"
+                      }`}
+                    />
+                  </button>
+
+                  <button
+                    onClick={handleShare}
+                    className="w-10 h-10 md:w-11 md:h-11 lg:w-9 lg:h-9 rounded-full bg-white shadow-md flex items-center justify-center"
+                  >
+                    <Share2 size={18} className="text-[#181C1F]" />
+                  </button>
+                </div>
+              </div>
+
               {/* Thumbnails */}
-              <div className="flex gap-3 mt-2 md:mx-auto lg:mx-auto xl:mx-0">
+              <div className="mt-3 flex gap-3 overflow-x-auto scrollbar-hide">
                 {images.map((img, index) => (
                   <button
                     key={index}
-                    type="button"
                     onClick={() => setActiveImage(img)}
-                    className={`size-16 rounded-md overflow-hidden border-2 transition-all duration-200 
-            ${
-              activeImage === img
-                ? "border-indigo-500"
-                : "border-transparent hover:border-indigo-300"
-            }`}
+                    className={`min-w-[74px] sm:min-w-[84px] w-[74px] sm:w-[90px] h-[74px] sm:h-[90px] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
+                      activeImage === img
+                        ? "border-[#4F46E5]"
+                        : "border-[#ECECEC]"
+                    }`}
                   >
                     <img
                       src={img}
-                      alt={`Thumbnail ${index + 1}`}
-                      className="w-full h-full object-cover"
+                      alt={`Preview ${index}`}
+                      className="w-full h-full object-fill"
                     />
                   </button>
                 ))}
               </div>
 
-              {/* Share */}
-              <div className="flex justify-end items-end pr-6 pt-5">
-                <button onClick={handleShare} aria-label="Share product">
-                  <IoMdShareAlt className="text-[#848484] hover:text-blue-500 lg:size-6 md:size-4 size-6" />
-                </button>
+              {/* Stats */}
+              <div className="mt-4 border border-[#E2E8F0] rounded-xl px-3 bg-[#FFFFFF] py-3 flex flex-wrap items-center justify-between gap-3 text-[13px] md:text-sm text-[#6B7280]">
+                <div className="flex items-center gap-2 text-[#475569] font-medium">
+                  <Eye size={16} className="text-[#2563EB]" />
+
+                  <span>{product?.views_count || 0} views</span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[#475569] font-medium">
+                  <MessageSquare size={16} />
+
+                  <span>18 users chatted</span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[#394FF1] font-medium">
+                  <Clock3 size={16} />
+
+                  <span>5 chats in last hour</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Key Details */}
+            <div className="bg-white shadow-sm rounded-xl border border-[#E2E8F0] p-5 md:p-6">
+              <h2 className="text-[24px] md:text-[28px] xl:text-xl font-bold text-[#0F172A] mb-5">
+                Key Details
+              </h2>
+
+              <div className="space-y-7">
+                {[
+                  {
+                    icon: <GoChecklist size={17} className="text-[#3838EC]" />,
+                    label: "Usage Duration",
+                    value: product?.attributes?.usage_duration || "<2 months",
+                  },
+
+                  {
+                    icon: <GoChecklist size={17} className="text-[#3838EC]" />,
+                    label: "Brand",
+                    value: product?.attributes?.brand || "N/A",
+                  },
+
+                  {
+                    icon: <GoChecklist size={17} className="text-[#3838EC]" />,
+                    label: "Model",
+                    value: product?.title,
+                  },
+                  {
+                    icon: (
+                      <IoColorPaletteOutline
+                        size={17}
+                        className="text-[#3838EC]"
+                      />
+                    ),
+                    label: "Color",
+                    value: product?.attributes?.color || "N/A",
+                  },
+                  {
+                    icon: (
+                      <IoCalendarOutline size={17} className="text-[#3838EC]" />
+                    ),
+                    label: "Purchase Date",
+                    value: product?.attributes?.purchase_date || "N/A",
+                  },
+                ].map((item, index) => (
+                  <div key={index} className="flex items-start justify-between">
+                    <div className="flex items-center gap-3 text-[#6B7280]">
+                      <div className="flex items-center justify-center">
+                        {item.icon}
+                      </div>
+
+                      <span className="text-base text-[#64748B]">
+                        {item.label}
+                      </span>
+                    </div>
+
+                    <span className="capitalize max-w-[180px] text-start text-base font-medium text-[#0F172A]">
+                      {item.value.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Left side bottom - seller info (desktop) */}
-          <div className="hidden xl:block ml-1 w-[37vw] p-5 rounded-2xl shadow-lg shadow-slate-200 border xl:w-[28vw] dark:bg-[#1A1D20] dark:border-0 dark:shadow-none">
-            <h1 className="text-base text-zinc-700 font-bold font-robotoFlex dark:text-[#D7D7D7]">
-              Seller Information
-            </h1>
-            <div className="flex pt-2 pb-1 items-center gap-2">
-              <img
-                className="size-8 rounded-md object-cover"
-                src="/assets/user_img.png"
-                alt="Seller"
-              />
-              <h1 className="font-semibold font-robotoFlex dark:text-[#848484]">
-                {product.seller_id?.name}
-              </h1>
-            </div>
+          {/* RIGHT */}
+          <div className="flex flex-col gap-4">
+            {/* Product Info */}
+            <div className="bg-white rounded-xl border border-[#C9D1DC] p-5 md:p-7 xl:px-7 xl:py-5">
+              {/* Tags */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="bg-[#E9F9EE] text-[#319F43] text-sm font-medium px-4 py-1 rounded-full">
+                  Available
+                </div>
 
-            <div className="flex flex-col pt-1">
-              <div className="pl-1 leading-tight">
-                <h1 className="text-[#979797] font-medium font-robotoFlex dark:text-[#979797]">
-                  {product.pickup_address_snapshot?.address_line}
-                </h1>
+                <div className="bg-[#2E40DC] text-[#CFD5FF] text-sm font-medium px-4 py-1 rounded-full capitalize">
+                  {product?.category?.replaceAll("_", " ")}
+                </div>
               </div>
 
-              <div className="flex justify-end items-end pr-3 pt-3 font-medium font-poppins text-sm dark:text-[#D7D7D7]">
-                <h1>Listed 10 days ago</h1>
+              {/* Title */}
+              <h1 className="mt-4 md:mt-5 text-[28px] sm:text-[34px] md:text-[38px] xl:text-4xl leading-[1.1] tracking-[-1px] font-bold text-[#0F172A]">
+                {product?.title}
+              </h1>
+
+              {/* Price */}
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <div className="text-[#3838EC] flex items-center">
+                  <span className="text-[30px] sm:text-[36px] md:text-[42px] xl:text-3xl font-extrabold leading-none">
+                    ₹{product?.selling_price}
+                  </span>
+                </div>
+
+                {product?.original_price && (
+                  <span className="line-through text-[#94A3B8] text-xl md:text-2xl xl:text-xl font-medium">
+                    ₹{product?.original_price}
+                  </span>
+                )}
+
+                <div className="bg-[#EEF0FF] text-[#3838EC] text-xs font-semibold px-3 py-1 rounded-md">
+                  Save {savedPricedPercentage}%
+                </div>
+              </div>
+
+              {/* Seller */}
+              <div className="mt-5 flex flex-wrap items-center gap-5">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={product.seller_id?.avatar || FALLBACK_IMAGE}
+                    alt="seller"
+                    className="w-9 h-9 rounded-full object-cover"
+                  />
+
+                  <span className="font-semibold text-[#181C1F]">
+                    {product?.seller_id?.name}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 text-[#181C1F] text-sm">
+                  <Clock3 size={16} />
+
+                  <span> Listed {getRelativeTime(product?.createdAt)}</span>
+                </div>
+              </div>
+
+              {/* About */}
+              <div className="mt-9">
+                <h2 className="text-[26px] md:text-xl font-bold text-[#181C1F]">
+                  About This Product
+                </h2>
+
+                <p className="max-w-[820px] mt-3 text-[#454655] text-[14px] sm:text-[15px] md:text-base leading-[1.9] whitespace-pre-line">
+                  {product?.description}
+                </p>
+              </div>
+
+              {/* CTA */}
+              <Link
+                to={`/chat?seller=${product?.seller_id?._id}`}
+                className="mt-10 h-[55px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] flex items-center justify-center gap-3 text-white font-semibold text-base tracking-wider"
+              >
+                <LuMessageSquareText size={20} />
+                Chat with Seller
+              </Link>
+            </div>
+
+            {/* Pickup & Safety */}
+            <div className="bg-white rounded-xl shadow-sm border border-[#E2E8F0] p-5 md:p-7 xl:px-7 xl:py-5">
+              <h2 className="text-[26px] md:text-xl font-bold text-[#111827] mb-7">
+                Pickup & Safety
+              </h2>
+
+              <div className="grid md:grid-cols-2 gap-7">
+                <div className="flex gap-4">
+                  <div className="w-11 h-11 rounded-full bg-[#F3F4FF] flex items-center justify-center">
+                    <HiOutlineBuildingLibrary
+                      size={22}
+                      className="text-[#3838EC]"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="text-[#64748B] text-sm">Campus Location</p>
+
+                    <h4 className="mt-1 font-semibold text-[#0F172A] text-base">
+                      VIT Vellore
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="w-11 h-11 rounded-full bg-[#F3F4FF] flex items-center justify-center">
+                    <MdLocationPin size={22} className="text-[#3838EC]" />
+                  </div>
+
+                  <div>
+                    <p className="text-[#64748B] text-sm">Meetup Point</p>
+
+                    <h4 className="mt-1 font-semibold text-[#0F172A] text-base">
+                      {product.pickup_address_snapshot?.address_line} <br />
+                      {product.pickup_address_snapshot?.city}
+                      <br />
+                      {product.pickup_address_snapshot?.pincode}
+                      {product.pickup_address_snapshot?.state}
+                      <br />
+                    </h4>
+                  </div>
+                </div>
+              </div>
+
+              {/* Safety Box */}
+              <div className="mt-7 rounded-2xl bg-[#F5F6FF] border border-[#F1F5F9] p-5 flex gap-4">
+                <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center">
+                  <ShieldCheck size={22} className="text-[#3838EC]" />
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-[#3838EC] text-lg">
+                    Safe campus-only exchange
+                  </h4>
+
+                  <p className="mt-1 text-[#666] leading-7">
+                    Meet in public places. Avoid sharing personal details.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right side */}
-        <div className="flex flex-col justify-between w-[93vw] ml-3 lg:ml-9 md:ml-7 mt-4 lg:mt-3 xl:ml-1 xl:mr-5 xl:w-3/4 dark:bg-[#131313] rounded-2xl">
-          {/* Right top side */}
-          <div className="flex flex-col rounded-2xl shadow-lg shadow-slate-200 border pl-6 pr-6 pb-6 pt-5 w-full xl:pl-12 dark:shadow-none dark:border-0 dark:bg-[#1A1D20]">
-            <div className="flex justify-between items-center pr-4">
-              <div className=" text-blue-600/80 bg-zinc-100 rounded-md w-28 md:w-36 md:py-2 py-[1vh] flex justify-center items-center font-semibold md:text-base text-sm font-robotoFlex dark:bg-[#131313] dark:text-[#BBC2C9]">
-                {product.category}
-              </div>
+        {/* Similar Products */}
+        <div className="w-full mt-12 mb-12">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <h2 className="text-[26px] md:text-xl font-bold text-[#0F172A]">
+              You might also like
+            </h2>
 
-              {/* Animated report dropdown */}
-              <div className="relative flex flex-col items-center gap-2">
-                <button onClick={handleReport}>
-                  <EllipsisVertical className="size-5 md:size-6 dark:text-white hover:text-blue-500 transition" />
-                </button>
-
-                <AnimatePresence>
-                  {report && (
-                    <motion.div
-                      key="report-menu"
-                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                      transition={{ duration: 0.25, ease: "easeInOut" }}
-                      className="absolute top-7 right-0 z-30 bg-white dark:bg-[#1F1F1F] dark:text-white 
-                                 border border-gray-200 dark:border-[#555] 
-                                 rounded-xl shadow-lg w-40 sm:w-44 overflow-hidden"
-                    >
-                      {[
-                        "Report Product",
-                        "Report a user",
-                        "Raise an issue",
-                      ].map((label, index) => (
-                        <button
-                          key={index}
-                          onClick={reportIssue}
-                          className="w-full text-left px-4 py-3 text-sm 
-                                     hover:bg-gray-100 dark:hover:bg-[#2A2A2A] transition-all"
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-
-            {/* Product text content */}
-            <div className="flex flex-col">
-              <h1 className="text-[5.5vw] text-neutral-900 font-bold mt-5 md:text-[3vw] lg:text-[2.7vw] xl:text-[1.8vw] font-robotoFlex dark:text-white">
-                {product.title}
-              </h1>
-              <div className="text-[8vw] flex items-center mt-1 md:text-[5vw] lg:text-[3.8vw] xl:text-[2.8vw]">
-                <IndianRupee className="size-6 dark:text-white" />
-                <h1 className="text-neutral-900 font-tiltWarp dark:text-white">
-                  {product.selling_price}
-                </h1>
-                <div className="text-zinc-600 flex items-center text-xl md:text-2xl justify-end ml-3 mt-3 font-normal line-through font-poppins leading-none dark:text-[#626262]">
-                  <IndianRupee className="size-4" />
-                  {product.original_price && <h1>{product.original_price}</h1>}
-                </div>
-              </div>
-
-              <h1 className="font-semibold md:font-medium mt-4 text-base md:text-lg xl:mt-7 font-poppins dark:text-[#D7D7D7]">
-                Product Details
-              </h1>
-              <p className="text-[#848484] xl:mr-20 font-poppins leading-5 dark:text-[#848484]">
-                {product.description}{" "}
-                <button className="text-black">more</button>
-              </p>
-            </div>
-
-            {/* Condition & usage */}
-            <div className="flex flex-col mt-8 gap-6 md:flex-row md:gap-36 lg:gap-32 xl:gap-64">
-              <div className="flex flex-col gap-2">
-                <h1 className="font-medium text-[#828F9B] text-base md:text-base dark:text-[#828F9B]">
-                  Condition
-                </h1>
-                <div className="flex flex-col gap-2">
-                  <div className="bg-gradient-to-r from-indigo-600 to-indigo-600 rounded-md text-white w-48 py-2 flex px-4 items-center font-medium text-sm md:w-52 md:text-base xl:py-3 xl:w-64 font-robotoFlex lg:px-6">
-                    {product.condition}
-                  </div>
-                  <div className="bg-[#09C712] rounded-md text-white w-48 py-2 flex px-3 items-center font-medium text-sm md:w-52 md:text-base xl:py-3 xl:w-64 font-robotoFlex lg:px-6">
-                    Price Negotiable : {product.is_negotiable ? "Yes" : "No"}
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <h1 className="font-medium text-[#828F9B] text-base md:text-base dark:text-[#828F9B]">
-                  Usage Duration
-                </h1>
-                <div className="flex flex-col gap-3">
-                  <div className="bg-gradient-to-r from-indigo-600 to-indigo-600 rounded-md text-white w-48 py-2 flex px-4 items-center font-medium text-sm md:w-52 md:text-base xl:py-3 xl:w-64 font-robotoFlex lg:px-6">
-                    {product.attributes?.usage_duration || "N/A"}
-                  </div>
-                  <div className="bg-[#09C712] rounded-md text-white w-48 py-2 flex px-3 items-center font-medium text-sm md:w-52 md:text-base xl:py-3 xl:w-64 font-robotoFlex lg:px-6">
-                    {product.attributes?.color || "N/A"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment & pickup */}
-            <div className="bg-[#f5faff] pt-4 pb-4 mt-6 rounded-md md:mt-3 xl:pl-5 pl-4 dark:bg-[#25272A]">
-              <h1 className="font-semibold text-base md:text-lg font-robotoFlex leading-7 dark:text-[#D7D7D7]">
-                Payment & Pickup
-              </h1>
-              <div className="flex items-center gap-4 mt-1">
-                <h1 className="text-zinc-500 text-sm md:text-base font-robotoFlex dark:text-[#848484]">
-                  Payment Mode (Cash/UPI):
-                </h1>
-                <div className="bg-white border border-gray-200 px-5 py-2 xl:px-8 rounded text-sm font-robotoFlex dark:bg-[#131313] dark:border-0 dark:text-white">
-                  {product.payment_preference}
-                </div>
-              </div>
-              <h1 className="text-[#848484] mt-2 text-sm md:text-base font-robotoFlex dark:text-[#848484]">
-                Pickup Location
-              </h1>
-              <p className="w-52 text-[#2D3339] font-medium text-sm leading-5 xl:leading-5 md:leading-7 md:text-base md:w-64 font-robotoFlex dark:text-[#848484]">
-                {product.pickup_address_snapshot?.address_line}
-              </p>
-            </div>
-          </div>
-
-          {/* Right bottom side */}
-          <div className="flex flex-col w-full justify-between items-center mt-4 mb-6 gap-3 lg:flex-row xl:gap-96 dark:bg-[#131313]">
-            <button
-              onClick={handleWishlist}
-              disabled={wishlistLoading}
-              className={`outline outline-2 outline-offset-[-2px] outline-neutral-200 rounded-md text-black w-full py-3 flex justify-center items-center font-semibold text-sm md:text-base font-robotoFlex gap-2 dark:border-[#DDDDDD] dark:text-[#F1F1F1] dark:outline-[#DDDDDD] dark:outline-1 hover:bg-gray-50 dark:hover:bg-[#1A1D20] transition-colors disabled:opacity-50 ${
-                wishlistLoading
-                  ? "cursor-not-allowed opacity-50"
-                  : "cursor-pointer"
-              }`}
-            >
-              {inWishlist ? (
-                <FaHeart className="lg:size-4 text-pink-500" />
-              ) : (
-                <FaRegHeart className="lg:size-4 hover:text-pink-500 transition-colors" />
-              )}
-              {inWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
+            <button className="text-[#2563EB] text-sm md:text-base font-semibold whitespace-nowrap capitalize flex items-center gap-2">
+              Browse all {product?.category?.replaceAll("_", " ")}{" "}
+              <FaArrowRight />
             </button>
-            <Link
-              to={`/chat?seller=${product.seller_id?._id}`}
-              className="bg-gradient-to-r from-indigo-600 to-blue-600 shadow-[0px_4px_12px_0px_rgba(0,0,0,0.17)] rounded-md text-white w-full py-3 flex justify-center items-center font-semibold gap-1 text-sm md:text-base"
-            >
-              <MessageSquareMore className="pt-1 size-6 block font-robotoFlex" />
-              Chat with seller
-            </Link>
           </div>
 
-          {/* Mobile Seller Info */}
-          <div className="lg:hidden w-full p-5 rounded-2xl shadow-xl dark:bg-[#1A1D20] mb-4">
-            <h1 className="text-base text-[#494949] font-medium md:text-lg dark:text-[#D7D7D7]">
-              Seller Information
-            </h1>
-            <div className="flex pt-2 pb-1 items-center gap-2">
-              <img
-                className="size-7 md:size-8 rounded-md object-cover"
-                src="/assets/user_img.png"
-                alt="Seller"
-              />
-              <h1 className="font-semibold dark:text-[#848484]">
-                {product.seller_id?.name}
-              </h1>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-5">
+            {[1, 2, 3, 4, 5].map((item) => (
+              <div
+                key={item}
+                className="bg-white rounded-[20px] border border-[#ECECEC] overflow-hidden hover:-translate-y-1 transition-all duration-200"
+              >
+                <div className="relative">
+                  <img
+                    src="/image10.png"
+                    alt=""
+                    className="w-full aspect-square object-cover"
+                  />
 
-            <div className="flex flex-col pt-1">
-              <div className="leading-tight">
-                <h1 className="text-[#979797] dark:text-[#979797] text-sm md:text-base">
-                  {product.pickup_address_snapshot?.address_line}
-                </h1>
-              </div>
+                  <button className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center">
+                    <Heart size={16} />
+                  </button>
+                </div>
 
-              <div className="flex justify-end items-end pr-3 pt-4 font-medium text-sm md:text-base dark:text-[#D7D7D7]">
-                <h1>Listed 10 days ago</h1>
+                <div className="p-4">
+                  <h3 className="line-clamp-2 font-semibold text-[15px] text-[#111827]">
+                    Dell XPS 15 Laptop
+                  </h3>
+
+                  <p className="mt-2 text-[#4F46E5] text-xl font-bold">
+                    ₹1,15,000
+                  </p>
+
+                  <div className="mt-2 flex items-center gap-1 text-[#777] text-sm">
+                    <MapPin size={14} />
+
+                    <span>Main Canteen</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };
