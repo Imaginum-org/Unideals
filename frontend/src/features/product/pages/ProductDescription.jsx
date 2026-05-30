@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from "react";
-import Footer from "../../../Components/layout/Footer.jsx";
 import { useNavigate } from "react-router-dom";
 import { getProducts } from "../api/productApi";
 import { Share2, MessageSquare, Eye, ShieldCheck, Clock3 } from "lucide-react";
@@ -41,9 +40,8 @@ const ProductDescription = () => {
 
   const [inWishlist, setInWishlist] = useState(false);
 
-  const [showFloatingCTA, setShowFloatingCTA] = useState(true);
-  const ctaSentinelRef = useRef(null);
-
+  const staticCTARef = useRef(null);
+  const floatingCTARef = useRef(null);
   const [isContainMode, setIsContainMode] = useState(false);
   const productId = product?._id;
   const navigate = useNavigate();
@@ -120,27 +118,56 @@ const ProductDescription = () => {
     fetchSimilarProducts();
   }, [product]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!ctaSentinelRef.current) return;
+useEffect(() => {
+  let rafId;
+  let wasVisible = false;
 
-      const rect = ctaSentinelRef.current.getBoundingClientRect();
+  const check = () => {
+    if (staticCTARef.current && floatingCTARef.current) {
+      const rect = staticCTARef.current.getBoundingClientRect();
+      const isStaticVisible = rect.top < window.innerHeight;
 
-      const triggerPoint = window.innerHeight - 90;
+      if (isStaticVisible && !wasVisible) {
+        // Static CTA just came into view — animate floating bar TO that position
+        wasVisible = true;
+        const floating = floatingCTARef.current;
 
-      setShowFloatingCTA(rect.top > triggerPoint);
-    };
+        const targetBottom = window.innerHeight - rect.bottom;
+        const targetLeft = rect.left;
+        const targetRight = window.innerWidth - rect.right;
 
-    handleScroll();
+        // Set destination position directly on DOM (no React re-render)
+        floating.style.bottom = `${targetBottom}px`;
+        floating.style.left = `${targetLeft}px`;
+        floating.style.right = `${targetRight}px`;
+        floating.style.opacity = "0";
+        floating.style.pointerEvents = "none";
+      } else if (!isStaticVisible && wasVisible) {
+        // Scrolled back up — snap floating bar back to bottom instantly (no transition)
+        wasVisible = false;
+        const floating = floatingCTARef.current;
 
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
+        floating.style.transition = "none";
+        floating.style.bottom = "16px";
+        floating.style.left = "16px";
+        floating.style.right = "16px";
+        floating.style.opacity = "1";
+        floating.style.pointerEvents = "auto";
 
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
+        // Re-enable transition after snap
+        requestAnimationFrame(() => {
+          floating.style.transition =
+            "bottom 450ms cubic-bezier(0.4, 0, 0.2, 1), left 450ms cubic-bezier(0.4, 0, 0.2, 1), right 450ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease";
+        });
+      }
+    }
+    rafId = requestAnimationFrame(check);
+  };
+
+  rafId = requestAnimationFrame(check);
+  return () => cancelAnimationFrame(rafId);
+}, []);
+
 
   const handleShare = async () => {
     try {
@@ -479,13 +506,10 @@ const ProductDescription = () => {
                 </p>
               </div>
 
-              <div ref={ctaSentinelRef} className="h-px w-full"></div>
-
               {/* CTA */}
               <div
-                className={`mt-10 flex flex-row items-stretch gap-3 transition-all duration-500 ${
-                  showFloatingCTA ? "opacity-100" : "opacity-100 scale-[1.01]"
-                }`}
+                ref={staticCTARef}
+                className="mt-10 flex flex-row items-stretch gap-3"
               >
                 {/* Wishlist */}
                 <button
@@ -619,14 +643,21 @@ const ProductDescription = () => {
       </div>
 
       <div
-        className={`sm:hidden fixed bottom-4 left-4 right-4 z-50 transform-gpu will-change-transform transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          showFloatingCTA
-            ? "opacity-100 translate-y-0 pointer-events-auto"
-            : "opacity-0 translate-y-8 pointer-events-none"
-        }`}
+        ref={floatingCTARef}
+        className="sm:hidden"
+        style={{
+          position: "fixed",
+          bottom: "16px",
+          left: "16px",
+          right: "16px",
+          zIndex: 50,
+          opacity: 1,
+          pointerEvents: "auto",
+          transition:
+            "bottom 450ms cubic-bezier(0.4, 0, 0.2, 1), left 450ms cubic-bezier(0.4, 0, 0.2, 1), right 450ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease",
+        }}
       >
         <div className="flex gap-3">
-          {/* Wishlist */}
           <button
             onClick={handleWishlistClick}
             disabled={wishlistLoading}
@@ -643,7 +674,6 @@ const ProductDescription = () => {
             )}
           </button>
 
-          {/* Chat */}
           <Link
             to={`/chat?seller=${product?.seller_id?._id}`}
             className="flex-1 h-[56px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] shadow-[0_12px_30px_rgba(46,63,220,0.35)] flex items-center justify-center gap-3 text-white font-semibold"

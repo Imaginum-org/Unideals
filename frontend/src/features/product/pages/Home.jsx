@@ -52,7 +52,6 @@ const Home = () => {
   };
 
   //STATE
-  // const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
   const [page, setPage] = useState(1);
 

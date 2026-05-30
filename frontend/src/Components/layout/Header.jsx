@@ -53,6 +53,7 @@ const Header = ({ isChat }) => {
   const [selectedCampus, setSelectedCampus] = useState("VIT Vellore");
   const [showCampusDropdown, setShowCampusDropdown] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
+  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     const storedSearches = localStorage.getItem("recentSearches");
@@ -143,8 +144,9 @@ const Header = ({ isChat }) => {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!debouncedQuery) {
+    if (debouncedQuery.trim().length < 2) {
       setResults([]);
+      setHasSearched(false);
       return;
     }
 
@@ -155,6 +157,7 @@ const Header = ({ isChat }) => {
         const res = await searchProducts(debouncedQuery);
 
         setResults(res.data?.products || []);
+        setHasSearched(true);
       } catch (err) {
         console.error(err);
       } finally {
@@ -609,21 +612,19 @@ const Header = ({ isChat }) => {
                       onFocus={() => setShowDropdown(true)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
-                          if (query.trim()) {
-                            setRecentSearches((prev) =>
-                              [
-                                query,
-                                ...prev.filter(
-                                  (item) =>
-                                    item.toLowerCase() !== query.toLowerCase(),
-                                ),
-                              ].slice(0, 5),
-                            );
+                          const trimmedQuery = query.trim();
+
+                          if (!trimmedQuery) {
+                            navigate("/");
+                            setShowMobileSearch(false);
+                            setShowDropdown(false);
+                            return;
                           }
 
-                          navigate(`/search?q=${query}`);
-
-                          setShowMobileSearch(false);
+                          saveRecentSearch(trimmedQuery);
+                          navigate(
+                            `/search?q=${encodeURIComponent(trimmedQuery)}`,
+                          );
                           setShowDropdown(false);
                         }
                       }}
@@ -666,7 +667,12 @@ const Header = ({ isChat }) => {
                       results={results}
                       loading={searchLoading}
                       query={query}
+                      hasSearched={hasSearched}
                       mobile
+                      onSelect={() => {
+                        setShowMobileSearch(false);
+                        setShowDropdown(false);
+                      }}
                     />
                   ) : (
                     <div className="px-4 py-5">
@@ -894,13 +900,25 @@ const Header = ({ isChat }) => {
                 onChange={handleSearchBar}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    saveRecentSearch(query);
-                    navigate(`/search?q=${query}`);
+                    const trimmedQuery = query.trim();
+
+                    if (!trimmedQuery) {
+                      navigate("/");
+                      setShowDropdown(false);
+                      return;
+                    }
+
+                    saveRecentSearch(trimmedQuery);
+                    navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
                     setShowDropdown(false);
                   }
                 }}
                 onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                onFocus={() => setShowDropdown(true)}
+                onFocus={() => {
+                  if (query.trim()) {
+                    setShowDropdown(true);
+                  }
+                }}
                 className="h-10 w-full rounded-3xl border border-[#b6bcc4] bg-white pl-9 pr-14 text-sm text-neutral-900 outline-none focus:border-blue-500 focus:ring-5 focus:ring-blue-100 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-950"
               />
 
@@ -925,11 +943,15 @@ const Header = ({ isChat }) => {
                 className="absolute right-3 xl:right-7 top-1/2 -translate-y-1/2 text-[#090A0B] dark:text-neutral-400"
               />
 
-              {showDropdown && (
+              {showDropdown && query.trim() && (
                 <SearchDropdown
                   results={results}
                   loading={searchLoading}
                   query={query}
+                  hasSearched={hasSearched}
+                  onSelect={() => {
+                    setShowDropdown(false);
+                  }}
                 />
               )}
             </div>

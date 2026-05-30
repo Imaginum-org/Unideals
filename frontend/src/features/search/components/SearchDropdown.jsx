@@ -1,6 +1,13 @@
 import { Link } from "react-router-dom";
 
-const SearchDropdown = ({ results, loading, query, mobile = false }) => {
+const SearchDropdown = ({
+  results,
+  loading,
+  query,
+  mobile = false,
+  hasSearched,
+  onSelect,
+}) => {
   if (!query) return null;
 
   const highlightText = (text, query) => {
@@ -58,7 +65,7 @@ const SearchDropdown = ({ results, loading, query, mobile = false }) => {
         )}
 
         {/* Empty State */}
-        {!loading && results.length === 0 && (
+        {!loading && hasSearched && results.length === 0 && (
           <div className="p-4 text-sm text-gray-500 dark:text-neutral-400">
             No results found for "{query}"
           </div>
@@ -70,6 +77,7 @@ const SearchDropdown = ({ results, loading, query, mobile = false }) => {
             <Link
               key={item._id}
               to={`/product/${item._id}`}
+              onClick={() => onSelect?.()}
               className={`
                 flex
                 items-center
@@ -119,6 +127,7 @@ const SearchDropdown = ({ results, loading, query, mobile = false }) => {
         {!loading && results.length > 0 && (
           <Link
             to={`/search?q=${query}`}
+            onClick={() => onSelect?.()}
             className={`
               block
               text-center
