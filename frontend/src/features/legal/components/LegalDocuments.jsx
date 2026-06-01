@@ -1,237 +1,433 @@
-const termsSections = [
-  {
-    title: "Fair Platform Use",
-    items: [
-      "Users must engage in honest and fair transactions. Fraudulent activity, misrepresentation, or misleading listings are strictly prohibited.",
-      "Any misuse of the platform, such as spamming, harassing other users, or exploiting platform vulnerabilities, will result in account suspension.",
-      "Unideals reserves the right to remove content or restrict accounts violating our terms.",
-    ],
-  },
-  {
-    title: "User Responsibility",
-    items: [
-      "Users must provide accurate and up-to-date information when registering and transacting on the platform.",
-      "You are responsible for safeguarding your account credentials. Unideals will not be liable for unauthorized access due to user negligence.",
-      "Any disputes arising from transactions must be resolved amicably between parties before seeking platform intervention.",
-    ],
-  },
-  {
-    title: "Seller Responsibility",
-    items: [
-      "Sellers must ensure that all product listings are accurate, truthful, and clearly described.",
-      "Selling illegal, counterfeit, or prohibited items is strictly forbidden.",
-      "Sellers must honor confirmed sales and deliver products in the agreed-upon condition and timeframe.",
-      "Refund and return policies must be explicitly mentioned in the listing if applicable.",
-    ],
-  },
-  {
-    title: "Product Listing Guidelines",
-    items: [
-      "All listings must include clear images, detailed descriptions, and accurate pricing.",
-      "Listings containing offensive, misleading, or inappropriate content will be removed.",
-      "Prohibited items include illegal substances, stolen goods, hazardous materials, and items violating intellectual property rights.",
-    ],
-  },
-  {
-    title: "Buying Guidelines",
-    items: [
-      "Buyers should review product details, seller ratings, and reviews before making a purchase.",
-      "All transactions should be conducted through the platform's approved channels to support safer communication and dispute resolution.",
-      "Buyers must verify product conditions and legitimacy before completing transactions.",
-    ],
-  },
-  {
-    title: "Payment and Transactions",
-    items: [
-      "Transactions must be conducted using approved payment methods on the platform.",
-      "Unideals is not liable for external transactions conducted outside the platform's payment system.",
-      "Refunds and disputes must be handled per the seller's stated return policy.",
-    ],
-  },
-  {
-    title: "Privacy and Data Security",
-    items: [
-      "Users' personal data is protected according to our Privacy Policy. We do not sell user data.",
-      "Users should report any suspicious activity or security breaches immediately.",
-    ],
-  },
-  {
-    title: "Prohibited Activities",
-    items: [
-      "Any fraudulent, deceptive, or illegal activity is strictly prohibited.",
-      "Users must not engage in harassment, hate speech, or discrimination on the platform.",
-      "Any attempt to manipulate ratings, reviews, or search results unfairly is not allowed.",
-    ],
-  },
-  {
-    title: "Content Ownership and Intellectual Property",
-    items: [
-      "Users retain ownership of the content they upload but grant Unideals a non-exclusive license to use, display, and distribute such content for platform-related purposes.",
-      "Any unauthorized use of Unideals's branding, trademarks, or intellectual property is prohibited.",
-    ],
-  },
-  {
-    title: "Account Suspension and Termination",
-    items: [
-      "Unideals reserves the right to suspend or terminate accounts found violating these terms.",
-      "Users may request account deletion at any time, subject to resolving any ongoing transactions or disputes.",
-    ],
-  },
-  {
-    title: "Liability and Disclaimers",
-    items: [
-      "Unideals acts as a marketplace and is not responsible for the quality, safety, or legitimacy of listed products.",
-      "Users transact at their own risk, and Unideals holds no liability for disputes or losses arising from transactions.",
-      "We reserve the right to modify these terms at any time, and continued use of the platform implies acceptance of updated terms.",
-    ],
-  },
-];
+import { useState } from "react";
+import { FiShield, FiFileText, FiChevronRight } from "react-icons/fi";
+
+// --- DATA ARRAYS ---
 
 const privacySections = [
   {
-    title: "Information We Collect",
-    items: [
-      "We collect account details such as name, email address, campus information, profile photo, and authentication status.",
-      "We collect marketplace activity such as listings, orders, chats, wishlist activity, support requests, and product interactions.",
-      "We may collect technical information needed to keep the platform secure, including device, browser, and session information.",
+    title: "1. WHO WE ARE",
+    body: [
+      {
+        type: "p",
+        text: "Campus Mart is a peer-to-peer student marketplace allowing verified university students to buy and sell goods within their campus community. We are committed to protecting the privacy of every user.",
+      },
     ],
   },
   {
-    title: "How We Use Information",
-    items: [
-      "We use your information to create accounts, verify email addresses, show listings, process marketplace actions, and support buyer-seller communication.",
-      "We use platform activity to improve safety, prevent misuse, investigate reports, and maintain service quality.",
-      "We may send transactional emails such as verification, password reset, support, and important account notices.",
+    title: "2. INFORMATION WE COLLECT",
+    body: [
+      {
+        type: "list-bold",
+        items: [
+          {
+            label: "Account data:",
+            text: "Name, university email, profile photo, campus name, optional mobile number.",
+          },
+          {
+            label: "Verification data:",
+            text: "Student ID details to confirm enrollment. Not shared with third parties.",
+          },
+          {
+            label: "Listing data:",
+            text: "Product titles, descriptions, photos, pricing, and transaction records.",
+          },
+          {
+            label: "Usage data:",
+            text: "Pages viewed, searches, clicks, session duration, device/browser info (via cookies).",
+          },
+          {
+            label: "Messages:",
+            text: "In-app chat stored to support conversation continuity and safety investigations.",
+          },
+        ],
+      },
     ],
   },
   {
-    title: "Sharing and Visibility",
-    items: [
-      "Public listing details may be visible to other users so they can evaluate and contact sellers.",
-      "We do not sell personal information to third parties.",
-      "We may disclose information if required by law, to protect users, or to investigate abuse of the platform.",
+    title: "3. HOW WE USE YOUR DATA",
+    body: [
+      {
+        type: "list-chevron",
+        items: [
+          "Create and manage your account and verify student status",
+          "Facilitate listings, transactions, and in-app messaging",
+          "Send transactional notifications (order updates, price alerts, messages)",
+          "Detect and prevent fraud, spam, and unsafe behaviour",
+          "Improve platform features through anonymised analytics",
+          "Comply with applicable Indian law and regulation",
+        ],
+      },
     ],
   },
   {
-    title: "Security and Retention",
-    items: [
-      "We use reasonable safeguards to protect account and marketplace information.",
-      "You are responsible for keeping your password and account access secure.",
-      "We retain information as long as needed to operate Unideals, meet legal obligations, resolve disputes, and enforce policies.",
+    title: "4. HOW WE SHARE YOUR DATA",
+    body: [
+      {
+        type: "p",
+        text: "We do not sell, rent, or trade your personal data. Limited sharing occurs only when:",
+      },
+      {
+        type: "list-chevron",
+        items: [
+          "Transacting with another user (only your first name and campus are shared)",
+          "Working with service providers bound by data-processing agreements",
+          "Required by court order or Indian regulatory authority",
+          "Campus Mart undergoes acquisition or merger (under equivalent protections)",
+        ],
+      },
     ],
   },
   {
-    title: "Your Choices",
-    items: [
-      "You can update profile information from your account settings where available.",
-      "You may request account deletion, subject to unresolved orders, disputes, or safety reviews.",
-      "For privacy questions, contact campus.mart@gmail.com.",
+    title: "5. DATA RETENTION",
+    body: [
+      {
+        type: "p",
+        text: "We keep your data while your account is active. Deletion requests are fulfilled within 30 days, except where Indian law requires longer retention (typically up to 3 years for financial records).",
+      },
+    ],
+  },
+  {
+    title: "6. COOKIES",
+    body: [
+      {
+        type: "p",
+        text: "We use essential session cookies and optional analytics cookies (anonymised). You may disable non-essential cookies in your browser, though some features may be affected.",
+      },
+    ],
+  },
+  {
+    title: "7. SECURITY",
+    body: [
+      {
+        type: "p",
+        text: "We use HTTPS encryption, access controls, and regular security reviews. No internet transmission is 100% secure — please use a strong password and report any suspected breach immediately.",
+      },
+    ],
+  },
+  {
+    title: "8. YOUR RIGHTS",
+    body: [
+      {
+        type: "list-chevron",
+        items: [
+          "Access: request a copy of data we hold about you",
+          "Correction: update inaccurate or incomplete information",
+          "Deletion: permanently remove your account and data",
+          "Portability: receive your data in a structured, machine-readable format",
+          "Objection: opt out of direct marketing",
+        ],
+      },
+      {
+        type: "p",
+        html: "Exercise any right by emailing <strong>privacy@campusmart.in</strong>.",
+      },
+    ],
+  },
+  {
+    title: "9. CHILDREN",
+    body: [
+      {
+        type: "p",
+        text: "Campus Mart is for students aged 18 and above. If we discover a user is under 18, their account and data will be removed immediately.",
+      },
+    ],
+  },
+  {
+    title: "10. CHANGES",
+    body: [
+      {
+        type: "p",
+        text: "Material changes will be notified at least 7 days before taking effect via in-app notification or email. Continued use constitutes acceptance.",
+      },
+    ],
+  },
+  {
+    title: "11. CONTACT",
+    body: [
+      {
+        type: "p",
+        html: "Data Protection queries: <strong>privacy@campusmart.in</strong><br/>Campus Mart, VIT Vellore, Tamil Nadu 632014, India",
+      },
     ],
   },
 ];
 
-function LegalHeader({ title, updated, intro, compact = false }) {
+const termsSections = [
+  {
+    title: "1. ACCEPTANCE",
+    body: [
+      {
+        type: "p",
+        text: "By using Campus Mart you agree to these Terms. They form a legally binding agreement. If you disagree, stop using the platform immediately.",
+      },
+    ],
+  },
+  {
+    title: "2. ELIGIBILITY",
+    body: [
+      {
+        type: "list-chevron",
+        items: [
+          "Minimum age of 18",
+          "Currently enrolled at a recognised Indian university or college",
+          "Completed campus email verification to list or buy",
+          "One account per person — duplicates are grounds for permanent suspension",
+        ],
+      },
+    ],
+  },
+  {
+    title: "3. OUR ROLE",
+    body: [
+      {
+        type: "p",
+        html: "Campus Mart is a technology marketplace. <strong>We are not a party to any transaction.</strong> We do not hold funds, take title to goods, or guarantee quality, safety, or legality of any listing. Transactions are entirely between buyers and sellers.",
+      },
+    ],
+  },
+  {
+    title: "4. WHAT YOU MUST DO",
+    body: [
+      {
+        type: "list-chevron",
+        items: [
+          "Provide accurate, honest information in your profile and listings",
+          "Respond to buyer or seller messages within a reasonable time",
+          "Meet transaction partners only in safe, public campus locations",
+          "Honour agreed prices and terms once confirmed",
+          "Report suspicious listings or users via the flag button",
+          "Keep your login credentials confidential",
+        ],
+      },
+    ],
+  },
+  {
+    title: "5. PROHIBITED ACTIVITIES",
+    body: [
+      {
+        type: "list-chevron",
+        items: [
+          "Listing illegal goods, counterfeit products, weapons, drugs, alcohol, or prescription medication",
+          "Misrepresenting condition, authenticity, or ownership of any item",
+          "Price gouging, bait-and-switch, or any form of fraud",
+          "Harassing, threatening, or discriminating against any user",
+          "Sharing personal home addresses before establishing trust in-app",
+          "Circumventing in-app messaging to conduct transactions off-platform",
+          "Creating fake reviews or trust signals",
+          "Scraping, hacking, or reverse-engineering the platform",
+          "Using Campus Mart for commercial reselling without written permission",
+          "Impersonating any student, staff member, or Campus Mart representative",
+        ],
+      },
+    ],
+  },
+  {
+    title: "6. LISTINGS",
+    body: [
+      {
+        type: "p",
+        text: "By posting a listing you confirm you own the item (or have authority to sell it), the description and photos are accurate, and the item is lawful. Campus Mart may remove any listing at any time without prior notice.",
+      },
+    ],
+  },
+  {
+    title: "7. INTELLECTUAL PROPERTY",
+    body: [
+      {
+        type: "p",
+        text: "All platform content, trademarks, and software belong to Campus Mart or its licensors. By uploading content you grant us a non-exclusive, royalty-free licence to use it for operating and improving the platform.",
+      },
+    ],
+  },
+  {
+    title: "8. LIMITATION OF LIABILITY",
+    body: [
+      {
+        type: "list-chevron",
+        items: [
+          "Campus Mart is not liable for loss or damage arising from user transactions",
+          "We do not guarantee uninterrupted or error-free access",
+          "Total liability for any claim is capped at ₹1,000 (one thousand rupees)",
+          "We are not liable for indirect, consequential, or punitive damages",
+        ],
+      },
+    ],
+  },
+  {
+    title: "9. DISPUTES",
+    body: [
+      {
+        type: "p",
+        text: "User-to-user disputes are not mediated by Campus Mart unless we choose to at our sole discretion. Disputes with Campus Mart proceed first through good-faith negotiation, then courts of competent jurisdiction in Vellore, Tamil Nadu.",
+      },
+    ],
+  },
+  {
+    title: "10. TERMINATION",
+    body: [
+      {
+        type: "p",
+        text: "We may suspend or terminate accounts at any time for any violation, fraudulent activity, or user-safety concern. Your access ends immediately on termination.",
+      },
+    ],
+  },
+  {
+    title: "11. GOVERNING LAW",
+    body: [
+      {
+        type: "p",
+        text: "Governed by Indian law, including the Information Technology Act 2000 and Consumer Protection Act 2019. Jurisdiction: Vellore, Tamil Nadu.",
+      },
+    ],
+  },
+];
+
+// --- COMPONENTS ---
+
+function LegalSection({ title, body }) {
   return (
-    <div className={compact ? "mb-4" : "mt-[4vh]"}>
-      <div className="font-poppins text-[15px] font-semibold text-black dark:text-white xl:mb-[0.9vh] xl:text-xl xl:font-medium">
+    <div className="font-poppins">
+      <h3 className="mb-4 border-b border-gray-100 pb-3 text-sm font-bold uppercase tracking-wide text-gray-900 dark:border-gray-800 dark:text-white lg:text-base">
         {title}
-      </div>
-      <div className="mb-[2vh] font-poppins text-[12px] text-[#64707d] xl:mb-[1.3vh] xl:text-sm xl:font-light">
-        Last updated {updated}
-      </div>
-      <div className="font-poppins text-[11px] font-light italic text-black dark:text-white xl:mb-[2vh] xl:text-[13px]">
-        {intro}
+      </h3>
+      <div className="space-y-4 text-[13px] leading-relaxed text-gray-600 dark:text-gray-300 lg:text-[15px]">
+        {body.map((block, index) => {
+          if (block.type === "p") {
+            return block.html ? (
+              <p key={index} dangerouslySetInnerHTML={{ __html: block.html }} />
+            ) : (
+              <p key={index}>{block.text}</p>
+            );
+          }
+
+          if (block.type === "list-bold") {
+            return (
+              <div key={index} className="space-y-3 pt-1">
+                {block.items.map((item, j) => (
+                  <div
+                    key={j}
+                    className="flex flex-col gap-1 sm:flex-row sm:gap-2"
+                  >
+                    <span className="min-w-fit font-bold text-gray-900 dark:text-white">
+                      {item.label}
+                    </span>
+                    <span className="text-gray-600 dark:text-gray-300">
+                      {item.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
+          if (block.type === "list-chevron") {
+            return (
+              <ul key={index} className="space-y-3 pt-1">
+                {block.items.map((item, j) => (
+                  <li key={j} className="flex items-start gap-3">
+                    <FiChevronRight
+                      className="mt-[3px] shrink-0 text-[#364EF2]"
+                      size={16}
+                    />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            );
+          }
+
+          return null;
+        })}
       </div>
     </div>
   );
 }
 
-function LegalSection({ index, title, items, compact = false }) {
-  return (
-    <div className="mb-[1.6vh] font-poppins text-[12px] font-medium text-black dark:text-white xl:mb-[2.5vh] xl:text-[19px]">
-      <span className="mr-[2.6vw] rounded-[3px] bg-[#e5e8ff] px-[1.6vw] py-0 dark:bg-[#131313] xl:mr-[0.7vw] xl:rounded-[8px] xl:px-[0.54vw] xl:py-[0.4vh]">
-        {index}
-      </span>
-      {title}
-      <div
-        className={`ml-[7vw] text-justify font-poppins font-normal text-[#717171] dark:text-[#D7D7D7] xl:ml-[3.4vw] xl:mt-[1.5vh] ${
-          compact ? "text-[11px] xl:text-[13px]" : "text-[9px] xl:text-[15px]"
-        }`}
-      >
-        <ul className="list-disc">
-          {items.map((item) => (
-            <li className="my-[0.8vh]" key={item}>
-              {item}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-function LegalDocument({ type = "terms", compact = false }) {
-  const isPrivacy = type === "privacy";
+function LegalDocument({ initialType = "privacy" }) {
+  const [activeTab, setActiveTab] = useState(initialType);
+  const isPrivacy = activeTab === "privacy";
   const sections = isPrivacy ? privacySections : termsSections;
 
   return (
-    <>
-      <div className={compact ? "" : "relative"}>
-        {!compact && !isPrivacy ? (
-          <button className="absolute right-[5vw] top-[5.2vh] rounded-[5px] bg-[#e5e8ff] px-[4vw] py-[0.5vh] font-poppins text-[10px] font-medium text-black dark:bg-[#1A1D20] dark:text-white xl:right-[3.5vw] xl:top-[3vh] xl:px-[1.8vw] xl:py-[0.8vh] xl:text-sm">
-            Must Read
-          </button>
-        ) : null}
-        <LegalHeader
-          title={isPrivacy ? "Privacy Policy" : "Terms and Condition"}
-          updated={isPrivacy ? "May 9, 2026" : "May 9, 2026"}
-          compact={compact}
-          intro={
-            isPrivacy
-              ? "This Privacy Policy explains how Unideals collects, uses, protects, and manages your information."
-              : "Welcome to Unideals! By using our platform, you agree to the following terms and conditions. Please read them carefully before proceeding."
-          }
-        />
+    <div className="font-poppins w-full">
+      {/* Header Area */}
+      <div className="mb-6 lg:mb-8">
+        <h1 className="mb-1 text-2xl font-bold text-gray-900 dark:text-white lg:text-[28px]">
+          Terms & Privacy
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 lg:text-base">
+          How we operate and how we protect you
+        </p>
       </div>
 
-      <div className="mt-[2.5vh] h-0 w-full border border-[#bbc2c9]" />
+      {/* Tab Switcher */}
+      <div className="mb-8 flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => setActiveTab("privacy")}
+          className={`flex items-center gap-2 rounded-xl border-2 px-5 py-2.5 text-sm transition-all duration-200 ${
+            isPrivacy
+              ? "border-gray-900 bg-transparent font-bold text-gray-900 dark:border-white dark:text-white"
+              : "border-transparent bg-gray-50 font-medium text-gray-500 hover:bg-gray-100 dark:bg-[#1A1D20] dark:text-gray-400 dark:hover:bg-[#25282c]"
+          }`}
+        >
+          <FiShield size={18} strokeWidth={isPrivacy ? 2.5 : 2} />
+          Privacy Policy
+        </button>
+        <button
+          onClick={() => setActiveTab("terms")}
+          className={`flex items-center gap-2 rounded-xl border-2 px-5 py-2.5 text-sm transition-all duration-200 ${
+            !isPrivacy
+              ? "border-gray-900 bg-transparent font-bold text-gray-900 dark:border-white dark:text-white"
+              : "border-transparent bg-gray-50 font-medium text-gray-500 hover:bg-gray-100 dark:bg-[#1A1D20] dark:text-gray-400 dark:hover:bg-[#25282c]"
+          }`}
+        >
+          <FiFileText size={18} strokeWidth={!isPrivacy ? 2.5 : 2} />
+          Terms & Conditions
+        </button>
+      </div>
 
-      <div
-        className={`mt-[2.2vh] rounded-[10px] bg-white shadow-[0px_4px_12px_0px_rgba(0,0,0,0.10)] dark:bg-zinc-900 xl:rounded-[20px] ${
-          compact
-            ? "px-4 py-4"
-            : "mb-[2.6vh] pb-[0.4vh] pl-[3vw] pr-[4vw] pt-[2vh] lg:mx-0 lg:mb-[3.7vh] lg:mt-[2.5vh] lg:pl-[1.8vw] lg:pb-[1vh] lg:pt-[5.5vh] xl:pr-[3vw]"
-        }`}
-      >
-        {sections.map((section, index) => (
-          <LegalSection
-            key={section.title}
-            index={index + 1}
-            compact={compact}
-            {...section}
-          />
-        ))}
+      {/* Main Content Card */}
+      <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-[0px_4px_20px_-10px_rgba(0,0,0,0.05)] dark:border-gray-800 dark:bg-[#1c1c1c] lg:p-10">
+        {/* Info Banner */}
+        <div className="mb-8 flex items-center rounded-r-xl border-l-[3px] border-[#364EF2] bg-[#F8F9FA] px-5 py-3.5 dark:bg-[#252525]">
+          <p className="text-[13px] text-gray-600 dark:text-gray-300 lg:text-sm">
+            <span className="font-bold text-gray-900 dark:text-white">
+              Last updated:
+            </span>{" "}
+            26 May 2026
+            <span className="mx-3 font-bold text-gray-300 dark:text-gray-600">
+              ·
+            </span>
+            {isPrivacy ? (
+              <>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  Effective:
+                </span>{" "}
+                24 May 2025
+              </>
+            ) : (
+              <>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  Governing law:
+                </span>{" "}
+                Republic of India
+              </>
+            )}
+          </p>
+        </div>
 
-        <div className="h-0 w-full outline outline-1 outline-offset-[-0.50px] outline-neutral-300 dark:outline-zinc-300 md:mb-[4vh] md:mt-[3vh] lg:mb-[7vh] lg:mt-[4vh]" />
-
-        <div className="mb-[2vh] justify-start">
-          <span className="font-poppins text-[12px] font-medium text-black dark:text-zinc-100 md:text-xs md:font-normal lg:text-[15px] lg:font-medium">
-            {isPrivacy
-              ? "For privacy questions, account requests, or concerns, please contact our support team at"
-              : "By using Unideals, you acknowledge and agree to these terms. If you have any questions or concerns, please contact our support team at"}
-          </span>
-          <span className="font-poppins text-[12px] font-medium text-indigo-500 md:text-xs md:font-normal lg:text-[15px]">
-            {" "}
-            campus.mart@gmail.com
-          </span>
-          <span className="font-poppins text-[12px] text-black dark:text-zinc-100 md:text-xs md:font-normal lg:text-[15px] lg:font-medium">
-            .<br />
-            <br />
-            Thank you for being part of the Unideals community!
-          </span>
+        {/* Sections Wrapper */}
+        <div className="space-y-10 lg:space-y-12">
+          {sections.map((section, index) => (
+            <LegalSection
+              key={index}
+              title={section.title}
+              body={section.body}
+            />
+          ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

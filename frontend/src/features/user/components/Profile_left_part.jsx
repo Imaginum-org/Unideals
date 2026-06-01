@@ -1,19 +1,20 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import { useEffect } from "react";
+import {
+  FiUser,
+  FiMessageSquare,
+  FiBell,
+  FiBox,
+  FiShoppingBag,
+  FiHeart,
+  FiSettings,
+  FiHelpCircle,
+  FiFileText,
+} from "react-icons/fi";
 
-import { MdShoppingBag } from "react-icons/md";
-import { BsFillBoxSeamFill } from "react-icons/bs";
-import { MdChat } from "react-icons/md";
 import whitebag from "../../../assets/bag.png";
 import bluebag from "../../../assets/bag.png";
 import { useTheme } from "../../../context/ThemeContext.jsx";
-import { IoIosArrowForward } from "react-icons/io";
-import { RiNotification4Fill } from "react-icons/ri";
-import { FaHeart } from "react-icons/fa6";
-import { MdMail } from "react-icons/md";
-import { BsFillFileTextFill } from "react-icons/bs";
-
 import Loader from "../../../Components/ui/Loader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 
@@ -21,34 +22,7 @@ function Profile_left_part() {
   const { darkMode } = useTheme();
   const { userDetails, loading } = useUser();
   const navigate = useNavigate();
-
-  const menu = [
-    { path: "/chat", label: "Chats", icon: MdChat, badge: 4 },
-    {
-      path: "/notification",
-      label: "Notifications",
-      icon: RiNotification4Fill,
-      badge: 3,
-    },
-    { path: "/wishlist", label: "Wishlist", icon: FaHeart },
-    { path: "/contact", label: "Contact Us", icon: MdMail },
-    {
-      path: "/termscondition",
-      label: "Terms and Condition",
-      icon: BsFillFileTextFill,
-    },
-  ];
-
   const { pathname } = useLocation();
-  const itemClasses = (active) => `
-    relative flex items-center px-[4vw] py-[1.2vh] md:px-[1.4vw] lg:px-[0.8vw] lg:py-[1.2vh] md:py-[1.2vh]  rounded-lg transition-all duration-150 cursor-pointer
-    hover:bg-[#E9ECFF] dark:hover:bg-[#131313] font-nirmala xl:py-3
-    ${
-      active
-        ? "bg-gradient-to-r from-[#394ff1] to-[#4d4ef2] text-white"
-        : "text-[#292929] dark:text-white"
-    }
-  `;
 
   useEffect(() => {
     if (!loading && !userDetails) {
@@ -58,186 +32,114 @@ function Profile_left_part() {
 
   if (loading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-[#FBFBFB] dark:bg-[#131313]">
+      <div className="w-full h-full flex items-center justify-center bg-[#FBFBFB] dark:bg-[#131313]">
         <Loader />
       </div>
     );
   }
 
-  // const [userDetails, setUserDetails] = useState(null);
-  // useEffect(() => {
-  //   const fetchUserProfile = async () => {
-  //     try {
-  //       const response = await axios({
-  //         method: SummaryApi.userProfile.method,
-  //         url: `${baseURL}${SummaryApi.userProfile.url}`,
-  //         withCredentials: true,
-  //       });
-  //       if (response.data.success) {
-  //         setUserDetails(response.data.user);
-  //       }
-  //     } catch (error) {
-  //       if (error.response?.status === 401) {
-  //         toast.error("Session expired. Please log in again.");
-  //         localStorage.removeItem("isAuthenticated");
-  //         navigate("/login");
-  //       } else {
-  //         toast.error("Failed to load profile data");
-  //       }
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-  //   fetchUserProfile();
-  // }, [navigate]);
+  // --- MENU CONFIGURATIONS ---
+  const mainMenu = [
+    { path: "/profile", label: "Profile", icon: FiUser },
+    { path: "/chat", label: "Message", icon: FiMessageSquare, badge: 4 },
+    { path: "/notification", label: "Notification", icon: FiBell, badge: 3 },
+    { path: "/myorders", label: "Orders", icon: FiBox },
+    { path: "/productlisted", label: "My Listings", icon: FiShoppingBag },
+    { path: "/wishlist", label: "Wishlist", icon: FiHeart },
+  ];
+
+  const accountMenu = [
+    { path: "/settings", label: "Settings", icon: FiSettings },
+    { path: "/contact", label: "Help and Support", icon: FiHelpCircle },
+    { path: "/termscondition", label: "Terms and Privacy", icon: FiFileText },
+  ];
+
+  const NavItem = ({ path, label, icon: Icon, badge }) => {
+    const isActive =
+      pathname === path ||
+      (path === "/profile" && pathname === "/profileoverview");
+
+    return (
+      <Link to={path} className="block w-full">
+        <div
+          className={`relative flex items-center px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+            isActive
+              ? "bg-[#3838EC] text-white shadow-md shadow-blue-500/20"
+              : "text-[#64707D] dark:text-[#AAB9C5] hover:bg-gray-100 dark:hover:bg-[#1c1c1c] hover:text-gray-900 dark:hover:text-white"
+          }`}
+        >
+          <Icon
+            size={18}
+            className={isActive ? "text-white" : ""}
+            strokeWidth={isActive ? 2.5 : 2}
+          />
+
+          <span
+            className={`ml-4 text-[15px] ${isActive ? "font-semibold" : "font-medium"}`}
+          >
+            {label}
+          </span>
+
+          {badge !== undefined && badge > 0 && (
+            <span
+              className={`absolute right-4 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                isActive ? "bg-white text-[#364EF2]" : "bg-red-500 text-white"
+              }`}
+            >
+              {badge}
+            </span>
+          )}
+        </div>
+      </Link>
+    );
+  };
 
   return (
-    <>
-      <div className="bg-white dark:bg-[#1A1D20] md:rounded-2xl md:shadow-[2px_4px_12px_0px_rgba(0,0,0,0.10)] md:h-[82.5vh] xl:h-[86vh]">
-        <div className=" px-[4.2vw] md:pl-[1.2vw] md:pr-[1.3vw] md:pt-[2.5vh] relative xl:px-6">
-          <Link to="/profile">
-            <div>
-              <div className="relative ">
-                <div className="bg-[#F6F7FF] dark:bg-[#282A2C] rounded-lg flex items-center p-5 md:p-4 pl-[3.5vw] md:pl-[1.8vw] lg:pl-[1.4vw] md:mx-0 mb-[2vh] md:mb-[2vh] transition-all duration-300 cursor-pointer hover:bg-[#e9ecff] xl:px-2 relative">
-                  <div className="absolute right-3 top-8 text-[#4F4F4F]">
-                    <IoIosArrowForward size={18} />
-                  </div>
-                  <AvatarComponent
-                    name={userDetails?.name}
-                    imageUrl={userDetails?.avatar}
-                    size="medium"
-                    isLoading={loading}
-                    className="md:mr-[1vw] mr-[2.5vw]"
-                  />
-                  <div className="flex flex-col ">
-                    <div className=" text-black dark:text-white  text-[13px] md:text-[14px] lg:text-[16px] font-normal font-['Poppins']">
-                      {userDetails?.name || "User"}
-                    </div>
-                    <div className=" text-[#727272] dark:text-white  text-[13px] md:text-[14px] lg:text-[11px] xl:text-[11px] font-normal font-['Poppins']">
-                      {userDetails?.email || "User@example.com"}
-                    </div>
-                    <div className=" text-[#979797] text-[10px] md:text-[9px] lg:text-[0.8rem] font-normal font-['Poppins']">
-                      {" "}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Link>
-          <div className="w-full h-[0px]  border border-[#E5E4FF]"></div>
+    <div className="h-full  flex flex-col font-figtree relative pl-[1.1vw] pr-[1vw] ">
+      {/* Scrollable Menu Area */}
+      <div className="flex-1 overflow-y-auto no-scrollbar lg:pr-2">
+        {/* Main Menu */}
+        <nav className="flex flex-col gap-1">
+          {mainMenu.map((item) => (
+            <NavItem key={item.path} {...item} />
+          ))}
+        </nav>
+        <div className="w-full h-px bg-gray-100 dark:bg-gray-800"></div>
 
-          {/* Manage Orders */}
-          <div className="  text-black dark:text-[#F2F3FF] md:text-[0.9rem] lg:text-[17px] font-medium font-poppins uppercase mt-[2vh] mb-[1vh] xl:text-[1vw]">
-            Manage Orders
-          </div>
-          <Link to="/myorders" className="block pb-[0.2vh] xl:p-1">
-            <div className={itemClasses(pathname === "/myorders")}>
-              <div
-                data-svg-wrapper
-                className={
-                  pathname === "/myorders"
-                    ? "text-white"
-                    : "text-black dark:text-white"
-                }
-              >
-                <MdShoppingBag size={24} />
-              </div>
-              <span className="md:ml-[2vw] ml-[3vw] md:text-[0.93rem] lg:text-[17px] font-nirmala xl:text-[16px] xl:ml-5">
-                Orders
-              </span>
-            </div>
-          </Link>
-          <Link
-            to="/productlisted"
-            className="block pb-[0.2vh] xl:px-[0.5vw] xl:py-1"
-          >
-            <div className={itemClasses(pathname === "/productlisted")}>
-              <div
-                data-svg-wrapper
-                className={
-                  pathname === "/productlisted"
-                    ? "text-white"
-                    : "text-black dark:text-white"
-                }
-              >
-                <BsFillBoxSeamFill size={20} />
-              </div>
-              <span className="md:ml-[2vw] ml-[3vw]  md:text-[0.93rem] lg:text-[17px] font-normal font-nirmala xl:text-[16px] xl:ml-5">
-                Product Listed
-              </span>
-            </div>
-          </Link>
-          <div className=" text-black dark:text-[#F2F3FF]   md:text-[0.9rem] lg:text-[17px] font-medium font-poppins uppercase mt-[2vh] mb-[1vh] xl:text-[1vw]">
-            Activity
-          </div>
-          <nav className="w-full md:px-0">
-            {menu.map(({ path, label, icon: Icon, badge }) => {
-              const active = pathname === path;
-              return (
-                <Link key={path} to={path} className="block pb-[0.2vh] xl:px-1">
-                  <div
-                    className={`relative flex items-center px-[3vw] py-[1.2vh] md:px-[1.4vw] lg:px-[0.8vw] md:py-[1.2vh] rounded-lg transition-all duration-150 cursor-pointer hover:bg-[#e9ecff] dark:hover:bg-[#131313] xl:py-3 ${
-                      active
-                        ? "bg-gradient-to-r from-[#394ff1] to-[#4d4ef2] text-white"
-                        : " text-[#292929]  dark:text-white"
-                    }`}
-                  >
-                    <div
-                      data-svg-wrapper
-                      className={
-                        active ? "text-white" : "text-black dark:text-white"
-                      }
-                    >
-                      <Icon size={22} />
-                    </div>
-                    <span className="md:ml-[2vw] ml-[3vw] md:text-[0.93rem] lg:text-[17px] font-nirmala xl:text-[16px] xl:ml-5">
-                      {label}
-                    </span>
-                    {badge !== undefined && (
-                      <span
-                        className={`absolute right-[1vw] top-[1.3vh] flex h-[22px] w-[22px] items-center justify-center rounded-full text-[13px] font-robotoFlex ${
-                          active
-                            ? "bg-white text-black dark:text-black"
-                            : "bg-[#F20000] text-white"
-                        }`}
-                      >
-                        {badge}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </nav>
-          <div className="absolute bottom-[-9vh] left-[20vw] lg:bottom-[-8.5vh] lg:left-[6vw] md:bottom-[-8vh] md:left-[5.5vw] xl:left-[5.5vw]">
-            <div className="flex items-end">
-              <div
-                data-svg-wrapper
-                className="mr-[0.5vw] lg:mr-[0.4vw] mb-[1vh]"
-              >
-                <img
-                  src={bluebag}
-                  alt="bag"
-                  className="size-3 lg:size-5 block dark:hidden"
-                />
+        {/* Account Menu */}
+        <div className="mt-3 mb-3 px-4">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            Account
+          </h3>
+        </div>
+        <nav className="flex flex-col gap-1.5">
+          {accountMenu.map((item) => (
+            <NavItem key={item.path} {...item} />
+          ))}
+        </nav>
+      </div>
 
-                <img
-                  src={whitebag}
-                  alt="bag"
-                  className="size-3 lg:size-5 hidden dark:block"
-                />
-              </div>
-              <span className="text-[#012436] dark:text-[#F2F3FF] md:text-[16px] lg:text-[20px] font-poppins font-semibold mr-[5px]">
-                Campus
-              </span>{" "}
-              <span className=" text-[#394FF1] dark:text-[#FFFFFF]  md:text-[16px] lg:text-[22px] font-poppins font-semibold">
-                Mart
-              </span>
-            </div>
+      {/* Bottom Branding (Sticky at bottom of sidebar) */}
+      <div className="bg-[#FFFFFF] dark:bg-[#131313]  border-t pt-4 border-gray-100 dark:border-gray-800/50 ">
+        <div className="flex items-center justify-center gap-2">
+          {/* Bag Icon */}
+          <div className="flex items-center justify-center">
+            <img
+              src="/logo.svg"
+              alt="image"
+              className="h-6 w-6 object-contain"
+            />
+          </div>
+          {/* Logo Text */}
+          <div className="flex items-center text-lg font-bold tracking-tight">
+            <span className="text-[#012436] dark:text-white mr-1.5">
+              Unideals
+            </span>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
+
 export default Profile_left_part;

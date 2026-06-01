@@ -1,11 +1,13 @@
 import Profile_left_part from "../../../features/user/components/Profile_left_part.jsx";
-import TabSwitcher from "../../../features/user/components/manageorderanime.jsx";
 import OrderCard from "../../../features/user/components/OrderCard.jsx";
 import { useState, useMemo, useEffect } from "react";
-import { MdShoppingBag } from "react-icons/md";
 import { getUserProducts } from "../api/productApi.js";
 import toast from "react-hot-toast";
 import Loader from "../../../Components/ui/Loader.jsx";
+import { FiPlus, FiEye, FiHeart, FiMessageSquare } from "react-icons/fi";
+
+// Custom Tabs matching the new screenshot
+const tabs = ["All", "Active", "Unlisted", "Sold"];
 
 function ProductListed() {
   const [activeTab, setActiveTab] = useState("All");
@@ -21,9 +23,7 @@ function ProductListed() {
     try {
       setLoading(true);
       setError(null);
-
       const res = await getUserProducts();
-
       if (res.data.success) {
         setProducts(res.data.data || []);
       }
@@ -37,11 +37,21 @@ function ProductListed() {
 
   const filteredProducts = useMemo(() => {
     const tab = (activeTab || "All").toLowerCase().trim();
-
     if (tab === "all") return products;
 
     return products.filter((p) => {
       const productStatus = (p.status || "").toLowerCase().trim();
+      // Map "Sold" tab to "Delivered" status based on typical backend flows
+      if (
+        tab === "sold" &&
+        (productStatus === "delivered" || productStatus === "sold")
+      )
+        return true;
+      if (
+        tab === "active" &&
+        (productStatus === "listed" || productStatus === "active")
+      )
+        return true;
       return productStatus === tab;
     });
   }, [activeTab, products]);
@@ -65,56 +75,135 @@ function ProductListed() {
   return (
     <div className="h-screen w-full dark:bg-[#131313] flex flex-col">
       <div className="flex-1 lg:flex md:flex overflow-hidden">
-        <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[26%] pt-[3.5vh] pl-[2vw] pr-[1.75vw] pb-[2vh] bg-[#FBFBFB] dark:bg-[#131313] xl:pt-[2.5vh] xl:-mr-4 xl:pb-0">
+        {/* LEFT PANEL */}
+        <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[25%] 2xl:w-[25%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-5  xl:pb-0 rounded-2xl lg:my-5 lg:ml-7">
           <Profile_left_part />
         </div>
-        <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[73.5%] overflow-y-auto no-scrollbar bg-[#FBFBFB] dark:bg-[#131313]">
-          <div className="mx-[5.5vw] md:mr-[3vw] md:ml-[2vw] lg:mr-[3.2vw] lg:ml-[1.5vw] xl:ml-[3vw]">
-            <div className="flex justify-between items-center">
-              <div className="text-[1.1rem] mb-[2vh] mt-[3vh] lg:mt-[5vh] lg:mb-[2vh] text-[#292929] dark:text-[#D6D6D6] xl:text-[1.3rem] lg:text-[22px] lg:font-medium font-poppins flex items-center justify-center">
-                <p className="mr-[0.8vw]">
-                  <MdShoppingBag size={25} />
-                </p>
-                <span> My Listed Products</span>
-              </div>
+
+        {/* RIGHT PANEL */}
+        <div className="h-full w-full md:w-[63%] lg:w-[72%] xl:w-[73.5%] overflow-y-auto no-scrollbar bg-[#FBFBFB] dark:bg-[#131313] p-6 lg:p-10">
+          <div className="max-w-4xl mx-auto">
+            {/* 1. Page Header */}
+            <div className="flex justify-between items-start mb-8">
               <div>
-                <TabSwitcher
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                />
+                <h1 className="text-[1.4rem] lg:text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                  My Listings
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {
+                    products.filter(
+                      (p) =>
+                        p.status?.toLowerCase() === "listed" ||
+                        p.status?.toLowerCase() === "active",
+                    ).length
+                  }{" "}
+                  active · {products.length} total
+                </p>
+              </div>
+              <button className="bg-[#364EF2] hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20">
+                <FiPlus size={18} />
+                List New Product
+              </button>
+            </div>
+
+            {/* 2. Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+                <div className="text-gray-400 dark:text-gray-500">
+                  <FiEye size={20} />
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+                    1,380
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Impressions
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+                <div className="text-gray-400 dark:text-gray-500">
+                  <FiHeart size={20} />
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+                    62
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Saves
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+                <div className="text-gray-400 dark:text-gray-500">
+                  <FiMessageSquare size={20} />
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+                    17
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Chats
+                  </div>
+                </div>
               </div>
             </div>
 
-            {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <Loader />
-              </div>
-            ) : error ? (
-              <div className="py-8 text-center text-red-500 dark:text-red-400">
-                {error}
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="py-8 text-center text-gray-500 dark:text-gray-400">
-                No products found for "{activeTab}"
-              </div>
-            ) : (
-              filteredProducts.map((p) => (
-                <OrderCard
-                  key={p._id}
-                  orderId={p._id}
-                  placedOn={new Date(p.createdAt).toLocaleDateString()}
-                  imageUrl={p.images?.[0] || "/image10.png"}
-                  name={p.title}
-                  color={p.attributes?.color || "N/A"}
-                  attr={p.attributes?.usage_duration || "N/A"}
-                  status={p.status}
-                  price={p.selling_price}
-                  onProductDeleted={handleProductDeleted}
-                  onProductUnlisted={handleProductUnlisted}
-                  onProductRelisted={handleProductRelisted}
-                />
-              ))
-            )}
+            {/* 3. Tabs */}
+            <div className="flex gap-2 mb-6">
+              {tabs.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-5 py-2 rounded-xl text-sm font-medium transition-colors ${
+                    activeTab === tab
+                      ? "bg-[#1A1D20] text-white dark:bg-white dark:text-black shadow-md"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* 4. Products List */}
+            <div className="flex flex-col gap-5 pb-10">
+              {loading ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader />
+                </div>
+              ) : error ? (
+                <div className="py-8 text-center text-red-500 dark:text-red-400 bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
+                  {error}
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="py-12 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
+                  No products found for "{activeTab}"
+                </div>
+              ) : (
+                filteredProducts.map((p) => (
+                  <OrderCard
+                    key={p._id}
+                    orderId={p._id}
+                    placedOn={new Date(p.createdAt)
+                      .toLocaleDateString("en-GB")
+                      .replace(/\//g, "-")}
+                    imageUrl={
+                      p.images?.[0] ||
+                      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=150&q=80"
+                    } // Fallback image
+                    name={p.title}
+                    color={p.attributes?.color || "N/A"}
+                    attr={p.attributes?.usage_duration || "Wireless"}
+                    status={p.status}
+                    price={p.selling_price}
+                    onProductDeleted={handleProductDeleted}
+                    onProductUnlisted={handleProductUnlisted}
+                    onProductRelisted={handleProductRelisted}
+                  />
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>

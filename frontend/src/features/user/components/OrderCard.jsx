@@ -1,6 +1,11 @@
-import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { 
+  FiEye, FiHeart, FiMessageSquare, FiEdit2, 
+  FiEyeOff, FiTrash2, FiRefreshCw 
+} from "react-icons/fi";
+import { IoRocketOutline } from "react-icons/io5";
+
 import DeleteProductModal from "../../product/components/DeleteProductModal.jsx";
 import UnlistProductModal from "../../product/components/UnlistProductModal.jsx";
 import RelistProductModal from "../../product/components/RelistProductModal.jsx";
@@ -33,17 +38,14 @@ const OrderCard = ({
   const [isRelisting, setIsRelisting] = useState(false);
 
   const normalized = (status || "").toLowerCase().trim();
-
-  const handleArrowClick = () => {
-    navigate(`/product/${orderId}`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const isActive = normalized === "listed" || normalized === "active" || normalized === "in progress";
+  const isUnlisted = normalized === "unlisted";
+  const isDelivered = normalized === "delivered" || normalized === "sold";
 
   const handleDeleteProduct = async () => {
     try {
       setIsDeleting(true);
       const res = await deleteProduct(orderId);
-
       if (res.data.success) {
         toast.success("Product deleted successfully");
         if (onProductDeleted) onProductDeleted(orderId);
@@ -59,7 +61,6 @@ const OrderCard = ({
     try {
       setIsUnlisting(true);
       const res = await unlistProduct(orderId);
-
       if (res.data.success) {
         toast.success("Product unlisted successfully");
         if (onProductUnlisted) onProductUnlisted(orderId);
@@ -75,7 +76,6 @@ const OrderCard = ({
     try {
       setIsRelisting(true);
       const res = await relistProduct(orderId);
-
       if (res.data.success) {
         toast.success("Product relisted successfully");
         if (onProductRelisted) onProductRelisted(orderId);
@@ -87,135 +87,143 @@ const OrderCard = ({
     }
   };
 
-  const statusClasses =
-    normalized === "delivered"
-      ? "bg-[#E6FFEB] text-[#008526]"
-      : normalized === "cancelled" || normalized === "canceled"
-        ? "bg-[#FFECEC] text-[#D12929]"
-        : "bg-[#E5E8FF] dark:bg-[#E5E8FF] text-[#534FF2] dark:text-[#534FF2]";
-
   return (
-    <div className="bg-white dark:bg-[#1A1D20] rounded-[15px] lg:rounded-[20px] shadow-md overflow-hidden pl-[3.4vw] pr-[3.5vw] pt-[1.8vh] pb-[1.8vh] lg:px-[1.8vw] lg:py-[1.9vh] xl:py-8 font-poppins mb-6">
-      <div className="flex justify-between items-center">
-        <div className="text-[#2d3339] dark:text-[#F1F1F1] text-[13px] lg:text-lg lg:font-medium">
-          #Order id : {orderId}
+    <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden font-poppins">
+      
+      {/* 1. HEADER */}
+      <div className="px-6 py-3.5 border-b border-gray-50 dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">
+          {isActive ? `#product id : ${orderId}` : `#Order id : ${orderId}`}
         </div>
-        <div className="text-[#646464] dark:text-[#D6D6D6] text-[12px] lg:text-[16px] font-light">
-          Placed on : {placedOn}
-        </div>
+        
+        {isActive ? (
+          <div className="bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400 px-3 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase">
+            ACTIVE
+          </div>
+        ) : (
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            Listed on : {placedOn}
+          </div>
+        )}
       </div>
 
-      <div className="w-full h-[0px] border lg:border-1 border-[#ECEEFF] mt-[2vh] mb-[2.4vh] lg:my-[1.5vh] xl:my-[2vh]" />
-
-      <div className="lg:flex lg:justify-between lg:mt-[2vh] xl:mt-[3vh]">
-        <div className="flex ml-[4vw] lg:ml-[0vw]">
+      {/* 2. BODY */}
+      <div className="p-6 pb-5 flex flex-col sm:flex-row justify-between gap-4">
+        
+        <div className="flex items-start gap-4">
           <img
-            className="w-[90px] h-[90px] lg:w-[88px] lg:h-[88px] rounded-[9.06px]"
+            className="w-[84px] h-[84px] rounded-xl object-cover bg-gray-100 dark:bg-gray-800 border border-gray-100 dark:border-gray-700"
             src={imageUrl}
-            alt={name || "product image"}
+            alt={name || "product"}
           />
-          <div className="flex flex-col ml-[4vw] lg:ml-[1.5vw] max-sm:mt-[1.2vh]">
-            <div className="text-[#2d3339] dark:text-[#F1F1F1] text-[15px] font-medium lg:text-[19px]">
+          <div className="flex flex-col justify-center">
+            <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
               {name}
-            </div>
-            <div className="text-[#64707d] dark:text-[#848484] text-[13px] lg:text-[15px] font-light mt-[-0.6vh]">
+            </h3>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {color} | {attr}
             </div>
 
-            <div className="lg:mt-[1.2vh]">
-              {/* status badge */}
-              <div
-                className={`rounded-[5px] lg:rounded-[7px] inline-block px-[2vw] py-[0.2vh] lg:py-[0.3vh] lg:px-[1vw] ${statusClasses} xl:py-1 xl:px-4`}
-              >
-                <div className="text-[12px] font-normal lg:text-[14px]">
-                  {status}
-                </div>
+            {/* Dynamic Status Row below title */}
+            {isActive ? (
+              <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 mt-3 font-medium">
+                <span className="flex items-center gap-1.5"><FiEye size={14}/> 320</span>
+                <span className="flex items-center gap-1.5"><FiHeart size={14}/> 12</span>
+                <span className="flex items-center gap-1.5"><FiMessageSquare size={14}/> 3</span>
               </div>
+            ) : (
+              <div className="mt-3">
+                <span className={`px-3 py-1 rounded-lg text-[11px] font-bold ${
+                  isDelivered 
+                    ? "bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400" 
+                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                }`}>
+                  {isDelivered ? "Delivered" : "Unlisted"}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="text-left sm:text-right self-end sm:self-start">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Price</div>
+          <div className="text-lg font-bold text-gray-900 dark:text-white">₹{price}</div>
+          {isActive && (
+            <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-2">1 week ago</div>
+          )}
+        </div>
+
+      </div>
+
+      {/* 3. FOOTER ACTIONS */}
+      <div className={`px-6 py-4 bg-gray-50/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-wrap items-center gap-3 ${
+        isActive ? 'justify-between' : isDelivered ? 'justify-between' : 'justify-end'
+      }`}>
+        
+        {isActive && (
+          <>
+            <button className="px-4 py-2 bg-[#364EF2] text-white rounded-lg text-[13px] font-medium hover:bg-blue-700 transition-colors shadow-sm shadow-blue-500/20 flex items-center gap-2">
+              <IoRocketOutline size={16} />
+              Boost Visibility
+            </button>
+            <div className="flex items-center gap-2 ml-auto">
+              <button className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-2">
+                <FiEdit2 size={14} />
+                Edit Details
+              </button>
+              <button 
+                onClick={() => setUnlistModalOpen(true)}
+                disabled={isUnlisting}
+                className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <FiEyeOff size={14} />
+                {isUnlisting ? "..." : "Unlist"}
+              </button>
+              <button 
+                onClick={() => setDeleteModalOpen(true)}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <FiTrash2 size={14} />
+                Delete
+              </button>
             </div>
-          </div>
-        </div>
-
-        <div className="lg:hidden mt-[2.4vh] w-full h-0 border border-[#cacaca]" />
-
-        <div className="flex lg:flex lg:flex-col lg:justify-center lg:items-end mt-[3vh] lg:mt-[0px]">
-          <div className="text-[#555555] dark:text-[#BBC2C9] mr-[3vw] lg:mr-[0] text-[0.95rem] lg:text-[1.1rem] font-normal">
-            Total
-          </div>
-          <div className="text-black dark:text-[#F1F1F1] text-[0.9rem] lg:text-[18px] md:mb-[1.7vh] lg:font-medium lg:mt-[-0.7vh]">
-            ₹{price}
-          </div>
-
-          <button
-            onClick={handleArrowClick}
-            data-svg-wrapper
-            className="max-sm:absolute bottom-[1.5vh] right-[4vw] lg:static md:absolute md:bottom-[1.5vh] md:right-[3.3vw] cursor-pointer hover:opacity-80 transition-opacity"
-            aria-label="View product details"
-            title="View product details"
-          >
-            <svg
-              className="max-sm:h-[25px] max-sm:w-[25px]"
-              width="30"
-              height="31"
-              viewBox="0 0 30 31"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <rect
-                width="30"
-                height="30"
-                rx="15"
-                transform="matrix(-1 0 0 1 30 0.253723)"
-                fill="#534FF2"
-              />
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M11.2636 7.53034C11.6151 7.16152 12.1849 7.16152 12.5364 7.53034L19.7364 15.0859C20.0879 15.4547 20.0879 16.0527 19.7364 16.4215L12.5364 23.9771C12.1849 24.3459 11.6151 24.3459 11.2636 23.9771C10.9121 23.6083 10.9121 23.0103 11.2636 22.6415L17.8272 15.7537L11.2636 8.86599C10.9121 8.49716 10.9121 7.89917 11.2636 7.53034Z"
-                fill="white"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Action Buttons Section */}
-      <div className="w-full h-[0px] border lg:border-1 border-[#ECEEFF] mt-[2vh] mb-[2vh] lg:my-[1.5vh] xl:my-[2vh]" />
-
-      <div className="flex flex-wrap gap-[2vw] lg:gap-[1vw] lg:justify-end items-center">
-        <button className="px-[3vw] py-[0.8vh] lg:px-[1.2vw] lg:py-[0.6vh] bg-[#534FF2] text-white rounded-[8px] text-[13px] lg:text-[14px] font-medium hover:bg-[#4239D4] transition-colors whitespace-nowrap">
-          Boost Visibility
-        </button>
-        <button className="px-[3vw] py-[0.8vh] lg:px-[1.2vw] lg:py-[0.6vh] bg-white dark:bg-[#2A2D31] border border-[#D0D0D0] dark:border-[#444] text-[#333] dark:text-[#E1E1E1] rounded-[8px] text-[13px] lg:text-[14px] font-medium hover:bg-[#F5F5F5] dark:hover:bg-[#333] transition-colors whitespace-nowrap">
-          Edit Details
-        </button>
-        {normalized === "unlisted" ? (
-          <button
-            onClick={() => setRelistModalOpen(true)}
-            disabled={isRelisting}
-            className="px-[3vw] py-[0.8vh] lg:px-[1.2vw] lg:py-[0.6vh] bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 rounded-[8px] text-[13px] lg:text-[14px] font-medium hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isRelisting ? "Listing..." : "List"}
-          </button>
-        ) : (
-          <button
-            onClick={() => setUnlistModalOpen(true)}
-            disabled={isUnlisting}
-            className="px-[3vw] py-[0.8vh] lg:px-[1.2vw] lg:py-[0.6vh] bg-white dark:bg-[#2A2D31] border border-[#D0D0D0] dark:border-[#444] text-[#333] dark:text-[#E1E1E1] rounded-[8px] text-[13px] lg:text-[14px] font-medium hover:bg-[#F5F5F5] dark:hover:bg-[#333] transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isUnlisting ? "Unlisting..." : "Unlist"}
-          </button>
+          </>
         )}
-        <button
-          onClick={() => setDeleteModalOpen(true)}
-          disabled={isDeleting}
-          className="p-[0.8vh] lg:p-[0.6vh] bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-[8px] hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Trash2 size={18} strokeWidth={2.5} />
-        </button>
+
+        {isUnlisted && (
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setRelistModalOpen(true)}
+              disabled={isRelisting}
+              className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <FiRefreshCw size={14} />
+              {isRelisting ? "..." : "Relist Product"}
+            </button>
+            <button 
+              onClick={() => setDeleteModalOpen(true)}
+              disabled={isDeleting}
+              className="p-2.5 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors disabled:opacity-50"
+            >
+              <FiTrash2 size={16} />
+            </button>
+          </div>
+        )}
+
+        {isDelivered && (
+          <>
+            <div className="text-xs text-gray-400 dark:text-gray-500 italic">
+              This order is completed. Actions are limited.
+            </div>
+            <button className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors">
+              View Delivery Details
+            </button>
+          </>
+        )}
       </div>
 
-      {/* Delete Product Modal */}
+      {/* MODALS */}
       <DeleteProductModal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
@@ -223,8 +231,6 @@ const OrderCard = ({
         productName={name}
         isLoading={isDeleting}
       />
-
-      {/* Unlist Product Modal */}
       <UnlistProductModal
         isOpen={unlistModalOpen}
         onClose={() => setUnlistModalOpen(false)}
@@ -232,8 +238,6 @@ const OrderCard = ({
         productName={name}
         isLoading={isUnlisting}
       />
-
-      {/* Relist Product Modal */}
       <RelistProductModal
         isOpen={relistModalOpen}
         onClose={() => setRelistModalOpen(false)}

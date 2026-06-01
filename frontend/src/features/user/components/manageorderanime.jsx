@@ -1,35 +1,39 @@
-import { motion } from "framer-motion";
+import React from "react";
 
-const tabs = ["All", "In progress", "Delivered"];
+const tabs = ["All", "In progress", "Delivered", "Unlisted"];
 
-export default function TabSwitcher({ activeTab, setActiveTab }) {
+export default function TabSwitcher({ activeTab, setActiveTab, counts = {} }) {
   return (
-    <div className="hidden lg:flex items-center space-x-1 bg-white dark:bg-[#1A1D20] rounded-[9.61px] shadow-[0px_3.2039802074432373px_6.407960414886475px_0px_rgba(0,0,0,0.06)] px-[0.5vw] py-[0.6vh]">
-      {tabs.map((tab) => (
-        <button
-          key={tab}
-          onClick={() => setActiveTab(tab)}
-          className="relative py-[0.5vh] px-[0.7vw] text-[0.85rem] font-medium font-['Poppins'] transition-colors duration-200 xl:py-1 xl:px-4"
-          aria-pressed={activeTab === tab}
-        >
-          {activeTab === tab && (
-            <motion.div
-              layoutId="active-pill"
-              className="absolute inset-0 bg-[#394ff1] rounded-[5px]"
-              transition={{ type: "spring", stiffness: 300, damping: 35 }}
-            />
-          )}
-          <span
-            className={`relative z-10 ${
-              activeTab === tab
-                ? "text-white text-[0.85rem] font-light"
-                : "text-[#292929] dark:text-[#D6D6D6] text-[0.85rem] font-light"
+    <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
+      {tabs.map((tab) => {
+        const isActive = activeTab === tab;
+        const count = counts[tab] || 0;
+
+        return (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] md:text-[13px] font-medium transition-all duration-200 border outline-none ${
+              isActive
+                ? "bg-[#364EF2] border-[#364EF2] text-white shadow-sm shadow-blue-500/20"
+                : "bg-white dark:bg-[#1A1D20] border-gray-200 dark:border-gray-700 text-gray-600 dark:text-[#D6D6D6] hover:border-gray-300 dark:hover:border-gray-500"
             }`}
           >
-            {tab}
-          </span>
-        </button>
-      ))}
+            <span>{tab}</span>
+            {count > 0 && (
+              <span
+                className={`flex items-center justify-center min-w-[20px] h-[20px] px-1 rounded-full text-[10px] font-bold ${
+                  isActive
+                    ? "bg-white/25 text-white"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
+                }`}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

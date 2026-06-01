@@ -264,7 +264,7 @@ const PricingStep = () => {
                 </div>
 
                 <button className="mt-4 text-sm font-semibold text-[#4F46E5] self-start">
-                  <a href="/profile">Change</a>
+                  <a href="/settings">Change</a>
                 </button>
               </div>
             </div>

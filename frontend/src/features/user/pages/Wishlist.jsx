@@ -43,7 +43,7 @@ function Wishlist() {
     <>
       <div className="w-screen h-screen overflow-hidden dark:bg-[#131313]">
         <div className="flex h-[calc(100vh-70px)]">
-          <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[26%] pt-[3.5vh] pl-[2vw] pr-[1.75vw] pb-[2vh] bg-[#FBFBFB] dark:bg-[#131313] xl:pt-[2.5vh] xl:-mr-4 xl:pb-0">
+          <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[25%] 2xl:w-[25%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-5  xl:pb-0 rounded-2xl lg:my-5 lg:ml-7">
             <Profile_left_part />
           </div>
 
