@@ -1,442 +1,328 @@
-import { useState } from "react";
-import Profile_left_part from "../components/Profile_left_part.jsx";
-import emailjs from "@emailjs/browser";
-import { Toaster, toast } from "react-hot-toast";
-import Loading from "../../../Components/ui/ContactLoader.jsx";
+import React, { useState } from "react";
 import { useUser } from "../../../context/useUserContext.jsx";
-import { Lightbulb, Sparkles } from "lucide-react";
+import Profile_left_part from "../components/Profile_left_part.jsx";
 import {
-  MdAccessTime,
-  MdEmail,
-  MdHelp,
-  MdOutlineArrowForward,
-  MdOutlineLocalOffer,
-  MdOutlineSubject,
-} from "react-icons/md";
+  Search,
+  MessageSquare,
+  ShieldAlert,
+  Lightbulb,
+  Clock,
+  Mail,
+  Headphones,
+  ChevronDown,
+  ChevronUp,
+  X,
+  AlertTriangle
+} from "lucide-react";
 
-const EMAILJS_SERVICE_ID = (
-  import.meta.env.VITE_EMAILJS_SERVICE_ID ||
-  import.meta.env.VITE_SERVICE_ID ||
-  ""
-).trim();
-const EMAILJS_TEMPLATE_ID = (
-  import.meta.env.VITE_EMAILJS_TEMPLATE_ID ||
-  import.meta.env.VITE_TEMPLATE_ID ||
-  ""
-).trim();
-const EMAILJS_PUBLIC_KEY = (
-  import.meta.env.VITE_EMAILJS_PUBLIC_KEY ||
-  import.meta.env.VITE_PUBLIC_KEY ||
-  ""
-).trim();
-const SUPPORT_EMAIL =
-  import.meta.env.VITE_SUPPORT_EMAIL?.trim() || "imaginum.org@gmail.com";
-
-if (EMAILJS_PUBLIC_KEY) {
-  emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-}
-
-const contactTypes = [
-  { value: "order", label: "Order issue" },
-  { value: "payment", label: "Payment issue" },
-  { value: "account", label: "Account help" },
-  { value: "listing", label: "Product listing" },
-  { value: "deal", label: "Deal or chat help" },
-  { value: "safety", label: "Safety report" },
-  { value: "other", label: "Other" },
-];
-
-const priorityOptions = [
-  { value: "low", label: "Low", hint: "General question" },
-  { value: "normal", label: "Normal", hint: "Need help soon" },
-  { value: "urgent", label: "Urgent", hint: "Blocking issue" },
-];
-
-const quickTips = [
-  "Include an order or product reference when possible.",
-  "Use urgent only for blocked payments or safety issues.",
-  "Tell us what result would solve the problem.",
-];
-
-const faqs = [
+// FAQ Data Structure
+const faqData = [
   {
-    question: "How do I track my order?",
-    answer:
-      "Open My Orders from your profile menu. If the seller has shared status updates, they will appear inside the order card.",
+    id: "transactions",
+    title: "TRANSACTIONS",
+    questions: [
+      { q: "How do I track the status of a deal?", a: "Check your 'My Deals' section for real-time updates." },
+      { q: "Can I return an item after buying it?", a: "Returns depend on the mutual agreement between the buyer and seller." },
+      { q: "What if I got scammed or the item is not as described?", a: "Please report the user immediately using our reporting tool." }
+    ]
   },
   {
-    question: "What should I include for payment issues?",
-    answer:
-      "Share the order or product reference, payment time, amount, and a short description. Do not send passwords or card details.",
+    id: "safety",
+    title: "SAFETY",
+    questions: [
+      {
+        q: "Is it safe to meet a seller on campus?",
+        a: "All users on UniDeals are verified students. Always meet in public, well-lit campus areas — the canteen, library lobby, or main gate. Never share home addresses or pay before inspecting the item."
+      },
+      { q: "What if a seller stops responding?", a: "If a seller stops responding, we recommend canceling the deal and looking for alternative listings." }
+    ]
   },
-  {
-    question: "How fast will support reply?",
-    answer:
-      "Most messages are reviewed within 24 hours. Urgent safety or payment issues are prioritized first.",
-  },
-  {
-    question: "Can I report a suspicious listing?",
-    answer:
-      "Yes. Choose Safety report or Product listing, include the product reference if you have it, and describe what looked wrong.",
-  },
+  { id: "account", title: "ACCOUNT & VERIFICATION", questions: [] },
+  { id: "listings", title: "LISTINGS", questions: [] }
 ];
 
-const getOptionLabel = (options, value) =>
-  options.find((option) => option.value === value)?.label || "";
-
-function ContactUs() {
+function Termscondition() {
   const { userDetails } = useUser();
-  const [contactType, setContactType] = useState("");
-  const [priority, setPriority] = useState("");
-  const [replyMethod, setReplyMethod] = useState("email");
-  const [subject, setSubject] = useState("");
-  const [reference, setReference] = useState("");
-  const [message, setMessage] = useState("");
-  const [activeIndex, setActiveIndex] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [activeForm, setActiveForm] = useState(null); // 'contact', 'report', 'suggest'
+  const [openCategory, setOpenCategory] = useState(null);
+  const [openQuestion, setOpenQuestion] = useState(null);
 
-  const selectedContactType = getOptionLabel(contactTypes, contactType);
-  const selectedPriority = getOptionLabel(priorityOptions, priority);
-  const senderName = userDetails?.name?.trim() || "Campus Mart user";
-  const senderEmail = userDetails?.email?.trim() || "";
-
-  const resetForm = () => {
-    setContactType("");
-    setPriority("normal");
-    setReplyMethod("email");
-    setSubject("");
-    setReference("");
-    setMessage("");
+  const toggleCategory = (id) => {
+    setOpenCategory(openCategory === id ? null : id);
+    setOpenQuestion(null);
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!contactType || !subject.trim() || !message.trim()) {
-      toast("Please complete the required fields.");
-      return;
-    }
-
-    if (!senderEmail) {
-      toast.error("We could not read your account email. Please log in again.");
-      return;
-    }
-
-    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
-      toast.error("Contact service is not configured. Please try again later.");
-      return;
-    }
-
-    const cleanReference = reference.trim() || "Not provided";
-    const cleanSubject = subject.trim();
-    const cleanMessage = message.trim();
-
-    const fullMessage = [
-      `Sender name: ${senderName}`,
-      `Sender email: ${senderEmail}`,
-      `Contact type: ${selectedContactType}`,
-      `Priority: ${selectedPriority}`,
-      `Preferred reply: ${selectedReplyMethod}`,
-      `Reference: ${cleanReference}`,
-      "",
-      "Message:",
-      cleanMessage,
-    ].join("\n");
-
-    setLoading(true);
-
-    try {
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        {
-          to_email: SUPPORT_EMAIL,
-          from_name: senderName,
-          sender_name: senderName,
-          user_name: senderName,
-          from_email: senderEmail,
-          sender_email: senderEmail,
-          reply_to: senderEmail,
-          contact_type: selectedContactType,
-          priority: selectedPriority,
-          preferred_reply: selectedReplyMethod,
-          reference: cleanReference,
-          subject: `Unideals Support: ${cleanSubject}`,
-          user_subject: cleanSubject,
-          message: fullMessage,
-          user_message: cleanMessage,
-        },
-        { publicKey: EMAILJS_PUBLIC_KEY },
-      );
-
-      toast.success("Message sent successfully!");
-      resetForm();
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to send message. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleFAQ = (index) => {
-    setActiveIndex((prev) => (prev === index ? null : index));
+  const toggleQuestion = (q) => {
+    setOpenQuestion(openQuestion === q ? null : q);
   };
 
   return (
-    <>
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          duration: 1800,
-          maxToasts: 1,
-        }}
-      />
-      {loading && <Loading />}
-
-      <div className="min-h-screen bg-[#F7F9FD] dark:bg-[#131313] font-figtree">
-        <div className="flex min-h-[calc(100vh-70px)]">
-          <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[20.5%] 2xl:w-[20.5%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
+    <div className="h-screen w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree">
+      <div className="flex-1 lg:flex md:flex overflow-hidden">
+        {/* LEFT PANEL - Only render if user exists */}
+        {userDetails?._id ? (
+          <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[20.5%] 2xl:w-[20.5%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
+        ) : null}
 
-          <main className="w-full overflow-y-auto bg-[#FBFBFB] px-4 py-6 dark:bg-[#131313] md:w-[63%] md:px-7 lg:w-[72%] xl:w-[73.5%] xl:px-10">
-            <div className="mx-auto max-w-6xl">
-              <section className="overflow-hidden rounded-3xl border border-[#E7E9FF] bg-white shadow-[0_18px_45px_rgba(36,49,148,0.08)] dark:border-[#282A2C] dark:bg-[#1A1D20]">
-                <div className="relative bg-gradient-to-r from-[#364EF2] via-[#4545F4] to-[#2367E8] px-5 py-6 text-white sm:px-7 lg:px-8 overflow-hidden">
-                  <div className="absolute right-[-3rem] top-[-3rem] h-36 w-36 rounded-full bg-white/10" />
-                  <div className="absolute bottom-[-4rem] left-[32%] h-32 w-32 rounded-full bg-white/10" />
-
-                  <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                        <MdEmail className="text-base" />
-                        Unideals Support
-                      </div>
-                      <h1 className="font-poppins text-2xl font-semibold tracking-normal sm:text-3xl">
-                        How can we help?
-                      </h1>
-                      <p className="mt-2 max-w-2xl font-inter text-sm leading-6 text-white/85 sm:text-base">
-                        Send us the details and we&apos;ll route your message
-                        with the right context.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-8">
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <AuthLikeField
-                        label="Contact type"
-                        required
-                        icon={<MdHelp />}
-                        active={Boolean(contactType)}
-                      >
-                        <select
-                          value={contactType}
-                          onChange={(event) =>
-                            setContactType(event.target.value)
-                          }
-                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#131313] dark:text-white dark:focus:bg-[#1A1D20]"
-                        >
-                          {/* This empty, disabled, hidden option prevents the text overlap */}
-                          <option value="" disabled hidden></option>
-
-                          {contactTypes.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </AuthLikeField>
-                      <AuthLikeField
-                        label="Priority"
-                        icon={<MdAccessTime />}
-                        active={Boolean(priority)}
-                      >
-                        <select
-                          value={priority}
-                          onChange={(event) => setPriority(event.target.value)}
-                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#131313] dark:text-white dark:focus:bg-[#1A1D20]"
-                        >
-                          {/* This empty, disabled, hidden option prevents the text overlap */}
-                          <option value="" disabled hidden></option>
-
-                          {priorityOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label} - {option.hint}
-                            </option>
-                          ))}
-                        </select>
-                      </AuthLikeField>
-                    </div>
-
-                    <AuthLikeField
-                      label="Subject"
-                      required
-                      icon={<MdOutlineSubject />}
-                      active={Boolean(subject)}
-                    >
-                      <input
-                        value={subject}
-                        onChange={(event) => setSubject(event.target.value)}
-                        className="h-[6.3vh] min-h-12 w-full rounded-xl border border-transparent bg-slate-50 pl-10 pr-3 text-[0.8125rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#131313] dark:text-white dark:focus:bg-[#1A1D20]"
-                        placeholder=" "
-                      />
-                    </AuthLikeField>
-
-                    <AuthLikeField
-                      label="Message"
-                      required
-                      icon={<MdOutlineLocalOffer />}
-                      active={Boolean(message)}
-                      multiline
-                    >
-                      <textarea
-                        rows="2"
-                        value={message}
-                        onChange={(event) => setMessage(event.target.value)}
-                        className="min-h-[5.7rem] w-full resize-none rounded-xl border border-transparent bg-slate-50 pb-3 pl-10 pr-4 pt-6 text-[0.8125rem] leading-6 text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#131313] dark:text-white dark:focus:bg-[#1A1D20]"
-                        placeholder=" "
-                      />
-                    </AuthLikeField>
-
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-                        Please do not include passwords, OTPs, or card details.
-                      </p>
-                      <button
-                        disabled={loading}
-                        type="submit"
-                        className="inline-flex h-[6.3vh] items-center justify-center gap-2 rounded-xl bg-[#364EF2] px-7 font-poppins text-sm font-semibold text-white shadow-[0_12px_24px_rgba(54,78,242,0.25)] transition hover:bg-[#2d44dd] disabled:cursor-not-allowed disabled:opacity-60 xl:text-xs"
-                      >
-                        {loading ? "Sending..." : "Send "}
-                        <MdOutlineArrowForward className="text-lg xl:text-base" />
-                      </button>
-                    </div>
-                  </form>
-
-                  <aside className="space-y-3">
-                    <div className="rounded-2xl bg-[#F0F0FF] px-6 py-5 dark:border dark:border-[#2A2D35] dark:bg-[#131313]">
-                      {/* Header */}
-                      <div className="mb-3 flex items-center gap-2.5">
-                        <div className="relative">
-                          <Lightbulb className="h-5 w-5 fill-[#3838EC] text-[#3838EC] dark:fill-indigo-400 dark:text-indigo-400" />
-                          <Sparkles className="absolute -right-2 -top-1 h-2.5 w-2.5 text-[#3838EC] dark:text-indigo-400" />
-                        </div>
-                        <h2 className="font-['Figtree'] text-base font-semibold uppercase leading-6 text-black dark:text-white">
-                          Quick tips
-                        </h2>
-                      </div>
-
-                      {/* Custom Bullet List */}
-                      <ul className="flex flex-col gap-1">
-                        {quickTips.map((tip, index) => (
-                          <li key={index} className="flex items-start gap-2.5">
-                            <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600/60 dark:bg-indigo-500/60">
-                              <Sparkles className="h-3 w-3 text-white" />
-                            </div>
-                            <span className="font-['Figtree'] text-[0.85rem] font-normal leading-6 text-black dark:text-slate-300">
-                              {tip}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </aside>
-                </div>
-              </section>
-
-              <section className="mt-6 rounded-3xl border border-[#E7E9FF] bg-white p-5 shadow-[0_18px_45px_rgba(36,49,148,0.06)] dark:border-[#282A2C] dark:bg-[#1A1D20] sm:p-7">
-                <h2 className="font-poppins text-xl font-semibold text-gray-950 dark:text-white">
-                  Frequently Asked Questions
-                </h2>
-
-                {/* Changed from 'grid lg:grid-cols-2' to 'flex flex-col' for 1 row per question */}
-                <div className="mt-5 flex flex-col gap-3">
-                  {faqs.map((item, index) => {
-                    const isOpen = activeIndex === index;
-                    return (
-                      <div
-                        key={item.question}
-                        className="rounded-2xl border border-gray-200 bg-white dark:border-[#2A2D35] dark:bg-[#131313]"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleFAQ(index)}
-                          className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left"
-                        >
-                          <span className="font-poppins text-sm font-medium text-gray-900 dark:text-white">
-                            {item.question}
-                          </span>
-                          <span
-                            className={`text-lg text-[#364EF2] transition-transform duration-200 ${
-                              isOpen ? "rotate-45" : ""
-                            }`}
-                          >
-                            +
-                          </span>
-                        </button>
-
-                        <div
-                          className={`grid transition-all duration-300 ease-out ${
-                            isOpen
-                              ? "grid-rows-[1fr] opacity-100"
-                              : "grid-rows-[0fr] opacity-0"
-                          }`}
-                        >
-                          <div className="overflow-hidden">
-                            <p className="px-4 pb-4 text-sm leading-6 text-gray-600 dark:text-gray-400">
-                              {item.answer}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            </div>
-          </main>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function AuthLikeField({
-  label,
-  required = false,
-  icon,
-  active,
-  multiline = false,
-  children,
-}) {
-  return (
-    <label className="block">
-      <span className="relative block group">
-        <span
-          className={`absolute left-3 z-10 text-lg text-gray-500 transition group-focus-within:text-[#393AF2] ${
-            multiline ? "top-7" : "top-1/2 -translate-y-1/2"
+        {/* RIGHT PANEL (Main Content Area) */}
+        <div
+          className={`h-full overflow-y-auto no-scrollbar bg-[#FBFBFB] dark:bg-[#131313] p-4 lg:p-8 ${
+            userDetails?._id
+              ? "w-full md:w-[63%] lg:w-[72%] xl:w-[73.5%]"
+              : "mx-auto w-full max-w-5xl"
           }`}
         >
-          {icon}
-        </span>
-        <span
-          className={`pointer-events-none absolute left-10 z-10 px-1 font-figtree transition-all duration-200 ${
-            active
-              ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
-              : `${multiline ? "top-7" : "top-1/2 -translate-y-1/2"} text-[0.75rem] text-gray-500/80`
-          } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
-        >
-          {label}
-          {required ? " *" : ""}
-        </span>
-        {children}
-      </span>
-    </label>
+          <div className="max-w-3xl mx-auto pb-10">
+            {/* Header */}
+            <div className="mb-6">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Help & Support</h1>
+              <p className="text-sm text-gray-500">Find answers, report issues, or reach our team.</p>
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search help articles..."
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white"
+              />
+            </div>
+
+            {/* Action Cards (Merged Bug & Issue) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+              <button
+                onClick={() => setActiveForm('contact')}
+                className={`p-4 text-left border rounded-xl transition-all ${activeForm === 'contact' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200 hover:border-gray-300'} bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-3">
+                  <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Contact support</h3>
+                <p className="text-xs text-gray-500 mt-1">Reach our team</p>
+              </button>
+
+              <button
+                onClick={() => setActiveForm('report')}
+                className={`p-4 text-left border rounded-xl transition-all ${activeForm === 'report' ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200 hover:border-gray-300'} bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center mb-3">
+                  <ShieldAlert className="w-4 h-4 text-red-500" />
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Report an issue / bug</h3>
+                <p className="text-xs text-gray-500 mt-1">Safety, fraud, or broken features</p>
+              </button>
+
+              <button
+                onClick={() => setActiveForm('suggest')}
+                className={`p-4 text-left border rounded-xl transition-all ${activeForm === 'suggest' ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-200 hover:border-gray-300'} bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-3">
+                  <Lightbulb className="w-4 h-4 text-green-600 dark:text-green-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Suggest a feature</h3>
+                <p className="text-xs text-gray-500 mt-1">Share your ideas</p>
+              </button>
+            </div>
+
+            {/* Dynamic Content Area */}
+            {activeForm ? (
+              <div className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-[#1f1f1f] p-5 relative mb-6 animate-in fade-in slide-in-from-top-4">
+                <button
+                  onClick={() => setActiveForm(null)}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                {/* CONTACT FORM */}
+                {activeForm === 'contact' && (
+                  <div>
+                    <h2 className="text-base font-semibold mb-1 dark:text-white">Contact support</h2>
+                    <p className="text-xs text-gray-500 mb-4">Fill in the details below and we will follow up.</p>
+                    
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Topic</label>
+                    <select className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 bg-white dark:bg-[#131313] dark:text-white">
+                      <option>Select a topic</option>
+                      <option>Account assistance</option>
+                      <option>Deal inquiries</option>
+                      <option>Other</option>
+                    </select>
+
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Message</label>
+                    <textarea 
+                      rows="3" 
+                      className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none"
+                      placeholder="Describe your issue in as much detail as possible..."
+                    ></textarea>
+
+                    <div className="flex gap-3">
+                      <button onClick={() => setActiveForm(null)} className="px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800">Back</button>
+                      <button className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+                        <MessageSquare className="w-4 h-4" /> Send message
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* MERGED REPORT FORM (Issue + Bug) */}
+                {activeForm === 'report' && (
+                  <div>
+                    <h2 className="text-base font-semibold mb-1 dark:text-white">Report an issue or bug</h2>
+                    <p className="text-xs text-gray-500 mb-4">Let us know what's wrong so we can fix it.</p>
+                    
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-3 mb-4 flex gap-2">
+                      <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-yellow-800 dark:text-yellow-500">For immediate safety emergencies on campus, contact campus security first. UniDeals reports are reviewed within 24 hours.</p>
+                    </div>
+
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">What are you reporting?</label>
+                    <select className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-1 focus:ring-indigo-500">
+                      <option>Select category...</option>
+                      <option>Fraud or Scam</option>
+                      <option>Safety Concern</option>
+                      <option>App Bug / Glitch</option>
+                      <option>Inappropriate Content</option>
+                    </select>
+
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Link, User ID, or Page Section (optional)</label>
+                    <input 
+                      type="text" 
+                      className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 bg-white dark:bg-[#131313] dark:text-white"
+                      placeholder="e.g. Paste a link, user ID, or type 'My Listings'"
+                    />
+
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tell us what happened / Steps to reproduce</label>
+                    <textarea 
+                      rows="3" 
+                      className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none"
+                      placeholder="Be as specific as possible. Include dates, messages, or steps to trigger the bug..."
+                    ></textarea>
+
+                    <div className="flex gap-3">
+                      <button onClick={() => setActiveForm(null)} className="px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800">Back</button>
+                      <button className="flex-1 flex items-center justify-center gap-2 bg-[#F14646] hover:bg-red-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+                        <ShieldAlert className="w-4 h-4" /> Submit report
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* SUGGEST FEATURE FORM */}
+                {activeForm === 'suggest' && (
+                  <div>
+                    <h2 className="text-base font-semibold mb-1 dark:text-white">Suggest a feature</h2>
+                    <p className="text-xs text-gray-500 mb-4">Fill in the details below and we will review your idea.</p>
+                    
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Feature title</label>
+                    <input 
+                      type="text" 
+                      className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 bg-white dark:bg-[#131313] dark:text-white"
+                      placeholder="e.g. Filter by hostel block"
+                    />
+
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Describe the feature</label>
+                    <textarea 
+                      rows="2" 
+                      className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none"
+                      placeholder="What should it do? How would it work?"
+                    ></textarea>
+
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Why is it useful? (optional)</label>
+                    <textarea 
+                      rows="2" 
+                      className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none"
+                      placeholder="Who benefits and how?"
+                    ></textarea>
+
+                    <div className="flex gap-3">
+                      <button onClick={() => setActiveForm(null)} className="px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800">Back</button>
+                      <button className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+                        <Lightbulb className="w-4 h-4" /> Submit idea
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Response Time Banner */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 mb-6 bg-gray-50 border border-gray-100 rounded-lg dark:bg-[#1a1a1a] dark:border-gray-800">
+                  <div className="flex items-center text-xs text-gray-600 dark:text-gray-300">
+                    <Clock className="w-4 h-4 mr-2 text-gray-400" />
+                    <span>Avg response: <strong className="text-gray-900 dark:text-white font-semibold">under 2 hours</strong> during campus hours (9 AM – 9 PM)</span>
+                  </div>
+                  <a href="mailto:hi@unideals.in" className="flex items-center mt-2 sm:mt-0 text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+                    <Mail className="w-4 h-4 mr-1.5" /> hi@unideals.in
+                  </a>
+                </div>
+
+                {/* FAQ Section */}
+                <div className="bg-white border border-gray-200 rounded-xl dark:bg-[#1f1f1f] dark:border-gray-700 p-4 lg:p-6">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-800">
+                    <h3 className="text-xs font-bold text-gray-400 tracking-wider">FREQUENTLY ASKED</h3>
+                    <Headphones className="w-4 h-4 text-gray-400" />
+                  </div>
+
+                  <div className="space-y-1">
+                    {faqData.map((category) => (
+                      <div key={category.id} className="border-b border-gray-50 last:border-0 dark:border-gray-800">
+                        <button
+                          onClick={() => toggleCategory(category.id)}
+                          className="w-full flex items-center justify-between py-3 text-left focus:outline-none"
+                        >
+                          <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wide">
+                            {category.title}
+                          </span>
+                          {openCategory === category.id ? (
+                            <ChevronUp className="w-4 h-4 text-gray-400" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+
+                        {/* Nested Questions */}
+                        {openCategory === category.id && (
+                          <div className="pl-2 pb-3 space-y-2">
+                            {category.questions.length > 0 ? (
+                              category.questions.map((item, idx) => (
+                                <div key={idx} className="bg-gray-50 dark:bg-[#131313] rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800">
+                                  <button
+                                    onClick={() => toggleQuestion(item.q)}
+                                    className="w-full flex items-center justify-between p-3 text-left focus:outline-none"
+                                  >
+                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{item.q}</span>
+                                    {openQuestion === item.q ? (
+                                      <ChevronUp className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                    )}
+                                  </button>
+                                  {openQuestion === item.q && (
+                                    <div className="p-3 pt-0 text-xs text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-100 dark:border-gray-800 mt-2">
+                                      {item.a}
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-xs text-gray-400 p-2">No articles in this category yet.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-export default ContactUs;
+export default Termscondition;

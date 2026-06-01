@@ -3,6 +3,7 @@ import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import "../../../styles/deletestyle.css";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { Trash2 } from "lucide-react";
 
 import { deleteAccount } from "../../../features/user/api/userApi.js";
 
@@ -37,8 +38,9 @@ function AlertDialogDemo() {
     <>
       <AlertDialog.Root>
         <AlertDialog.Trigger asChild>
-          <button className="text-[#E40000] text-[13px] lg:text-[17px] font-normal font-['Poppins'] xl:text-[15px] bg-[#FFDDDD] rounded-lg px-[2.5vw] py-[0.9vh] lg:px-[0.8vw] lg:py-[0.8vh] xl:px-[1vw] xl:py-[1vh] transition-all duration-300 cursor-pointer hover:bg-[#f9c7c7]">
-            Delete Account
+          <button className="flex items-center gap-2 rounded-xl bg-[#FFE0E0] px-5 py-2.5 text-sm font-semibold text-[#EF4444] transition-all duration-300 hover:bg-[#f9c7c7]">
+            <Trash2 size={17} />
+            Delete
           </button>
         </AlertDialog.Trigger>
         <AlertDialog.Portal>
