@@ -95,24 +95,47 @@ function Profile_left_part() {
   };
 
   return (
-    <div className="h-full  flex flex-col font-figtree relative pl-[1.1vw] pr-[1vw] ">
+    <div className="h-full flex flex-col font-figtree relative pl-[1.1vw] pr-[1vw]">
       {/* Scrollable Menu Area */}
       <div className="flex-1 overflow-y-auto no-scrollbar lg:pr-2">
+        
+        {/* Top Profile Section */}
+        <div className="flex items-center px-4 py-6 border-b border-gray-100 dark:border-gray-800/50 mb-4">
+          <div className="relative">
+            <img
+              src={userDetails?.profilePic || "https://ui-avatars.com/api/?name=" + (userDetails?.name || "User")}
+              alt="Profile avatar"
+              className="w-12 h-12 rounded-full object-cover bg-blue-50 dark:bg-gray-800"
+            />
+            {/* Green Online Indicator Dot */}
+            <span className="absolute bottom-0 right-0 w-[14px] h-[14px] bg-[#22C55E] border-2 border-white dark:border-[#131313] rounded-full"></span>
+          </div>
+          <div className="ml-3 flex flex-col">
+            <h2 className="text-[17px] font-semibold text-gray-900 dark:text-white leading-tight">
+              {userDetails?.name || "Anurag Adarsh"}
+            </h2>
+            <p className="text-[14px] font-medium text-[#94A3B8] dark:text-gray-500 mt-0.5">
+              {userDetails?.college || "VIT Vellore"}
+            </p>
+          </div>
+        </div>
+
         {/* Main Menu */}
         <nav className="flex flex-col gap-1">
           {mainMenu.map((item) => (
             <NavItem key={item.path} {...item} />
           ))}
         </nav>
-        <div className="w-full h-px bg-gray-100 dark:bg-gray-800"></div>
+        
+        <div className="w-full h-px bg-gray-100 dark:bg-gray-800 my-4"></div>
 
         {/* Account Menu */}
-        <div className="mt-3 mb-3 px-4">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+        <div className="mb-2 px-4">
+          <h3 className="text-[13px] font-bold tracking-wider text-gray-400 dark:text-gray-500 uppercase">
             Account
           </h3>
         </div>
-        <nav className="flex flex-col gap-1.5">
+        <nav className="flex flex-col gap-1.5 pb-4">
           {accountMenu.map((item) => (
             <NavItem key={item.path} {...item} />
           ))}
@@ -120,7 +143,7 @@ function Profile_left_part() {
       </div>
 
       {/* Bottom Branding (Sticky at bottom of sidebar) */}
-      <div className="bg-[#FFFFFF] dark:bg-[#131313]  border-t pt-4 border-gray-100 dark:border-gray-800/50 ">
+      <div className="bg-[#FFFFFF] dark:bg-[#131313] border-t pt-4 border-gray-100 dark:border-gray-800/50 pb-4">
         <div className="flex items-center justify-center gap-2">
           {/* Bag Icon */}
           <div className="flex items-center justify-center">

@@ -286,11 +286,11 @@ const termsSections = [
 
 function LegalSection({ title, body }) {
   return (
-    <div className="font-poppins">
-      <h3 className="mb-4 border-b border-gray-100 pb-3 text-sm font-bold uppercase tracking-wide text-gray-900 dark:border-gray-800 dark:text-white lg:text-base">
+    <div className="font-figtree">
+      <h3 className="mb-4 border-b border-gray-100 pb-3 text-sm font-semibold uppercase tracking-wide text-gray-900 dark:border-gray-800 dark:text-white lg:text-sm">
         {title}
       </h3>
-      <div className="space-y-4 text-[13px] leading-relaxed text-gray-600 dark:text-gray-300 lg:text-[15px]">
+      <div className="space-y-4 text-[13px] leading-relaxed text-gray-500 dark:text-gray-300 lg:text-[0.85rem]">
         {body.map((block, index) => {
           if (block.type === "p") {
             return block.html ? (
@@ -302,7 +302,7 @@ function LegalSection({ title, body }) {
 
           if (block.type === "list-bold") {
             return (
-              <div key={index} className="space-y-3 pt-1">
+              <div key={index} className="space-y-3 pt-0">
                 {block.items.map((item, j) => (
                   <div
                     key={j}
@@ -349,39 +349,52 @@ function LegalDocument({ initialType = "privacy" }) {
   const sections = isPrivacy ? privacySections : termsSections;
 
   return (
-    <div className="font-poppins w-full">
+    <div className="font-figtree w-full bg-[#F7F9FD]">
       {/* Header Area */}
-      <div className="mb-6 lg:mb-8">
-        <h1 className="mb-1 text-2xl font-bold text-gray-900 dark:text-white lg:text-[28px]">
+      <div className="mb-6 lg:mb-4">
+        <h1 className="mb-1 text-[1.2rem] lg:text-xl xl:text-xl  font-bold text-gray-900 dark:text-white">
           Terms & Privacy
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 lg:text-base">
+        <p className="text-sm text-gray-500 dark:text-gray-400 lg:text-sm">
           How we operate and how we protect you
         </p>
       </div>
 
       {/* Tab Switcher */}
-      <div className="mb-8 flex flex-wrap items-center gap-3">
+      <div className="mb-4 inline-flex items-center p-1 bg-gray-100 dark:bg-[#1A1D20] rounded-2xl border border-gray-100 dark:border-gray-800">
         <button
           onClick={() => setActiveTab("privacy")}
-          className={`flex items-center gap-2 rounded-xl border-2 px-5 py-2.5 text-sm transition-all duration-200 ${
+          className={`flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition-all duration-200 ${
             isPrivacy
-              ? "border-gray-900 bg-transparent font-bold text-gray-900 dark:border-white dark:text-white"
-              : "border-transparent bg-gray-50 font-medium text-gray-500 hover:bg-gray-100 dark:bg-[#1A1D20] dark:text-gray-400 dark:hover:bg-[#25282c]"
+              ? "bg-white font-medium text-gray-900 shadow-sm dark:bg-[#25282c] dark:text-white"
+              : "bg-transparent font-medium text-[#9AA4B2] hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           }`}
         >
-          <FiShield size={18} strokeWidth={isPrivacy ? 2.5 : 2} />
+          <FiShield
+            size={18}
+            strokeWidth={isPrivacy ? 2.5 : 2}
+            className={
+              isPrivacy ? "text-gray-900 dark:text-white" : "text-[#9AA4B2]"
+            }
+          />
           Privacy Policy
         </button>
+
         <button
           onClick={() => setActiveTab("terms")}
-          className={`flex items-center gap-2 rounded-xl border-2 px-5 py-2.5 text-sm transition-all duration-200 ${
+          className={`flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition-all duration-200 ${
             !isPrivacy
-              ? "border-gray-900 bg-transparent font-bold text-gray-900 dark:border-white dark:text-white"
-              : "border-transparent bg-gray-50 font-medium text-gray-500 hover:bg-gray-100 dark:bg-[#1A1D20] dark:text-gray-400 dark:hover:bg-[#25282c]"
+              ? "bg-white font-medium text-gray-900 shadow-sm dark:bg-[#25282c] dark:text-white"
+              : "bg-transparent font-medium text-[#9AA4B2] hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           }`}
         >
-          <FiFileText size={18} strokeWidth={!isPrivacy ? 2.5 : 2} />
+          <FiFileText
+            size={18}
+            strokeWidth={!isPrivacy ? 2.5 : 2}
+            className={
+              !isPrivacy ? "text-gray-900 dark:text-white" : "text-[#9AA4B2]"
+            }
+          />
           Terms & Conditions
         </button>
       </div>
@@ -417,7 +430,7 @@ function LegalDocument({ initialType = "privacy" }) {
         </div>
 
         {/* Sections Wrapper */}
-        <div className="space-y-10 lg:space-y-12">
+        <div className="space-y-10 lg:space-y-10">
           {sections.map((section, index) => (
             <LegalSection
               key={index}
