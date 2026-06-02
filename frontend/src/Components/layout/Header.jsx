@@ -333,6 +333,7 @@ const Header = ({ isChat }) => {
                       imageUrl={userDetails?.avatar}
                       size="small"
                       isLoading={userLoading}
+                      className="rounded-full"
                     />
                   </button>
 
@@ -371,6 +372,7 @@ const Header = ({ isChat }) => {
                               imageUrl={userDetails?.avatar}
                               size="medium"
                               isLoading={userLoading}
+                              className="rounded-full"
                             />
 
                             <div>
@@ -1009,6 +1011,7 @@ const Header = ({ isChat }) => {
                         imageUrl={userDetails?.avatar}
                         size="medium"
                         isLoading={userLoading}
+                        className="rounded-full"
                       />
                     </button>
 
@@ -1032,6 +1035,7 @@ const Header = ({ isChat }) => {
                                 imageUrl={userDetails?.avatar}
                                 size="medium"
                                 isLoading={userLoading}
+                                className="rounded-full"
                               />
 
                               <div>

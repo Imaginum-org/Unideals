@@ -35,36 +35,39 @@ export default function SecuritySettings({ email }) {
         toast.error(response.data.message || "Unable to send reset link.");
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to send reset link.");
+      toast.error(
+        error?.response?.data?.message || "Failed to send reset link.",
+      );
     } finally {
       setIsSendingReset(false);
     }
   };
 
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
-      <h2 className="mb-6 text-lg font-bold">Security Settings</h2>
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+      <h2 className="mb-6 text-base font-bold">Security Settings</h2>
 
       <div className="divide-y divide-[#EDF0F5]">
         <div className="flex min-h-[74px] items-center justify-between gap-4 py-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F2F4F9] text-[#98A1B2]">
-              <Lock size={18} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F2F4F9] text-[#98A1B2]">
+              <Lock size={15} />
             </div>
             <div>
-              <h3 className="text-base font-semibold">Password</h3>
-              <div className="mt-2 flex items-center gap-4 text-[#98A1B2]">
+              <h3 className="text-[0.9rem] font-medium tracking-wide">
+                Password
+              </h3>
+              <div className=" flex items-center gap-4 text-[#98A1B2]">
                 <span className="text-base leading-none tracking-[5px]">
                   ............
                 </span>
-                <Eye size={16} />
               </div>
             </div>
           </div>
 
           <Dialog.Root open={isDialogOpen} onOpenChange={handleOpenChange}>
             <Dialog.Trigger asChild>
-              <button className="text-sm font-semibold text-[#4F46FF]">
+              <button className="text-sm font-semibold text-[#4F46FF] mr-3">
                 Change
               </button>
             </Dialog.Trigger>
@@ -121,14 +124,14 @@ export default function SecuritySettings({ email }) {
 
         <div className="flex min-h-[74px] items-center justify-between gap-4 py-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#DDFBE9] text-[#16A34A]">
-              <Shield size={18} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DDFBE9] text-[#16A34A]">
+              <Shield size={15} />
             </div>
             <div>
-              <h3 className="text-base font-semibold">
+              <h3 className="text-[0.9rem] font-medium tracking-normal">
                 Two-Factor Authentication
               </h3>
-              <p className="mt-1 text-sm font-medium text-[#98A1B2]">
+              <p className=" text-xs font-medium text-[#98A1B2]">
                 Extra layer of security
               </p>
             </div>
