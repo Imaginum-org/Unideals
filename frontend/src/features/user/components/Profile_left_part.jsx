@@ -1,16 +1,16 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import {
-  FiUser,
-  FiMessageSquare,
-  FiBell,
-  FiBox,
-  FiShoppingBag,
-  FiHeart,
-  FiSettings,
-  FiHelpCircle,
-  FiFileText,
-} from "react-icons/fi";
+  DashboardIcon,
+  MessageCircleIcon,
+  BellIcon,
+  BoxIcon,
+  ShoppingBagIcon,
+  HeartIcon,
+  ContactIcon,
+  FolderIcon,
+} from "@animateicons/react/lucide";
+import { Settings01Icon } from "@animateicons/react/huge";
 
 import whitebag from "../../../assets/bag.png";
 import bluebag from "../../../assets/bag.png";
@@ -40,18 +40,18 @@ function Profile_left_part() {
 
   // --- MENU CONFIGURATIONS ---
   const mainMenu = [
-    { path: "/profile", label: "Profile", icon: FiUser },
-    { path: "/chat", label: "Message", icon: FiMessageSquare, badge: 4 },
-    { path: "/notification", label: "Notification", icon: FiBell, badge: 3 },
-    { path: "/myorders", label: "Orders", icon: FiBox },
-    { path: "/productlisted", label: "My Listings", icon: FiShoppingBag },
-    { path: "/wishlist", label: "Wishlist", icon: FiHeart },
+    { path: "/profile", label: "Overview", icon: DashboardIcon },
+    { path: "/chat", label: "Message", icon: MessageCircleIcon, badge: 4 },
+    { path: "/notification", label: "Notification", icon: BellIcon, badge: 3 },
+    { path: "/myorders", label: "Orders", icon: BoxIcon },
+    { path: "/productlisted", label: "My Listings", icon: ShoppingBagIcon },
+    { path: "/wishlist", label: "Wishlist", icon: HeartIcon },
   ];
 
   const accountMenu = [
-    { path: "/settings", label: "Settings", icon: FiSettings },
-    { path: "/contact", label: "Help and Support", icon: FiHelpCircle },
-    { path: "/termscondition", label: "Terms and Privacy", icon: FiFileText },
+    { path: "/settings", label: "Settings", icon: Settings01Icon },
+    { path: "/contact", label: "Help and Support", icon: ContactIcon },
+    { path: "/termscondition", label: "Terms and Privacy", icon: FolderIcon },
   ];
 
   const NavItem = ({ path, label, icon: Icon, badge }) => {
@@ -69,13 +69,13 @@ function Profile_left_part() {
           }`}
         >
           <Icon
-            size={18}
+            size={17}
             className={isActive ? "text-white" : ""}
-            strokeWidth={isActive ? 2.5 : 2}
+            strokeWidth={isActive ? 2.5 : 1.5}
           />
 
           <span
-            className={`ml-4 text-[15px] ${isActive ? "font-semibold" : "font-medium"}`}
+            className={`ml-2.5 text-[14px] ${isActive ? "font-semibold" : "font-medium"}`}
           >
             {label}
           </span>
@@ -95,26 +95,29 @@ function Profile_left_part() {
   };
 
   return (
-    <div className="h-full flex flex-col font-figtree relative pl-[1.1vw] pr-[1vw]">
+    <div className="h-full flex flex-col font-figtree relative pl-[0.3vw] ">
       {/* Scrollable Menu Area */}
       <div className="flex-1 overflow-y-auto no-scrollbar lg:pr-2">
-        
         {/* Top Profile Section */}
-        <div className="flex items-center px-4 py-6 border-b border-gray-100 dark:border-gray-800/50 mb-4">
+        <div className="flex items-center px-4 py-[0.95rem] border-b border-gray-200 dark:border-gray-800/50 mb-4">
           <div className="relative">
             <img
-              src={userDetails?.profilePic || "https://ui-avatars.com/api/?name=" + (userDetails?.name || "User")}
+              src={
+                userDetails?.profilePic ||
+                "https://ui-avatars.com/api/?name=" +
+                  (userDetails?.name || "User")
+              }
               alt="Profile avatar"
-              className="w-12 h-12 rounded-full object-cover bg-blue-50 dark:bg-gray-800"
+              className="w-9 h-9 rounded-full object-cover bg-blue-50 dark:bg-gray-800"
             />
             {/* Green Online Indicator Dot */}
-            <span className="absolute bottom-0 right-0 w-[14px] h-[14px] bg-[#22C55E] border-2 border-white dark:border-[#131313] rounded-full"></span>
+            <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#22C55E] border-2 border-white dark:border-[#131313] rounded-full"></span>
           </div>
           <div className="ml-3 flex flex-col">
-            <h2 className="text-[17px] font-semibold text-gray-900 dark:text-white leading-tight">
+            <h2 className="text-[0.95rem] font-semibold text-gray-900 dark:text-white leading-tight">
               {userDetails?.name || "Anurag Adarsh"}
             </h2>
-            <p className="text-[14px] font-medium text-[#94A3B8] dark:text-gray-500 mt-0.5">
+            <p className="text-xs font-medium text-[#94A3B8] dark:text-gray-500 mt-0.5">
               {userDetails?.college || "VIT Vellore"}
             </p>
           </div>
@@ -126,8 +129,8 @@ function Profile_left_part() {
             <NavItem key={item.path} {...item} />
           ))}
         </nav>
-        
-        <div className="w-full h-px bg-gray-100 dark:bg-gray-800 my-4"></div>
+
+        <div className="w-full h-px bg-gray-200 dark:bg-gray-800 my-3.5"></div>
 
         {/* Account Menu */}
         <div className="mb-2 px-4">
@@ -144,18 +147,18 @@ function Profile_left_part() {
 
       {/* Bottom Branding (Sticky at bottom of sidebar) */}
       <div className="bg-[#FFFFFF] dark:bg-[#131313] border-t pt-4 border-gray-100 dark:border-gray-800/50 pb-4">
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-1">
           {/* Bag Icon */}
           <div className="flex items-center justify-center">
             <img
               src="/logo.svg"
               alt="image"
-              className="h-6 w-6 object-contain"
+              className="h-5 w-5 object-contain"
             />
           </div>
           {/* Logo Text */}
-          <div className="flex items-center text-lg font-bold tracking-tight">
-            <span className="text-[#012436] dark:text-white mr-1.5">
+          <div className="flex items-center text-[1.1rem] font-bold tracking-tight">
+            <span className="text-[#012436] dark:text-white mt-[0.3rem]">
               Unideals
             </span>
           </div>

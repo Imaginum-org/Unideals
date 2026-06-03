@@ -81,7 +81,7 @@ function ProductListed() {
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[10vh] xl:py-6 2xl:px-0">
+        <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
           <div className="max-w-4xl mx-auto">
             {/* 1. Page Header */}
             <div className="flex justify-between items-start mb-4">

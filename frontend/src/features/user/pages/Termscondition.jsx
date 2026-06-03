@@ -17,7 +17,7 @@ function Termscondition() {
 
         {/* RIGHT PANEL (Main Content Area) */}
         <div
-          className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:px-[10vh] lg:py-6 ${
+          className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:px-[5.7rem] lg:py-6 ${
             userDetails?._id
               ? "w-full md:w-[63%] lg:w-[72%] xl:w-[79.5%]"
               : "mx-auto w-full max-w-5xl"

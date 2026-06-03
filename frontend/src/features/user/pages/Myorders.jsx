@@ -94,7 +94,7 @@ function Myorders() {
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[10vh] xl:py-6 2xl:px-0">
+        <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6 ">
           <div className="max-w-4xl mx-auto">
             {/* Header Section */}
             <div className="flex items-center gap-2 text-[1.2rem] lg:text-xl xl:text-xl font-bold text-gray-900 dark:text-white mb-1">
@@ -103,7 +103,7 @@ function Myorders() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Manage your listings and orders
             </p>
-  
+
             {/* Tabs */}
             <div className="mb-5">
               <TabSwitcher
@@ -112,7 +112,7 @@ function Myorders() {
                 counts={tabCounts}
               />
             </div>
- 
+
             {/* Orders List */}
             <div className="flex flex-col gap-6 pb-10">
               {filteredOrders.length === 0 ? (
