@@ -98,32 +98,32 @@ const OrderCard = ({
   return (
     <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden font-figtree">
       {/* 1. HEADER */}
-      <div className="px-6 py-3.5 border-b bg-gray-100 border-gray-50 dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">
+      <div className="px-4 sm:px-6 py-3.5 border-b bg-gray-100 border-gray-50 dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-[12px] sm:text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate flex-1 pr-2">
           {isActive ? `#product id : ${orderId}` : `#Order id : ${orderId}`}
         </div>
 
         {isActive ? (
-          <div className="bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400 px-3 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase">
+          <div className="bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400 px-3 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0">
             ACTIVE
           </div>
         ) : (
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 shrink-0">
             Listed on : {placedOn}
           </div>
         )}
       </div>
 
       {/* 2. BODY */}
-      <div className="p-6 pb-5 flex flex-col sm:flex-row justify-between gap-4">
-        <div className="flex items-start gap-4">
+      <div className="p-4 sm:p-6 pb-4 sm:pb-5 flex flex-col sm:flex-row justify-between gap-4">
+        <div className="flex items-start gap-3 sm:gap-4 w-full sm:w-auto">
           <img
-            className="w-[84px] h-[84px] rounded-xl object-cover bg-gray-100 dark:bg-gray-800 border border-gray-100 dark:border-gray-700"
+            className="w-[72px] h-[72px] sm:w-[84px] sm:h-[84px] shrink-0 rounded-xl object-cover bg-gray-100 dark:bg-gray-800 border border-gray-100 dark:border-gray-700"
             src={imageUrl}
             alt={name || "product"}
           />
-          <div className="flex flex-col justify-center">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
+          <div className="flex flex-col justify-center flex-1">
+            <h3 className="text-[15px] sm:text-base font-bold text-gray-900 dark:text-white leading-tight">
               {name}
             </h3>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -132,21 +132,21 @@ const OrderCard = ({
 
             {/* Dynamic Status Row below title */}
             {isActive ? (
-              <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 mt-3 font-medium">
-                <span className="flex items-center gap-1.5">
+              <div className="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 mt-2 sm:mt-3 font-medium">
+                <span className="flex items-center gap-1 sm:gap-1.5">
                   <FiEye size={14} /> 320
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1 sm:gap-1.5">
                   <FiHeart size={14} /> 12
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1 sm:gap-1.5">
                   <FiMessageSquare size={14} /> 3
                 </span>
               </div>
             ) : (
-              <div className="mt-3">
+              <div className="mt-2 sm:mt-3">
                 <span
-                  className={`px-3 py-1 rounded-lg text-[11px] font-bold ${
+                  className={`px-3 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold ${
                     isDelivered
                       ? "bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400"
                       : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
@@ -159,91 +159,111 @@ const OrderCard = ({
           </div>
         </div>
 
-        <div className="text-left sm:text-right self-end sm:self-start">
-          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-            Total Price
-          </div>
-          <div className="text-lg font-bold text-gray-900 dark:text-white">
-            ₹{price}
-          </div>
-          {isActive && (
-            <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-2">
-              1 week ago
+        {/* NEW PRICE LAYOUT: 
+          On mobile -> flex-row with split ends and a top border to separate it cleanly.
+          On desktop -> stacks vertically aligned to the right. 
+        */}
+        <div className="flex sm:block flex-row items-center justify-between w-full sm:w-auto mt-1 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-gray-100 dark:border-gray-800/50">
+          <div className="text-left sm:text-right">
+            <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5 sm:mb-1">
+              Total Price
             </div>
-          )}
+            {isActive && (
+              <div className="text-[10px] text-gray-400 dark:text-gray-500 block sm:hidden mt-0.5">
+                1 week ago
+              </div>
+            )}
+          </div>
+
+          <div className="text-right sm:text-right">
+            <div className="text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white">
+              ₹{price}
+            </div>
+            {isActive && (
+              <div className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block mt-1">
+                1 week ago
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* 3. FOOTER ACTIONS */}
       <div
-        className={`px-6 py-4 bg-gray-50/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-wrap items-center gap-3 ${
-          isActive
-            ? "justify-between"
-            : isDelivered
-              ? "justify-between"
-              : "justify-end"
+        className={`px-4 sm:px-6 py-4 bg-gray-50/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row items-center gap-3 ${
+          isActive || isDelivered ? "sm:justify-between" : "sm:justify-end"
         }`}
       >
         {isActive && (
           <>
-            <button className="px-4 py-2 bg-[#3838EC] text-white rounded-lg text-[13px] font-medium hover:bg-blue-700 transition-colors shadow-sm shadow-blue-500/20 flex items-center gap-2">
+            {/* Boost button full width on mobile, normal on desktop */}
+            <button className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-[#3838EC] text-white rounded-lg text-[13px] font-medium hover:bg-blue-700 transition-colors shadow-sm shadow-blue-500/20 flex justify-center items-center gap-2 shrink-0">
               <IoRocketOutline size={16} />
-              Boost Visibility
+              <span>Boost Visibility</span>
             </button>
-            <div className="flex items-center gap-2 ml-auto">
-              <button className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-2">
+
+            {/* Secondary actions span evenly on mobile, group right on desktop */}
+            <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+              <button className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2">
                 <FiEdit2 size={14} />
-                Edit Details
+                <span className="sm:hidden text-xs">Edit</span>
+                <span className="hidden sm:inline">Edit Details</span>
               </button>
+
               <button
                 onClick={() => setUnlistModalOpen(true)}
                 disabled={isUnlisting}
-                className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
               >
                 <FiEyeOff size={14} />
-                {isUnlisting ? "..." : "Unlist"}
+                <span className="text-xs sm:text-[13px]">
+                  {isUnlisting ? "..." : "Unlist"}
+                </span>
               </button>
+
               <button
                 onClick={() => setDeleteModalOpen(true)}
                 disabled={isDeleting}
-                className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
               >
                 <FiTrash2 size={14} />
-                Delete
+                <span className="text-xs sm:text-[13px]">Delete</span>
               </button>
             </div>
           </>
         )}
 
         {isUnlisted && (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
             <button
               onClick={() => setRelistModalOpen(true)}
               disabled={isRelisting}
-              className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <FiRefreshCw size={14} />
               {isRelisting ? "..." : "Relist Product"}
             </button>
+
             <button
               onClick={() => setDeleteModalOpen(true)}
               disabled={isDeleting}
-              className="p-2.5 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto justify-center py-2.5 sm:p-2.5 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <FiTrash2 size={16} />
+              <span className="sm:hidden text-[13px]">Delete</span>
             </button>
           </div>
         )}
 
         {isDelivered && (
-          <>
-            <div className="text-xs text-gray-400 dark:text-gray-500 italic">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:justify-between">
+            <div className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 italic text-center sm:text-left w-full sm:w-auto">
               This order is completed. Actions are limited.
             </div>
-            <button className="px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors">
+            <button className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2">
               View Delivery Details
             </button>
-          </>
+          </div>
         )}
       </div>
 

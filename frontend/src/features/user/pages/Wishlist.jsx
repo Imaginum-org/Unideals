@@ -48,14 +48,18 @@ function Wishlist() {
             <Profile_left_part />
           </div>
 
-          <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[73.5%] overflow-y-auto no-scrollbar bg-[#FBFBFB] dark:bg-[#131313]">
-            <div className="mx-[5.5vw] md:mx-[1.7vh] lg:mr-[3.2vw] lg:ml-[1.5vw]">
-              <div
-                className="justify-start text-zinc-800 lg:text-2xl dark:bg-[#131313] 
-          font-['Poppins'] dark:text-[#D6D6D6] mb-[2vh] mt-[3vh]  
-          lg:mt-[5.5vh] lg:mb-[2vh] text-[1.1rem] lg:font-medium"
-              >
-                Wishlist ({visibleWishlist?.length || 0})
+          <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h1 className="text-[1.4rem] lg:text-2xl font-bold text-gray-900 dark:text-white mb-1 xl:text-xl">
+                    Wishlist
+                  </h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                    {visibleWishlist?.length || 0} saved item
+                    {visibleWishlist?.length === 1 ? "" : "s"}
+                  </p>
+                </div>
               </div>
 
               {isLoading ? (
@@ -63,10 +67,7 @@ function Wishlist() {
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
                 </div>
               ) : visibleWishlist && visibleWishlist.length > 0 ? (
-                <div
-                  className="w-full grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3  
-            gap-x-4 gap-y-7 dark:bg-[#131313]"
-                >
+                <div className="w-full grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-x-5 2xl:gap-x-12  gap-y-7 dark:bg-[#131313]">
                   {visibleWishlist.map((product) => (
                     <ProductCard
                       key={product._id}

@@ -4,8 +4,12 @@ import { useState, useMemo, useEffect } from "react";
 import { getUserProducts } from "../api/productApi.js";
 import toast from "react-hot-toast";
 import Loader from "../../../Components/ui/Loader.jsx";
-import { FiPlus, FiEye, FiHeart, FiMessageSquare } from "react-icons/fi";
-
+import { FiPlus } from "react-icons/fi";
+import {
+  EyeIcon,
+  HeartIcon,
+  MessageCircleIcon,
+} from "@animateicons/react/lucide";
 // Custom Tabs matching the new screenshot
 const tabs = ["All", "Active", "Unlisted", "Sold"];
 
@@ -101,18 +105,18 @@ function ProductListed() {
                 </p>
               </div>
               <div className="hidden md:block">
-              <button className="bg-[#3838EC] hover:bg-blue-700 text-white px-3 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20">
-                <FiPlus size={18} />
-                List New Product
-              </button>
+                <button className="bg-[#3838EC] hover:bg-blue-700 text-white px-3 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20">
+                  <FiPlus size={18} />
+                  List New Product
+                </button>
               </div>
             </div>
 
             {/* 2. Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-3 md:gap-5 mb-5">
               <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                 <div className="text-gray-400 dark:text-gray-500">
-                  <FiEye size={20} />
+                  <EyeIcon size={20} className="text-black" />
                 </div>
                 <div>
                   <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
@@ -125,7 +129,7 @@ function ProductListed() {
               </div>
               <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                 <div className="text-gray-400 dark:text-gray-500">
-                  <FiHeart size={20} />
+                  <HeartIcon size={20} className="text-pink-600" />
                 </div>
                 <div>
                   <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
@@ -138,7 +142,7 @@ function ProductListed() {
               </div>
               <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                 <div className="text-gray-400 dark:text-gray-500">
-                  <FiMessageSquare size={20} />
+                  <MessageCircleIcon size={20} className="text-blue-600" />
                 </div>
                 <div>
                   <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">

@@ -6,6 +6,9 @@ import {
   FiMessageSquare,
   FiChevronRight,
   FiMapPin,
+  FiTruck,
+  FiCheckCircle,
+  FiXCircle,
 } from "react-icons/fi";
 import { MdCheck } from "react-icons/md";
 import DeleteProductModal from "../../product/components/DeleteProductModal.jsx";
@@ -34,7 +37,6 @@ const MyOrdersCard = ({
   attr,
   status,
   price,
-  // Added these as placeholders since they appear in your new UI design
   sellerName = "Rahul Kumar",
   location = "Main Canteen, VIT Vellore",
   onProductDeleted,
@@ -107,17 +109,23 @@ const MyOrdersCard = ({
     }
   };
 
+  // Badge Status & Icon Logic
   let badgeStyles =
     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+  let StatusIcon = null;
+
   if (normalized === "in progress") {
     badgeStyles =
       "bg-[#FFF4E5] text-[#F59E0B] dark:bg-amber-900/20 dark:text-amber-500";
+    StatusIcon = FiTruck;
   } else if (normalized === "delivered") {
     badgeStyles =
       "bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400";
+    StatusIcon = FiCheckCircle;
   } else if (normalized === "cancelled" || normalized === "canceled") {
     badgeStyles =
       "bg-[#FFECEC] text-[#D12929] dark:bg-red-900/20 dark:text-red-500";
+    StatusIcon = FiXCircle;
   }
 
   return (
@@ -135,18 +143,19 @@ const MyOrdersCard = ({
             {placedOn}
           </div>
           <div
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5 ${badgeStyles}`}
+            className={`text-[12px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 ${badgeStyles}`}
           >
+            {StatusIcon && <StatusIcon size={14} strokeWidth={2.5} />}
             {status}
           </div>
         </div>
       </div>
 
       {/* 2. PRODUCT INFO BODY */}
-      <div className="p-5 lg:px-5 lg:py-4 ">
+      <div className="py-4 px-4 md:px-5 md:py-4">
         <div className="flex items-start gap-5">
           <img
-            className="w-[5vw] h-[5vw] rounded-xl object-cover bg-gray-100 dark:bg-gray-800 border border-gray-50 dark:border-gray-700"
+            className="w-12 h-12 md:w-[5vw] md:h-[5vw] rounded-xl object-cover bg-gray-100 dark:bg-gray-800 border border-gray-50 dark:border-gray-700"
             src={imageUrl}
             alt={name}
           />
@@ -186,11 +195,15 @@ const MyOrdersCard = ({
                     {/* The Node */}
                     <div className="flex flex-col items-center relative z-10">
                       <div
-                        className={`w-6 h-6 mx-5 rounded-full flex items-center justify-center text-[12px] font-bold transition-all duration-300 ${
+                        className={`w-6 h-6 mx-3 md:mx-5 rounded-full flex items-center justify-center text-[12px] font-bold transition-all duration-300 ${
                           isCompleted || isCurrent
                             ? "bg-[#364EF2] text-white"
                             : "bg-white dark:bg-[#1c1c1c] border-2 border-gray-200 dark:border-gray-700 text-gray-400"
-                        } ${isCurrent ? "ring-4 ring-blue-50 dark:ring-blue-900/20" : ""}`}
+                        } ${
+                          isCurrent
+                            ? "ring-4 ring-blue-50 dark:ring-blue-900/20"
+                            : ""
+                        }`}
                       >
                         {isCompleted ? <MdCheck size={13} /> : step.id}
                       </div>
@@ -221,8 +234,8 @@ const MyOrdersCard = ({
         )}
       </div>
 
-      {/* 4. FOOTER ACTIONS ROW (As per image 2 & 3) */}
-      <div className="px-5 py-3 bg-gray-100 dark:bg-[#1A1D20]/50 border-t border-gray-50 dark:border-gray-800/50  flex items-center justify-between">
+      {/* 4. FOOTER ACTIONS ROW */}
+      <div className="px-5 py-3 bg-gray-100 dark:bg-[#1A1D20]/50 border-t border-gray-50 dark:border-gray-800/50 flex items-center justify-between">
         <button className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
           <FiMessageSquare size={16} />
           Contact Seller
@@ -237,7 +250,7 @@ const MyOrdersCard = ({
         </button>
       </div>
 
-      {/* MODALS - Logic preserved but hidden from primary UI */}
+      {/* MODALS */}
       <DeleteProductModal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}

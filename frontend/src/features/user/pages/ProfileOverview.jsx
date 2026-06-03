@@ -8,21 +8,22 @@ import { getUserProducts } from "../../product/api/productApi.js";
 
 // React Icons Imports
 import {
+  FiShoppingBag,
   FiCalendar,
   FiClock,
   FiPackage,
+  FiHeart,
+  FiEye,
   FiArrowUpRight,
   FiChevronRight,
 } from "react-icons/fi";
 import {
   MapPinIcon,
-  ShoppingBagIcon,
-  HeartIcon,
   EyeIcon,
   StarIcon,
   CircleCheckIcon,
 } from "@animateicons/react/lucide";
-import { FaBolt } from "react-icons/fa";
+import { FaStar, FaBolt } from "react-icons/fa";
 
 function ProfileOverview() {
   const { userDetails, fetchUserProfile } = useUser();
@@ -95,113 +96,115 @@ function ProfileOverview() {
         <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6 ">
           <div className="max-w-5xl mx-auto space-y-7 pb-2">
             {/* 1. PROFILE HEADER CARD */}
-            <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-0">
-              {/* Left Section: Avatar + Text Information */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-6 w-full">
-                {/* Avatar */}
-                <div className="relative shrink-0">
-                  <AvatarComponent
-                    name={userDetails?.name || "User"}
-                    imageUrl={userDetails?.avatar}
-                    size="xlarge"
-                    className="w-24 h-24 md:w-[7vw] md:h-[14vh] rounded-2xl bg-sky-100 border-4 border-white dark:border-[#1c1c1c]"
-                  />
-                  {/* Active Dot */}
-                  <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-[1.5vw] md:h-[3vh] bg-[#00BA5E] rounded-full border-[3px] border-white dark:border-[#1c1c1c]"></div>
+            <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 dark:border-gray-800 grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto] gap-x-4 md:gap-x-6 items-center">
+              {/* 1. Avatar (Left side, spans both rows vertically on desktop) */}
+              <div className="relative shrink-0 col-span-1 md:row-span-2 self-start md:self-center">
+                <AvatarComponent
+                  name={userDetails?.name || "User"}
+                  imageUrl={userDetails?.avatar}
+                  size="xlarge"
+                  className="w-[72px] h-[72px] md:w-[7vw] md:h-[14vh] rounded-2xl bg-sky-100 border-4 border-white dark:border-[#1c1c1c]"
+                />
+                {/* Active Dot */}
+                <div className="absolute -bottom-1 -right-1 w-[18px] h-[18px] md:w-[1.5vw] md:h-[3vh] bg-[#00BA5E] rounded-full border-[3px] border-white dark:border-[#1c1c1c]"></div>
+              </div>
+
+              {/* 2. Top Info: Name & Location (Top Right on Mobile, Top Middle on Desktop) */}
+              <div className="flex flex-col min-w-0 col-span-1 md:col-start-2 md:row-start-1 w-full">
+                {/* Row 1: Name & Badge */}
+                <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1.5 mt-1 md:mt-0">
+                  <h1 className="text-[1.15rem] md:text-xl font-bold text-gray-900 dark:text-white leading-none truncate">
+                    {userDetails?.name || "User"}
+                  </h1>
+                  <div className="hidden md:flex items-center gap-1 bg-indigo-50/80 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-full text-[0.68rem] font-semibold shrink-0">
+                    <CircleCheckIcon size={13} />
+                    Verified Student
+                  </div>
+                  <div className=" flex items-center md:hidden text-indigo-600 dark:text-indigo-400 ">
+                    <CircleCheckIcon className="" size={15} />
+                  </div>
                 </div>
 
-                {/* Text Information Column */}
-                <div className="flex flex-col w-full">
-                  {/* Row 1: Name & Badge */}
-                  <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1.5">
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-none">
-                      {userDetails?.name || "User"}
-                    </h1>
-                    <div className="flex items-center gap-1 bg-indigo-50/80 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-full text-[0.68rem] font-semibold">
-                      <CircleCheckIcon size={13} />
-                      Verified Student
-                    </div>
+                {/* Row 2: Location & Date */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 md:gap-5 text-[0.80rem] md:text-[0.85rem] text-gray-400 dark:text-gray-400">
+                  <div className="flex items-center gap-1.5">
+                    <MapPinIcon
+                      size={14}
+                      className="text-indigo-500/70 shrink-0"
+                    />
+                    <span className="truncate">{campus}</span>
                   </div>
-
-                  {/* Row 2: Location & Date */}
-                  <div className="flex flex-wrap items-center gap-3 md:gap-5 text-[0.85rem] text-gray-400 dark:text-gray-400">
-                    <div className="flex items-center gap-1.5">
-                      <MapPinIcon
-                        size={15}
-                        className="text-indigo-500/70 shrink-0"
-                      />
-                      {campus}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <FiCalendar
-                        size={15}
-                        className="text-gray-400 shrink-0"
-                      />
-                      Member since {memberSince}
-                    </div>
-                  </div>
-
-                  {/* Row 3: The Divider Line (Now contained within the text block) */}
-                  <div className="max-w-[32.1rem] h-px bg-gray-200  dark:bg-gray-800 my-3"></div>
-
-                  {/* Row 4: Stats */}
-                  <div className="flex flex-wrap items-center gap-4 md:gap-7 text-[0.92rem] font-semibold text-gray-900 dark:text-gray-100">
-                    <div className="flex items-center gap-1 md:gap-2">
-                      <StarIcon
-                        size={16}
-                        className="text-orange-400 shrink-0"
-                      />
-                      <span>
-                        4.8{" "}
-                        <span className="text-gray-400 font-normal ml-[0.4vh]">
-                          Trust Score
-                        </span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <FaBolt
-                        size={16}
-                        className="text-indigo-600 dark:text-indigo-400 shrink-0"
-                      />
-                      <span>
-                        94%{" "}
-                        <span className="text-gray-400 font-normal ml-[0.4vh]">
-                          Response Rate
-                        </span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 md:gap-2">
-                      <FiClock size={16} className="text-gray-400 shrink-0" />
-                      <span>
-                        &lt; 1 hour{" "}
-                        <span className="text-gray-400 font-normal ml-[0.4vh]">
-                          Avg Response
-                        </span>
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-1.5">
+                    <FiCalendar size={14} className="text-gray-400 shrink-0" />
+                    <span className="truncate">Member since {memberSince}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Right Section: Edit Profile Button */}
-              <Link
-                to="/settings"
-                className="bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-6 py-2.5 rounded-xl text-[0.82rem] font-semibold transition-colors shrink-0 w-full md:w-auto text-center mt-2 md:mt-0"
-              >
-                Edit Profile
-              </Link>
+              {/* 3. Divider & Stats (Full width on Mobile, Bottom Middle on Desktop) */}
+              <div className="col-span-2 md:col-span-1 md:col-start-2 md:row-start-2 w-full mt-4 md:mt-0">
+                {/* The Divider Line */}
+                <div className="w-full md:max-w-[32.1rem] h-px bg-gray-100 dark:bg-gray-800 mb-3 md:my-3"></div>
+
+                {/* Stats */}
+                <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-4 md:gap-7 text-[0.82rem] md:text-[0.92rem] font-semibold text-gray-900 dark:text-gray-100">
+                  <div className="flex items-center gap-1 md:gap-2">
+                    <StarIcon size={15} className="text-orange-400 shrink-0" />
+                    <span>
+                      4.8{" "}
+                      <span className="text-gray-400 font-normal ml-0.5">
+                        Trust Score
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <FaBolt
+                      size={15}
+                      className="text-indigo-600 dark:text-indigo-400 shrink-0"
+                    />
+                    <span>
+                      94%{" "}
+                      <span className="text-gray-400 font-normal ml-0.5">
+                        Response Rate
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 md:gap-2">
+                    <FiClock size={15} className="text-gray-400 shrink-0" />
+                    <span>
+                      &lt; 1 hour{" "}
+                      <span className="text-gray-400 font-normal ml-0.5 hidden sm:inline">
+                        Avg Response
+                      </span>
+                      <span className="text-gray-400 font-normal ml-0.5 sm:hidden">
+                        Avg
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Edit Profile Button (Full width on Mobile, Far Right on Desktop) */}
+              <div className="col-span-2 md:col-span-1 md:col-start-3 md:row-start-1 md:row-span-2 mt-5 md:mt-0">
+                <Link
+                  to="/settings"
+                  className="block bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-6 py-2.5 rounded-xl text-[0.82rem] font-semibold transition-colors w-full md:w-auto text-center"
+                >
+                  Edit Profile
+                </Link>
+              </div>
             </div>
             {/* 2. YOUR ACTIVITY SECTION */}
             <div>
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
+              <h3 className="text-xs sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
                 Your Activity
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Card 1 */}
                 <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl px-5 py-4 shadow-sm border border-gray-100 dark:border-gray-800">
                   <div className="flex justify-between items-start mb-4">
                     <div className="bg-green-100 dark:bg-green-900/20 p-2.5 rounded-xl text-green-500 ">
-                      <ShoppingBagIcon size={18} />
+                      <FiShoppingBag size={18} />
                     </div>
                     <span className="text-xs font-semibold text-green-500  flex items-center gap-1">
                       <FiArrowUpRight size={14} /> +3 this month
@@ -234,7 +237,7 @@ function ProfileOverview() {
                 <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
                   <div className="flex justify-between items-start mb-4">
                     <div className="bg-pink-100 dark:bg-pink-900/20 p-2.5 rounded-xl text-pink-500 ">
-                      <HeartIcon size={20} />
+                      <FiHeart size={18} />
                     </div>
                   </div>
                   <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
@@ -249,13 +252,13 @@ function ProfileOverview() {
                 <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
                   <div className="flex justify-between items-start mb-4">
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-xl text-blue-600 dark:text-blue-400">
-                      <EyeIcon size={20} />
+                      <FiEye size={18} />
                     </div>
                     <span className="text-xs font-semibold text-green-500  flex items-center gap-1">
                       <FiArrowUpRight size={14} /> +24 this week
                     </span>
                   </div>
-                  <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  <h2 className="text-[1.2rem] font-extrabold text-gray-900 dark:text-white">
                     {stats.profileViews}
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -267,10 +270,10 @@ function ProfileOverview() {
                 <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
                   <div className="flex justify-between items-start mb-4">
                     <div className="bg-yellow-100 dark:bg-yellow-900/20 p-2.5 rounded-xl text-yellow-400 dark:text-yellow-400">
-                      <StarIcon size={18} />
+                      <FaStar size={18} />
                     </div>
                   </div>
-                  <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  <h2 className="text-[1.2rem] font-extrabold text-gray-900 dark:text-white">
                     4.8
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -282,10 +285,10 @@ function ProfileOverview() {
                 <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
                   <div className="flex justify-between items-start mb-4">
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-xl text-blue-600 dark:text-blue-400">
-                      <FiClock size={20} />
+                      <FiClock size={18} />
                     </div>
                   </div>
-                  <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  <h2 className="text-[1.2rem] font-extrabold text-gray-900 dark:text-white">
                     &lt; 1 hour
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -311,9 +314,9 @@ function ProfileOverview() {
                 </button>
               </div>
 
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
                 {/* Order 1 */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between hover:bg-gray-50 dark:hover:bg-[#252525] p-2 -mx-2 rounded-xl transition-colors cursor-pointer">
                   <div className="flex items-center gap-4">
                     <img
                       src="https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=150&q=80"
@@ -321,7 +324,7 @@ function ProfileOverview() {
                       className="w-12 h-12 rounded-xl object-cover bg-gray-100"
                     />
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      <h4 className="text-sm font-normal md:font-semibold text-gray-900 dark:text-white">
                         Sony WH-1000XM4 Headphones
                       </h4>
                       <p className="text-xs text-gray-400">
@@ -333,16 +336,16 @@ function ProfileOverview() {
                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
                       ₹750
                     </p>
-                    <span className="text-[10px] font-semibold bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-500 px-2 py-1 rounded-md">
+                    <span className="text-[8px] font-semibold bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-500 px-2 py-1 rounded-md">
                       In Progress
                     </span>
                   </div>
                 </div>
 
-                <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50"></div>
+                <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50 my-1"></div>
 
                 {/* Order 2 */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between hover:bg-gray-50 dark:hover:bg-[#252525] p-2 -mx-2 rounded-xl transition-colors cursor-pointer">
                   <div className="flex items-center gap-4">
                     <img
                       src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=150&q=80"
@@ -350,7 +353,7 @@ function ProfileOverview() {
                       className="w-12 h-12 rounded-xl object-cover bg-gray-100"
                     />
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      <h4 className="text-sm font-normal md:font-semibold text-gray-900 dark:text-white">
                         MacBook Pro M1
                       </h4>
                       <p className="text-xs text-gray-400">
@@ -362,7 +365,7 @@ function ProfileOverview() {
                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
                       ₹72,000
                     </p>
-                    <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 px-2 py-1 rounded-md">
+                    <span className="text-[9px] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 px-2 py-1 rounded-md">
                       Delivered
                     </span>
                   </div>
@@ -383,8 +386,8 @@ function ProfileOverview() {
                   </button>
                 </div>
 
-                <div className="flex flex-col gap-5">
-                  <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between hover:bg-gray-50 dark:hover:bg-[#252525] p-2 -mx-2 rounded-xl transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       <img
                         src="https://api.dicebear.com/7.x/avataaars/svg?seed=Rahul"
@@ -392,7 +395,7 @@ function ProfileOverview() {
                         className="w-10 h-10 rounded-full bg-red-100"
                       />
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        <h4 className="text-sm font-normal md:font-semibold text-gray-900 dark:text-white">
                           Rahul Kumar
                         </h4>
                         <p className="text-xs text-gray-500 truncate w-40 sm:w-56">
@@ -403,9 +406,9 @@ function ProfileOverview() {
                     <span className="text-[10px] text-gray-400">3h ago</span>
                   </div>
 
-                  <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50"></div>
+                  <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50 my-1"></div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between hover:bg-gray-50 dark:hover:bg-[#252525] p-2 -mx-2 rounded-xl transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       <img
                         src="https://api.dicebear.com/7.x/avataaars/svg?seed=Priya"
@@ -413,7 +416,7 @@ function ProfileOverview() {
                         className="w-10 h-10 rounded-full bg-pink-100"
                       />
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        <h4 className="text-sm font-normal md:font-semibold text-gray-900 dark:text-white">
                           Priya Singh
                         </h4>
                         <p className="text-xs text-gray-500 truncate w-40 sm:w-56">
@@ -424,9 +427,9 @@ function ProfileOverview() {
                     <span className="text-[10px] text-gray-400">5h ago</span>
                   </div>
 
-                  <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50"></div>
+                  <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50 my-1"></div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between hover:bg-gray-50 dark:hover:bg-[#252525] p-2 -mx-2 rounded-xl transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       <img
                         src="https://api.dicebear.com/7.x/avataaars/svg?seed=Arjun"
@@ -434,7 +437,7 @@ function ProfileOverview() {
                         className="w-10 h-10 rounded-full bg-green-100"
                       />
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        <h4 className="text-sm font-normal md:font-semibold text-gray-900 dark:text-white">
                           Arjun Sharma
                         </h4>
                         <p className="text-xs text-gray-500 truncate w-40 sm:w-56">
@@ -461,13 +464,13 @@ function ProfileOverview() {
                   </Link>
                 </div>
 
-                <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-2">
                   {savedItems.length > 0 ? (
                     savedItems.map((item, index) => (
                       <React.Fragment key={item._id || index}>
                         <Link
                           to={`/product/${item._id}`}
-                          className="flex items-center justify-between group cursor-pointer"
+                          className="flex items-center justify-between group cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] p-2 -mx-2 rounded-xl transition-colors"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <img
@@ -490,7 +493,7 @@ function ProfileOverview() {
                           />
                         </Link>
                         {index < savedItems.length - 1 && (
-                          <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50"></div>
+                          <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50 my-1"></div>
                         )}
                       </React.Fragment>
                     ))
