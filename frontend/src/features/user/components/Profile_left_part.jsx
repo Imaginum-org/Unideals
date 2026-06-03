@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   DashboardIcon,
   MessageCircleIcon,
@@ -17,6 +17,7 @@ import bluebag from "../../../assets/bag.png";
 import { useTheme } from "../../../context/ThemeContext.jsx";
 import Loader from "../../../Components/ui/Loader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
+import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 
 function Profile_left_part() {
   const { darkMode } = useTheme();
@@ -55,6 +56,8 @@ function Profile_left_part() {
   ];
 
   const NavItem = ({ path, label, icon: Icon, badge }) => {
+    // 1. Create a reference for the icon
+    const iconRef = useRef(null);
     const isActive =
       pathname === path ||
       (path === "/profile" && pathname === "/profileoverview");
@@ -62,13 +65,18 @@ function Profile_left_part() {
     return (
       <Link to={path} className="block w-full">
         <div
+          // 2. Trigger the animation manually on container hover
+          onMouseEnter={() => iconRef.current?.startAnimation?.()}
+          onMouseLeave={() => iconRef.current?.stopAnimation?.()}
           className={`relative flex items-center px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
             isActive
               ? "bg-[#3838EC] text-white shadow-md shadow-blue-500/20"
               : "text-[#64707D] dark:text-[#AAB9C5] hover:bg-gray-100 dark:hover:bg-[#1c1c1c] hover:text-gray-900 dark:hover:text-white"
           }`}
         >
+          {/* 3. Attach the ref to the animate-icon */}
           <Icon
+            ref={iconRef}
             size={17}
             className={isActive ? "text-white" : ""}
             strokeWidth={isActive ? 2.5 : 1.5}
@@ -95,27 +103,23 @@ function Profile_left_part() {
   };
 
   return (
-    <div className="h-full flex flex-col font-figtree relative pl-[0.3vw] ">
+    <div className="h-full flex flex-col font-figtree relative pl-[0.3rem] ">
       {/* Scrollable Menu Area */}
       <div className="flex-1 overflow-y-auto no-scrollbar lg:pr-2">
         {/* Top Profile Section */}
         <div className="flex items-center px-4 py-[0.95rem] border-b border-gray-200 dark:border-gray-800/50 mb-4">
           <div className="relative">
-            <img
-              src={
-                userDetails?.profilePic ||
-                "https://ui-avatars.com/api/?name=" +
-                  (userDetails?.name || "User")
-              }
-              alt="Profile avatar"
-              className="w-9 h-9 rounded-full object-cover bg-blue-50 dark:bg-gray-800"
+            <AvatarComponent
+              name={userDetails?.name || "User"}
+              imageUrl={userDetails?.avatar}
+              className="rounded-full w-[2.5rem] h-[2.5rem] bg-blue-50 dark:bg-gray-800"
             />
             {/* Green Online Indicator Dot */}
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#22C55E] border-2 border-white dark:border-[#131313] rounded-full"></span>
           </div>
           <div className="ml-3 flex flex-col">
             <h2 className="text-[0.95rem] font-semibold text-gray-900 dark:text-white leading-tight">
-              {userDetails?.name || "Anurag Adarsh"}
+              {userDetails?.name || "User"}
             </h2>
             <p className="text-xs font-medium text-[#94A3B8] dark:text-gray-500 mt-0.5">
               {userDetails?.college || "VIT Vellore"}
@@ -134,7 +138,7 @@ function Profile_left_part() {
 
         {/* Account Menu */}
         <div className="mb-2 px-4">
-          <h3 className="text-[13px] font-bold tracking-wider text-gray-400 dark:text-gray-500 uppercase">
+          <h3 className="text-xs font-bold tracking-wider text-gray-400 dark:text-gray-500 uppercase">
             Account
           </h3>
         </div>

@@ -1,6 +1,10 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Profile_left_part from "../components/Profile_left_part.jsx";
+import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
+import { useUser } from "../../../context/useUserContext.jsx";
+import { useWishlist } from "../../../context/useWishlist.js";
+import { getUserProducts } from "../../product/api/productApi.js";
 
 // React Icons Imports
 import {
@@ -21,6 +25,64 @@ import {
 import { FaBolt } from "react-icons/fa";
 
 function ProfileOverview() {
+  const { userDetails, fetchUserProfile } = useUser();
+  const { wishlist, fetchWishlist } = useWishlist();
+  const [userProducts, setUserProducts] = useState([]);
+
+  useEffect(() => {
+    fetchUserProfile();
+    fetchWishlist();
+
+    const loadUserProducts = async () => {
+      try {
+        const res = await getUserProducts();
+        if (res.data.success) {
+          setUserProducts(res.data.data || []);
+        }
+      } catch (error) {
+        console.error("Failed to load profile products:", error);
+      }
+    };
+
+    loadUserProducts();
+  }, [fetchUserProfile, fetchWishlist]);
+
+  const stats = useMemo(() => {
+    const activeListings = userProducts.filter((product) =>
+      ["listed", "active"].includes((product.status || "").toLowerCase()),
+    ).length;
+    const productsSold = userProducts.filter((product) =>
+      ["sold", "delivered", "completed"].includes(
+        (product.status || "").toLowerCase(),
+      ),
+    ).length;
+    const profileViews = userProducts.reduce(
+      (total, product) => total + Number(product.views_count || 0),
+      0,
+    );
+
+    return {
+      activeListings,
+      productsSold,
+      profileViews,
+      wishlistSaved: wishlist?.length || 0,
+    };
+  }, [userProducts, wishlist]);
+
+  const memberSince = userDetails?.createdAt
+    ? new Date(userDetails.createdAt).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : "October 2022";
+
+  const campus = userDetails?.college || userDetails?.campus || "VIT Vellore";
+  const savedItems = (wishlist || []).filter(Boolean).slice(0, 3);
+  const formatPrice = (price) => {
+    if (price === undefined || price === null || price === "") return "";
+    return `\u20B9${Number(price).toLocaleString("en-IN")}`;
+  };
+
   return (
     <div className="w-full h-screen overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
       <div className="flex h-[calc(100vh-70px)] ">
@@ -38,10 +100,11 @@ function ProfileOverview() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-6 w-full">
                 {/* Avatar */}
                 <div className="relative shrink-0">
-                  <img
-                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=Anurag&backgroundColor=b6e3f4"
-                    alt="Profile"
-                    className="w-24 h-24 md:w-[7vw] md:h-[14vh] rounded-2xl object-cover bg-sky-100 border-4 border-white dark:border-[#1c1c1c]"
+                  <AvatarComponent
+                    name={userDetails?.name || "User"}
+                    imageUrl={userDetails?.avatar}
+                    size="xlarge"
+                    className="w-24 h-24 md:w-[7vw] md:h-[14vh] rounded-2xl bg-sky-100 border-4 border-white dark:border-[#1c1c1c]"
                   />
                   {/* Active Dot */}
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-[1.5vw] md:h-[3vh] bg-[#00BA5E] rounded-full border-[3px] border-white dark:border-[#1c1c1c]"></div>
@@ -52,7 +115,7 @@ function ProfileOverview() {
                   {/* Row 1: Name & Badge */}
                   <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1.5">
                     <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-none">
-                      Kamal Sinha
+                      {userDetails?.name || "User"}
                     </h1>
                     <div className="flex items-center gap-1 bg-indigo-50/80 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-full text-[0.68rem] font-semibold">
                       <CircleCheckIcon size={13} />
@@ -67,14 +130,14 @@ function ProfileOverview() {
                         size={15}
                         className="text-indigo-500/70 shrink-0"
                       />
-                      VIT Vellore
+                      {campus}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <FiCalendar
                         size={15}
                         className="text-gray-400 shrink-0"
                       />
-                      Member since October 2022
+                      Member since {memberSince}
                     </div>
                   </div>
 
@@ -138,14 +201,14 @@ function ProfileOverview() {
                 <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl px-5 py-4 shadow-sm border border-gray-100 dark:border-gray-800">
                   <div className="flex justify-between items-start mb-4">
                     <div className="bg-green-100 dark:bg-green-900/20 p-2.5 rounded-xl text-green-500 ">
-                      <ShoppingBagIcon size={20} />
+                      <ShoppingBagIcon size={18} />
                     </div>
                     <span className="text-xs font-semibold text-green-500  flex items-center gap-1">
                       <FiArrowUpRight size={14} /> +3 this month
                     </span>
                   </div>
                   <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
-                    12
+                    {stats.productsSold}
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Products Sold
@@ -160,7 +223,7 @@ function ProfileOverview() {
                     </div>
                   </div>
                   <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
-                    8
+                    {stats.activeListings}
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Active Listings
@@ -175,7 +238,7 @@ function ProfileOverview() {
                     </div>
                   </div>
                   <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
-                    23
+                    {stats.wishlistSaved}
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Wishlist Saved
@@ -193,7 +256,7 @@ function ProfileOverview() {
                     </span>
                   </div>
                   <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
-                    341
+                    {stats.profileViews}
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Profile Views
@@ -390,81 +453,52 @@ function ProfileOverview() {
                   <h2 className="text-sm font-bold text-gray-900 dark:text-white">
                     Saved Items
                   </h2>
-                  <button className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                  <Link
+                    to="/wishlist"
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                  >
                     View all
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="flex flex-col gap-5">
-                  <div className="flex items-center justify-between group cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src="https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=150&q=80"
-                        alt="iPad"
-                        className="w-10 h-10 rounded-lg object-cover bg-gray-100"
-                      />
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors">
-                          iPad Pro 11-inch (3rd Gen)
-                        </h4>
-                        <p className="text-xs font-bold text-blue-600">
-                          ₹32,000
-                        </p>
-                      </div>
-                    </div>
-                    <FiChevronRight
-                      size={16}
-                      className="text-gray-400 group-hover:text-blue-600 transition-colors"
-                    />
-                  </div>
-
-                  <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50"></div>
-
-                  <div className="flex items-center justify-between group cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src="https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=150&q=80"
-                        alt="Headphones"
-                        className="w-10 h-10 rounded-lg object-cover bg-gray-100"
-                      />
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors">
-                          Sony WH-1000XM4 Headphones
-                        </h4>
-                        <p className="text-xs font-bold text-blue-600">
-                          ₹14,500
-                        </p>
-                      </div>
-                    </div>
-                    <FiChevronRight
-                      size={16}
-                      className="text-gray-400 group-hover:text-blue-600 transition-colors"
-                    />
-                  </div>
-
-                  <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50"></div>
-
-                  <div className="flex items-center justify-between group cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src="https://images.unsplash.com/photo-1662947278385-e10b659c4021?w=150&q=80"
-                        alt="Fold"
-                        className="w-10 h-10 rounded-lg object-cover bg-gray-100"
-                      />
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors">
-                          Samsung Galaxy Z Fold3
-                        </h4>
-                        <p className="text-xs font-bold text-blue-600">
-                          ₹1,70,000
-                        </p>
-                      </div>
-                    </div>
-                    <FiChevronRight
-                      size={16}
-                      className="text-gray-400 group-hover:text-blue-600 transition-colors"
-                    />
-                  </div>
+                  {savedItems.length > 0 ? (
+                    savedItems.map((item, index) => (
+                      <React.Fragment key={item._id || index}>
+                        <Link
+                          to={`/product/${item._id}`}
+                          className="flex items-center justify-between group cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img
+                              src={item.images?.[0] || "/default-avatar.png"}
+                              alt={item.title || "Saved item"}
+                              className="w-10 h-10 rounded-lg object-cover bg-gray-100 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors truncate">
+                                {item.title || "Untitled product"}
+                              </h4>
+                              <p className="text-xs font-bold text-blue-600">
+                                {formatPrice(item.selling_price)}
+                              </p>
+                            </div>
+                          </div>
+                          <FiChevronRight
+                            size={16}
+                            className="text-gray-400 group-hover:text-blue-600 transition-colors shrink-0"
+                          />
+                        </Link>
+                        {index < savedItems.length - 1 && (
+                          <div className="w-full h-px bg-gray-200 dark:bg-gray-800/50"></div>
+                        )}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No saved items yet
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

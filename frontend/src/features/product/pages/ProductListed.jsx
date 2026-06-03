@@ -100,10 +100,12 @@ function ProductListed() {
                   active · {products.length} total
                 </p>
               </div>
+              <div className="hidden md:block">
               <button className="bg-[#3838EC] hover:bg-blue-700 text-white px-3 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20">
                 <FiPlus size={18} />
                 List New Product
               </button>
+              </div>
             </div>
 
             {/* 2. Stats Grid */}
