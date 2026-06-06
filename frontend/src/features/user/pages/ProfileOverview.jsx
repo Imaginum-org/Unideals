@@ -88,12 +88,12 @@ function ProfileOverview() {
     <div className="w-full h-screen overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
       <div className="flex h-[calc(100vh-70px)] ">
         {/* LEFT PANEL */}
-        <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[20.5%] 2xl:w-[20.5%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
+        <div className="hidden md:block md:w-[22.5%] lg:w-[21%] xl:w-[20.5%] 2xl:w-[20.5%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
           <Profile_left_part />
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6 ">
+        <div className="h-full md:w-[77.5%] lg:w-[79%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6 ">
           <div className="max-w-5xl mx-auto space-y-7 pb-2">
             {/* 1. PROFILE HEADER CARD */}
             <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 dark:border-gray-800 grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto] gap-x-4 md:gap-x-6 items-center">
@@ -102,11 +102,13 @@ function ProfileOverview() {
                 <AvatarComponent
                   name={userDetails?.name || "User"}
                   imageUrl={userDetails?.avatar}
+                  plan={userDetails?.subscription}
                   size="xlarge"
-                  className="w-[72px] h-[72px] md:w-[7vw] md:h-[14vh] rounded-2xl bg-sky-100 border-4 border-white dark:border-[#1c1c1c]"
+                  className="rounded-2xl"
+                  showBadge
+                  shape="square"
                 />
                 {/* Active Dot */}
-                <div className="absolute -bottom-1 -right-1 w-[18px] h-[18px] md:w-[1.5vw] md:h-[3vh] bg-[#00BA5E] rounded-full border-[3px] border-white dark:border-[#1c1c1c]"></div>
               </div>
 
               {/* 2. Top Info: Name & Location (Top Right on Mobile, Top Middle on Desktop) */}

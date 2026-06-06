@@ -30,11 +30,16 @@ const OrderCard = ({
   attr,
   status,
   price,
+  viewsCount = 0,
+  wishlistedCount = 0,
   onProductDeleted,
   onProductUnlisted,
   onProductRelisted,
 }) => {
   const navigate = useNavigate();
+  const handleCardClick = () => {
+    navigate(`/product/${orderId}`);
+  };
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [relistModalOpen, setRelistModalOpen] = useState(false);
@@ -96,7 +101,10 @@ const OrderCard = ({
   };
 
   return (
-    <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden font-figtree">
+    <div
+      onClick={handleCardClick}
+      className="bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden font-figtree cursor-pointer transition-shadow hover:shadow-md"
+    >
       {/* 1. HEADER */}
       <div className="px-4 sm:px-6 py-3.5 border-b bg-gray-100 border-gray-50 dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-3">
         <div className="text-[12px] sm:text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate flex-1 pr-2">
@@ -134,10 +142,10 @@ const OrderCard = ({
             {isActive ? (
               <div className="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 mt-2 sm:mt-3 font-medium">
                 <span className="flex items-center gap-1 sm:gap-1.5">
-                  <FiEye size={14} /> 320
+                  <FiEye size={14} /> {viewsCount || 0}
                 </span>
                 <span className="flex items-center gap-1 sm:gap-1.5">
-                  <FiHeart size={14} /> 12
+                  <FiHeart size={14} /> {wishlistedCount || 0}
                 </span>
                 <span className="flex items-center gap-1 sm:gap-1.5">
                   <FiMessageSquare size={14} /> 3
@@ -204,14 +212,20 @@ const OrderCard = ({
 
             {/* Secondary actions span evenly on mobile, group right on desktop */}
             <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-              <button className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2"
+              >
                 <FiEdit2 size={14} />
                 <span className="sm:hidden text-xs">Edit</span>
                 <span className="hidden sm:inline">Edit Details</span>
               </button>
 
               <button
-                onClick={() => setUnlistModalOpen(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUnlistModalOpen(true);
+                }}
                 disabled={isUnlisting}
                 className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
               >
@@ -222,7 +236,10 @@ const OrderCard = ({
               </button>
 
               <button
-                onClick={() => setDeleteModalOpen(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteModalOpen(true);
+                }}
                 disabled={isDeleting}
                 className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
               >
@@ -236,7 +253,10 @@ const OrderCard = ({
         {isUnlisted && (
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
             <button
-              onClick={() => setRelistModalOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setRelistModalOpen(true);
+              }}
               disabled={isRelisting}
               className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
@@ -245,7 +265,10 @@ const OrderCard = ({
             </button>
 
             <button
-              onClick={() => setDeleteModalOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteModalOpen(true);
+              }}
               disabled={isDeleting}
               className="w-full sm:w-auto justify-center py-2.5 sm:p-2.5 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
             >

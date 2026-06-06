@@ -1,6 +1,7 @@
 import Profile_left_part from "../../../features/user/components/Profile_left_part.jsx";
 import OrderCard from "../../../features/user/components/OrderCard.jsx";
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { getUserProducts } from "../api/productApi.js";
 import toast from "react-hot-toast";
 import Loader from "../../../Components/ui/Loader.jsx";
@@ -16,12 +17,31 @@ const tabs = ["All", "Active", "Unlisted", "Sold"];
 function ProductListed() {
   const [activeTab, setActiveTab] = useState("All");
   const [products, setProducts] = useState([]);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchUserProducts();
   }, []);
+
+  const totalImpressions = useMemo(
+    () => products.reduce((sum, p) => sum + Number(p.views_count || 0), 0),
+    [products],
+  );
+
+  const totalWishlisted = useMemo(
+    () =>
+      products.reduce(
+        (sum, p) =>
+          sum +
+          Number(
+            p.wishlist_count ?? p.wishlisted_count ?? p.wishlist?.length ?? 0,
+          ),
+        0,
+      ),
+    [products],
+  );
 
   const fetchUserProducts = async () => {
     try {
@@ -80,12 +100,12 @@ function ProductListed() {
     <div className="w-full h-screen overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
       <div className="flex h-[calc(100vh-70px)] ">
         {/* LEFT PANEL */}
-        <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[20.5%] 2xl:w-[20.5%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
+        <div className="hidden md:block md:w-[22.5%] lg:w-[21%] xl:w-[20.5%] 2xl:w-[20.5%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
           <Profile_left_part />
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="h-full md:w-[63%] lg:w-[72%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
+        <div className="h-full md:w-[77.5%] lg:w-[79%] xl:w-[79.5%] 2xl:w-[79.5%] overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
           <div className="max-w-4xl mx-auto">
             {/* 1. Page Header */}
             <div className="flex justify-between items-start mb-4">
@@ -105,7 +125,10 @@ function ProductListed() {
                 </p>
               </div>
               <div className="hidden md:block">
-                <button className="bg-[#3838EC] hover:bg-blue-700 text-white px-3 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20">
+                <button
+                  onClick={() => navigate("/upload")}
+                  className="bg-[#3838EC] hover:bg-blue-700 text-white px-3 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20"
+                >
                   <FiPlus size={18} />
                   List New Product
                 </button>
@@ -120,7 +143,7 @@ function ProductListed() {
                 </div>
                 <div>
                   <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                    1,380
+                    {totalImpressions.toLocaleString()}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     Impressions
@@ -133,7 +156,7 @@ function ProductListed() {
                 </div>
                 <div>
                   <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                    62
+                    {totalWishlisted.toLocaleString()}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     Saves
@@ -203,6 +226,13 @@ function ProductListed() {
                     attr={p.attributes?.usage_duration || "Wireless"}
                     status={p.status}
                     price={p.selling_price}
+                    viewsCount={p.views_count || 0}
+                    wishlistedCount={
+                      p.wishlist_count ??
+                      p.wishlisted_count ??
+                      p.wishlist?.length ??
+                      0
+                    }
                     onProductDeleted={handleProductDeleted}
                     onProductUnlisted={handleProductUnlisted}
                     onProductRelisted={handleProductRelisted}

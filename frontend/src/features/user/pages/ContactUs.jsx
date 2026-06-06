@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "../../../context/useUserContext.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
+import emailjs from "@emailjs/browser";
+import toast from "react-hot-toast";
 import {
   Search,
   MessageSquare,
@@ -11,7 +13,6 @@ import {
   Mail,
   Headphones,
   ChevronDown,
-  ChevronUp,
   X,
   AlertTriangle,
 } from "lucide-react";
@@ -84,11 +85,25 @@ const faqData = [
   },
 ];
 
-function Termscondition() {
+function ContactUs() {
   const { userDetails } = useUser();
   const [activeForm, setActiveForm] = useState(null); // 'contact', 'report', 'suggest'
   const [openCategory, setOpenCategory] = useState(null);
   const [openQuestion, setOpenQuestion] = useState(null);
+
+  // Unified Form States
+  const [contactForm, setContactForm] = useState({ topic: "", message: "" });
+  const [reportForm, setReportForm] = useState({
+    category: "",
+    link: "",
+    description: "",
+  });
+  const [suggestForm, setSuggestForm] = useState({
+    title: "",
+    description: "",
+    whyUseful: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const toggleCategory = (id) => {
     setOpenCategory(openCategory === id ? null : id);
@@ -99,13 +114,88 @@ function Termscondition() {
     setOpenQuestion(openQuestion === q ? null : q);
   };
 
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    // Base template parameters mapped to your HTML template
+    let templateParams = {
+      sender_name: userDetails?.name || "Unregistered User",
+      sender_email: userDetails?.email || "No email provided",
+      preferred_reply: "Email",
+      reference: "N/A",
+    };
+
+    // Dynamically update parameters based on the active form
+    if (activeForm === "contact") {
+      if (!contactForm.topic || !contactForm.message.trim()) {
+        toast.error("Please fill in all fields.");
+        setIsSubmitting(false);
+        return;
+      }
+      templateParams = {
+        ...templateParams,
+        contact_type: "Support Request",
+        priority: "Normal",
+        user_subject: contactForm.topic,
+        user_message: contactForm.message,
+      };
+    } else if (activeForm === "report") {
+      if (!reportForm.category || !reportForm.description.trim()) {
+        toast.error("Please select a category and provide a description.");
+        setIsSubmitting(false);
+        return;
+      }
+      templateParams = {
+        ...templateParams,
+        contact_type: "Issue / Bug Report",
+        priority: "High",
+        reference: reportForm.link || "N/A",
+        user_subject: reportForm.category,
+        user_message: reportForm.description,
+      };
+    } else if (activeForm === "suggest") {
+      if (!suggestForm.title || !suggestForm.description.trim()) {
+        toast.error("Please provide a title and description.");
+        setIsSubmitting(false);
+        return;
+      }
+      templateParams = {
+        ...templateParams,
+        contact_type: "Feature Suggestion",
+        priority: "Low",
+        user_subject: suggestForm.title,
+        user_message: `Description:\n${suggestForm.description}\n\nWhy it is useful:\n${suggestForm.whyUseful || "Not provided"}`,
+      };
+    }
+
+    try {
+      await emailjs.send(
+        import.meta.env.VITE_EMAILJS_SERVICE_ID,
+        import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+        templateParams,
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
+      );
+
+      toast.success("Message sent successfully! We'll be in touch soon.");
+
+      // Clear forms and reset view
+      setContactForm({ topic: "", message: "" });
+      setReportForm({ category: "", link: "", description: "" });
+      setSuggestForm({ title: "", description: "", whyUseful: "" });
+      setActiveForm(null);
+    } catch (error) {
+      console.error("EmailJS Error:", error);
+      toast.error("Failed to send message. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
   const itemVariants = {
@@ -116,18 +206,18 @@ function Termscondition() {
   return (
     <div className="h-screen w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree">
       <div className="flex-1 lg:flex md:flex overflow-hidden">
-        {/* LEFT PANEL - Only render if user exists */}
+        {/* LEFT PANEL */}
         {userDetails?._id ? (
-          <div className="hidden md:block md:w-[37%] lg:w-[28%] xl:w-[20.5%] 2xl:w-[20.5%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+          <div className="hidden md:block md:w-[22.5%] lg:w-[21%] xl:w-[20.5%] 2xl:w-[20.5%] bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
         ) : null}
 
-        {/* RIGHT PANEL (Main Content Area) */}
+        {/* RIGHT PANEL */}
         <div
           className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-4 xl:px-[5.7rem] xl:py-6 ${
             userDetails?._id
-              ? "w-full md:w-[63%] lg:w-[72%] xl:w-[73.5%]"
+              ? "w-full md:w-[77.5%] lg:w-[79%] xl:w-[73.5%]"
               : "mx-auto w-full max-w-5xl"
           }`}
         >
@@ -157,7 +247,7 @@ function Termscondition() {
               />
             </motion.div>
 
-            {/* Action Cards (Merged Bug & Issue) */}
+            {/* Action Cards */}
             <motion.div
               variants={itemVariants}
               className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6"
@@ -209,14 +299,14 @@ function Termscondition() {
                 <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#22C55E] group-hover:scale-105 group-hover:shadow-md">
                   <Lightbulb className="w-4 h-4 text-green-600 dark:text-green-400 transition-colors duration-300 group-hover:text-white" />
                 </div>
-                <h3 className="text-sm font-bolds text-gray-900 dark:text-white transition-colors">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white transition-colors">
                   Suggest a feature
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">Share your ideas</p>
               </button>
             </motion.div>
 
-            {/* Dynamic Content Area with AnimatePresence for smooth mounting/unmounting */}
+            {/* Dynamic Content Area */}
             <AnimatePresence mode="wait">
               {activeForm ? (
                 <motion.div
@@ -236,7 +326,8 @@ function Termscondition() {
 
                   {/* CONTACT FORM */}
                   {activeForm === "contact" && (
-                    <motion.div
+                    <motion.form
+                      onSubmit={handleEmailSubmit}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.1 }}
@@ -251,11 +342,23 @@ function Termscondition() {
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Topic
                       </label>
-                      <select className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none">
-                        <option>Select a topic</option>
-                        <option>Account assistance</option>
-                        <option>Deal inquiries</option>
-                        <option>Other</option>
+                      <select
+                        value={contactForm.topic}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            topic: e.target.value,
+                          })
+                        }
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                        required
+                      >
+                        <option value="">Select a topic</option>
+                        <option value="Account assistance">
+                          Account assistance
+                        </option>
+                        <option value="Deal inquiries">Deal inquiries</option>
+                        <option value="Other">Other</option>
                       </select>
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -263,27 +366,42 @@ function Termscondition() {
                       </label>
                       <textarea
                         rows="3"
+                        value={contactForm.message}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            message: e.target.value,
+                          })
+                        }
                         className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
                         placeholder="Describe your issue in as much detail as possible..."
+                        required
                       ></textarea>
 
                       <div className="flex gap-3">
                         <button
+                          type="button"
                           onClick={() => setActiveForm(null)}
                           className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
-                        <button className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]">
-                          <MessageSquare className="w-4 h-4" /> Send message
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
+                        >
+                          <MessageSquare className="w-4 h-4" />{" "}
+                          {isSubmitting ? "Sending..." : "Send message"}
                         </button>
                       </div>
-                    </motion.div>
+                    </motion.form>
                   )}
 
-                  {/* MERGED REPORT FORM (Issue + Bug) */}
+                  {/* REPORT FORM */}
                   {activeForm === "report" && (
-                    <motion.div
+                    <motion.form
+                      onSubmit={handleEmailSubmit}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.1 }}
@@ -307,14 +425,34 @@ function Termscondition() {
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         What are you reporting?
                       </label>
-                      <select className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none">
-                        <option>Select category...</option>
-                        <option>Fraud or Scam Seller</option>
-                        <option>Safety Concern</option>
-                        <option>App Bug / Glitch</option>
-                        <option>Harassment or abuse</option>
-                        <option>Spam or Bot account</option>
-                        <option>Inappropriate Content</option>
+                      <select
+                        value={reportForm.category}
+                        onChange={(e) =>
+                          setReportForm({
+                            ...reportForm,
+                            category: e.target.value,
+                          })
+                        }
+                        required
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                      >
+                        <option value="">Select category...</option>
+                        <option value="Fraud or Scam Seller">
+                          Fraud or Scam Seller
+                        </option>
+                        <option value="Safety Concern">Safety Concern</option>
+                        <option value="App Bug / Glitch">
+                          App Bug / Glitch
+                        </option>
+                        <option value="Harassment or abuse">
+                          Harassment or abuse
+                        </option>
+                        <option value="Spam or Bot account">
+                          Spam or Bot account
+                        </option>
+                        <option value="Inappropriate Content">
+                          Inappropriate Content
+                        </option>
                       </select>
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -322,6 +460,10 @@ function Termscondition() {
                       </label>
                       <input
                         type="text"
+                        value={reportForm.link}
+                        onChange={(e) =>
+                          setReportForm({ ...reportForm, link: e.target.value })
+                        }
                         className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                         placeholder="e.g. Paste a link, user ID, or type 'My Listings'"
                       />
@@ -331,27 +473,42 @@ function Termscondition() {
                       </label>
                       <textarea
                         rows="3"
+                        value={reportForm.description}
+                        onChange={(e) =>
+                          setReportForm({
+                            ...reportForm,
+                            description: e.target.value,
+                          })
+                        }
+                        required
                         className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                         placeholder="Be as specific as possible. Include dates, messages, or steps to trigger the bug..."
                       ></textarea>
 
                       <div className="flex gap-3">
                         <button
+                          type="button"
                           onClick={() => setActiveForm(null)}
                           className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
-                        <button className="flex-1 flex items-center justify-center gap-2 bg-[#EF4444] hover:bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]">
-                          <ShieldAlert className="w-4 h-4" /> Submit report
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="flex-1 flex items-center justify-center gap-2 bg-[#EF4444] hover:bg-red-600 disabled:bg-red-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
+                        >
+                          <ShieldAlert className="w-4 h-4" />{" "}
+                          {isSubmitting ? "Submitting..." : "Submit report"}
                         </button>
                       </div>
-                    </motion.div>
+                    </motion.form>
                   )}
 
                   {/* SUGGEST FEATURE FORM */}
                   {activeForm === "suggest" && (
-                    <motion.div
+                    <motion.form
+                      onSubmit={handleEmailSubmit}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.1 }}
@@ -368,6 +525,14 @@ function Termscondition() {
                       </label>
                       <input
                         type="text"
+                        value={suggestForm.title}
+                        onChange={(e) =>
+                          setSuggestForm({
+                            ...suggestForm,
+                            title: e.target.value,
+                          })
+                        }
+                        required
                         className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="e.g. Filter by hostel block"
                       />
@@ -377,6 +542,14 @@ function Termscondition() {
                       </label>
                       <textarea
                         rows="2"
+                        value={suggestForm.description}
+                        onChange={(e) =>
+                          setSuggestForm({
+                            ...suggestForm,
+                            description: e.target.value,
+                          })
+                        }
+                        required
                         className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="What should it do? How would it work?"
                       ></textarea>
@@ -386,22 +559,35 @@ function Termscondition() {
                       </label>
                       <textarea
                         rows="2"
+                        value={suggestForm.whyUseful}
+                        onChange={(e) =>
+                          setSuggestForm({
+                            ...suggestForm,
+                            whyUseful: e.target.value,
+                          })
+                        }
                         className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="Who benefits and how?"
                       ></textarea>
 
                       <div className="flex gap-3">
                         <button
+                          type="button"
                           onClick={() => setActiveForm(null)}
                           className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
-                        <button className="flex-1 flex items-center justify-center gap-2 bg-[#22C55E] hover:bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]">
-                          <Lightbulb className="w-4 h-4" /> Submit idea
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="flex-1 flex items-center justify-center gap-2 bg-[#22C55E] hover:bg-green-600 disabled:bg-green-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
+                        >
+                          <Lightbulb className="w-4 h-4" />{" "}
+                          {isSubmitting ? "Submitting..." : "Submit idea"}
                         </button>
                       </div>
-                    </motion.div>
+                    </motion.form>
                   )}
                 </motion.div>
               ) : (
@@ -466,7 +652,7 @@ function Termscondition() {
                             </motion.div>
                           </button>
 
-                          {/* Nested Questions with AnimatePresence */}
+                          {/* Nested Questions */}
                           <AnimatePresence>
                             {openCategory === category.id && (
                               <motion.div
@@ -558,4 +744,4 @@ function Termscondition() {
   );
 }
 
-export default Termscondition;
+export default ContactUs;

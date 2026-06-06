@@ -12,6 +12,7 @@ import { IoIosArrowForward } from "react-icons/io";
 import { getProductById } from "../api/productApi";
 import { HiOutlineBuildingLibrary } from "react-icons/hi2";
 import { MdLocationPin } from "react-icons/md";
+import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 
 // condition
 import { GoChecklist } from "react-icons/go";
@@ -118,56 +119,55 @@ const ProductDescription = () => {
     fetchSimilarProducts();
   }, [product]);
 
-useEffect(() => {
-  let rafId;
-  let wasVisible = false;
+  useEffect(() => {
+    let rafId;
+    let wasVisible = false;
 
-  const check = () => {
-    if (staticCTARef.current && floatingCTARef.current) {
-      const rect = staticCTARef.current.getBoundingClientRect();
-      const isStaticVisible = rect.top < window.innerHeight;
+    const check = () => {
+      if (staticCTARef.current && floatingCTARef.current) {
+        const rect = staticCTARef.current.getBoundingClientRect();
+        const isStaticVisible = rect.top < window.innerHeight;
 
-      if (isStaticVisible && !wasVisible) {
-        // Static CTA just came into view — animate floating bar TO that position
-        wasVisible = true;
-        const floating = floatingCTARef.current;
+        if (isStaticVisible && !wasVisible) {
+          // Static CTA just came into view — animate floating bar TO that position
+          wasVisible = true;
+          const floating = floatingCTARef.current;
 
-        const targetBottom = window.innerHeight - rect.bottom;
-        const targetLeft = rect.left;
-        const targetRight = window.innerWidth - rect.right;
+          const targetBottom = window.innerHeight - rect.bottom;
+          const targetLeft = rect.left;
+          const targetRight = window.innerWidth - rect.right;
 
-        // Set destination position directly on DOM (no React re-render)
-        floating.style.bottom = `${targetBottom}px`;
-        floating.style.left = `${targetLeft}px`;
-        floating.style.right = `${targetRight}px`;
-        floating.style.opacity = "0";
-        floating.style.pointerEvents = "none";
-      } else if (!isStaticVisible && wasVisible) {
-        // Scrolled back up — snap floating bar back to bottom instantly (no transition)
-        wasVisible = false;
-        const floating = floatingCTARef.current;
+          // Set destination position directly on DOM (no React re-render)
+          floating.style.bottom = `${targetBottom}px`;
+          floating.style.left = `${targetLeft}px`;
+          floating.style.right = `${targetRight}px`;
+          floating.style.opacity = "0";
+          floating.style.pointerEvents = "none";
+        } else if (!isStaticVisible && wasVisible) {
+          // Scrolled back up — snap floating bar back to bottom instantly (no transition)
+          wasVisible = false;
+          const floating = floatingCTARef.current;
 
-        floating.style.transition = "none";
-        floating.style.bottom = "16px";
-        floating.style.left = "16px";
-        floating.style.right = "16px";
-        floating.style.opacity = "1";
-        floating.style.pointerEvents = "auto";
+          floating.style.transition = "none";
+          floating.style.bottom = "16px";
+          floating.style.left = "16px";
+          floating.style.right = "16px";
+          floating.style.opacity = "1";
+          floating.style.pointerEvents = "auto";
 
-        // Re-enable transition after snap
-        requestAnimationFrame(() => {
-          floating.style.transition =
-            "bottom 450ms cubic-bezier(0.4, 0, 0.2, 1), left 450ms cubic-bezier(0.4, 0, 0.2, 1), right 450ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease";
-        });
+          // Re-enable transition after snap
+          requestAnimationFrame(() => {
+            floating.style.transition =
+              "bottom 450ms cubic-bezier(0.4, 0, 0.2, 1), left 450ms cubic-bezier(0.4, 0, 0.2, 1), right 450ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease";
+          });
+        }
       }
-    }
+      rafId = requestAnimationFrame(check);
+    };
+
     rafId = requestAnimationFrame(check);
-  };
-
-  rafId = requestAnimationFrame(check);
-  return () => cancelAnimationFrame(rafId);
-}, []);
-
+    return () => cancelAnimationFrame(rafId);
+  }, []);
 
   const handleShare = async () => {
     try {
@@ -477,10 +477,12 @@ useEffect(() => {
               {/* Seller */}
               <div className="mt-5 flex flex-wrap items-center gap-5">
                 <div className="flex items-center gap-3">
-                  <img
-                    src={product.seller_id?.avatar || FALLBACK_IMAGE}
-                    alt="seller"
-                    className="w-7 h-7 lg:w-9 lg:h-9 rounded-full object-cover"
+                  <AvatarComponent
+                    name={product?.seller_id?.name || "Seller"}
+                    imageUrl={product?.seller_id?.avatar}
+                    plan={product?.seller_id?.subscription} // Shows the seller's badge to buyers!
+                    size="small"
+                    className="lg:scale-125 origin-left" // This keeps your responsive sizing (w-7 to w-9)
                   />
 
                   <span className="font-semibold text-[#181C1F] text-sm dark:text-white">

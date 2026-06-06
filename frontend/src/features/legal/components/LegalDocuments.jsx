@@ -349,9 +349,9 @@ function LegalDocument({ initialType = "privacy" }) {
   const sections = isPrivacy ? privacySections : termsSections;
 
   return (
-    <div className="font-figtree w-full bg-[#F7F9FD]">
+    <div className="font-figtree w-full bg-[#F7F9FD] dark:bg-[#131313]">
       {/* Header Area */}
-      <div className="mb-6 lg:mb-4">
+      <div className="mb-6 lg:mb-4 marker:">
         <h1 className="mb-1 text-[1.2rem] lg:text-xl xl:text-xl  font-bold text-gray-900 dark:text-white">
           Terms & Privacy
         </h1>

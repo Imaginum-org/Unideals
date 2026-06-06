@@ -112,10 +112,10 @@ function Profile_left_part() {
             <AvatarComponent
               name={userDetails?.name || "User"}
               imageUrl={userDetails?.avatar}
-              className="rounded-full w-[2.5rem] h-[2.5rem] bg-blue-50 dark:bg-gray-800"
+              plan={userDetails?.subscription} // <-- Just add this line!
+              className="rounded-full bg-blue-50 dark:bg-gray-800"
+              size="xmedium"
             />
-            {/* Green Online Indicator Dot */}
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#22C55E] border-2 border-white dark:border-[#131313] rounded-full"></span>
           </div>
           <div className="ml-3 flex flex-col">
             <h2 className="text-[0.95rem] font-semibold text-gray-900 dark:text-white leading-tight">
