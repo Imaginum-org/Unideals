@@ -1,199 +1,89 @@
-import React from "react";
-import { FaInstagram, FaLinkedin, FaHeart } from "react-icons/fa";
-import { FaXTwitter } from "react-icons/fa6";
 import { Link } from "react-router-dom";
+import { FiArrowRight, FiShare2 } from "react-icons/fi";
+import { FaInstagram, FaLinkedinIn } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 const Footer = () => {
+  const cols = [
+    ["MARKETPLACE", "Sell Now", "Chats", "My Orders", "Setting", "My Listing"],
+    ["COMPANY", "Imaginum", "Linkedin", "Careers", "Blogs", "New Releases"],
+    ["SUPPORT", "Contact us", "Report a bug", "Suggest a feature", "FAQ"],
+  ];
+
   return (
-    <footer className="w-full bg-gradient-to-bl from-indigo-600 to-blue-600 dark:bg-none dark:bg-zinc-900 px-[4.5vw] pt-10 lg:pt-[2vw] relative text-white font-poppins overflow-hidden">
-      {/* Decorative Circles */}
-      <img
-        src="/assets/circle45.png"
-        alt="circle"
-        className="absolute hidden md:block bottom-[-2vh] left-60 w-[250px]"
-      />
-      <img
-        src="/assets/footer_circle.png"
-        alt="circle"
-        className="absolute hidden md:block top-[-2vh] right-[-3vh] w-[250px]"
-      />
-
-      {/* Top Section */}
-      <div className="flex flex-col md:flex-row justify-between gap-10 md:pt-4 pt-2">
-        {/* Left */}
-        <div className="w-full md:w-1/2 flex flex-col gap-3">
-          <div className="flex flex-col lg:gap-2 gap-1">
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-xl font-bold lg:text-2xl"
-            >
-              <img src="/whitebag.png" alt="logo" className="w-5 h-5" />
-              <h1> Unideals</h1>
+    <footer className="w-full overflow-hidden bg-[radial-gradient(circle_at_15%_85%,#7c3cff_0,#1737ff_32%,#050047_72%)] px-3 pt-5 font-poppins">
+      <div className="rounded-[28px] bg-white px-8 py-10 text-[#5d6068] shadow-2xl md:px-14 lg:px-16">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div>
+            <Link to="/" className="mb-7 flex items-center gap-3 text-2xl font-bold text-black">
+              <img src="/whitebag.png" alt="Unideals" className="h-7 w-7 rounded bg-indigo-600 p-1" />
+              Unideals
             </Link>
 
-            <h1 className="flex items-center gap-2 md:text-xl text-sm lg:text-lg font-poppins">
-              <span className="font-extralight">~ platform build by</span>{" "}
-              <a
-                href="https://imaginumorg.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-white font-poppins font-extrabold hover:text-black duration-300 ease-in-out"
-              >
-                Imaginum
-              </a>
-            </h1>
+            <p className="mb-7 max-w-[230px] leading-7">
+              Your campus connection for buying, selling, and trading.
+            </p>
+
+            <h3 className="mb-4 font-bold text-[#4c4f58]">STAY IN THE LOOP</h3>
+            <form className="mb-6 flex max-w-[330px] gap-2">
+              <input
+                type="email"
+                placeholder="Drop you mail"
+                className="min-w-0 flex-1 rounded-xl bg-[#f1f2f6] px-5 py-3 outline-none placeholder:text-[#b8bcc6]"
+              />
+              <button className="grid h-12 w-12 place-items-center rounded-xl bg-indigo-600 text-xl text-white">
+                <FiArrowRight />
+              </button>
+            </form>
+
+            <div className="flex gap-3">
+              {[FaXTwitter, FaInstagram, FaLinkedinIn].map((Icon, i) => (
+                <a key={i} href="#" className="grid h-10 w-10 place-items-center rounded-lg bg-[#f4f5f8] text-lg text-[#6f737c]">
+                  <Icon />
+                </a>
+              ))}
+            </div>
           </div>
 
-          <p className="text-[4vw] md:text-[2vw] lg:text-[1.5vw] leading-snug">
-            The Ultimate Marketplace for <br />
-            Students to Buy, Sell, and Trade with Ease!
-          </p>
-        </div>
-
-        {/* Right */}
-        <div className="hidden md:flex flex-col items-end gap-4 w-full md:w-1/2 md:mt-8 lg:mt-6">
-          <h2 className="text-[1.2vw] flex items-center gap-2 font-medium md:text-[2.3vw] lg:text-[1.5vw] font-poppins">
-            Feedback? We're Listening!
-            <FaHeart className="text-white" />
-          </h2>
-
-          <div className="relative md:w-2/3 lg:w-1/2">
-            <Link
-              to={"/contact"}
-              className="z-10 absolute inset-x-0 top-0 py-3 px-10 text-black bg-white rounded-3xl text-lg font-semibold text-center"
-            >
-              Send Us
-            </Link>
-            <div className="border border-slate-200 bg-transparent rounded-3xl py-6 px-20 md:mt-3 md:ml-[-0.5vw] md:mr-2"></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Middle Section */}
-      <div className="flex justify-between items-center my-10 relative">
-        <button className="z-10 py-2 px-7 lg:py-3 lg:px-10 text-black bg-white rounded-3xl font-semibold hover:scale-105 transition-transform duration-200 md:text-base text-sm">
-          Share with friends
-        </button>
-
-        <img
-          src="/assets/Line_11.png"
-          alt="decorative line"
-          className="absolute right-0 w-[60%] lg:w-auto"
-        />
-      </div>
-
-      {/* Mobile Feedback */}
-      <div className="md:hidden flex flex-col gap-2 mb-10">
-        <h2 className="text-[4.3vw] mb-1">Feedback? We're Listening!</h2>
-
-        <div className="relative w-2/3">
-          <a
-            href="mailto:sarthakkrishak1234@gmail.com"
-            className="z-10 absolute inset-x-0 top-0 py-3 px-10 text-black bg-white rounded-3xl text-sm font-semibold text-center"
-          >
-            Send Us
-          </a>
-
-          <div className="border border-slate-200 bg-transparent rounded-3xl py-6 px-20 ml-[-0.8vw] mr-2"></div>
-        </div>
-      </div>
-
-      {/* Bottom Links */}
-      <div className="flex flex-col-reverse md:flex-row justify-between gap-10 mt-8">
-        {/* Social Icons */}
-        <div className="flex gap-4 items-end">
-          {[
-            { Icon: FaInstagram, link: "#" },
-            { Icon: FaLinkedin, link: "#" },
-            { Icon: FaXTwitter, link: "#" },
-          ].map(({ Icon, link }, idx) => (
-            <a
-              key={idx}
-              href={link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-3 text-2xl bg-blue-700 shadow-[2px_4px_18px_0px_rgba(0,0,0,0.20)] border border-white/50 rounded-full hover:shadow-lg transition-shadow duration-300"
-            >
-              <Icon />
-            </a>
+          {cols.map(([title, ...links]) => (
+            <div key={title}>
+              <h3 className="mb-6 font-bold text-[#4c4f58]">{title}</h3>
+              <ul className="space-y-4">
+                {links.map((text) => (
+                  <li key={text}>
+                    <Link to="/" className="hover:text-indigo-600">
+                      {text}
+                    </Link>
+                  </li>
+                ))}
+                {title === "SUPPORT" && (
+                  <li>
+                    <a href="mailto:unideals@gmail.com" className="font-medium text-indigo-500">
+                      unideals@gmail.com
+                    </a>
+                  </li>
+                )}
+              </ul>
+            </div>
           ))}
         </div>
 
-        {/* Navigation Links */}
-        <div className="flex gap-16 pl-2">
-          <ul className="space-y-3 text-sm md:text-lg">
-            {["Orders", "Chats", "Dev team"].map((text, i) => (
-              <li
-                key={i}
-                className="hover:text-black transition-colors duration-300"
-              >
-                <Link to="/">{text}</Link>
-              </li>
-            ))}
-          </ul>
+        <div className="mt-20 flex flex-col gap-5 border-t border-gray-100 pt-8 text-sm text-[#b6bbc4] md:flex-row md:items-center md:justify-between">
+          <p>© 2026 Unideals.in All rights reserved.</p>
 
-          <ul className="space-y-3 text-sm md:text-lg">
-            {["Sell a product", "Notification", "Contact us"].map((text, i) => (
-              <li
-                key={i}
-                className="hover:text-black transition-colors duration-300"
-              >
-                <Link to="/">{text}</Link>
-              </li>
-            ))}
-          </ul>
+          <div className="flex items-center gap-7">
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Terms</Link>
+            <button className="flex items-center gap-2 rounded-full border border-indigo-300 px-5 py-2 font-medium text-[#7d7fb0]">
+              <FiShare2 /> Share Unideals
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Footer Bottom */}
-      <div className="border-t border-white/30 mt-10 pt-4 md:text-sm text-sm pb-4 text-white flex flex-col md:flex-row md:items-center justify-between">
-        <p className="hover:underline cursor-default">
-          © 2026 All rights reserved
-        </p>
-
-        <p className="text-[3.5vw] hidden md:block sm:text-base mt-1">
-          Designed and developed by{" "}
-          <a
-            href="https://www.linkedin.com/in/sarthakkrishak/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold hover:text-black transition"
-          >
-            Sarthak
-          </a>
-          ,{" "}
-          <a href="#" className="font-semibold hover:text-black transition">
-            Kamal
-          </a>
-          , and{" "}
-          <a href="#" className="font-semibold hover:text-black transition">
-            Anurag
-          </a>
-          .
-        </p>
-
-        {/* Mobile */}
-        <p className="text-xs md:hidden sm:text-base mt-1">
-          Developed by{" "}
-          <a
-            href="https://www.linkedin.com/in/sarthakkrishak/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold hover:text-black transition"
-          >
-            Sarthak
-          </a>
-          ,{" "}
-          <a href="#" className="font-semibold hover:text-black transition">
-            Kamal
-          </a>
-          , and{" "}
-          <a href="#" className="font-semibold hover:text-black transition">
-            Anurag
-          </a>
-          .
-        </p>
-      </div>
+      <h2 className="pointer-events-none select-none text-center text-[18vw] font-bold leading-none text-white/55">
+        unideals
+      </h2>
     </footer>
   );
 };

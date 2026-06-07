@@ -6,7 +6,20 @@ import Footer from "../Components/layout/Footer";
 const MainLayout = () => {
   const location = useLocation();
 
-  const shouldShowFooter = !location.pathname.startsWith("/chat");
+  const hideFooterRoutes = [
+    "/chat",
+    "/profile",
+    "/notification",
+    "/myorders",
+    "/productlisted",
+    "/settings",
+    "/contact",
+    "/wishlist",
+  ];
+
+  const shouldShowFooter = !hideFooterRoutes.some((route) =>
+    location.pathname.startsWith(route),
+  );
 
   return (
     <div className="min-h-screen flex flex-col">

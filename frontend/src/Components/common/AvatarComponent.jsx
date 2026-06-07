@@ -6,7 +6,7 @@ const AvatarComponent = ({
   imageUrl,
   size = "large",
   plan = "base_user", // "base_user", "pro", "pro_plus"
-  showBadge = false, 
+  showBadge = false,
   shape = "circle", // "circle" or "square"
   className = "",
   isLoading = false,
@@ -60,12 +60,18 @@ const AvatarComponent = ({
 
   if (isLoading) {
     return (
-      <div className={`${currentSize.container} ${borderRadiusClass} animate-pulse bg-gray-300 dark:bg-neutral-700 ${className}`} />
+      <div
+        className={`${currentSize.container} ${borderRadiusClass} animate-pulse bg-gray-300 dark:bg-neutral-700 ${className}`}
+      />
     );
   }
 
-  const hasValidImage = typeof cachedImage === "string" && cachedImage.trim().length > 0 && !imageLoadError;
-  const isDefaultAvatar = typeof cachedImage === "string" && cachedImage.includes("avatar-default");
+  const hasValidImage =
+    typeof cachedImage === "string" &&
+    cachedImage.trim().length > 0 &&
+    !imageLoadError;
+  const isDefaultAvatar =
+    typeof cachedImage === "string" && cachedImage.includes("avatar-default");
   const shouldShowImage = hasValidImage && !isDefaultAvatar;
 
   const isProPlus = plan === "pro_plus";
@@ -78,14 +84,17 @@ const AvatarComponent = ({
     : "bg-gradient-to-tr from-[#3838EC] to-[#5C6DFF]";
 
   return (
-    <div className={`relative inline-flex items-center justify-center ${currentSize.container} ${className}`}>
-      
+    <div
+      className={`relative inline-flex items-center justify-center ${currentSize.container} ${className}`}
+    >
       {/* 1. Glow Layer (Behind everything) */}
       {isPremium && (
         <motion.div
           className={`absolute inset-0 ${borderRadiusClass} ${gradientClass} opacity-50 z-0`}
           style={{ filter: "blur(6px)" }}
-          animate={isSquare ? {} : { rotate: 360, scale: isProPlus ? [1, 1.08, 1] : 1 }}
+          animate={
+            isSquare ? {} : { rotate: 360, scale: isProPlus ? [1, 1.08, 1] : 1 }
+          }
           transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
         />
       )}
@@ -100,10 +109,10 @@ const AvatarComponent = ({
       )}
 
       {/* 3. Static Inner Avatar (Never rotates, perfectly centered) */}
-      <div 
+      <div
         // inset-[2px] exposes exactly 2px of the animated gradient behind it.
         // border-[2px] creates the clean white/dark gap between the image and the gradient.
-        className={`absolute ${isPremium ? 'inset-[2px] border-[2px] border-white dark:border-[#131313]' : 'inset-0'} z-10 ${borderRadiusClass} bg-white dark:bg-[#131313] overflow-hidden`}
+        className={`absolute ${isPremium ? "inset-[2px] border-[2px] border-white dark:border-[#131313]" : "inset-0"} z-10 ${borderRadiusClass} bg-white dark:bg-[#131313] overflow-hidden`}
       >
         {shouldShowImage ? (
           <img
