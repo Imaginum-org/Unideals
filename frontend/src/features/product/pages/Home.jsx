@@ -13,7 +13,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import "swiper/css";
 import "swiper/css/pagination";
-import FirstListingCelebration from "../../../components/FirstListingCelebration";
+import FirstListingCelebration from "../../../components/FirstListingCelebration.jsx"
 import bannerRight from "/bannerRight.png";
 
 const Home = () => {
