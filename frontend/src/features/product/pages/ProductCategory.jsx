@@ -3,13 +3,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import ReactSlider from "react-slider";
 import {PRODUCT_CATEGORY_OPTIONS} from "../constants/productOptions.js"
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
-import { getProducts } from "../api/productApi";
+import { getBoostedProducts, getProducts } from "../api/productApi";
 
 import { FaFilter, FaTimes } from "react-icons/fa";
 
 const CategoryPage = () => {
   const { categoryName } = useParams();
   const navigate = useNavigate();
+  const isBoostedPage = categoryName === "boosted-products";
 
   const [open, setOpen] = useState(false);
 
@@ -34,9 +35,11 @@ const CategoryPage = () => {
       try {
         setLoading(true);
 
-        const res = await getProducts({
-          category: categoryName,
-        });
+        const res = isBoostedPage
+          ? await getBoostedProducts()
+          : await getProducts({
+              category: categoryName,
+            });
 
         setProducts(res.data?.data || []);
       } catch (err) {
@@ -48,7 +51,7 @@ const CategoryPage = () => {
     };
 
     fetchCategoryProducts();
-  }, [categoryName]);
+  }, [categoryName, isBoostedPage]);
 
   //HANDLER
   const handleClear = () => {
@@ -75,6 +78,9 @@ const CategoryPage = () => {
           onChange={handleCategoryChange}
           className="w-full p-2 border rounded-lg bg-transparent dark:border-zinc-700 dark:text-zinc-300 outline-none appearance-none cursor-pointer"
         >
+          {isBoostedPage && (
+            <option value="boosted-products">Boosted Products</option>
+          )}
           {PRODUCT_CATEGORY_OPTIONS.map((category) => (
             <option key={category.value} value={category.value}>
               {category.label}
@@ -184,7 +190,9 @@ const CategoryPage = () => {
           <div className="max-w-[1100px] mx-auto">
             <div className="mb-6">
               <h1 className="text-lg lg:text-xl xl:text-3xl font-bold capitalize text-[#121417] dark:text-white font-manrope">
-                {categoryName.replace("_", " ")}
+                {isBoostedPage
+                  ? "Boosted Products"
+                  : categoryName.replace("_", " ")}
               </h1>
 
               {loading && <p>Loading...</p>}
@@ -193,7 +201,9 @@ const CategoryPage = () => {
               <p className="text-xs xl:text-base font-manrope text-zinc-400 mt-1">
                 Showing {products.length} products in{" "}
                 <span className="text-[#394FF1] font-semibold capitalize">
-                  {categoryName.replace("_", " ")}
+                  {isBoostedPage
+                    ? "boosted products"
+                    : categoryName.replace("_", " ")}
                 </span>
               </p>
             </div>

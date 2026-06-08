@@ -449,7 +449,7 @@ const Home = () => {
         </div>
 
         {boostedProducts.length > 0 && (
-          <div className="w-full lg:mt-12 mt-6 flex flex-col lg:gap-4 xl:gap-6 gap-2">
+          <div className="w-full lg:mt-12 mt-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-amber-50/70 px-3 py-4 md:px-5 md:py-6 dark:border-indigo-900/50 dark:from-indigo-950/25 dark:via-[#18181B] dark:to-amber-950/10">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-[#394FF1] dark:text-blue-400">
@@ -459,9 +459,17 @@ const Home = () => {
                   Boosted Products
                 </h1>
               </div>
+
+              <Link
+                to="/category/boosted-products"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#394FF1]/20 bg-white px-3 py-2 text-[11px] font-semibold text-[#394FF1] shadow-sm transition hover:border-[#394FF1]/40 hover:bg-indigo-50 md:text-sm dark:bg-zinc-900 dark:text-blue-300 dark:hover:bg-zinc-800"
+              >
+                View all
+                <IoIosArrowForward className="text-sm" />
+              </Link>
             </div>
 
-            <div className="w-full flex flex-wrap lg:shrink-0 mt-1 lg:gap-4 xl:gap-6 md:gap-3 gap-1">
+            <div className="w-full flex flex-nowrap overflow-x-auto no-scrollbar lg:flex-wrap lg:shrink-0 mt-4 lg:gap-4 xl:gap-6 md:gap-3 gap-2 pb-1">
               {boostedProducts.map((product) => (
                 <ProductCard key={product._id} product={product} />
               ))}

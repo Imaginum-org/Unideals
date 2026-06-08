@@ -74,6 +74,7 @@ export const getBoostedProducts = async () => {
     .select(
       "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier",
     )
+    .populate("seller_id", "name avatar subscription")
     .lean();
 };
 
@@ -230,6 +231,7 @@ export const getAllProducts = async (query) => {
         "seller._id": 1,
         "seller.name": 1,
         "seller.avatar": 1,
+        "seller.subscription": 1,
       },
     },
   );
