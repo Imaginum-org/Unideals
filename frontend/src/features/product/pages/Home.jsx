@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { PRODUCT_CATEGORY_OPTIONS } from "../constants/productOptions.js";
 import Category from "../../../features/product/components/Category.jsx";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
-import { getProducts } from "../api/productApi";
+import { getBoostedProducts, getProducts } from "../api/productApi";
 import { FaPlus } from "react-icons/fa6";
 import { IoIosArrowForward } from "react-icons/io";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -54,6 +54,7 @@ const Home = () => {
 
   //STATE
   const [products, setProducts] = useState([]);
+  const [boostedProducts, setBoostedProducts] = useState([]);
   const [page, setPage] = useState(1);
   const [showCelebration, setShowCelebration] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -130,6 +131,19 @@ const Home = () => {
   useEffect(() => {
     fetchProducts(1);
   }, [fetchProducts]);
+
+  useEffect(() => {
+    const fetchBoostedProducts = async () => {
+      try {
+        const res = await getBoostedProducts();
+        setBoostedProducts(res.data?.data || []);
+      } catch (err) {
+        console.error("Failed to load boosted products", err);
+      }
+    };
+
+    fetchBoostedProducts();
+  }, []);
 
   // INFINITE SCROLL
   const observerRef = useRef();
@@ -433,6 +447,27 @@ const Home = () => {
             <Category title="Others" imageSrc={"/others.png"} /> */}
           </div>
         </div>
+
+        {boostedProducts.length > 0 && (
+          <div className="w-full lg:mt-12 mt-6 flex flex-col lg:gap-4 xl:gap-6 gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-[#394FF1] dark:text-blue-400">
+                  Featured
+                </p>
+                <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
+                  Boosted Products
+                </h1>
+              </div>
+            </div>
+
+            <div className="w-full flex flex-wrap lg:shrink-0 mt-1 lg:gap-4 xl:gap-6 md:gap-3 gap-1">
+              {boostedProducts.map((product) => (
+                <ProductCard key={product._id} product={product} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Products section */}
         <div className="w-full lg:mt-12 mt-6 flex flex-col lg:gap-4 xl:gap-6 gap-2">

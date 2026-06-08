@@ -81,7 +81,11 @@ const ProductCard = memo(
        : null;
       
       
-      
+            const isBoosted =
+        product.is_boosted &&
+        (!product.boost_expires_at ||
+          new Date(product.boost_expires_at) > new Date());
+
       const imageUrl = useMemo(
         () => (images?.length ? images[0] : FALLBACK_IMAGE),
         [images],
@@ -313,6 +317,12 @@ const ProductCard = memo(
            )}
          </button>
        </div>
+
+            {isBoosted && (
+              <div className="absolute left-4 top-4 md:left-6 md:top-6 rounded bg-amber-400 px-2 py-1 text-[10px] md:text-xs font-bold uppercase tracking-wide text-amber-950 shadow-sm">
+                Boosted
+              </div>
+            )}
 
        {/* CONTENT */}
        <div className="p-4">

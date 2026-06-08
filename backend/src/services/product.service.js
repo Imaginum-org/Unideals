@@ -71,7 +71,9 @@ export const getBoostedProducts = async () => {
   })
     .sort({ boost_expires_at: -1 })
     .limit(10)
-    .select("title images selling_price createdAt")
+    .select(
+      "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier",
+    )
     .lean();
 };
 
@@ -221,6 +223,9 @@ export const getAllProducts = async (query) => {
         category: 1,
         createdAt: 1,
         views_count: 1,
+        is_boosted: 1,
+        boost_expires_at: 1,
+        boost_tier: 1,
         score: 1,
         "seller._id": 1,
         "seller.name": 1,

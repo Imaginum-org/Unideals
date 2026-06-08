@@ -2,7 +2,11 @@ import Profile_left_part from "../../../features/user/components/Profile_left_pa
 import OrderCard from "../../../features/user/components/OrderCard.jsx";
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getUserProducts } from "../api/productApi.js";
+import {
+  boostProduct,
+  getBoostSummary,
+  getUserProducts,
+} from "../api/productApi.js";
 import toast from "react-hot-toast";
 import Loader from "../../../Components/ui/Loader.jsx";
 import { FiPlus } from "react-icons/fi";
@@ -20,9 +24,11 @@ function ProductListed() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [boostSummary, setBoostSummary] = useState(null);
 
   useEffect(() => {
     fetchUserProducts();
+    fetchBoostSummary();
   }, []);
 
   const totalImpressions = useMemo(
@@ -56,6 +62,17 @@ function ProductListed() {
       toast.error("Failed to load your products");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBoostSummary = async () => {
+    try {
+      const res = await getBoostSummary();
+      if (res.data?.success) {
+        setBoostSummary(res.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch boost summary", err);
     }
   };
 
@@ -94,6 +111,26 @@ function ProductListed() {
     setProducts((prev) =>
       prev.map((p) => (p._id === productId ? { ...p, status: "LISTED" } : p)),
     );
+  };
+
+  const handleBoostProduct = async (productId) => {
+    const res = await boostProduct(productId);
+    const boostedProduct = res.data?.data?.product;
+
+    if (res.data?.success && boostedProduct) {
+      setProducts((prev) =>
+        prev.map((p) => (p._id === productId ? { ...p, ...boostedProduct } : p)),
+      );
+
+      if (res.data?.data?.usage) {
+        setBoostSummary((prev) => ({
+          ...prev,
+          ...res.data.data.usage,
+        }));
+      }
+    }
+
+    return res;
   };
 
   return (
@@ -136,7 +173,7 @@ function ProductListed() {
             </div>
 
             {/* 2. Stats Grid */}
-            <div className="grid grid-cols-3 gap-2 md:grid-cols-3 md:gap-5 mb-5">
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-4 md:gap-5 mb-5">
               <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                 <div className="text-gray-400 dark:text-gray-500">
                   <EyeIcon size={20} className="text-black" />
@@ -174,6 +211,23 @@ function ProductListed() {
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     Chats
                   </div>
+                </div>
+              </div>
+              <div className="col-span-3 md:col-span-1 bg-white dark:bg-[#1c1c1c] border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-4 flex items-center justify-between md:block shadow-sm">
+                <div>
+                  <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
+                    {boostSummary
+                      ? `${boostSummary.monthlyRemaining}/${boostSummary.monthlyLimit}`
+                      : "--"}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Boosts left
+                  </div>
+                </div>
+                <div className="text-right md:text-left md:mt-2 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
+                  {boostSummary
+                    ? `${boostSummary.activeBoosts}/${boostSummary.maxActiveBoosts} active`
+                    : "Plan quota"}
                 </div>
               </div>
             </div>
@@ -236,6 +290,10 @@ function ProductListed() {
                     onProductDeleted={handleProductDeleted}
                     onProductUnlisted={handleProductUnlisted}
                     onProductRelisted={handleProductRelisted}
+                    isBoosted={Boolean(p.is_boosted)}
+                    boostExpiresAt={p.boost_expires_at}
+                    boostTier={p.boost_tier}
+                    onBoostProduct={handleBoostProduct}
                   />
                 ))
               )}

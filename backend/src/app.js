@@ -14,6 +14,7 @@ import addressRouter from "./routes/address.routes.js";
 import imagekitRouter from "./routes/imagekit.routes.js";
 import wishlistRouter from "./routes/wishlist.routes.js";
 import adminRouter from "./routes/admin.routes.js";
+import boostRouter from "./routes/boost.routes.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
@@ -121,6 +122,7 @@ app.use("/api/address", addressRouter);
 app.use("/api/imagekit", imagekitRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/boost", boostRouter);
 
 // If no route matches
 app.use((req, res) => {
@@ -131,6 +133,13 @@ app.use((req, res) => {
 });
 
 // Global error handler
-// app.use(errorMiddleware);
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 400;
+
+  return res.status(statusCode).json({
+    success: false,
+    message: err.message || "Something went wrong",
+  });
+});
 
 export default app;
