@@ -478,11 +478,11 @@ const Home = () => {
         )}
 
         {/* Products section */}
-        <div className="w-full lg:mt-12 mt-6 flex flex-col lg:gap-4 xl:gap-6 gap-2">
+        <div className="w-full lg:mt-12 mt-6 flex flex-col lg:gap-4 xl:gap-4 gap-2">
           <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
             Popular Products
           </h1>
-          <div className="w-full flex flex-wrap lg:shrink-0 mt-1 lg:gap-4 xl:gap-6 md:gap-3 gap-1">
+          <div className="w-full flex flex-wrap lg:shrink-0 mt-1 lg:gap-4 xl:gap-4 md:gap-3 gap-1">
             {/* EMPTY STATE */}
             {!initialLoading && products.length === 0 && (
               <div className="w-full text-center mt-10 text-gray-500">

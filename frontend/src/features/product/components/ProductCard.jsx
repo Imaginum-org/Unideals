@@ -12,6 +12,7 @@ import { useWishlist } from "../../../context/useWishlist.js";
 import toast from "react-hot-toast";
 import { IoLocationOutline, IoEyeOutline } from "react-icons/io5";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
+
 const FALLBACK_IMAGE = "/image10.png";
 
 // Helper function to get tier-specific styles with Custom Hex Colors
@@ -202,112 +203,114 @@ const ProductCard = memo(
           ref={ref}
           to={`/product/${_id}`}
           onClick={handleClick}
-          className={`group relative rounded-[24px] overflow-hidden transition-all duration-300 lg:w-[28vw] xl:w-[21vw] md:w-[29vw] w-[44.7vw] hover:-translate-y-1.5 ${styles.cardBg} ${styles.cardBorder} ${styles.cardShadow}`}
+          className={`group relative rounded-[16px] md:rounded-[20px] overflow-hidden transition-all duration-300 xl:w-[17vw] lg:w-[21vw] md:w-[28vw] w-[43vw] hover:-translate-y-1.5 ${styles.cardBg} ${styles.cardBorder} ${styles.cardShadow}`}
         >
-          {/* IMAGE */}
-          <div className="relative h-[220px] md:h-[250px] overflow-hidden">
-            <img
-              src={imageUrl}
-              alt={title}
-              onError={(e) => {
-                e.currentTarget.src = FALLBACK_IMAGE;
-              }}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
+          {/* IMAGE WITH PADDED WRAPPER */}
+          <div className="w-full p-2 md:p-2.5 pb-0">
+            <div className="relative w-full aspect-[4/3] overflow-hidden rounded-[12px] md:rounded-[16px]">
+              <img
+                src={imageUrl}
+                alt={title}
+                onError={(e) => {
+                  e.currentTarget.src = FALLBACK_IMAGE;
+                }}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
 
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
-            {discountPercentage > 0 && (
-              <div className="absolute top-3 left-3 bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full z-10">
-                {discountPercentage}% OFF
-              </div>
-            )}
-
-            {/* DYNAMIC BOOSTED BADGE */}
-            {isBoosted && (
-              <div
-                className={`absolute ${discountPercentage > 0 ? "top-12 md:top-14" : "top-3"} left-3 rounded-full px-3.5 py-1.5 text-[10px] md:text-xs font-bold uppercase tracking-wider border border-white/20 backdrop-blur-sm flex items-center gap-1.5 z-10 ${styles.badgeBg}`}
-              >
-                {styles.icon}
-                <span>
-                  {currentTier === "pro_plus" ? "Pro+ Boost" : "Boosted"}
-                </span>
-              </div>
-            )}
-
-            {usage_duration && (
-              <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-800">
-                {usageLabel[usage_duration]}
-              </div>
-            )}
-
-            <button
-              onClick={showRemoveButton ? handleRemoveClick : handleWishlistClick}
-              disabled={loading}
-              className="absolute top-3 right-3 h-11 w-11 rounded-full bg-white/95 backdrop-blur-md flex items-center justify-center shadow-lg z-10"
-            >
-              {inWishlist ? (
-                <FaHeart className="text-pink-500" />
-              ) : (
-                <FaRegHeart className="text-zinc-500" />
+              {discountPercentage > 0 && (
+                <div className="absolute top-2 left-2 md:top-2.5 md:left-2.5 bg-emerald-500 text-white text-[9px] md:text-[11px] font-bold px-2 py-1 md:px-2.5 md:py-1 rounded-full z-10">
+                  {discountPercentage}% OFF
+                </div>
               )}
-            </button>
+
+              {/* DYNAMIC BOOSTED BADGE */}
+              {isBoosted && (
+                <div
+                  className={`absolute ${discountPercentage > 0 ? "top-8 md:top-10" : "top-2 md:top-2.5"} left-2 md:left-2.5 rounded-full px-2 py-1 md:px-2.5 md:py-1 text-[8px] md:text-[9px] font-bold uppercase tracking-wider border border-white/20 backdrop-blur-sm flex items-center gap-1 z-10 ${styles.badgeBg}`}
+                >
+                  {styles.icon}
+                  <span>
+                    {currentTier === "pro_plus" ? "Pro+ Boost" : "Boosted"}
+                  </span>
+                </div>
+              )}
+
+              {usage_duration && (
+                <div className="absolute bottom-2 left-2 md:bottom-2.5 md:left-2.5 bg-white/95 backdrop-blur-md px-2 py-1 md:px-2.5 md:py-1 rounded-full text-[9px] md:text-[10px] font-semibold text-zinc-800">
+                  {usageLabel[usage_duration]}
+                </div>
+              )}
+
+              <button
+                onClick={showRemoveButton ? handleRemoveClick : handleWishlistClick}
+                disabled={loading}
+                className="absolute top-2 right-2 md:top-2.5 md:right-2.5 h-8 w-8 md:h-9 md:w-9 rounded-full bg-white/95 backdrop-blur-md flex items-center justify-center shadow-lg z-10"
+              >
+                {inWishlist ? (
+                  <FaHeart className="text-pink-500 text-sm" />
+                ) : (
+                  <FaRegHeart className="text-zinc-500 text-sm" />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* CONTENT */}
-          <div className="p-4">
+          <div className="p-2.5 md:p-3">
             {/* CATEGORY */}
             <div
-              className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${styles.categoryTag}`}
+              className={`inline-flex px-2 py-0.5 md:px-2 md:py-0.5 rounded-full text-[8px] md:text-[9px] font-semibold uppercase tracking-wider ${styles.categoryTag}`}
             >
               {category?.replaceAll("_", " ")}
             </div>
 
             {/* TITLE */}
-            <h3 className="mt-3 text-[17px] md:text-[18px] font-bold text-zinc-900 dark:text-white line-clamp-2 min-h-[48px]">
+            <h3 className="mt-1.5 text-[14px] md:text-[15px] leading-tight font-bold text-zinc-900 dark:text-white line-clamp-2 min-h-[38px] md:min-h-[42px]">
               {title}
             </h3>
 
             {/* PRICE */}
-            <div>
-              <div className="flex items-end gap-2">
-                <span className="text-2xl font-semibold text-zinc-900 dark:text-white">
+            <div className="mt-1">
+              <div className="flex items-end gap-1.5">
+                <span className="text-[17px] md:text-[19px] font-semibold text-zinc-900 dark:text-white">
                   ₹{Number(selling_price).toLocaleString()}
                 </span>
               </div>
             </div>
 
             {/* FOOTER */}
-            <div className={`mt-4 pt-4 border-t ${styles.footerBorder}`}>
+            <div className={`mt-2 pt-2 border-t ${styles.footerBorder}`}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <AvatarComponent
                     name={sellerInfo?.name || "Seller"}
                     imageUrl={sellerAvatarUrl}
-                    size="xmedium"
+                    size="small"
                     plan={sellerPlan}
-                    className="shrink-0"
+                    className="shrink-0 h-5 w-5 md:h-6 md:w-6"
                   />
                   <div>
-                    <p className="text-xs font-semibold text-zinc-900 dark:text-white">
+                    <p className="text-[10px] md:text-[11px] font-semibold text-zinc-900 dark:text-white line-clamp-1">
                       {sellerInfo?.name || "Seller"}
                     </p>
-                    <p className="text-[11px] text-zinc-500">
+                    <p className="text-[8px] md:text-[9px] text-zinc-500">
                       {getRelativeTime(createdAt)}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 text-zinc-500">
-                  <IoEyeOutline size={15} />
-                  <span className="text-xs">{views_count || 0}</span>
+                <div className="flex items-center gap-1 text-zinc-500 shrink-0">
+                  <IoEyeOutline size={12} />
+                  <span className="text-[9px] md:text-[10px]">{views_count || 0}</span>
                 </div>
               </div>
 
               {location && (
-                <div className="flex items-center gap-1 mt-3 text-zinc-500">
-                  <IoLocationOutline size={15} />
-                  <span className="text-xs truncate">{location}</span>
+                <div className="flex items-center gap-1 mt-1.5 text-zinc-500">
+                  <IoLocationOutline size={12} />
+                  <span className="text-[9px] md:text-[10px] truncate">{location}</span>
                 </div>
               )}
             </div>
