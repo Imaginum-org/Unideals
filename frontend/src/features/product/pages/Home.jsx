@@ -1,6 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { PRODUCT_CATEGORY_OPTIONS } from "../constants/productOptions.js";
 import Category from "../../../features/product/components/Category.jsx";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
 import { getBoostedProducts, getProducts } from "../api/productApi";
@@ -13,44 +12,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import "swiper/css";
 import "swiper/css/pagination";
-import FirstListingCelebration from "../../../Components/FirstListingCelebration.jsx"
+import FirstListingCelebration from "../../../Components/FirstListingCelebration.jsx";
 import bannerRight from "/bannerRight.png";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { CATEGORY_ITEMS } from "../constants/categories";
 
 const Home = () => {
-  const sliderRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
-  //drag state using refs (no re-render bugs)
-  const isDownRef = useRef(false);
-  const startXRef = useRef(0);
-  const scrollLeftRef = useRef(0);
-  const isDraggingRef = useRef(false);
-  const onMouseDown = (e) => {
-    if (!sliderRef.current) return;
-    isDownRef.current = true;
-    isDraggingRef.current = false;
-    startXRef.current = e.pageX - sliderRef.current.offsetLeft;
-    scrollLeftRef.current = sliderRef.current.scrollLeft;
-  };
-
-  const onMouseUp = () => {
-    isDownRef.current = false;
-  };
-
-  const onMouseLeave = () => {
-    isDownRef.current = false;
-  };
-
-  const onMouseMove = (e) => {
-    if (!isDownRef.current || !sliderRef.current) return;
-
-    const x = e.pageX - sliderRef.current.offsetLeft;
-    const walk = (x - startXRef.current) * 2;
-
-    if (Math.abs(walk) > 5) isDraggingRef.current = true;
-
-    sliderRef.current.scrollLeft = scrollLeftRef.current - walk;
-  };
 
   //STATE
   const [products, setProducts] = useState([]);
@@ -60,9 +29,11 @@ const Home = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
-
   const [error, setError] = useState(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
+  const sliderRef = useRef(null);
   const fetchingRef = useRef(false);
   const hasMoreRef = useRef(true);
 
@@ -87,6 +58,52 @@ const Home = () => {
       state: {},
     });
   }, [location, navigate]);
+
+  const categoryCards = useMemo(
+    () =>
+      CATEGORY_ITEMS.map((category) => (
+        <div key={category.value} className="flex-shrink-0 snap-start">
+          <Category title={category.label} imageSrc={category.icon} />
+        </div>
+      )),
+    [],
+  );
+
+  const updateScrollButtons = () => {
+    const slider = sliderRef.current;
+
+    if (!slider) return;
+
+    setCanScrollLeft(slider.scrollLeft > 5);
+
+    setCanScrollRight(
+      slider.scrollLeft < slider.scrollWidth - slider.clientWidth - 5,
+    );
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!sliderRef.current) return;
+
+      // Ignore when typing in inputs/textareas
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft") {
+        scrollLeft();
+      }
+
+      if (e.key === "ArrowRight") {
+        scrollRight();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   //FETCH
   const fetchProducts = useCallback(async (pageNumber = 1) => {
@@ -121,11 +138,29 @@ const Home = () => {
       setPage(pageNumber);
     } catch (err) {
       setError("Failed to load products");
+      console.log(err);
     } finally {
       fetchingRef.current = false;
       setLoading(false);
       setInitialLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const slider = sliderRef.current;
+
+    if (!slider) return;
+
+    updateScrollButtons();
+
+    slider.addEventListener("scroll", updateScrollButtons);
+
+    window.addEventListener("resize", updateScrollButtons);
+
+    return () => {
+      slider.removeEventListener("scroll", updateScrollButtons);
+      window.removeEventListener("resize", updateScrollButtons);
+    };
   }, []);
 
   useEffect(() => {
@@ -144,6 +179,20 @@ const Home = () => {
 
     fetchBoostedProducts();
   }, []);
+
+  const scrollLeft = () => {
+    sliderRef.current?.scrollBy({
+      left: -(sliderRef.current.clientWidth * 0.8),
+      behavior: "smooth",
+    });
+  };
+
+  const scrollRight = () => {
+    sliderRef.current?.scrollBy({
+      left: sliderRef.current.clientWidth * 0.8,
+      behavior: "smooth",
+    });
+  };
 
   // INFINITE SCROLL
   const observerRef = useRef();
@@ -410,46 +459,142 @@ const Home = () => {
 
       <div className="w-full min-h-screen bg-white flex flex-col items-center pl-[4.5vw] pr-[4.5vw] pb-24 lg:pb-0 dark:bg-[#131313]">
         {/* Category section */}
-        <div className="flex w-[90vw] flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-12 mt-5">
-          <div className="lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
-            <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white">
-              Categories
-            </h1>
+        <div className="flex w-full max-w-[1380px] mx-auto flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-12 mt-5">
+          <div>
+            <h2 className="font-semibold text-black dark:text-white text-lg md:text-2xl font-figtree">
+              Shop by Category
+            </h2>
           </div>
-          <div
-            ref={sliderRef}
-            className="flex w-full gap-2 md:gap-4 lg:gap-6 items-center overflow-x-auto no-scrollbar cursor-grab select-none"
-            onMouseDown={onMouseDown}
-            onMouseLeave={onMouseLeave}
-            onMouseUp={onMouseUp}
-            onMouseMove={onMouseMove}
-          >
-            {PRODUCT_CATEGORY_OPTIONS.map((category) => {
-              return (
-                <Category
-                  key={category.value}
-                  title={category.label}
-                  imageSrc="/assets/icons8-electronics-961.png"
-                />
-              );
-            })}
-            {/* <Category
-              title="Electronics"
-              imageSrc="/assets/icons8-electronics-961.png"
+          {/* <div
+            className="relative flex w-full gap-2 md:gap-4 lg:gap-6 items-center overflow-x-auto no-scrollbar cursor-grab select-none"
+          > */}
+          <div className="relative w-full">
+            {canScrollLeft && (
+              <button
+                onClick={scrollLeft}
+                aria-label="Scroll categories left"
+                className="
+            hidden
+            lg:flex
+            absolute
+            left-2
+            top-1/2
+            -translate-y-1/2
+            z-20
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-full
+            bg-white/95
+            dark:bg-neutral-900/95
+            border
+            border-gray-200
+            dark:border-neutral-700
+            shadow-lg
+            backdrop-blur
+            transition-all
+            duration-300
+            hover:scale-105
+            hover:shadow-xl
+        "
+              >
+                <FiChevronLeft className="text-xl" />
+              </button>
+            )}
+            {/* <div
+              className="
+        hidden
+        lg:block
+        absolute
+        left-0
+        top-0
+        bottom-0
+        w-12
+        bg-gradient-to-r
+        from-white
+        dark:from-[#131313]
+        to-transparent
+        pointer-events-none
+        z-10
+    "
+            /> */}
+            <div
+              ref={sliderRef}
+              className="
+              select-none
+        flex
+        gap-3
+        md:gap-5
+        lg:gap-6
+        overflow-x-auto
+        scroll-smooth
+        snap-x
+        snap-mandatory
+        overscroll-x-contain
+        no-scrollbar
+        py-2
+    "
+              aria-label="Browse product categories"
+            >
+              {categoryCards}
+            </div>
+
+            {canScrollRight && (
+              <button
+                onClick={scrollRight}
+                aria-label="Scroll categories right"
+                className="
+            hidden
+            lg:flex
+            absolute
+            right-2
+            top-1/2
+            -translate-y-1/2
+            z-20
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-full
+            bg-white/95
+            dark:bg-neutral-900/95
+            border
+            border-gray-200
+            dark:border-neutral-700
+            shadow-lg
+            backdrop-blur
+            transition-all
+            duration-300
+            hover:scale-105
+            hover:shadow-xl
+        "
+              >
+                <FiChevronRight className="text-xl" />
+              </button>
+            )}
+            <div
+              className="
+        hidden
+        lg:block
+        absolute
+        right-0
+        top-0
+        bottom-0
+        w-12
+        bg-gradient-to-l
+        from-white
+        dark:from-[#131313]
+        to-transparent
+        pointer-events-none
+        z-10
+    "
             />
-            <Category title="Books" imageSrc="/assets/icons8-books-961.png" />
-            <Category title="Essentials" imageSrc="/assets/Group_116.png" />
-            <Category
-              title="Cycles"
-              imageSrc="/assets/icons8-bicycle-961.png"
-            />
-            <Category title="Matress" imageSrc="/assets/icons8-bed-961.png" />
-            <Category title="Others" imageSrc={"/others.png"} /> */}
           </div>
         </div>
 
         {boostedProducts.length > 0 && (
-          <div className="w-full lg:mt-12 mt-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-amber-50/70 px-3 py-4 md:px-5 md:py-6 dark:border-indigo-900/50 dark:from-indigo-950/25 dark:via-[#18181B] dark:to-amber-950/10">
+          <div className="w-full max-w-[1380px] mx-auto lg:mt-12 mt-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-amber-50/70 px-3 py-4 md:px-5 md:py-6 dark:border-indigo-900/50 dark:from-indigo-950/25 dark:via-[#18181B] dark:to-amber-950/10">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-[#394FF1] dark:text-blue-400">
@@ -478,11 +623,27 @@ const Home = () => {
         )}
 
         {/* Products section */}
-        <div className="w-full lg:mt-12 mt-6 flex flex-col lg:gap-4 xl:gap-4 gap-2">
-          <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
-            Popular Products
+        <div className="w-full max-w-[1380px] mx-auto lg:mt-12 mt-6 flex flex-col gap-4 lg:mb-6">
+          <h1 className="font-semibold text-[#000000] font-figtree dark:text-white lg:text-[2vw] xl:text-2xl md:text-[2.1vw] text-sm">
+            Trending Items
           </h1>
-          <div className="w-full flex flex-wrap lg:shrink-0 mt-1 lg:gap-4 xl:gap-4 md:gap-3 gap-1">
+
+          <div
+            className="
+      mt-2
+      grid
+      w-full
+      grid-cols-2
+      md:grid-cols-3
+      lg:grid-cols-4
+      2xl:grid-cols-4
+      gap-2
+      sm:gap-3
+      md:gap-4
+      lg:gap-4
+      xl:gap-5
+    "
+          >
             {/* EMPTY STATE */}
             {!initialLoading && products.length === 0 && (
               <div className="w-full text-center mt-10 text-gray-500">
@@ -518,21 +679,6 @@ const Home = () => {
           )}
         </div>
       </div>
-
-      {/* More section
-      <div className="w-full lg:text-[1.1vw] text-sm flex justify-center items-center lg:p-10 p-6 font-semibold font-poppins dark:text-white">
-        <button>More</button>
-        <IoIosArrowDown className="size-4" />
-      </div> */}
-
-      {/* {hasMore && !loading && (
-        <button
-          onClick={() => fetchProducts(page + 1)}
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
-        >
-          Load More
-        </button>
-      )} */}
 
       {/* Mobile Floating Sell Button */}
       <Link

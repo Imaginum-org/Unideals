@@ -18,6 +18,7 @@
     @apply h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#364EF2] focus:ring-4 focus:ring-[#364EF2]/10 dark:border-[#2A2D35] dark:bg-[#1A1D20] dark:text-white dark:placeholder:text-slate-500;
   }
 }
+
 ::-webkit-scrollbar {
   width: 6px;
 }

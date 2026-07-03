@@ -10,50 +10,43 @@ import { Link } from "react-router-dom";
 import { FaStar, FaHeart, FaRegHeart, FaCrown } from "react-icons/fa";
 import { useWishlist } from "../../../context/useWishlist.js";
 import toast from "react-hot-toast";
-import { IoLocationOutline, IoEyeOutline } from "react-icons/io5";
+import { IoLocationOutline } from "react-icons/io5";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
+import { MdOutlineChatBubbleOutline } from "react-icons/md";
 
 const FALLBACK_IMAGE = "/image10.png";
+const INR_FORMATTER = new Intl.NumberFormat("en-IN");
 
-// Helper function to get tier-specific styles with Custom Hex Colors
+// Helper function to get tier-specific styles (retained for your logic)
 const getTierStyles = (tier) => {
   switch (tier) {
     case "pro_plus":
       return {
-        cardBg:
-          "bg-gradient-to-b from-[#FFD700]/10 to-white dark:from-[#FFD700]/10 dark:to-[#18181B]",
+        cardBg: "bg-white dark:bg-[#18181B]",
         cardBorder: "border-2 border-[#FFD700]/80",
         cardShadow:
           "shadow-[0_4px_20px_rgba(255,215,0,0.15)] hover:shadow-[0_8px_30px_rgba(255,215,0,0.3)] z-10",
         badgeBg:
           "bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black shadow-lg shadow-[#FFD700]/40",
-        categoryTag:
-          "bg-[#FFD700]/20 text-[#FF8C00] dark:bg-[#FFD700]/10 dark:text-[#FFD700]",
-        footerBorder: "border-[#FFD700]/30 dark:border-[#FFD700]/20",
         icon: <FaCrown className="animate-pulse" size={12} />,
       };
     case "pro":
       return {
-        cardBg:
-          "bg-gradient-to-b from-[#3838EC]/10 to-white dark:from-[#3838EC]/10 dark:to-[#18181B]",
+        cardBg: "bg-white dark:bg-[#18181B]",
         cardBorder: "border-2 border-[#3838EC]/80",
         cardShadow:
           "shadow-[0_4px_20px_rgba(56,56,236,0.15)] hover:shadow-[0_8px_30px_rgba(56,56,236,0.3)] z-10",
         badgeBg:
           "bg-gradient-to-r from-[#3838EC] to-[#5C6DFF] text-white shadow-lg shadow-[#3838EC]/40",
-        categoryTag:
-          "bg-[#3838EC]/10 text-[#3838EC] dark:bg-[#3838EC]/20 dark:text-[#5C6DFF]",
-        footerBorder: "border-[#3838EC]/20 dark:border-[#3838EC]/30",
         icon: <FaStar className="animate-pulse" size={10} />,
       };
     default:
       return {
         cardBg: "bg-white dark:bg-[#18181B]",
         cardBorder: "border border-zinc-200 dark:border-zinc-800",
-        cardShadow: "shadow-sm hover:shadow-2xl",
-        badgeBg: "bg-zinc-800 text-white", // Fallback
-        categoryTag: "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600",
-        footerBorder: "border-zinc-200 dark:border-zinc-800",
+        cardShadow:
+          "shadow-[0_4px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)]",
+        badgeBg: "bg-zinc-800 text-white",
         icon: null,
       };
   }
@@ -96,14 +89,9 @@ const ProductCard = memo(
         selling_price,
         original_price,
         location,
-        createdAt,
         seller_id,
         seller,
-        views_count,
-        attributes = {},
       } = product;
-
-      const { usage_duration } = attributes;
 
       const isBoosted =
         product.is_boosted &&
@@ -112,27 +100,37 @@ const ProductCard = memo(
 
       const sellerInfo = seller_id || seller;
 
-      // Default to "pro" if boosted but no tier is specified
       const currentTier = isBoosted ? product.boost_tier || "pro" : "regular";
-      const styles = getTierStyles(currentTier);
+      const tierStyles = getTierStyles(currentTier);
       const sellerAvatarUrl =
         sellerInfo?.avatar || sellerInfo?.profile_image || sellerInfo?.image;
       const sellerPlan =
         sellerInfo?.subscription ||
         (currentTier === "regular" ? "base_user" : currentTier);
 
-      const imageUrl = useMemo(
-        () => (images?.length ? images[0] : FALLBACK_IMAGE),
-        [images],
-      );
-      const discountPercentage = useMemo(
+      // Fallback seller rating for design match (can be replaced with dynamic data: sellerInfo?.rating)
+      const sellerRating = sellerInfo?.rating ?? 4.9;
+
+      const imageUrl = useMemo(() => {
+        if (!images?.length) return FALLBACK_IMAGE;
+        return images[0];
+      }, [images]);
+
+      const savings = useMemo(
         () =>
           original_price && original_price > selling_price
-            ? Math.round(
-                ((original_price - selling_price) / original_price) * 100,
-              )
+            ? original_price - selling_price
             : 0,
         [original_price, selling_price],
+      );
+
+      const formattedPrice = useMemo(
+        () => ({
+          selling: INR_FORMATTER.format(selling_price || 0),
+          original: INR_FORMATTER.format(original_price || 0),
+          savings: INR_FORMATTER.format(savings),
+        }),
+        [selling_price, original_price, savings],
       );
 
       const handleClick = useCallback(() => {
@@ -145,27 +143,16 @@ const ProductCard = memo(
         if (loading || !_id) return;
         setLoading(true);
         try {
-          const result = await toggleWishlist(_id, product);
-          setInWishlist(result);
-          toast.success(result ? "Added to Wishlist" : "Removed from Wishlist");
+          const updatedWishlist = await toggleWishlist(_id, product);
+          setInWishlist(updatedWishlist);
+          toast.success(
+            updatedWishlist ? "Added to Wishlist" : "Removed from Wishlist",
+          );
         } catch (error) {
           toast.error("Failed to update wishlist");
         } finally {
           setLoading(false);
         }
-      };
-
-      const getRelativeTime = (date) => {
-        if (!date) return "";
-        const diffInSeconds = Math.floor((new Date() - new Date(date)) / 1000);
-        const minutes = Math.floor(diffInSeconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (days > 0) return `${days}d ago`;
-        if (hours > 0) return `${hours}h ago`;
-        if (minutes > 0) return `${minutes}m ago`;
-        return "Just now";
       };
 
       const handleRemoveClick = async (e) => {
@@ -190,129 +177,248 @@ const ProductCard = memo(
         }
       };
 
-      const usageLabel = {
-        less_than_one_month: "Like New",
-        one_to_three_months: "1-3 Months Used",
-        three_to_six_months: "3-6 Months Used",
-        six_to_twelve_months: "6-12 Months Used",
-        more_than_one_year: "1+ Year Used",
-      };
+      const formattedCategory = category?.replaceAll("_", " ") ?? "Category";
+
+      const sellerName = sellerInfo?.name || "Seller";
+
+      const handleImageError = useCallback((e) => {
+        e.currentTarget.onerror = null;
+        e.currentTarget.src = FALLBACK_IMAGE;
+      }, []);
+
+      const formattedLocation = location || "VIT Vellore";
 
       return (
         <Link
           ref={ref}
           to={`/product/${_id}`}
           onClick={handleClick}
-          className={`group relative rounded-[16px] md:rounded-[20px] overflow-hidden transition-all duration-300 xl:w-[17vw] lg:w-[21vw] md:w-[28vw] w-[43vw] hover:-translate-y-1.5 ${styles.cardBg} ${styles.cardBorder} ${styles.cardShadow}`}
+          className={`
+group
+relative
+w-full
+overflow-hidden
+rounded-2xl
+bg-white
+font-figtree
+select-none
+transform-gpu
+will-change-transform
+transition-all
+duration-300
+ease-[cubic-bezier(0.22,1,0.36,1)]
+${tierStyles.cardBg}
+${tierStyles.cardBorder}
+${tierStyles.cardShadow}
+`}
         >
-          {/* IMAGE WITH PADDED WRAPPER */}
-          <div className="w-full p-2 md:p-2.5 pb-0">
-            <div className="relative w-full aspect-[4/3] overflow-hidden rounded-[12px] md:rounded-[16px]">
+          {/* PADDED WRAPPER FOR EVERYTHING AS PER DESIGN */}
+          <div className="p-3 flex flex-col h-full">
+            {/* IMAGE SECTION */}
+            <div className="relative w-full aspect-[6/5] overflow-hidden rounded-xl">
               <img
+                loading="lazy"
+                decoding="async"
+                fetchPriority="low"
                 src={imageUrl}
                 alt={title}
-                onError={(e) => {
-                  e.currentTarget.src = FALLBACK_IMAGE;
-                }}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                onError={handleImageError}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500
+ease-[cubic-bezier(0.22,1,0.36,1)]
+group-hover:scale-[1.05]"
               />
 
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+              {/* Chat Now Button */}
+              <div
+                className="
+absolute
+bottom-3
+left-1/2
+z-20
 
-              {discountPercentage > 0 && (
-                <div className="absolute top-2 left-2 md:top-2.5 md:left-2.5 bg-emerald-500 text-white text-[9px] md:text-[11px] font-bold px-2 py-1 md:px-2.5 md:py-1 rounded-full z-10">
-                  {discountPercentage}% OFF
-                </div>
-              )}
+-translate-x-1/2
 
-              {/* DYNAMIC BOOSTED BADGE */}
+translate-y-8
+opacity-0
+scale-95
+
+pointer-events-none
+
+transition-all
+duration-300
+ease-out
+
+group-hover:translate-y-0
+group-hover:opacity-100
+group-hover:scale-100
+group-hover:pointer-events-auto
+"
+              >
+                <Link
+                  to={"/chat"}
+                  className="
+      rounded-lg
+      bg-[#3838EC]
+      px-5
+      py-2.5
+      text-xs
+      xl:text-base
+      2xl:text-sm
+      font-semibold
+      text-white
+      shadow-lg
+      transition-all
+      duration-200
+      hover:bg-[#2f2fd9]
+      hover:scale-[1.04]
+                  flex items-center justify-center gap-2
+      active:scale-95
+    "
+                >
+                  <MdOutlineChatBubbleOutline size={18} />
+                  <span>Chat Now</span>
+                </Link>
+              </div>
+
+              {/* DYNAMIC BOOSTED BADGE (Retained functionality, subtly styled) */}
               {isBoosted && (
                 <div
-                  className={`absolute ${discountPercentage > 0 ? "top-8 md:top-10" : "top-2 md:top-2.5"} left-2 md:left-2.5 rounded-full px-2 py-1 md:px-2.5 md:py-1 text-[8px] md:text-[9px] font-bold uppercase tracking-wider border border-white/20 backdrop-blur-sm flex items-center gap-1 z-10 ${styles.badgeBg}`}
+                  className={`absolute top-2 left-2 rounded-md px-2 py-1 text-[9px] md:text-[10px] font-bold uppercase tracking-wider border border-white/20 backdrop-blur-sm flex items-center gap-1 z-10 ${tierStyles.badgeBg}`}
                 >
-                  {styles.icon}
-                  <span>
-                    {currentTier === "pro_plus" ? "Pro+ Boost" : "Boosted"}
-                  </span>
+                  {tierStyles.icon}
+                  <span>{currentTier === "pro_plus" ? "Pro+" : "Boosted"}</span>
                 </div>
               )}
 
-              {usage_duration && (
-                <div className="absolute bottom-2 left-2 md:bottom-2.5 md:left-2.5 bg-white/95 backdrop-blur-md px-2 py-1 md:px-2.5 md:py-1 rounded-full text-[9px] md:text-[10px] font-semibold text-zinc-800">
-                  {usageLabel[usage_duration]}
-                </div>
-              )}
+              {/* WISHLIST BUTTON (Retained for functionality, placed top right) */}
+              <div
+                className="
+absolute
+top-3
+right-3
+z-20
 
-              <button
-                onClick={showRemoveButton ? handleRemoveClick : handleWishlistClick}
-                disabled={loading}
-                className="absolute top-2 right-2 md:top-2.5 md:right-2.5 h-8 w-8 md:h-9 md:w-9 rounded-full bg-white/95 backdrop-blur-md flex items-center justify-center shadow-lg z-10"
+translate-x-6
+opacity-0
+scale-90
+
+pointer-events-none
+
+transition-all
+duration-300
+ease-out
+
+group-hover:translate-x-0
+group-hover:opacity-100
+group-hover:scale-100
+group-hover:pointer-events-auto
+"
               >
-                {inWishlist ? (
-                  <FaHeart className="text-pink-500 text-sm" />
-                ) : (
-                  <FaRegHeart className="text-zinc-500 text-sm" />
-                )}
-              </button>
-            </div>
-          </div>
+                <button
+                  onClick={
+                    showRemoveButton ? handleRemoveClick : handleWishlistClick
+                  }
+                  disabled={loading}
+                  aria-label={
+                    inWishlist ? "Remove from Wishlist" : "Add to Wishlist"
+                  }
+                  className="
+      flex
+      h-10
+      w-10
+      items-center
+      justify-center
 
-          {/* CONTENT */}
-          <div className="p-2.5 md:p-3">
-            {/* CATEGORY */}
-            <div
-              className={`inline-flex px-2 py-0.5 md:px-2 md:py-0.5 rounded-full text-[8px] md:text-[9px] font-semibold uppercase tracking-wider ${styles.categoryTag}`}
-            >
-              {category?.replaceAll("_", " ")}
-            </div>
+      rounded-full
 
-            {/* TITLE */}
-            <h3 className="mt-1.5 text-[14px] md:text-[15px] leading-tight font-bold text-zinc-900 dark:text-white line-clamp-2 min-h-[38px] md:min-h-[42px]">
-              {title}
-            </h3>
+      bg-[#FFFFFF]
+      backdrop-blur-xl
 
-            {/* PRICE */}
-            <div className="mt-1">
-              <div className="flex items-end gap-1.5">
-                <span className="text-[17px] md:text-[19px] font-semibold text-zinc-900 dark:text-white">
-                  ₹{Number(selling_price).toLocaleString()}
-                </span>
+      shadow-lg
+
+      transition-all
+      duration-200
+
+      hover:scale-110
+      active:scale-95
+    "
+                >
+                  {inWishlist ? (
+                    <FaHeart className="text-[#ef4444] text-lg" />
+                  ) : (
+                    <FaRegHeart className="text-zinc-500 text-lg" />
+                  )}
+                </button>
               </div>
             </div>
 
-            {/* FOOTER */}
-            <div className={`mt-2 pt-2 border-t ${styles.footerBorder}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
+            {/* CONTENT SECTION */}
+            <div className="mt-3 flex flex-col flex-grow">
+              {/* CATEGORY (Plain text style matching image) */}
+              <div className="text-[13px] md:text-base font-semibold text-[#3838EC] dark:text-[#5C6DFF] capitalize">
+                {formattedCategory}
+              </div>
+
+              {/* TITLE */}
+              <h3 className="mt-2 text-[16px] md:text-lg font-bold text-[#2D3339] dark:text-white min-h-[32px]  line-clamp-2">
+                {title}
+              </h3>
+
+              {/* PRICE & DISCOUNT */}
+              <div className="mt-2 flex items-end gap-2">
+                <span className="text-[20px] md:text-lg xl:text-xl font-bold text-[#2A2A2A] dark:text-white">
+                  ₹{formattedPrice.selling}
+                </span>
+
+                {savings > 0 && (
+                  <>
+                    <span className="text-[14px] md:text-[15px] font-medium text-[#ACACAC] line-through">
+                      ₹{formattedPrice.original}
+                    </span>
+                    <div className="bg-[#008000] text-white text-[11px] md:text-[12px] font-medium px-2 py-0.5 md:py-1 rounded-md ml-1">
+                      Save ₹{formattedPrice.savings}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* DIVIDER */}
+              <div className="my-3.5 h-px bg-[#EEF1F5] dark:bg-zinc-800" />
+
+              {/* FOOTER (Avatar, Rating & Location) */}
+              <div className="flex items-center justify-between mt-auto">
+                {/* Left Side: Avatar & Name */}
+                <div className="flex items-center gap-2">
                   <AvatarComponent
-                    name={sellerInfo?.name || "Seller"}
+                    name={sellerName}
                     imageUrl={sellerAvatarUrl}
                     size="small"
-                    plan={sellerPlan}
-                    className="shrink-0 h-5 w-5 md:h-6 md:w-6"
+                    // plan={sellerPlan}
+                    className="shrink-0 h-6 w-6 md:h-7 md:w-7"
                   />
-                  <div>
-                    <p className="text-[10px] md:text-[11px] font-semibold text-zinc-900 dark:text-white line-clamp-1">
-                      {sellerInfo?.name || "Seller"}
-                    </p>
-                    <p className="text-[8px] md:text-[9px] text-zinc-500">
-                      {getRelativeTime(createdAt)}
-                    </p>
+                  <span className="capitalize text-[13px] md:text-[14px] font-medium text-zinc-500 dark:text-zinc-400 line-clamp-1 max-w-[80px]">
+                    {sellerName}
+                  </span>
+
+                  {/* Rating Badge */}
+                  <div className="flex items-center gap-1 border border-[#E1E1E1] dark:border-zinc-700 rounded-full px-2 py-1 ml-1">
+                    <FaStar className="text-yellow-400 text-[13px]" />
+                    <span className="text-[13px] font-medium text-zinc-400">
+                      {sellerRating}
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 text-zinc-500 shrink-0">
-                  <IoEyeOutline size={12} />
-                  <span className="text-[9px] md:text-[10px]">{views_count || 0}</span>
-                </div>
+                {/* Right Side: Location */}
+                {formattedLocation && (
+                  <div className="flex items-center justify-center gap-1 text-[#A2ACB8] shrink-0">
+                    <IoLocationOutline size={18} className="text-[#4A5565]" />
+                    <span className="text-[12px] md:text-[14px] font-medium truncate max-w-[110px]">
+                      {formattedLocation}
+                    </span>
+                  </div>
+                )}
               </div>
-
-              {location && (
-                <div className="flex items-center gap-1 mt-1.5 text-zinc-500">
-                  <IoLocationOutline size={12} />
-                  <span className="text-[9px] md:text-[10px] truncate">{location}</span>
-                </div>
-              )}
             </div>
           </div>
         </Link>

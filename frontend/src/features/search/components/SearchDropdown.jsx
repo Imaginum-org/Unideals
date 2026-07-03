@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
 
 const SearchDropdown = ({
   results,
@@ -7,6 +8,8 @@ const SearchDropdown = ({
   mobile = false,
   hasSearched,
   onSelect,
+  selectedIndex,
+  setSelectedIndex,
 }) => {
   if (!query) return null;
 
@@ -26,6 +29,17 @@ const SearchDropdown = ({
       ),
     );
   };
+
+  const itemRefs = useRef([]);
+
+  useEffect(() => {
+    if (selectedIndex >= 0) {
+      itemRefs.current[selectedIndex]?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
+  }, [selectedIndex]);
 
   return (
     <div
@@ -73,33 +87,30 @@ const SearchDropdown = ({
 
         {/* Results */}
         {!loading &&
-          (mobile ? results : results.slice(0, 5)).map((item) => (
+          (mobile ? results : results.slice(0, 5)).map((item, index) => (
             <Link
+              ref={(el) => (itemRefs.current[index] = el)}
               key={item._id}
               to={`/product/${item._id}`}
               onClick={() => onSelect?.()}
+              onMouseEnter={() => setSelectedIndex(index)}
               className={`
-                flex
-                items-center
-                gap-3
-                transition-colors
-                duration-200
-                ${
-                  mobile
-                    ? `
-                      px-4
-                      py-4
-                      active:bg-neutral-100
-                      dark:active:bg-neutral-800
-                    `
-                    : `
-                      px-3
-                      py-3
-                      hover:bg-neutral-100
-                      dark:hover:bg-neutral-800
-                    `
-                }
-              `}
+flex
+items-center
+gap-3
+transition-colors
+duration-150
+
+${
+  selectedIndex === index
+    ? "bg-blue-100 dark:bg-blue-950/30"
+    : mobile
+      ? "active:bg-neutral-100 dark:active:bg-neutral-800"
+      : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
+}
+
+${mobile ? "px-4 py-4" : "px-3 py-3"}
+`}
             >
               <img
                 src={item.images?.[0] || "/placeholder.png"}

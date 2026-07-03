@@ -2,9 +2,7 @@ import axios from "../../../services/axiosInstance";
 
 // GET PRODUCTS
 export const getProducts = (params = {}) => {
-  return axios.get("/api/product", {
-    params,
-  });
+  return axios.get("/api/product", {params});
 };
 
 export const getBoostedProducts = () => {
