@@ -424,65 +424,6 @@ ${shareUrl}`;
                     <Share2 size={18} className="text-[#181C1F]" />
                   </button>
                 </div>
-                {showShareMenu && (
-                  <div className="absolute top-16 right-3 z-50 w-56 rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(window.location.href);
-                        toast.success("Link copied");
-                        setShowShareMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50"
-                    >
-                      Copy Link
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        window.open(
-                          `https://wa.me/?text=${encodeURIComponent(
-                            `${product.title} - ₹${product.selling_price}\n${window.location.href}`,
-                          )}`,
-                          "_blank",
-                        );
-
-                        setShowShareMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50"
-                    >
-                      Share on WhatsApp
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        window.open(
-                          `https://t.me/share/url?url=${encodeURIComponent(
-                            window.location.href,
-                          )}&text=${encodeURIComponent(product.title)}`,
-                          "_blank",
-                        );
-
-                        setShowShareMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50"
-                    >
-                      Share on Telegram
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        window.location.href = `mailto:?subject=${encodeURIComponent(
-                          product.title,
-                        )}&body=${encodeURIComponent(window.location.href)}`;
-
-                        setShowShareMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50"
-                    >
-                      Share via Email
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Thumbnails */}
