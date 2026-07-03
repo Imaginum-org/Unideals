@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { FiArrowRight, FiShare2 } from "react-icons/fi";
 import { FaInstagram, FaLinkedinIn } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
@@ -15,8 +16,15 @@ const Footer = () => {
       <div className="rounded-[28px] bg-white px-8 py-10 text-[#5d6068] shadow-2xl md:px-14 lg:px-16">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            <Link to="/" className="mb-7 flex items-center gap-3 text-2xl font-bold text-black">
-              <img src="/whitebag.png" alt="Unideals" className="h-7 w-7 rounded bg-indigo-600 p-1" />
+            <Link
+              to="/"
+              className="mb-7 flex items-center gap-3 text-2xl font-bold text-black"
+            >
+              <img
+                src="/whitebag.png"
+                alt="Unideals"
+                className="h-7 w-7 rounded bg-indigo-600 p-1"
+              />
               Unideals
             </Link>
 
@@ -38,7 +46,11 @@ const Footer = () => {
 
             <div className="flex gap-3">
               {[FaXTwitter, FaInstagram, FaLinkedinIn].map((Icon, i) => (
-                <a key={i} href="#" className="grid h-10 w-10 place-items-center rounded-lg bg-[#f4f5f8] text-lg text-[#6f737c]">
+                <a
+                  key={i}
+                  href="#"
+                  className="grid h-10 w-10 place-items-center rounded-lg bg-[#f4f5f8] text-lg text-[#6f737c]"
+                >
                   <Icon />
                 </a>
               ))}
@@ -58,7 +70,10 @@ const Footer = () => {
                 ))}
                 {title === "SUPPORT" && (
                   <li>
-                    <a href="mailto:unideals@gmail.com" className="font-medium text-indigo-500">
+                    <a
+                      href="mailto:unideals@gmail.com"
+                      className="font-medium text-indigo-500"
+                    >
                       unideals@gmail.com
                     </a>
                   </li>
@@ -81,9 +96,15 @@ const Footer = () => {
         </div>
       </div>
 
-      <h2 className="pointer-events-none select-none text-center text-[18vw] font-bold leading-none text-white/55">
+      <motion.h2
+        initial={{ y: 28, opacity: 0.85 }}
+        whileInView={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        viewport={{ amount: 0.45 }}
+        className="pointer-events-none select-none text-center text-[15.3vw] font-bold leading-none text-white/55"
+      >
         unideals
-      </h2>
+      </motion.h2>
     </footer>
   );
 };

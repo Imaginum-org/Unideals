@@ -199,7 +199,7 @@ const PricingModel = () => {
               key={plan.name}
               className={`relative flex h-full min-h-[390px] w-full max-w-[330px] flex-col overflow-hidden rounded-[25px] bg-white transition-all duration-300 ease-out dark:bg-[#1A1D20] ${
                 plan.highlighted
-                  ? "shadow-xl lg:-translate-y-3"
+                  ? "shadow-xl lg:h-[calc(100%+0.75rem)] lg:-translate-y-3"
                   : "shadow-xl dark:shadow-none"
               }`}
             >
@@ -226,14 +226,18 @@ const PricingModel = () => {
                 </div>
               )}
 
-              <div className="flex flex-1 flex-col p-5">
+              <div
+                className={`flex flex-1 flex-col p-5 ${
+                  plan.highlighted ? "lg:pt-2" : ""
+                }`}
+              >
                 {/* Plan title and price */}
                 <h2 className="text-lg font-semibold text-[#3300ff] font-figtree">
                   {plan.name}
                 </h2>
 
                 <div className="mt-3 flex flex-wrap items-end gap-2">
-                  <span className="text-3xl font-medium tracking-normal text-slate-950 dark:text-white font-figtree">
+                  <span className="text-3xl font-extrabold tracking-normal text-slate-950 dark:text-white font-figtree">
                     ₹{plan.price}
                   </span>
                   <span className="pb-1 text-xs font-medium text-slate-500 dark:text-[#D7D7D7] font-figtree">
