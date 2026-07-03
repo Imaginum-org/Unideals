@@ -55,6 +55,9 @@ const Header = ({ isChat }) => {
   const [recentSearches, setRecentSearches] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [showHeader, setShowHeader] = useState(true);
+
+  const lastScrollY = useRef(0);
 
   useEffect(() => {
     const storedSearches = localStorage.getItem("recentSearches");
@@ -234,39 +237,86 @@ const Header = ({ isChat }) => {
     };
   }, [showMobileSearch]);
 
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const difference = currentScrollY - lastScrollY.current;
+
+          // Always show at top
+          if (currentScrollY < 100) {
+            setShowHeader(true);
+          }
+
+          // Scrolling down
+          else if (difference > 8) {
+            setShowHeader(false);
+
+            setShowmenu(false);
+            setShowCampusDropdown(false);
+            setShowDropdown(false);
+          }
+
+          // Scrolling up
+          else if (difference < -8) {
+            setShowHeader(true);
+          }
+
+          lastScrollY.current = currentScrollY;
+
+          ticking = false;
+        });
+
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 
-useEffect(() => {
-  const handleShortcut = (e) => {
-    // Don't trigger while typing in another input
-    const tag = e.target.tagName;
+  useEffect(() => {
+    const handleShortcut = (e) => {
+      // Don't trigger while typing in another input
+      const tag = e.target.tagName;
 
-    if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) {
-      return;
-    }
+      if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) {
+        return;
+      }
 
-    const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+      const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 
-    const pressed =
-      (isMac && e.metaKey && e.key.toLowerCase() === "k") ||
-      (!isMac && e.ctrlKey && e.key.toLowerCase() === "k");
+      const pressed =
+        (isMac && e.metaKey && e.key.toLowerCase() === "k") ||
+        (!isMac && e.ctrlKey && e.key.toLowerCase() === "k");
 
-    if (!pressed) return;
+      if (!pressed) return;
 
-    e.preventDefault();
+      e.preventDefault();
 
-    searchInputRef.current?.focus();
-    searchInputRef.current?.select();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
 
-    setShowDropdown(true);
-  };
+      setShowDropdown(true);
+    };
 
-  document.addEventListener("keydown", handleShortcut);
+    document.addEventListener("keydown", handleShortcut);
 
-  return () => {
-    document.removeEventListener("keydown", handleShortcut);
-  };
-}, []);
+    return () => {
+      document.removeEventListener("keydown", handleShortcut);
+    };
+  }, []);
 
   const handleMenu = () => {
     setShowmenu((prev) => !prev);
@@ -316,7 +366,24 @@ useEffect(() => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-xl dark:border-neutral-800 dark:bg-[#131313] font-figtree">
+      <nav
+        className={`
+    sticky
+    top-0
+    z-50
+    border-b
+    border-neutral-200
+    bg-white/80
+    backdrop-blur-xl
+    dark:border-neutral-800
+    dark:bg-[#131313]
+    font-figtree
+    transition-transform
+    duration-500
+    ease-[cubic-bezier(0.22,1,0.36,1)]
+    ${showHeader ? "translate-y-0" : "-translate-y-full"}
+  `}
+      >
         <div className="mx-auto flex h-14 sm:h-16 w-full max-w-[1380px] items-center justify-between px-6 sm:px-8 md:px-11 lg:px-14 2xl:px-0">
           {/* Mobile Navbar */}
           <div className="flex w-full items-center justify-between sm:hidden">

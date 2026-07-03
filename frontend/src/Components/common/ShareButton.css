@@ -1,0 +1,104 @@
+.share-btn-wrapper {
+    position: relative;
+    display: inline-flex;
+    border-radius: 999px;
+    padding: 1.5px;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.share-btn-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: -100%;
+    background: conic-gradient(from 0deg,
+            #4285f4 0deg,
+            #9b72cb 90deg,
+            #d96570 180deg,
+            #f2a93b 270deg,
+            #4285f4 360deg);
+    animation: share-btn-rotate 3.5s linear infinite;
+    will-change: transform;
+}
+
+.share-btn-wrapper::after {
+    content: '';
+    position: absolute;
+    inset: -100%;
+    background: conic-gradient(from 0deg,
+            #4285f4 0deg,
+            #9b72cb 90deg,
+            #d96570 180deg,
+            #f2a93b 270deg,
+            #4285f4 360deg);
+    animation: share-btn-rotate 3.5s linear infinite;
+    filter: blur(6px);
+    opacity: 0.55;
+    z-index: -1;
+}
+
+@keyframes share-btn-rotate {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.share-btn {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    border: none;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #3c4043;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.share-btn:hover {
+    background: #f8f9fb;
+}
+
+.share-btn:active {
+    transform: scale(0.97);
+}
+
+.share-btn:focus-visible {
+    outline: 2px solid #4285f4;
+    outline-offset: 2px;
+}
+
+.share-btn-icon {
+    display: inline-flex;
+    color: #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .share-btn-wrapper::before,
+    .share-btn-wrapper::after {
+        animation: none;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .share-btn {
+        background: #fff;
+        color: #000;
+    }
+
+    .share-btn:hover {
+        background: #fff;
+    }
+
+    .share-btn-icon {
+        color: #000;
+    }
+}

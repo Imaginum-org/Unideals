@@ -1,73 +1,79 @@
-import { FiShare2 } from "react-icons/fi";
+import { useCallback, useState } from "react";
 import "./ShareButton.css";
 
-const ShareButton = ({ onClick }) => {
+function ShareIcon() {
   return (
-    <button
-      type="button"
-      className="share-button"
-      onClick={onClick}
-      aria-label="Share Unideals"
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
     >
-      {/* Animated Border */}
-      <svg
-        className="share-button__border"
-        viewBox="0 0 220 52"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <linearGradient
-            id="shareBorderGradient"
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="0%"
-          >
-            <stop offset="0%" stopColor="#818CF8" stopOpacity="0" />
-            <stop offset="40%" stopColor="#818CF8" stopOpacity="1" />
-            <stop offset="50%" stopColor="#FFFFFF" stopOpacity="1" />
-            <stop offset="60%" stopColor="#818CF8" stopOpacity="1" />
-            <stop offset="100%" stopColor="#818CF8" stopOpacity="0" />
-          </linearGradient>
-
-          <filter id="shareGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* Static Border */}
-        <rect
-          className="share-button__border-base"
-          x="1"
-          y="1"
-          width="218"
-          height="50"
-          rx="25"
-        />
-
-        {/* Animated Border */}
-        <rect
-          className="share-button__border-animated"
-          x="1"
-          y="1"
-          width="218"
-          height="50"
-          rx="25"
-          filter="url(#shareGlow)"
-        />
-      </svg>
-
-      {/* Button Content */}
-      <span className="share-button__content">
-        <FiShare2 size={18} />
-        <span>Share Unideals</span>
-      </span>
-    </button>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
   );
-};
+}
 
-export default ShareButton;
+export default function ShareButton({
+  label = "Share Unideals",
+  url = typeof window !== "undefined" ? window.location.href : "",
+  title = "Unideals",
+  text = "Check out Unideals",
+  onShare,
+  className = "",
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleClick = useCallback(async () => {
+    if (onShare) {
+      onShare();
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url });
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Share failed:", err);
+        }
+      }
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Clipboard copy failed:", err);
+    }
+  }, [onShare, title, text, url]);
+
+  return (
+    <div className={`share-btn-wrapper ${className}`}>
+      <span className="share-btn-track" aria-hidden="true" />
+      <span className="share-btn-comet" aria-hidden="true" />
+      <button
+        type="button"
+        className="share-btn"
+        onClick={handleClick}
+        aria-label={label}
+      >
+        <span className="share-btn-icon">
+          <ShareIcon />
+        </span>
+        <span>{copied ? "Link copied" : label}</span>
+      </button>
+    </div>
+  );
+}
