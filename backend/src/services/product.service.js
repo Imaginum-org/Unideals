@@ -84,9 +84,10 @@ export const getAllProducts = async (query) => {
     limit = 10,
     search,
     category,
+    condition,
     min_price,
     max_price,
-    sort,
+    sort = "recommended",
   } = query;
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -98,15 +99,33 @@ export const getAllProducts = async (query) => {
     status: PRODUCT_STATUS.LISTED,
   };
 
-  if (category) baseMatch.category = category;
+  if (category) {
+    baseMatch.category = category;
+  }
+
+  if (condition) {
+    baseMatch.condition = condition;
+  }
 
   if (min_price || max_price) {
     baseMatch.selling_price = {};
-    if (min_price) baseMatch.selling_price.$gte = Number(min_price);
-    if (max_price) baseMatch.selling_price.$lte = Number(max_price);
+
+    if (min_price !== undefined && min_price !== "") {
+      baseMatch.selling_price.$gte = Number(min_price);
+    }
+
+    if (max_price !== undefined && max_price !== "") {
+      baseMatch.selling_price.$lte = Number(max_price);
+    }
   }
 
   const pipeline = [{ $match: baseMatch }];
+
+  const priceMetaPipeline = [
+    {
+      $match: baseMatch,
+    },
+  ];
 
   // SEARCH
   if (search) {
@@ -117,6 +136,15 @@ export const getAllProducts = async (query) => {
     const safeQuery = escapeRegex(sanitizedQuery);
 
     pipeline.push({
+      $match: {
+        $or: [
+          { title: { $regex: safeQuery, $options: "i" } },
+          { description: { $regex: safeQuery, $options: "i" } },
+        ],
+      },
+    });
+
+    priceMetaPipeline.push({
       $match: {
         $or: [
           { title: { $regex: safeQuery, $options: "i" } },
@@ -180,21 +208,31 @@ export const getAllProducts = async (query) => {
   );
 
   // SORT
-  if (sort === "price_low") {
-    pipeline.push({ $sort: { selling_price: 1 } });
-  } else if (sort === "price_high") {
-    pipeline.push({ $sort: { selling_price: -1 } });
-  } else if (sort === "latest") {
-    pipeline.push({ $sort: { createdAt: -1 } });
-  } else {
-    pipeline.push({
-      $sort: {
-        ...(search ? { relevanceScore: -1 } : {}),
-        score: -1,
-        createdAt: -1,
-      },
-    });
-  }
+  const sortOptions = {
+    recommended: {
+      ...(search ? { relevanceScore: -1 } : {}),
+      score: -1,
+      createdAt: -1,
+    },
+
+    latest: {
+      createdAt: -1,
+    },
+
+    price_low: {
+      selling_price: 1,
+      createdAt: -1,
+    },
+
+    price_high: {
+      selling_price: -1,
+      createdAt: -1,
+    },
+  };
+
+  pipeline.push({
+    $sort: sortOptions[sort] || sortOptions.recommended,
+  });
 
   // PAGINATION
   pipeline.push({ $skip: skip }, { $limit: Number(limit) });
@@ -245,23 +283,46 @@ export const getAllProducts = async (query) => {
     (stage) => !stage.$skip && !stage.$limit && !stage.$lookup,
   );
 
-  const [products, totalResult] = await Promise.all([
+  priceMetaPipeline.push({
+    $group: {
+      _id: null,
+      minPrice: {
+        $min: "$selling_price",
+      },
+      maxPrice: {
+        $max: "$selling_price",
+      },
+    },
+  });
+
+  const [products, totalResult, priceMeta] = await Promise.all([
     Product.aggregate(pipeline),
     Product.aggregate([...totalPipeline, { $count: "total" }]),
+    Product.aggregate(priceMetaPipeline),
   ]);
 
   const total = totalResult[0]?.total || 0;
 
+  const filterMeta = {
+    price: {
+      min: priceMeta[0]?.minPrice ?? 0,
+      max: priceMeta[0]?.maxPrice ?? 0,
+    },
+  };
+
   return {
     data: products,
+
     pagination: {
       total,
       page: Number(page),
       limit: Number(limit),
       totalPages: Math.ceil(total / limit),
     },
+
+    filterMeta,
   };
-};
+};;
 
 export const getSingleProduct = async (id) => {
   const product = await Product.findOneAndUpdate(

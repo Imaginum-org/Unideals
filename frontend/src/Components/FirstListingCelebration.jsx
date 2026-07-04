@@ -1,9 +1,7 @@
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
-import { MdCelebration } from "react-icons/md";
-import { HiSparkles } from "react-icons/hi2";
-import { FaArrowRight } from "react-icons/fa";
+import { HiXMark, HiArrowRight, HiCheckBadge } from "react-icons/hi2";
 
 const FirstListingCelebration = ({ onClose }) => {
   useEffect(() => {
@@ -16,6 +14,7 @@ const FirstListingCelebration = ({ onClose }) => {
         angle: 60,
         spread: 55,
         origin: { x: 0 },
+        colors: ["#3838EC", "#8B8BFF", "#1F1F8F"],
       });
 
       confetti({
@@ -23,6 +22,7 @@ const FirstListingCelebration = ({ onClose }) => {
         angle: 120,
         spread: 55,
         origin: { x: 1 },
+        colors: ["#3838EC", "#8B8BFF", "#1F1F8F"],
       });
 
       if (Date.now() < end) {
@@ -35,13 +35,14 @@ const FirstListingCelebration = ({ onClose }) => {
       spread: 120,
       startVelocity: 35,
       origin: { y: 0.6 },
+      colors: ["#3838EC", "#8B8BFF", "#1F1F8F"],
     });
 
     frame();
 
     const timer = setTimeout(() => {
       onClose?.();
-    }, 5000);
+    }, 6000);
 
     return () => clearTimeout(timer);
   }, [onClose]);
@@ -52,232 +53,116 @@ const FirstListingCelebration = ({ onClose }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="
-  fixed
-  inset-0
-  z-[99999]
-  flex
-  items-center
-  justify-center
-  bg-black/40
-  backdrop-blur-[3px]
-  px-4
-"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="first-listing-heading"
+        className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/55 backdrop-blur-sm px-4"
       >
         <motion.div
-          initial={{
-            opacity: 0,
-            scale: 0.85,
-            y: 40,
-          }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-            y: 0,
-          }}
-          exit={{
-            opacity: 0,
-            scale: 0.92,
-            y: 20,
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 180,
-            damping: 18,
-          }}
-          className="
-            relative
-            overflow-hidden
-            w-full
-            max-w-2xl
-            rounded-[32px]
-            bg-gradient-to-br
-            from-white
-            via-indigo-50
-            to-purple-50
-            shadow-[0_30px_100px_rgba(0,0,0,0.25)]
-          "
+          initial={{ opacity: 0, scale: 0.92, y: 28 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 12 }}
+          transition={{ type: "spring", stiffness: 220, damping: 22 }}
+          className="relative w-full max-w-[420px] overflow-hidden rounded-2xl bg-white shadow-[0_30px_80px_-16px_rgba(56,56,236,0.28)] border border-slate-900/[0.06]"
         >
-          {/* Decorative Glow */}
-          <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-indigo-300/30 blur-3xl" />
+          {/* Top accent bar */}
+          <div className="h-[3px] w-full bg-[#3838EC]" />
 
-          <div className="absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-purple-300/30 blur-3xl" />
-
-          {/* Sparkles */}
-          <motion.div
-            animate={{
-              y: [0, -10, 0],
-              rotate: [0, 10, 0],
-            }}
-            transition={{
-              repeat: Infinity,
-              duration: 2.5,
-            }}
-            className="absolute left-10 top-12 text-yellow-400"
-          >
-            <HiSparkles size={28} />
-          </motion.div>
-
-          <motion.div
-            animate={{
-              y: [0, -12, 0],
-              rotate: [0, -10, 0],
-            }}
-            transition={{
-              repeat: Infinity,
-              duration: 2.8,
-            }}
-            className="absolute right-10 top-16 text-yellow-400"
-          >
-            <HiSparkles size={24} />
-          </motion.div>
-
-          <div className="relative z-10 px-8 py-10 md:px-12 md:py-12 text-center">
-            {/* Celebration Icon */}
-            <motion.div
-              animate={{
-                scale: [1, 1.04, 1],
-              }}
-              transition={{
-                repeat: Infinity,
-                duration: 2,
-              }}
-              className="
-                mx-auto
-                mb-6
-                flex
-                h-24
-                w-24
-                items-center
-                justify-center
-                rounded-full
-                bg-gradient-to-r
-                from-indigo-600
-                to-purple-600
-                shadow-[0_12px_40px_rgba(79,70,229,0.35)]
-              "
-            >
-              <MdCelebration className="text-white" size={54} />
-            </motion.div>
-
-            {/* Badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="
-                inline-flex
-                items-center
-                gap-2
-                rounded-full
-                border
-                border-indigo-100
-                bg-white
-                px-4
-                py-2
-                text-sm
-                font-semibold
-                text-indigo-700
-                shadow-sm
-              "
-            >
-              ✨ First Listing Achievement
-            </motion.div>
-
-            {/* Heading */}
-            <motion.h2
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="
-                mt-6
-                text-3xl
-                md:text-4xl
-                font-extrabold
-                tracking-tight
-                text-gray-900
-              "
-            >
-              Congratulations!
-            </motion.h2>
-
-            {/* Main Text */}
-            <motion.p
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="
-    mt-5
-    mx-auto
-    max-w-lg
-    text-lg
-    leading-8
-    text-gray-700
-  "
-            >
-              Your first product is now live on
-              <span className="font-bold text-indigo-600"> Unideals</span>.
-            </motion.p>
-
-            <motion.p
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.65 }}
-              className="
-                mt-3
-                text-gray-500
-                leading-7
-              "
-            >
-              Students can now discover, view and connect with you through your
-              listing.
-            </motion.p>
-
-            {/* CTA */}
-            <motion.button
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              whileHover={{
-                scale: 1.03,
-              }}
-              whileTap={{
-                scale: 0.98,
-              }}
+          {/* Header row: brand mark + close */}
+          <div className="flex items-center justify-between px-6 pt-5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#3838EC] text-[13px] font-bold text-white">
+              U
+            </div>
+            <button
               onClick={onClose}
-              className="
-                mt-8
-                inline-flex
-                items-center
-                gap-2
-                rounded-2xl
-                bg-indigo-600
-                px-7
-                py-3.5
-                text-white
-                font-semibold
-                shadow-lg
-                transition-all
-                hover:bg-indigo-700
-              "
+              aria-label="Close"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             >
-              Continue Exploring
-              <FaArrowRight size={14} />
-            </motion.button>
+              <HiXMark size={18} />
+            </button>
+          </div>
 
-            {/* Footer */}
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1 }}
-              className="
-                mt-5
-                text-xs
-                text-gray-400
-              "
+          {/* Top: celebration content */}
+          <div className="px-8 pb-8 pt-4 text-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.4, rotate: -20 }}
+              animate={{ opacity: 1, scale: 1, rotate: -8 }}
+              transition={{
+                delay: 0.15,
+                type: "spring",
+                stiffness: 320,
+                damping: 14,
+              }}
+              className="mx-auto mb-6 inline-flex items-center gap-1.5 rounded-md border-[3px] border-double border-[#3838EC] px-4 py-1.5 font-mono text-xs font-bold uppercase tracking-[0.15em] text-[#3838EC]"
             >
-              This celebration will close automatically in a few seconds
-            </motion.p>
+              <HiCheckBadge size={16} />
+              Listed
+            </motion.div>
+
+            <h2
+              id="first-listing-heading"
+              className="text-[28px] font-bold leading-tight tracking-tight text-slate-900"
+            >
+              You&apos;re live.
+            </h2>
+
+            <p className="mx-auto mt-3 max-w-[300px] text-[15px] leading-relaxed text-slate-500">
+              Your first listing just went up on{" "}
+              <span className="font-semibold text-[#3838EC]">Unideals</span>.
+              Students can now find it, view it, and reach out.
+            </p>
+          </div>
+
+          {/* Perforated tear line */}
+          <div className="relative border-t-2 border-dashed border-slate-200">
+            <div className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-slate-100 shadow-[inset_0_1px_3px_rgba(15,23,42,0.12)]" />
+            <div className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-slate-100 shadow-[inset_0_1px_3px_rgba(15,23,42,0.12)]" />
+          </div>
+
+          {/* Receipt stub */}
+          <div className="space-y-2.5 bg-slate-50/70 px-8 py-5 font-mono text-[13px] tabular-nums">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                Status
+              </span>
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#3838EC]">
+                <motion.span
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="h-1.5 w-1.5 rounded-full bg-[#3838EC]"
+                />
+                Live
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                Visible to
+              </span>
+              <span className="font-semibold text-slate-700">All students</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                Listing
+              </span>
+              <span className="font-semibold text-slate-700">No. 001</span>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="px-8 pb-8 pt-6">
+            <motion.button
+              whileHover={{ scale: 1.015 }}
+              whileTap={{ scale: 0.985 }}
+              onClick={onClose}
+              className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-lg bg-[#3838EC] py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_20px_-6px_rgba(56,56,236,0.55)] transition-colors hover:bg-[#2F2FCB]"
+            >
+              <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/25" />
+              Continue exploring
+              <HiArrowRight size={16} />
+            </motion.button>
+            <p className="mt-3 text-center text-xs text-slate-400">
+              Closes automatically in a few seconds
+            </p>
           </div>
         </motion.div>
       </motion.div>

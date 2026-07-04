@@ -219,7 +219,7 @@ ${tierStyles.cardShadow}
               <img
                 loading="lazy"
                 decoding="async"
-                fetchPriority="low"
+                // fetchPriority="low"
                 src={imageUrl}
                 alt={title}
                 onError={handleImageError}

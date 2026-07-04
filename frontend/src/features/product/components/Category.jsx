@@ -11,8 +11,8 @@ const Category = ({ title, imageSrc }) => {
 w-24
 md:w-28
 lg:w-32
-xl:w-36
-aspect-[10/9]
+xl:w-32
+aspect-[9/8]
 flex
 flex-col
 items-center
@@ -44,7 +44,7 @@ font-figtree"
           width={40}
           height={40}
           alt={`${title} icon`}
-          className="w-8 h-8 lg:w-10 lg:h-10 object-contain transition-transform duration-300 group-hover:scale-110"
+          className="w-8 h-8 lg:w-9 lg:h-9 object-contain transition-transform duration-300 group-hover:scale-110"
           loading="lazy"
           decoding="async"
           draggable={false}
@@ -54,7 +54,7 @@ font-figtree"
           <span className="text-xs text-gray-400">N/A</span>
         </div>
       )}
-      <h3 className="text-xs sm:text-sm md:text-base font-semibold text-center line-clamp-2 text-[#4A5565] dark:text-white">
+      <h3 className="text-xs sm:text-sm md:text-base xl:text-sm font-semibold text-center line-clamp-2 text-[#4A5565] dark:text-white">
         {title}
       </h3>
     </Link>

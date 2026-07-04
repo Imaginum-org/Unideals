@@ -1,31 +1,69 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import ReactSlider from "react-slider";
-import {PRODUCT_CATEGORY_OPTIONS} from "../constants/productOptions.js"
+import {
+  PRODUCT_CATEGORY_OPTIONS,
+  PRODUCT_CONDITION_OPTIONS,
+} from "../constants/productOptions.js";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
 import { getBoostedProducts, getProducts } from "../api/productApi";
-
 import { FaFilter, FaTimes } from "react-icons/fa";
+import useDebounce from "../hooks/useDebounce.js";
 
 const CategoryPage = () => {
   const { categoryName } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isBoostedPage = categoryName === "boosted-products";
 
   const [open, setOpen] = useState(false);
 
   const [products, setProducts] = useState([]);
+  const [filterMeta, setFilterMeta] = useState({
+    price: {
+      min: 0,
+      max: 0,
+    },
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const [priceRange, setPriceRange] = useState([200, 500]);
-  const [selectedCondition, setSelectedCondition] = useState("Excellent");
-  const [sortBy, setSortBy] = useState("Latest");
+  const [sliderValue, setSliderValue] = useState([0, 0]);
+  const [priceRange, setPriceRange] = useState(null);
+
+  const [selectedCondition, setSelectedCondition] = useState(
+    searchParams.get("condition") || "",
+  );
+
+  const [sortBy, setSortBy] = useState(
+    searchParams.get("sort") || "recommended",
+  );
+
+  const debouncedPriceRange = useDebounce(priceRange, 400);
+
+  const SORT_OPTIONS = [
+    {
+      value: "recommended",
+      label: "Recommended",
+    },
+    {
+      value: "latest",
+      label: "Latest",
+    },
+    {
+      value: "price_low",
+      label: "Price: Low to High",
+    },
+    {
+      value: "price_high",
+      label: "Price: High to Low",
+    },
+  ];
 
   useEffect(() => {
     window.scrollTo({
       top: 0,
-      behavior: "smooth",
+      behavior: "instant",
     });
   }, []);
 
@@ -35,13 +73,36 @@ const CategoryPage = () => {
       try {
         setLoading(true);
 
+        const params = {
+          category: categoryName,
+          condition: selectedCondition,
+          sort: sortBy,
+          page: 1,
+          limit: 20,
+        };
+
+        if (debouncedPriceRange) {
+          params.min_price = debouncedPriceRange[0];
+          params.max_price = debouncedPriceRange[1];
+        }
+
         const res = isBoostedPage
           ? await getBoostedProducts()
-          : await getProducts({
-              category: categoryName,
-            });
+          : await getProducts(params);
 
         setProducts(res.data?.data || []);
+        const meta = res.data?.filterMeta || {
+          price: {
+            min: 0,
+            max: 0,
+          },
+        };
+
+        setFilterMeta(meta);
+
+        if (!priceRange) {
+          setSliderValue([meta.price.min, meta.price.max]);
+        }
       } catch (err) {
         setError("Failed to load products");
         console.log(err.message);
@@ -51,13 +112,23 @@ const CategoryPage = () => {
     };
 
     fetchCategoryProducts();
-  }, [categoryName, isBoostedPage]);
+  }, [
+    categoryName,
+    isBoostedPage,
+    debouncedPriceRange,
+    selectedCondition,
+    sortBy,
+  ]);
 
   //HANDLER
   const handleClear = () => {
-    setPriceRange([200, 500]);
-    setSelectedCondition("Excellent");
-    setSortBy("Latest");
+    setSelectedCondition("");
+    setSortBy("recommended");
+
+    setPriceRange(null);
+
+    setSliderValue([filterMeta.price.min, filterMeta.price.max]);
+
     setOpen(false);
   };
 
@@ -70,7 +141,7 @@ const CategoryPage = () => {
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col gap-5 font-robotoFlex">
+    <div className="flex flex-col gap-5 font-figtree">
       <div>
         <h4 className="font-bold mb-3 dark:text-white text-sm">Category</h4>
         <select
@@ -96,45 +167,64 @@ const CategoryPage = () => {
             className="w-full h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full flex items-center"
             thumbClassName="size-4 bg-[#394FF1] border-2 border-white rounded-full cursor-grab active:cursor-grabbing outline-none"
             trackClassName="h-1 rounded-full"
-            min={0}
-            max={1000}
-            value={priceRange}
-            onAfterChange={(value) => setPriceRange(value)}
+            min={filterMeta.price.min}
+            max={filterMeta.price.max}
+            value={sliderValue}
+            onChange={setSliderValue}
+            onAfterChange={(value) => {
+              setPriceRange(value);
+            }}
             minDistance={50}
           />
         </div>
         <div className="flex justify-between mt-4 text-[10px] text-zinc-400 font-bold uppercase">
           <div className="flex flex-col">
             <span>Min</span>
-            <span className="text-zinc-800 dark:text-zinc-200">₹0</span>
+            <span className="text-zinc-800 dark:text-zinc-200">
+              ₹{filterMeta.price.min}
+            </span>
           </div>
           <div className="flex flex-col items-center">
-            <span>₹{priceRange[0]}</span>
+            <span>₹{sliderValue[0]}</span>
           </div>
           <div className="flex flex-col items-center">
-            <span>₹{priceRange[1]}</span>
+            <span>₹{sliderValue[1]}</span>
           </div>
           <div className="flex flex-col items-end">
             <span>Max</span>
-            <span className="text-zinc-800 dark:text-zinc-200">₹1000+</span>
+            <span className="text-zinc-800 dark:text-zinc-200">
+              ₹{filterMeta.price.max}
+            </span>
           </div>
         </div>
       </div>
 
       <div>
         <h4 className="font-bold mb-3 dark:text-white text-sm">Condition</h4>
-        <div className="flex gap-3">
-          {["Excellent", "Good"].map((c) => (
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedCondition("")}
+            className={`px-4 py-2 rounded-lg border text-xs font-semibold transition-all ${
+              selectedCondition === ""
+                ? "border-[#394FF1] bg-blue-50 text-[#394FF1] dark:bg-blue-900/20"
+                : "border-zinc-200 dark:border-zinc-700 text-zinc-500"
+            }`}
+          >
+            All
+          </button>
+
+          {PRODUCT_CONDITION_OPTIONS.map((condition) => (
             <button
-              key={c}
-              onClick={() => setSelectedCondition(c)}
-              className={`px-5 py-2 border rounded-lg text-xs font-bold transition-all ${
-                selectedCondition === c
-                  ? "border-[#394FF1] text-[#394FF1] bg-blue-50 dark:bg-blue-900/10"
-                  : "border-zinc-200 dark:border-zinc-800 text-zinc-500"
+              key={condition.value}
+              onClick={() => setSelectedCondition(condition.value)}
+              className={`px-4 py-2 rounded-lg border text-xs font-semibold transition-all ${
+                selectedCondition === condition.value
+                  ? "border-[#394FF1] bg-blue-50 text-[#394FF1] dark:bg-blue-900/20"
+                  : "border-zinc-200 dark:border-zinc-700 text-zinc-500"
               }`}
             >
-              {c}
+              {condition.label}
             </button>
           ))}
         </div>
@@ -143,24 +233,27 @@ const CategoryPage = () => {
       <div>
         <h4 className="font-bold mb-3 dark:text-white text-sm">Sort By</h4>
         <div className="flex flex-col gap-3">
-          {["Latest", "Price: Low to High", "Price: High to Low"].map((opt) => (
+          {SORT_OPTIONS.map((option) => (
             <label
-              key={opt}
+              key={option.value}
               className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer dark:border-zinc-800"
             >
               <input
                 type="radio"
                 name="sort"
-                checked={sortBy === opt}
-                onChange={() => setSortBy(opt)}
+                checked={sortBy === option.value}
+                onChange={() => setSortBy(option.value)}
                 className="size-4 accent-[#394FF1]"
               />
+
               <span
                 className={`text-xs ${
-                  sortBy === opt ? "font-bold dark:text-white" : "text-zinc-500"
+                  sortBy === option.value
+                    ? "font-bold dark:text-white"
+                    : "text-zinc-500"
                 }`}
               >
-                {opt}
+                {option.label}
               </span>
             </label>
           ))}
@@ -180,7 +273,7 @@ const CategoryPage = () => {
     <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#121212] overflow-hidden">
       <div className="flex flex-1 overflow-hidden px-4 lg:px-11">
         <aside className="hidden lg:block w-[340px] flex-shrink-0 my-6 rounded-3xl bg-white dark:bg-[#131313] px-8 py-9 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-zinc-100 dark:border-zinc-800/50 h-[calc(100vh-140px)] sticky top-6 self-start overflow-y-auto no-scrollbar">
-          <h2 className="text-2xl font-bold mb-8 dark:text-white font-robotoFlex">
+          <h2 className="text-2xl font-bold mb-8 dark:text-white font-figtree">
             Filters
           </h2>
           <SidebarContent />
@@ -189,7 +282,7 @@ const CategoryPage = () => {
         <main className="flex-1 overflow-y-auto no-scrollbar bg-transparent p-4 md:p-8 lg:pl-12">
           <div className="max-w-[1100px] mx-auto">
             <div className="mb-6">
-              <h1 className="text-lg lg:text-xl xl:text-3xl font-bold capitalize text-[#121417] dark:text-white font-manrope">
+              <h1 className="text-lg lg:text-xl xl:text-3xl font-bold capitalize text-[#121417] dark:text-white font-figtree">
                 {isBoostedPage
                   ? "Boosted Products"
                   : categoryName.replace("_", " ")}
@@ -198,7 +291,7 @@ const CategoryPage = () => {
               {loading && <p>Loading...</p>}
               {error && <p className="text-red-500">{error}</p>}
 
-              <p className="text-xs xl:text-base font-manrope text-zinc-400 mt-1">
+              <p className="text-xs xl:text-base font-figtree text-zinc-400 mt-1">
                 Showing {products.length} products in{" "}
                 <span className="text-[#394FF1] font-semibold capitalize">
                   {isBoostedPage
