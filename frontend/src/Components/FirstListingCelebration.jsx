@@ -140,12 +140,6 @@ const FirstListingCelebration = ({ onClose }) => {
               </span>
               <span className="font-semibold text-slate-700">All students</span>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[11px] uppercase tracking-wide text-slate-400">
-                Listing
-              </span>
-              <span className="font-semibold text-slate-700">No. 001</span>
-            </div>
           </div>
 
           {/* CTA */}
