@@ -6,7 +6,7 @@ import { FaRupeeSign } from "react-icons/fa";
 import { MdVerified } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import axios from "../../../services/axiosInstance";
-import { uploadImage } from "../../../Utils/imageUpload";
+import { uploadImage } from "../../../Utils/imageUpload.js";
 import { compressImage } from "../utils/imageCompression";
 import useProductListing from "../hooks/useProductListing";
 import { saveDraftProduct } from "../api/productApi.js";

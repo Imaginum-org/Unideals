@@ -11,7 +11,7 @@ import {
   FolderIcon,
 } from "@animateicons/react/lucide";
 import { Settings01Icon } from "@animateicons/react/huge";
-
+import { Crown } from "lucide-react";
 import whitebag from "../../../assets/bag.png";
 import bluebag from "../../../assets/bag.png";
 import { useTheme } from "../../../context/ThemeContext.jsx";
@@ -50,6 +50,7 @@ function Profile_left_part() {
   ];
 
   const accountMenu = [
+    { path: "/subscription", label: "Subscription", icon: Crown },
     { path: "/settings", label: "Settings", icon: Settings01Icon },
     { path: "/contact", label: "Help and Support", icon: ContactIcon },
     { path: "/termscondition", label: "Terms and Privacy", icon: FolderIcon },

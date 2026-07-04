@@ -22,6 +22,7 @@ import PricingModel from "../features/product/pages/PricingModel.jsx";
 // User
 import ProfileOverview from "../features/user/pages/ProfileOverview.jsx";
 import Settings from "../features/user/pages/Settings.jsx";
+import Subscription from "../features/user/pages/Subscription.jsx";
 import Wishlist from "../features/user/pages/Wishlist.jsx";
 import Myorders from "../features/user/pages/Myorders.jsx";
 import ContactUs from "../features/user/pages/ContactUs.jsx";
@@ -59,9 +60,16 @@ export default function AppRoutes() {
       <Route element={<ProtectedLayout />}>
         <Route element={<MainLayout />}>
           <Route path="/profile" element={<ProfileOverview />} />
-          <Route path="/profileoverview" element={<Navigate to="/profile" replace />} />
+          <Route
+            path="/profileoverview"
+            element={<Navigate to="/profile" replace />}
+          />
+          <Route path="/subscription" element={<Subscription />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/setting" element={<Navigate to="/settings" replace />} />
+          <Route
+            path="/setting"
+            element={<Navigate to="/settings" replace />}
+          />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/myorders" element={<Myorders />} />
           <Route path="/chat" element={<Chat />} />
