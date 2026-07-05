@@ -56,9 +56,11 @@ export const PRODUCT_USAGE_DURATION = Object.freeze({
 });
 
 export const DEAL_STATUS = Object.freeze({
-  NEGOTIATION: "negotiation",
+  NEGOTIATING: "negotiating",
+  OFFER_ACCEPTED: "offer_accepted",
   DEAL_CONFIRMED: "deal_confirmed",
   PICKUP_SCHEDULED: "pickup_scheduled",
+  PAYMENT_CONFIRMED: "payment_confirmed",
   COMPLETED: "completed",
   CANCELLED: "cancelled",
 });
@@ -79,6 +81,32 @@ export const REPORT_STATUS = Object.freeze({
   PENDING: "pending",
   ACTION_TAKEN: "action_taken",
   DISMISSED: "dismissed",
+});
+
+export const MESSAGE_TYPE = Object.freeze({
+  TEXT: "text",
+  OFFER: "offer",
+  SYSTEM: "system",
+  IMAGE: "image",
+  FILE: "file",
+});
+
+export const CONVERSATION_ROLE = Object.freeze({
+  BUYER: "buyer",
+  SELLER: "seller",
+});
+
+export const OFFER_STATUS = Object.freeze({
+  PENDING: "pending",
+  ACCEPTED: "accepted",
+  DECLINED: "declined",
+  EXPIRED: "expired",
+});
+
+export const MESSAGE_STATUS = Object.freeze({
+  SENT: "sent",
+  DELIVERED: "delivered",
+  READ: "read",
 });
 
 export const USER_TIER = Object.freeze({
@@ -133,9 +161,11 @@ export const PRODUCT_STATUS_LABELS = {
 };
 
 export const DEAL_STATUS_LABELS = {
-  negotiation: "Negotiation",
+  negotiating: "Negotiating",
+  offer_accepted: "Offer Accepted",
   deal_confirmed: "Deal Confirmed",
   pickup_scheduled: "Pickup Scheduled",
+  payment_confirmed: "Payment Confirmed",
   completed: "Completed",
   cancelled: "Cancelled",
 };
@@ -168,6 +198,30 @@ export const USER_STATUS_LABELS = {
   active: "Active",
   inactive: "Inactive",
   suspended: "Suspended",
+};
+
+export const MESSAGE_TYPE_LABELS = {
+  text: "Text",
+  offer: "Offer",
+  system: "System",
+};
+
+export const CONVERSATION_ROLE_LABELS = {
+  buyer: "Buyer",
+  seller: "Seller",
+};
+
+export const OFFER_STATUS_LABELS = {
+  pending: "Pending",
+  accepted: "Accepted",
+  declined: "Declined",
+  expired: "Expired",
+};
+
+export const MESSAGE_STATUS_LABELS = {
+  sent: "Sent",
+  delivered: "Delivered",
+  read: "Read",
 };
 
 export const USER_TIER_LABELS = {

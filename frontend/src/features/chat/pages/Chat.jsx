@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import Header from "../../../Components/layout/Header.jsx";
-import ChatUser from "../components/ChatUser";
+import ChatCard from "../components/ChatCard.jsx";
 import userdp from "/userdp.png";
 
 import {
@@ -15,8 +14,8 @@ import { IoSend } from "react-icons/io5";
 
 const supportChat = {
   id: "support",
-  name: "CampusMart Support",
-  url: "/bag.webp",
+  name: "Unideals Support",
+  url: "/logo.png",
 };
 
 const supportCategories = [
@@ -138,15 +137,6 @@ const Chat = () => {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-white dark:bg-[#131313] overflow-hidden font-roboto">
-      <Header
-        color="#394ff1"
-        textColor="#ffffff"
-        bagUrl="/whitebag.png"
-        isChat
-        darkUrl="/bag.png"
-        isHome="s"
-      />
-
       <div className="flex-1 flex overflow-hidden relative">
         <div
           className={`${
@@ -163,7 +153,7 @@ const Chat = () => {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-3 pb-4">
-            <ChatUser
+            <ChatCard
               user={supportChat}
               onClick={setSelectedUser}
               isSelected={selectedUser?.id === "support"}
@@ -172,7 +162,7 @@ const Chat = () => {
               Recent Conversations
             </div>
             {users.map((user) => (
-              <ChatUser
+              <ChatCard
                 key={user.id}
                 user={user}
                 onClick={setSelectedUser}
@@ -322,14 +312,14 @@ const Chat = () => {
           ) : (
             <div className="hidden lg:flex flex-1 flex-col items-center gap-3 justify-center p-8">
               <img
-                src="/fav.svg"
-                alt="CampusMart Logo"
-                className="size-20 object-contain drop-shadow-md"
+                src="/logo.png"
+                alt="image"
+                className="size-12 object-contain drop-shadow-md"
               />
 
               <div className="max-w-sm text-center space-y-2 animate-in fade-in zoom-in duration-700">
                 <h2 className="text-2xl font-bold text-zinc-800 dark:text-white font-roboto tracking-tight">
-                  Welcome to CampusMart
+                  Welcome to Unideals
                 </h2>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 font-roboto leading-relaxed">
                   Connect with students across campus. Select a conversation

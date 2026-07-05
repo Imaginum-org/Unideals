@@ -11,18 +11,18 @@ const FOOTER_LINKS = [
   {
     title: "Marketplace",
     links: [
-      { label: "Sell Now", href: "/sell" },
-      { label: "Chats", href: "/chats" },
-      { label: "My Orders", href: "/orders" },
+      { label: "Sell Now", href: "/upload" },
+      { label: "Chats", href: "/chat" },
+      { label: "My Orders", href: "/myorders" },
       { label: "Settings", href: "/settings" },
-      { label: "My Listings", href: "/my-listings" },
+      { label: "My Listings", href: "/productlisted" },
     ],
   },
 
   {
     title: "Company",
     links: [
-      { label: "Imaginum", href: "/imaginum" },
+      { label: "Imaginum", href: "https://imaginumorg.vercel.app/" },
       { label: "LinkedIn", href: "/linkedin" },
       { label: "Careers", href: "/careers" },
       { label: "Blogs", href: "/blogs" },
@@ -34,9 +34,9 @@ const FOOTER_LINKS = [
     title: "Support",
     links: [
       { label: "Contact Us", href: "/contact" },
-      { label: "Report a Bug", href: "/report-bug" },
-      { label: "Suggest a Feature", href: "/feature-request" },
-      { label: "FAQ", href: "/faq" },
+      { label: "Report a Bug", href: "/contact" },
+      { label: "Suggest a Feature", href: "/contact" },
+      { label: "FAQ", href: "/contact" },
     ],
   },
 ];
@@ -96,9 +96,11 @@ gap-8"
                       alt="image"
                       className="h-8 w-8 object-contain"
                     />
-                    <div>
+                    <div className="flex flex-col leading-6">
                       <h1>Unideals</h1>
-                      <h5 className="text-sm font-medium">By Imaginum</h5>
+                      <h5 className="text-sm font-medium text-slate-600">
+                        By Imaginum
+                      </h5>
                     </div>
                   </div>
                 </Link>
@@ -192,7 +194,7 @@ gap-8"
             </div>
 
             <div className="mt-16 flex flex-col gap-8 border-t border-[#e7e8e9] pt-6 text-sm text-[#9CA3AF] md:flex-row md:items-center md:justify-between">
-              <p>© {new Date().getFullYear()} Imaginum All rights reserved.</p>
+              <p>© {new Date().getFullYear()} Unideals All rights reserved.</p>
 
               <div className="flex items-center gap-7 text-[#9CA3AF]">
                 <Link to="/termscondition">Terms and Privacy</Link>

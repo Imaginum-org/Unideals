@@ -23,4 +23,3 @@ export const DEFAULT_BOOST_PLAN = USER_TIER.BASE_USER;
 export const getBoostPlanRules = (tier = DEFAULT_BOOST_PLAN) => {
   return BOOST_PLAN_RULES[tier] || BOOST_PLAN_RULES[DEFAULT_BOOST_PLAN];
 };
-   

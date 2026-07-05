@@ -15,7 +15,7 @@ import { MdLocationPin } from "react-icons/md";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import { motion } from "framer-motion";
 import { FaWhatsapp, FaTelegram, FaLink } from "react-icons/fa";
-
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 // condition
 import { GoChecklist } from "react-icons/go";
@@ -50,9 +50,8 @@ const ProductDescription = () => {
   const productId = product?._id;
   const navigate = useNavigate();
 
-
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, [id]);
 
   useEffect(() => {
@@ -114,7 +113,7 @@ const ProductDescription = () => {
 
         const filteredProducts = (res?.data?.data || [])
           .filter((item) => item._id !== product._id)
-          .slice(0, 5);
+          .slice(0, 4);
 
         setSimilarProducts(filteredProducts);
       } catch (error) {
@@ -197,6 +196,22 @@ ${shareUrl}`;
       url: shareUrl,
     };
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "ArrowLeft") {
+        goToPreviousImage();
+      }
+
+      if (e.key === "ArrowRight") {
+        goToNextImage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeImage]);
 
   // const handleShare = async () => {
   //   const shareData = getShareData();
@@ -319,6 +334,20 @@ ${shareUrl}`;
   const images =
     product?.images?.length > 0 ? product.images : [FALLBACK_IMAGE];
 
+  const currentImageIndex = images.findIndex((img) => img === activeImage);
+
+  const goToPreviousImage = () => {
+    if (currentImageIndex > 0) {
+      setActiveImage(images[currentImageIndex - 1]);
+    }
+  };
+
+  const goToNextImage = () => {
+    if (currentImageIndex < images.length - 1) {
+      setActiveImage(images[currentImageIndex + 1]);
+    }
+  };
+
   return (
     <motion.div
       initial={{
@@ -383,7 +412,7 @@ ${shareUrl}`;
             {/* Image Card */}
             <div className="bg-[#FFFFFF] dark:bg-[#1A1D20] dark:border-0 rounded-xl border border-[#C9D1DC] p-3 md:p-4 xl:p-4">
               {/* Main Image */}
-              <div className="relative overflow-hidden rounded-2xl bg-[#F8FAFC]">
+              <div className="relative group overflow-hidden rounded-2xl bg-[#F8FAFC]">
                 <motion.img
                   key={activeImage}
                   src={activeImage}
@@ -403,6 +432,66 @@ ${shareUrl}`;
                     isContainMode ? "object-contain" : "object-cover"
                   }`}
                 />
+
+                {images.length > 1 && currentImageIndex > 0 && (
+                  <button
+                    onClick={goToPreviousImage}
+                    className="
+      absolute
+      left-4
+      top-1/2
+      -translate-y-1/2
+      h-11
+      w-11
+      rounded-full
+      bg-white/90
+      backdrop-blur-md
+      shadow-lg
+      flex
+      items-center
+      justify-center
+      z-20
+      transition-all
+      duration-200
+      opacity-100
+      md:opacity-0
+      md:group-hover:opacity-100
+      hover:scale-105
+    "
+                  >
+                    <FiChevronLeft size={24} />
+                  </button>
+                )}
+
+                {images.length > 1 && currentImageIndex < images.length - 1 && (
+                  <button
+                    onClick={goToNextImage}
+                    className="
+      absolute
+      right-4
+      top-1/2
+      -translate-y-1/2
+      h-11
+      w-11
+      rounded-full
+      bg-white/90
+      backdrop-blur-md
+      shadow-lg
+      flex
+      items-center
+      justify-center
+      z-20
+      transition-all
+      duration-200
+      opacity-100
+      md:opacity-0
+      md:group-hover:opacity-100
+      hover:scale-105
+    "
+                  >
+                    <FiChevronRight size={24} />
+                  </button>
+                )}
 
                 {/* Image Fit Toggle */}
                 <button

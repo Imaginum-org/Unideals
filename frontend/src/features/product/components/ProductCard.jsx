@@ -134,7 +134,7 @@ const ProductCard = memo(
       );
 
       const handleClick = useCallback(() => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "instant" });
       }, []);
 
       const handleWishlistClick = async (e) => {

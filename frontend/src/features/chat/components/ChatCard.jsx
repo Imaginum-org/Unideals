@@ -1,7 +1,6 @@
-import React from "react";
 import userdp from "/userdp.png";
 
-const ChatUser = ({ user, onClick, isSelected }) => {
+const ChatCard = ({ user, onClick, isSelected }) => {
   return (
     <div
       onClick={() => onClick(user)}
@@ -41,4 +40,4 @@ const ChatUser = ({ user, onClick, isSelected }) => {
   );
 };
 
-export default ChatUser;
+export default ChatCard;

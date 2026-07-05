@@ -60,7 +60,7 @@ const MyOrdersCard = ({
 
   const handleArrowClick = () => {
     navigate(`/product/${orderId}`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   // Logic Handlers

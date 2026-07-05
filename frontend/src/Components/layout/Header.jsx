@@ -1072,7 +1072,13 @@ const Header = ({ isChat }) => {
                     setShowDropdown(true);
                   }
                 }}
-                className="h-10 w-full rounded-xl border border-[#EEF1F5] bg-slate-100 pl-9 pr-28 text-sm text-neutral-900 outline-none focus:border-blue-500 focus:ring-5 focus:ring-blue-100 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-950"
+                className="h-10 w-full rounded-xl border border-[#eaecec]
+bg-gradient-to-b from-[#FFFFFF] to-[#f4f4f5]
+dark:bg-none
+pl-9 pr-28 text-sm text-[#64707D]
+outline-none
+focus:border-[#3838EC] focus:ring-5 focus:ring-blue-100
+dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-950"
               />
 
               {search === "" && (
@@ -1082,7 +1088,7 @@ const Header = ({ isChat }) => {
                   </span>
 
                   <span
-                    className={`text-blue-600 transition-opacity duration-500 ${
+                    className={`text-[#3838EC] transition-opacity duration-500 ${
                       fade ? "opacity-100" : "opacity-0"
                     }`}
                   >
