@@ -9,7 +9,7 @@ const privacySections = [
     body: [
       {
         type: "p",
-        text: "Campus Mart is a peer-to-peer student marketplace allowing verified university students to buy and sell goods within their campus community. We are committed to protecting the privacy of every user.",
+        text: "Unideals is a peer-to-peer student marketplace allowing verified university students to buy and sell goods within their campus community. We are committed to protecting the privacy of every user.",
       },
     ],
   },
@@ -72,7 +72,7 @@ const privacySections = [
           "Transacting with another user (only your first name and campus are shared)",
           "Working with service providers bound by data-processing agreements",
           "Required by court order or Indian regulatory authority",
-          "Campus Mart undergoes acquisition or merger (under equivalent protections)",
+          "Unideals undergoes acquisition or merger (under equivalent protections)",
         ],
       },
     ],
@@ -128,7 +128,7 @@ const privacySections = [
     body: [
       {
         type: "p",
-        text: "Campus Mart is for students aged 18 and above. If we discover a user is under 18, their account and data will be removed immediately.",
+        text: "Unideals is for students aged 18 and above. If we discover a user is under 18, their account and data will be removed immediately.",
       },
     ],
   },
@@ -146,7 +146,7 @@ const privacySections = [
     body: [
       {
         type: "p",
-        html: "Data Protection queries: <strong>privacy@campusmart.in</strong><br/>Campus Mart, VIT Vellore, Tamil Nadu 632014, India",
+        html: "Data Protection queries: <strong>privacy@campusmart.in</strong><br/>Unideals, Bangalore, India",
       },
     ],
   },
@@ -158,7 +158,7 @@ const termsSections = [
     body: [
       {
         type: "p",
-        text: "By using Campus Mart you agree to these Terms. They form a legally binding agreement. If you disagree, stop using the platform immediately.",
+        text: "By using Unideals you agree to these Terms. They form a legally binding agreement. If you disagree, stop using the platform immediately.",
       },
     ],
   },
@@ -181,7 +181,7 @@ const termsSections = [
     body: [
       {
         type: "p",
-        html: "Campus Mart is a technology marketplace. <strong>We are not a party to any transaction.</strong> We do not hold funds, take title to goods, or guarantee quality, safety, or legality of any listing. Transactions are entirely between buyers and sellers.",
+        html: "Unideals is a technology marketplace. <strong>We are not a party to any transaction.</strong> We do not hold funds, take title to goods, or guarantee quality, safety, or legality of any listing. Transactions are entirely between buyers and sellers.",
       },
     ],
   },
@@ -215,8 +215,8 @@ const termsSections = [
           "Circumventing in-app messaging to conduct transactions off-platform",
           "Creating fake reviews or trust signals",
           "Scraping, hacking, or reverse-engineering the platform",
-          "Using Campus Mart for commercial reselling without written permission",
-          "Impersonating any student, staff member, or Campus Mart representative",
+          "Using Unideals for commercial reselling without written permission",
+          "Impersonating any student, staff member, or Unideals representative",
         ],
       },
     ],
@@ -226,7 +226,7 @@ const termsSections = [
     body: [
       {
         type: "p",
-        text: "By posting a listing you confirm you own the item (or have authority to sell it), the description and photos are accurate, and the item is lawful. Campus Mart may remove any listing at any time without prior notice.",
+        text: "By posting a listing you confirm you own the item (or have authority to sell it), the description and photos are accurate, and the item is lawful. Unideals may remove any listing at any time without prior notice.",
       },
     ],
   },
@@ -235,7 +235,7 @@ const termsSections = [
     body: [
       {
         type: "p",
-        text: "All platform content, trademarks, and software belong to Campus Mart or its licensors. By uploading content you grant us a non-exclusive, royalty-free licence to use it for operating and improving the platform.",
+        text: "All platform content, trademarks, and software belong to Unideals or its licensors. By uploading content you grant us a non-exclusive, royalty-free licence to use it for operating and improving the platform.",
       },
     ],
   },
@@ -245,7 +245,7 @@ const termsSections = [
       {
         type: "list-chevron",
         items: [
-          "Campus Mart is not liable for loss or damage arising from user transactions",
+          "Unideals is not liable for loss or damage arising from user transactions",
           "We do not guarantee uninterrupted or error-free access",
           "Total liability for any claim is capped at ₹1,000 (one thousand rupees)",
           "We are not liable for indirect, consequential, or punitive damages",
@@ -258,7 +258,7 @@ const termsSections = [
     body: [
       {
         type: "p",
-        text: "User-to-user disputes are not mediated by Campus Mart unless we choose to at our sole discretion. Disputes with Campus Mart proceed first through good-faith negotiation, then courts of competent jurisdiction in Vellore, Tamil Nadu.",
+        text: "User-to-user disputes are not mediated by Unideals unless we choose to at our sole discretion. Disputes with Unideals proceed first through good-faith negotiation, then courts of competent jurisdiction in Vellore, Tamil Nadu.",
       },
     ],
   },

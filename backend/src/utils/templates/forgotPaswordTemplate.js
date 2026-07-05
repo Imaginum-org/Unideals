@@ -4,7 +4,7 @@ const forgotPasswordTemplate = ({ name, resetUrl }) => {
       
       <div style="border-bottom: 1px solid #F1F5F9; padding: 32px 20px; text-align: center; border-top: 4px solid #2563EB; background-image: url('https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/HorizontalBorder.png?updatedAt=1779453128090'); background-size: cover; background-position: center;">
         <h1 style="color: #2563EB; font-size: 24px; font-weight: 700; margin: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background-color: rgba(255, 255, 255, 0.95); padding: 8px 16px; border-radius: 8px;">
-          <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Group%2014.png" alt="Logo" style="display: inline-block; height: 24px; vertical-align: middle; margin: 0;" />Campus Mart
+          <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Group%2014.png" alt="Logo" style="display: inline-block; height: 24px; vertical-align: middle; margin: 0;" />Unideals
         </h1>
       </div>
 
@@ -57,7 +57,7 @@ const forgotPasswordTemplate = ({ name, resetUrl }) => {
         </div>
 
         <p style="color: #94A3B8; font-size: 11px; line-height: 1.6; margin: 0 0 12px 0;">
-          © 2026 Campus Mart Inc. All rights reserved.<br/>
+          © 2026 Unideals Inc. All rights reserved.<br/>
           Bangalore, India
         </p>
 

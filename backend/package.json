@@ -1,5 +1,5 @@
 {
-  "name": "campus-mart-backend",
+  "name": "unideals-backend",
   "version": "1.0.0",
   "description": "Backend API for Unideals - a marketplace platform",
   "main": "server.js",
