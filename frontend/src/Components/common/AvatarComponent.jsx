@@ -87,7 +87,7 @@ const AvatarComponent = ({
     <div
       className={`relative inline-flex items-center justify-center ${currentSize.container} ${className}`}
     >
-      {/* 1. Glow Layer (Behind everything) */}
+      {/* Glow Layer (Behind everything) */}
       {isPremium && (
         <motion.div
           className={`absolute inset-0 ${borderRadiusClass} ${gradientClass} opacity-50 z-0`}
@@ -99,7 +99,7 @@ const AvatarComponent = ({
         />
       )}
 
-      {/* 2. Spinning Crisp Gradient Border Layer */}
+      {/* Spinning Crisp Gradient Border Layer */}
       {isPremium && (
         <motion.div
           className={`absolute inset-0 ${borderRadiusClass} ${gradientClass} z-0`}
@@ -108,7 +108,7 @@ const AvatarComponent = ({
         />
       )}
 
-      {/* 3. Static Inner Avatar (Never rotates, perfectly centered) */}
+      {/* Static Inner Avatar (Never rotates, perfectly centered) */}
       <div
         // inset-[2px] exposes exactly 2px of the animated gradient behind it.
         // border-[2px] creates the clean white/dark gap between the image and the gradient.
@@ -135,14 +135,14 @@ const AvatarComponent = ({
         )}
       </div>
 
-      {/* 4. PRO Badge */}
+      {/* PRO Badge */}
       {showBadge && plan === "pro" && (
         <span className="absolute -bottom-1 -right-1 translate-x-1/4 translate-y-1/4 bg-gradient-to-r from-[#3838EC] to-[#5C6DFF] text-white shadow-[#3838EC]/40 shadow-lg text-[9px] leading-none font-extrabold px-1.5 py-0.5 rounded border border-white dark:border-[#131313] z-20">
           PRO
         </span>
       )}
 
-      {/* 5. PRO+ Badge */}
+      {/* PRO+ Badge */}
       {showBadge && plan === "pro_plus" && (
         <span className="absolute -bottom-1 -right-1 translate-x-1/4 translate-y-1/4 bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black shadow-[#FFD700]/40 shadow-lg text-[9px] leading-none font-extrabold px-1.5 py-0.5 rounded border border-white dark:border-[#131313] z-20">
           PRO+

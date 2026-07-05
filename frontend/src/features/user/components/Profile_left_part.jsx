@@ -12,8 +12,6 @@ import {
 } from "@animateicons/react/lucide";
 import { Settings01Icon } from "@animateicons/react/huge";
 import { Crown } from "lucide-react";
-import whitebag from "../../../assets/bag.png";
-import bluebag from "../../../assets/bag.png";
 import { useTheme } from "../../../context/ThemeContext.jsx";
 import Loader from "../../../Components/ui/Loader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
@@ -38,8 +36,7 @@ function Profile_left_part() {
       </div>
     );
   }
-
-  // --- MENU CONFIGURATIONS ---
+  // MENU CONFIGURATIONS
   const mainMenu = [
     { path: "/profile", label: "Overview", icon: DashboardIcon },
     { path: "/chat", label: "Message", icon: MessageCircleIcon, badge: 4 },
@@ -57,7 +54,7 @@ function Profile_left_part() {
   ];
 
   const NavItem = ({ path, label, icon: Icon, badge }) => {
-    // 1. Create a reference for the icon
+    // Create a reference for the icon
     const iconRef = useRef(null);
     const isActive =
       pathname === path ||
@@ -66,7 +63,7 @@ function Profile_left_part() {
     return (
       <Link to={path} className="block w-full">
         <div
-          // 2. Trigger the animation manually on container hover
+          // Trigger the animation manually on container hover
           onMouseEnter={() => iconRef.current?.startAnimation?.()}
           onMouseLeave={() => iconRef.current?.stopAnimation?.()}
           className={`relative flex items-center px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
@@ -75,7 +72,7 @@ function Profile_left_part() {
               : "text-[#64707D] dark:text-[#AAB9C5] hover:bg-gray-100 dark:hover:bg-[#1c1c1c] hover:text-gray-900 dark:hover:text-white"
           }`}
         >
-          {/* 3. Attach the ref to the animate-icon */}
+          {/* Attach the ref to the animate-icon */}
           <Icon
             ref={iconRef}
             size={17}
@@ -113,7 +110,7 @@ function Profile_left_part() {
             <AvatarComponent
               name={userDetails?.name || "User"}
               imageUrl={userDetails?.avatar}
-              plan={userDetails?.subscription} // <-- Just add this line!
+              plan={userDetails?.subscription}
               className="rounded-full bg-blue-50 dark:bg-gray-800"
               size="xmedium"
             />

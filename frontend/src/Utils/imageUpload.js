@@ -4,25 +4,25 @@ import instance from "../services/axiosInstance";
 export const uploadImage = async (file) => {
   const { data } = await instance.get("/api/imagekit/auth");
 
-const toBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    if (!(file instanceof Blob)) {
-      reject(
-        new Error(
-          `Invalid file provided. Expected Blob/File but received ${typeof file}`,
-        ),
-      );
-      return;
-    }
+  const toBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      if (!(file instanceof Blob)) {
+        reject(
+          new Error(
+            `Invalid file provided. Expected Blob/File but received ${typeof file}`,
+          ),
+        );
+        return;
+      }
 
-    const reader = new FileReader();
+      const reader = new FileReader();
 
-    reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onload = () => resolve(reader.result.split(",")[1]);
 
-    reader.onerror = reject;
+      reader.onerror = reject;
 
-    reader.readAsDataURL(file);
-  });
+      reader.readAsDataURL(file);
+    });
 
   const base64 = await toBase64(file);
 

@@ -27,7 +27,7 @@ import SearchDropdown from "../../features/search/components/SearchDropdown";
 
 import { toast } from "react-hot-toast";
 
-const Header = ({ isChat }) => {
+const Header = () => {
   const {
     userDetails,
     isLoggedIn,
