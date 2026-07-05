@@ -9,7 +9,6 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import FirstListingCelebration from "../../../Components/FirstListingCelebration.jsx";
-import bannerRight from "/bannerRight.png";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { CATEGORY_ITEMS } from "../constants/categories";
 import { FiArrowRight } from "react-icons/fi";
