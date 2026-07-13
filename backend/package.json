@@ -22,7 +22,7 @@
   "author": "Imaginum team",
   "license": "ISC",
   "engines": {
-    "node": ">=18"
+    "node": "22.x"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
