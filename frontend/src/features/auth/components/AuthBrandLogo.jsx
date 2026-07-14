@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import cmlogo from "../../../assets/final_cm_logo.png";
-import whitecmlogo from "../../../assets/white_cm_logo_mobile.png";
+import cmlogo from "/logo.webp";
+import whitecmlogo from "/white_cm_logo_mobile.webp";
 
 function AuthBrandLogo() {
   return (

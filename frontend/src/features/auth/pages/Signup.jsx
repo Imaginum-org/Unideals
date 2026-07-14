@@ -13,7 +13,7 @@ import { registerUser } from "../api/authApi.js";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
-import AuthBrandLogo from "../components/AuthBrandLogo";
+import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import LegalAgreementModal from "../components/LegalAgreementModal";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import SignInwithGoogle from "../components/signinWithGoogle";

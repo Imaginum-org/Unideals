@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { checkEmailVerification, resendVerification } from "../api/authApi";
-import checkemailicon from "../../../assets/checkemailicon.png";
+import checkemailicon from "/checkemailicon.webp";
 import { ArrowLeft, OctagonAlert } from "lucide-react";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
-import AuthBrandLogo from "../components/AuthBrandLogo";
+import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 
 function CheckEmail() {
   const location = useLocation();

@@ -5,7 +5,7 @@ import { forgotPassword } from "../api/authApi";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
-import AuthBrandLogo from "../components/AuthBrandLogo";
+import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 
 /* ─── Main component ─── */
 function ForgotPassword() {

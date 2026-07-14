@@ -1,8 +1,8 @@
 import { IoIosSunny, IoMdMoon } from "react-icons/io";
 import { motion } from "framer-motion";
 import { useTheme } from "../../../context/ThemeContext.jsx";
-import AuthPanelShape from "../../../assets/auth_page_left_side.png";
-import HomepagePreview from "../../../assets/auth_left_card_image.png";
+import AuthPanelShape from "/auth_page_left_side.webp";
+import HomepagePreview from "/auth_left_card_image.webp";
 
 function AuthPageRightPart() {
   const { darkMode, toggleDarkMode } = useTheme();

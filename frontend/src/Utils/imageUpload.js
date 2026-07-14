@@ -1,7 +1,7 @@
 import { upload } from "@imagekit/javascript";
 import instance from "../services/axiosInstance";
 
-export const uploadImage = async (file) => {
+export const uploadImage = async (file, folder = "Products") => {
   const { data } = await instance.get("/api/imagekit/auth");
 
   const toBase64 = (file) =>
@@ -29,7 +29,7 @@ export const uploadImage = async (file) => {
   const result = await upload({
     file: base64,
     fileName: `${Date.now()}_${file.name}`,
-    folder: `Products`,
+    folder, // <-- Use the parameter instead of hardcoding
     signature: data.signature,
     expire: data.expire,
     token: data.token,
