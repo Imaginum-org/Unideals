@@ -389,7 +389,7 @@ const Header = () => {
           <div className="flex w-full items-center justify-between sm:hidden">
             <Link to="/" className="flex items-center gap-2">
               <img
-                src="/logo.svg"
+                src="/logo.webp"
                 alt="image"
                 className="h-6 w-6 object-contain"
               />
@@ -877,7 +877,7 @@ const Header = () => {
             {/* Logo */}
             <Link to="/" className="flex shrink-0 items-center gap-2">
               <img
-                src="/logo.svg"
+                src="/logo.webp"
                 alt="image"
                 className="h-6 w-6 object-contain"
               />

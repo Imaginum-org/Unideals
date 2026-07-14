@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import ChatCard from "../components/ChatCard.jsx";
-import userdp from "/userdp.png";
+import userdp from "/userdp.webp";
 
 import {
   ChevronLeft,
@@ -15,7 +15,7 @@ import { IoSend } from "react-icons/io5";
 const supportChat = {
   id: "support",
   name: "Unideals Support",
-  url: "/logo.png",
+  url: "/logo.webp",
 };
 
 const supportCategories = [
@@ -55,7 +55,7 @@ const Chat = () => {
   const messagesEndRef = useRef(null);
 
   const users = [
-    { id: 1, name: "Sarthak", url: "/userdp2.png" },
+    { id: 1, name: "Sarthak", url: "/userdp2.webp" },
     { id: 2, name: "Arnav Sharma" },
     { id: 3, name: "Piyush Srinivasan" },
     { id: 4, name: "Anvesha Shoumya" },
@@ -312,7 +312,7 @@ const Chat = () => {
           ) : (
             <div className="hidden lg:flex flex-1 flex-col items-center gap-3 justify-center p-8">
               <img
-                src="/logo.png"
+                src="/logo.webp"
                 alt="image"
                 className="size-12 object-contain drop-shadow-md"
               />

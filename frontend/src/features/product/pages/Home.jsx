@@ -241,7 +241,7 @@ const Home = () => {
     bg-center
     bg-no-repeat"
           style={{
-            backgroundImage: "url('/banner_bg.png')",
+            backgroundImage: "url('/banner_bg.webp')",
           }}
         >
           {/* Black Overlay for text */}
@@ -256,7 +256,7 @@ const Home = () => {
 
           {/* Left Image */}
           <motion.img
-            src="/fan.png"
+            src="/fan.webp"
             alt="Left Decoration"
             className="absolute left-6 lg:left-12 xl:left-20 top-72 -translate-y-1/2
              w-24 md:w-36 lg:w-44 xl:w-80
@@ -265,7 +265,7 @@ const Home = () => {
 
           {/* Right Image */}
           <motion.img
-            src="/bag_banner.png"
+            src="/bag_banner.webp"
             alt="Right Decoration"
             className="absolute right-6 lg:right-12 xl:right-20 top-72 -translate-y-1/2
              w-24 md:w-36 lg:w-44 xl:w-96

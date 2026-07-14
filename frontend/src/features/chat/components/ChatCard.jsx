@@ -1,4 +1,4 @@
-import userdp from "/userdp.png";
+import userdp from "/userdp.webp";
 
 const ChatCard = ({ user, onClick, isSelected }) => {
   return (
