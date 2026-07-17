@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AppRoutes from "./routes.jsx";
 import { useUser } from "../context/useUserContext.jsx";
-import SmoothScroll from "../components/common/SmoothScroll.jsx";
+// import SmoothScroll from "../components/common/SmoothScroll.jsx";
 
 function App() {
   const navigate = useNavigate();
