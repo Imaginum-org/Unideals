@@ -322,7 +322,7 @@ export const getAllProducts = async (query) => {
 
     filterMeta,
   };
-};;
+};
 
 export const getSingleProduct = async (id) => {
   const product = await Product.findOneAndUpdate(
@@ -416,7 +416,7 @@ export const searchProducts = async (query) => {
       },
     },
 
-    // ⏱️ RECENCY
+    // RECENCY
     {
       $addFields: {
         hoursSinceCreated: {
