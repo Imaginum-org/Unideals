@@ -149,13 +149,13 @@ function Profile_left_part() {
 
       {/* Bottom Branding (Sticky at bottom of sidebar) */}
       <div className="bg-[#FFFFFF] dark:bg-[#131313] border-t pt-4 border-gray-100 dark:border-gray-800/50 pb-4">
-        <div className="flex items-center justify-center gap-1">
+        <div className="flex items-center justify-center">
           {/* Bag Icon */}
           <div className="flex items-center justify-center">
             <img
               src="/logo.svg"
               alt="image"
-              className="h-5 w-5 object-contain"
+              className="h-8 w-8 object-contain"
             />
           </div>
           {/* Logo Text */}

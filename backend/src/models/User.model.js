@@ -32,8 +32,14 @@ const userSchema = new Schema(
     },
 
     avatar: {
-      type: String,
-      default: "https://ik.imagekit.io/mspoxwn8v/avatar-default.svg",
+      url: {
+        type: String,
+        default: "https://ik.imagekit.io/mspoxwn8v/avatar-default.svg",
+      },
+      fileId: {
+        type: String,
+        default: null,
+      },
     },
 
     mobile: {

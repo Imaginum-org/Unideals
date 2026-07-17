@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AppRoutes from "./routes.jsx";
 import { useUser } from "../context/useUserContext.jsx";
+import SmoothScroll from "../components/common/SmoothScroll.jsx";
 
 function App() {
   const navigate = useNavigate();
@@ -12,15 +13,17 @@ function App() {
   useEffect(() => {
     const handleBlockedAccount = (event) => {
       clearUserData();
-      toast.error(event.detail?.message || "Your account access has been restricted.");
+      toast.error(
+        event.detail?.message || "Your account access has been restricted.",
+      );
       navigate("/login", { replace: true });
     };
 
-    window.addEventListener("campus-mart:account-blocked", handleBlockedAccount);
+    window.addEventListener("unideals:account-blocked", handleBlockedAccount);
 
     return () => {
       window.removeEventListener(
-        "campus-mart:account-blocked",
+        "unideals:account-blocked",
         handleBlockedAccount,
       );
     };
@@ -28,6 +31,7 @@ function App() {
 
   return (
     <div className="App">
+      {/* <SmoothScroll /> */}
       <AppRoutes />
       <Toaster position="top-center" />
     </div>

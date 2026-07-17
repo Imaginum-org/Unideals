@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-
 import { GrLocation } from "react-icons/gr";
 import { CiSearch, CiMail } from "react-icons/ci";
 import { IoNotificationsOutline } from "react-icons/io5";
-import { IoIosSunny, IoMdMoon } from "react-icons/io";
+import { MdSunny } from "react-icons/md";
+import { HiMiniMoon } from "react-icons/hi2";
 import { FiMessageSquare } from "react-icons/fi";
 import { FaPlus } from "react-icons/fa6";
 import { LuMessageSquare } from "react-icons/lu";
@@ -14,17 +14,13 @@ import { BsBoxSeam } from "react-icons/bs";
 import { IoIosHeartEmpty } from "react-icons/io";
 import { MdOutlineLogout } from "react-icons/md";
 import { IoChevronBackOutline } from "react-icons/io5";
-
 import AvatarComponent from "../common/AvatarComponent.jsx";
-
 import { useUser } from "../../context/useUserContext.jsx";
 import { logoutUser } from "../../features/auth/api/authApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
-
 import useDebounce from "../../features/search/hooks/useDebounce";
 import { searchProducts } from "../../features/search/api/searchApi";
 import SearchDropdown from "../../features/search/components/SearchDropdown";
-
 import { toast } from "react-hot-toast";
 
 const Header = () => {
@@ -58,6 +54,8 @@ const Header = () => {
   const [showHeader, setShowHeader] = useState(true);
 
   const lastScrollY = useRef(0);
+  const scrollStartY = useRef(0);
+  const lastDirection = useRef(null);
 
   useEffect(() => {
     const storedSearches = localStorage.getItem("recentSearches");
@@ -240,20 +238,34 @@ const Header = () => {
   useEffect(() => {
     let ticking = false;
 
+    const HIDE_DISTANCE = 18;
+    const SHOW_DISTANCE = 18;
+
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
+      const currentY = window.scrollY;
 
       if (!ticking) {
-        window.requestAnimationFrame(() => {
-          const difference = currentScrollY - lastScrollY.current;
-
-          // Always show at top
-          if (currentScrollY < 100) {
+        requestAnimationFrame(() => {
+          if (currentY <= 80) {
             setShowHeader(true);
+            scrollStartY.current = currentY;
+            lastDirection.current = null;
+            lastScrollY.current = currentY;
+            ticking = false;
+            return;
           }
 
-          // Scrolling down
-          else if (difference > 8) {
+          const direction = currentY > lastScrollY.current ? "down" : "up";
+
+          // Direction changed
+          if (direction !== lastDirection.current) {
+            lastDirection.current = direction;
+            scrollStartY.current = currentY;
+          }
+
+          const travelled = Math.abs(currentY - scrollStartY.current);
+
+          if (direction === "down" && travelled >= HIDE_DISTANCE) {
             setShowHeader(false);
 
             setShowmenu(false);
@@ -261,13 +273,11 @@ const Header = () => {
             setShowDropdown(false);
           }
 
-          // Scrolling up
-          else if (difference < -8) {
+          if (direction === "up" && travelled >= SHOW_DISTANCE) {
             setShowHeader(true);
           }
 
-          lastScrollY.current = currentScrollY;
-
+          lastScrollY.current = currentY;
           ticking = false;
         });
 
@@ -373,13 +383,13 @@ const Header = () => {
     z-50
     border-b
     border-neutral-200
-    bg-white/80
+    bg-white/95
     backdrop-blur-xl
     dark:border-neutral-800
     dark:bg-[#131313]
     font-figtree
     transition-transform
-    duration-500
+    duration-300
     ease-[cubic-bezier(0.22,1,0.36,1)]
     ${showHeader ? "translate-y-0" : "-translate-y-full"}
   `}
@@ -389,9 +399,9 @@ const Header = () => {
           <div className="flex w-full items-center justify-between sm:hidden">
             <Link to="/" className="flex items-center gap-2">
               <img
-                src="/logo.webp"
+                src="/logo.svg"
                 alt="image"
-                className="h-6 w-6 object-contain"
+                className="h-11 w-11 object-cover"
               />
 
               <span className="text-base font-medium text-[#000000] dark:text-white">
@@ -406,9 +416,9 @@ const Header = () => {
                 aria-label="Toggle Theme"
               >
                 {darkMode ? (
-                  <IoIosSunny className="size-4 text-[#FFD119]" />
+                  <MdSunny className="size-4 text-[#FFD119]" />
                 ) : (
-                  <IoMdMoon className="size-4 text-[#323232] dark:text-white" />
+                  <HiMiniMoon className="size-4 text-[#323232] dark:text-white" />
                 )}
               </button>
 
@@ -875,11 +885,11 @@ const Header = () => {
           {/* Desktop Navbar */}
           <div className="hidden w-full items-center justify-between sm:flex">
             {/* Logo */}
-            <Link to="/" className="flex shrink-0 items-center gap-2">
+            <Link to="/" className="flex shrink-0 items-center">
               <img
-                src="/logo.webp"
+                src="/logo.svg"
                 alt="image"
-                className="h-6 w-6 object-contain"
+                className="h-11 w-11 object-cover"
               />
 
               <span className="text-xl md:text-lg lg:text-xl font-semibold text-[#000000] dark:text-white">
@@ -1151,9 +1161,9 @@ dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-9
                     aria-label="Toggle Theme"
                   >
                     {darkMode ? (
-                      <IoIosSunny className="size-5 text-[#FFD119]" />
+                      <MdSunny className="size-5 text-[#FFD119]" />
                     ) : (
-                      <IoMdMoon className="size-5 text-[#323232] dark:text-white" />
+                      <HiMiniMoon className="size-5 text-[#323232] dark:text-white" />
                     )}
                   </button>
 
@@ -1296,9 +1306,9 @@ dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-9
                     aria-label="Toggle Theme"
                   >
                     {darkMode ? (
-                      <IoIosSunny className="size-5 text-[#FFD119]" />
+                      <MdSunny className="size-5 text-[#FFD119]" />
                     ) : (
-                      <IoMdMoon className="size-5 text-[#323232] dark:text-white" />
+                      <HiMiniMoon className="size-5 text-[#323232] dark:text-white" />
                     )}
                   </button>
 

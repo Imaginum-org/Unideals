@@ -86,12 +86,18 @@ const productSchema = new Schema(
     images: {
       type: [
         {
-          type: String,
+          url: {
+            type: String,
+            required: true,
+            validate: {
+              validator: (url) => /^https?:\/\/.+/.test(url),
+              message: "Invalid image URL",
+            },
+          },
 
-          validate: {
-            validator: (url) => /^https?:\/\/.+/.test(url),
-
-            message: "Invalid image URL",
+          fileId: {
+            type: String,
+            required: true,
           },
         },
       ],

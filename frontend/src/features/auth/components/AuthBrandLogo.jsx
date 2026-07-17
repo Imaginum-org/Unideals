@@ -1,16 +1,16 @@
 import { Link } from "react-router-dom";
-import cmlogo from "/logo.webp";
+import cmlogo from "/logo.svg";
 import whitecmlogo from "/white_cm_logo_mobile.webp";
 
 function AuthBrandLogo() {
   return (
     <Link
       to="/"
-      className="inline-flex items-center justify-center gap-2.5 sm:gap-3 font-figtree text-xl font-semibold text-white md:gap-1.5 md:text-sm md:text-[#012436] dark:md:text-white lg:gap-2 lg:text-sm xl:gap-2 xl:text-base 2xl:gap-2.5 2xl:text-lg"
+      className="inline-flex items-center gap-2.5 sm:gap-3 font-figtree text-xl font-semibold text-white md:gap-1.5 md:text-sm md:text-[#012436] dark:md:text-white lg:gap-2 lg:text-sm xl:gap-0 xl:text-base 2xl:gap-0 2xl:text-lg"
     >
       <img
         src={cmlogo}
-        className="mb-1 hidden size-5 md:block md:h-[1.0625rem] md:w-[0.8125rem] lg:h-[1.1875rem] lg:w-[0.9375rem] xl:h-[1.3125rem] xl:w-[1.0625rem] 2xl:h-[3vh] 2xl:w-[1.2vw]"
+        className="h-10 w-10 object-cover mb-1 hidden md:block"
         alt="image"
       />
       <img

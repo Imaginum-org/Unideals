@@ -15,7 +15,7 @@ import { IoSend } from "react-icons/io5";
 const supportChat = {
   id: "support",
   name: "Unideals Support",
-  url: "/logo.webp",
+  url: "/logo.svg",
 };
 
 const supportCategories = [
@@ -312,7 +312,7 @@ const Chat = () => {
           ) : (
             <div className="hidden lg:flex flex-1 flex-col items-center gap-3 justify-center p-8">
               <img
-                src="/logo.webp"
+                src="/logo.svg"
                 alt="image"
                 className="size-12 object-contain drop-shadow-md"
               />

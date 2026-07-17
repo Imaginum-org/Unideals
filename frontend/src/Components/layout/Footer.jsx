@@ -88,24 +88,24 @@ gap-8"
               <div>
                 <Link
                   to="/"
-                  className="mb-6 flex flex-col items-start text-2xl font-semibold text-black"
+                  className="mb-6 flex flex-col items-start text-xl font-semibold text-black dark:text-white"
                 >
-                  <div className="flex items-center justify-center gap-3">
+                  <div className="flex items-center justify-center">
                     <img
                       src="/logo.svg"
                       alt="image"
-                      className="h-8 w-8 object-contain"
+                      className="h-12 w-12 object-cover"
                     />
                     <div className="flex flex-col leading-6">
                       <h1>Unideals</h1>
-                      <h5 className="text-sm font-medium text-slate-600">
+                      <h5 className="text-xs font-medium text-slate-600">
                         By Imaginum
                       </h5>
                     </div>
                   </div>
                 </Link>
 
-                <p className="mb-8 max-w-[230px] leading-6 text-base text-[#2D3339]">
+                <p className="mb-8 max-w-[230px] leading-6 text-base text-[#2D3339] dark:text-slate-500">
                   Your campus connection for buying, selling, and trading.
                 </p>
 
