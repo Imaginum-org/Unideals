@@ -13,7 +13,6 @@ import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { CATEGORY_ITEMS } from "../constants/categories";
 import { FiArrowRight } from "react-icons/fi";
 
-
 const Home = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -255,22 +254,45 @@ const Home = () => {
           /> */}
 
           {/* Left Image */}
-          <motion.img
-            src="/fan.webp"
-            alt="Left Decoration"
+          <div
             className="absolute left-6 lg:left-12 xl:left-20 top-72 -translate-y-1/2
-             w-24 md:w-36 lg:w-44 xl:w-80
-             z-10 pointer-events-none -scale-x-100 -rotate-12"
-          />
+   w-24 md:w-36 lg:w-44 xl:w-80
+   z-10 pointer-events-none -scale-x-100 -rotate-12"
+          >
+            <motion.img
+              src="/fan.webp"
+              alt="Left Decoration"
+              className="w-full h-auto block"
+              animate={{ y: [0, -14, 0] }}
+              transition={{
+                duration: 4,
+                ease: "easeInOut",
+                repeat: Infinity,
+                repeatType: "loop",
+              }}
+            />
+          </div>
 
           {/* Right Image */}
-          <motion.img
-            src="/bag_banner.webp"
-            alt="Right Decoration"
+          <div
             className="absolute right-6 lg:right-12 xl:right-20 top-72 -translate-y-1/2
-             w-24 md:w-36 lg:w-44 xl:w-96
-             z-10 pointer-events-none -rotate-12"
-          />
+   w-24 md:w-36 lg:w-44 xl:w-96
+   z-10 pointer-events-none -rotate-12"
+          >
+            <motion.img
+              src="/bag_banner.webp"
+              alt="Right Decoration"
+              className="w-full h-auto block"
+              animate={{ y: [0, -16, 0] }}
+              transition={{
+                duration: 4.6,
+                ease: "easeInOut",
+                repeat: Infinity,
+                repeatType: "loop",
+                delay: 0.6,
+              }}
+            />
+          </div>
 
           <div className="relative z-10 flex h-full w-full items-center justify-center px-5">
             {/* Left Content */}
@@ -289,11 +311,6 @@ const Home = () => {
                 Your trusted platform to simplify student life
                 <br className="hidden sm:block" /> Buy, sell and connect easily!
               </p>
-              {/* <p className="md:hidden test-center text-[clamp(0.7rem,1.5vw,1.2rem)] lg:leading-7 md:leading-5  text-gray-200 font-medium mt-2 font-figtree">
-                Your trusted platform to simplify
-                <br className="hidden sm:block" /> Buying, selling & connect
-                easily.
-              </p> */}
               <Link
                 to="/upload"
                 className="bg-white text-[#2D3339] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-7 lg:px-7 xl:text-lg lg:text-lg md:text-base text-xs lg:mt-4 xl:mt-8 md:mt-4 mt-3 shadow-md py-[0.7vh] px-4 font-figtree duration-500 ease-in-out flex items-center justify-center gap-2"
@@ -302,20 +319,6 @@ const Home = () => {
                 <FiArrowRight />
               </Link>
             </div>
-
-            {/* Right Image Section
-            <div className="relative w-[50%] flex justify-center items-center">
-              <motion.img
-                src="/assets/Group_115.png"
-                alt="Background Shape"
-                className="absolute md:size-[32vw] xl:size-[25vw] lg:size-[25vw] size-[30vw] md:h-80 lg:h-[28vh] h-56 z-0"
-              />
-              <motion.img
-                src={bannerRight}
-                alt="Main Visual"
-                className="absolute xl:size-[26vw] lg:size-[33vw] md:size-[35vw] xl:mt-20 lg:mt-16 size-[45vw] z-10 mt-10"
-              />
-            </div> */}
           </div>
         </motion.div>
 
@@ -413,26 +416,9 @@ const Home = () => {
             hover:shadow-xl
         "
               >
-                <FiChevronLeft className="text-xl" />
+                <FiChevronLeft className="text-xl text-black dark:text-white" />
               </button>
             )}
-            {/* <div
-              className="
-        hidden
-        lg:block
-        absolute
-        left-0
-        top-0
-        bottom-0
-        w-12
-        bg-gradient-to-r
-        from-white
-        dark:from-[#131313]
-        to-transparent
-        pointer-events-none
-        z-10
-    "
-            /> */}
             <div
               ref={sliderRef}
               className="
@@ -484,7 +470,7 @@ const Home = () => {
             hover:shadow-xl
         "
               >
-                <FiChevronRight className="text-xl" />
+                <FiChevronRight className="text-xl text-black dark:text-white" />
               </button>
             )}
             <div

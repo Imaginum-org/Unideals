@@ -4,9 +4,7 @@ import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
 // CREATE PRODUCT
 export const createProduct = async (req, res) => {
-  const fileIds = Array.isArray(req.body.image_file_ids)
-    ? req.body.image_file_ids
-    : [];
+  const fileIds = req.body.images?.map((image) => image.fileId) || [];
 
   try {
     const user = req.user;
