@@ -1,5 +1,6 @@
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
+import { deleteImage } from "../utils/imagekit.js";
 
 export const createProduct = async (data, user) => {
   if (
@@ -490,9 +491,18 @@ export const deleteProduct = async (productId, userId) => {
     throw new Error("Product is already deleted");
   }
 
+  // Delete all uploaded images from ImageKit
+  await Promise.all(
+    product.images
+      .filter((image) => image.fileId)
+      .map((image) => deleteImage(image.fileId)),
+  );
+
+  // Soft delete product
   product.is_deleted = true;
+
   return await product.save();
-};
+};;
 
 // UNLIST PRODUCT
 export const unlistProduct = async (productId, userId) => {

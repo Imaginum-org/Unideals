@@ -113,7 +113,7 @@ ${mobile ? "px-4 py-4" : "px-3 py-3"}
 `}
             >
               <img
-                src={item.images?.[0] || "/placeholder.png"}
+                src={item.images?.[0].url || "/placeholder.png"}
                 alt={item.title}
                 className={
                   mobile

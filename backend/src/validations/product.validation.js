@@ -49,7 +49,12 @@ export const createProductSchema = z
     payment_preference: z.enum(Object.values(PRODUCT_PAYMENT)).optional(),
 
     images: z
-      .array(z.string().url())
+      .array(
+        z.object({
+          url: z.string().url("Invalid image URL"),
+          fileId: z.string().min(1, "Invalid file ID"),
+        }),
+      )
       .max(3, "Maximum 3 images allowed")
       .optional(),
 
@@ -96,8 +101,6 @@ export const createProductSchema = z
         additional_info: z.string().trim().max(300).optional(),
       })
       .optional(),
-
-    image_file_ids: z.array(z.string().min(1)).optional(),
   })
   .refine(
     (data) => {

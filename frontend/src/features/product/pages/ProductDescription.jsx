@@ -19,11 +19,9 @@ import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 // condition
 import { GoChecklist } from "react-icons/go";
-
 // color
 import { IoColorPaletteOutline } from "react-icons/io5";
-import { useWishlist } from "../../../context/useWishlist.js";
-
+import { useWishlist } from "../../../context/WishlistContext";
 // date of purchase
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaArrowRight } from "react-icons/fa6";
@@ -31,9 +29,8 @@ import { FaArrowRight } from "react-icons/fa6";
 const FALLBACK_IMAGE = "/image10.png";
 
 const ProductDescription = () => {
-  const { toggleWishlist, checkProductInWishlist } = useWishlist();
+  const { toggleWishlist, isInWishlist } = useWishlist();
   const { id } = useParams();
-
   const [product, setProduct] = useState(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [activeImage, setActiveImage] = useState("");
@@ -42,12 +39,12 @@ const ProductDescription = () => {
   const [similarProducts, setSimilarProducts] = useState([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [inWishlist, setInWishlist] = useState(false);
+  const [isContainMode, setIsContainMode] = useState(false);
 
   const staticCTARef = useRef(null);
   const floatingCTARef = useRef(null);
-  const [isContainMode, setIsContainMode] = useState(false);
   const productId = product?._id;
+  const inWishlist = isInWishlist(productId);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,7 +61,7 @@ const ProductDescription = () => {
         setProduct(fetchedProduct);
 
         if (fetchedProduct?.images?.length > 0) {
-          setActiveImage(fetchedProduct.images[0]);
+          setActiveImage(fetchedProduct.images[0].url);
         }
       } catch (error) {
         console.log(error);
@@ -76,29 +73,29 @@ const ProductDescription = () => {
     fetchProduct();
   }, [id]);
 
-  useEffect(() => {
-    let isMounted = true;
+  // useEffect(() => {
+  //   let isMounted = true;
 
-    const checkWishlist = async () => {
-      if (!productId) return;
+  //   const checkWishlist = async () => {
+  //     if (!productId) return;
 
-      try {
-        const inWish = await checkProductInWishlist(productId);
+  //     try {
+  //       const inWish = await checkProductInWishlist(productId);
 
-        if (isMounted) {
-          setInWishlist(inWish);
-        }
-      } catch (error) {
-        console.error("Wishlist check failed:", error);
-      }
-    };
+  //       if (isMounted) {
+  //         setInWishlist(inWish);
+  //       }
+  //     } catch (error) {
+  //       console.error("Wishlist check failed:", error);
+  //     }
+  //   };
 
-    checkWishlist();
+  //   checkWishlist();
 
-    return () => {
-      isMounted = false;
-    };
-  }, [productId, checkProductInWishlist]);
+  //   return () => {
+  //     isMounted = false;
+  //   };
+  // }, [productId, checkProductInWishlist]);
 
   useEffect(() => {
     const fetchSimilarProducts = async () => {
@@ -246,11 +243,11 @@ Available for pickup on campus.
 
 ${shareUrl}`;
 
-  const original = Number(product?.original_price);
-  const selling = Number(product?.selling_price);
-  const savedPricedPercentage = Math.round(
-    ((original - selling) / original) * 100,
-  );
+  const original = Number(product?.original_price || 0);
+  const selling = Number(product?.selling_price || 0);
+
+  const savedPricedPercentage =
+    original > 0 ? Math.round(((original - selling) / original) * 100) : 0;
 
   const handleWishlistClick = async (e) => {
     e.preventDefault();
@@ -262,9 +259,6 @@ ${shareUrl}`;
 
     try {
       const result = await toggleWishlist(product._id, product);
-
-      setInWishlist(result);
-
       toast.success(result ? "Added to Wishlist" : "Removed from Wishlist", {
         id: "wishlist-toast",
       });
@@ -332,7 +326,9 @@ ${shareUrl}`;
   };
 
   const images =
-    product?.images?.length > 0 ? product.images : [FALLBACK_IMAGE];
+    product?.images?.length > 0
+      ? product.images.map((image) => image.url)
+      : [FALLBACK_IMAGE];
 
   const currentImageIndex = images.findIndex((img) => img === activeImage);
 
@@ -656,10 +652,11 @@ ${shareUrl}`;
                     ₹{product?.original_price}
                   </span>
                 )}
-
-                <div className="bg-[#EEF0FF] text-[#3838EC] text-xs font-semibold px-3 py-1 rounded-md">
-                  Save {savedPricedPercentage}%
-                </div>
+                {savedPricedPercentage > 0 && (
+                  <div className="bg-[#EEF0FF] text-[#3838EC] text-xs font-semibold px-3 py-1 rounded-md">
+                    Save {savedPricedPercentage}%
+                  </div>
+                )}
               </div>
 
               {/* Seller */}
@@ -890,9 +887,10 @@ ${shareUrl}`;
           {/* Modal */}
           <motion.div
             initial={{
-              y: 120,
+              y: 80,
               opacity: 0,
-              scale: 0.96,
+              scale: 0.98,
+              backdropFilter: "blur(0px)",
             }}
             drag="y"
             dragConstraints={{
@@ -908,10 +906,12 @@ ${shareUrl}`;
               y: 0,
               opacity: 1,
               scale: 1,
+              backdropFilter: "blur(12px)",
             }}
             exit={{
               y: 120,
               opacity: 0,
+              backdropFilter: "blur(0px)",
             }}
             transition={{
               type: "spring",
@@ -923,13 +923,16 @@ ${shareUrl}`;
   w-full
   md:w-[520px]
   mx-4
-  bg-white/90
-  dark:bg-[#1A1D20]/95
+  bg-white/95
+dark:bg-[#16181B]/95
+border
+border-white/40
+dark:border-white/5
   backdrop-blur-2xl
   rounded-t-[32px]
   md:rounded-[32px]
   p-6
-  shadow-[0_25px_80px_rgba(0,0,0,0.22)]
+  shadow-[0_-8px_40px_rgba(0,0,0,0.12),0_24px_80px_rgba(0,0,0,0.18)]
 "
           >
             {/* Header */}
@@ -944,12 +947,16 @@ ${shareUrl}`;
               />
             </div>
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold dark:text-white">
-                Share on Unideals
-              </h3>
+              <div className="text-black">
+                <h3 className="text-xl font-bold">Share Product</h3>
+
+                <p className="text-sm text-zinc-500 mt-1">
+                  Share this listing with your classmates
+                </p>
+              </div>
 
               <button onClick={() => setShowShareMenu(false)}>
-                <IoClose size={24} />
+                <IoClose className="text-black dark:text-white" size={24} />
               </button>
             </div>
 
@@ -963,15 +970,15 @@ items-center
 gap-4
 p-4
 rounded-3xl
-bg-gradient-to-br
-from-[#F8FAFF]
-to-[#EEF2FF]
+bg-white
+dark:bg-zinc-900
 border
-border-[#E5E7EB]
+border-zinc-200
+dark:border-zinc-800
 "
             >
               <img
-                src={product?.images?.[0]}
+                src={product?.images?.[0]?.url || FALLBACK_IMAGE}
                 className="
     w-20
     h-20
@@ -982,7 +989,7 @@ border-[#E5E7EB]
               />
 
               <div>
-                <h4 className="font-semibold dark:text-white">
+                <h4 className="font-semibold text-black dark:text-white">
                   {product?.title}
                 </h4>
 
@@ -1011,9 +1018,9 @@ border-[#E5E7EB]
                 whileTap={{
                   scale: 0.94,
                 }}
-                className="h-14 rounded-2xl text-white transition-all shadow-sm hover:shadow-xl bg-[#25D366] flex items-center justify-center gap-3"
+                className="h-14 rounded-xl text-white transition-all shadow-sm hover:shadow-xl bg-[#25D366] flex items-center justify-center gap-3"
               >
-                <FaWhatsapp size={28} />
+                <FaWhatsapp size={24} />
                 <span className="font-medium">WhatsApp</span>
               </motion.button>
 
@@ -1030,14 +1037,14 @@ border-[#E5E7EB]
                 }}
                 whileHover={{
                   y: -1,
-                  scale: 1.01,
+                  scale: 1,
                 }}
                 whileTap={{
                   scale: 0.94,
                 }}
-                className="h-14 rounded-2xl text-white transition-all shadow-sm hover:shadow-xl bg-[#3390EC] flex items-center justify-center gap-3"
+                className="h-14 rounded-xl text-white transition-all shadow-sm hover:shadow-xl bg-[#3390EC] flex items-center justify-center gap-3"
               >
-                <FaTelegram size={22} />
+                <FaTelegram size={24} />
                 Telegram
               </motion.button>
 
@@ -1057,12 +1064,12 @@ border-[#E5E7EB]
                 }}
                 whileHover={{
                   y: -1,
-                  scale: 1.01,
+                  scale: 1,
                 }}
                 whileTap={{
-                  scale: 0.94,
+                  scale: 0.97,
                 }}
-                className="col-span-2 h-14 rounded-2xl text-white bg-[#4556F0] flex items-center justify-center gap-3 font-semibold"
+                className="hover:brightness-110 col-span-2 h-14 rounded-xl text-white bg-[#4556F0] flex items-center justify-center gap-3 font-semibold"
               >
                 {copied ? (
                   <>✓ Copied</>
@@ -1090,19 +1097,19 @@ p-4
               </p>
 
               <p className="text-sm text-slate-600 mt-1">
-                Great deals spread faster through hostel groups and batch
-                communities.
+                Listings shared in hostel groups usually get more views and
+                responses.
               </p>
             </div>
 
             {/* URL Preview */}
 
-            <div className="mt-6 p-3 rounded-xl border bg-[#FAFAFA] text-sm truncate">
+            <div className="mt-6 p-3 rounded-xl border text-black bg-[#FAFAFA] text-sm truncate">
               {shareUrl}
             </div>
 
             <p className="mt-4 text-center text-xs text-zinc-500">
-              Share with classmates and hostel groups
+              Anyone with this link can view this listing.
             </p>
           </motion.div>
         </div>

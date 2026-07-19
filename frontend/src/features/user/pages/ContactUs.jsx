@@ -204,7 +204,7 @@ function ContactUs() {
   };
 
   return (
-    <div className="h-screen w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree">
+    <div className="h-screen w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree text-black dark:text-white">
       <div className="flex-1 lg:flex md:flex overflow-hidden">
         {/* LEFT PANEL */}
         {userDetails?._id ? (
@@ -243,7 +243,7 @@ function ContactUs() {
               <input
                 type="text"
                 placeholder="Search help articles..."
-                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white transition-all"
+                className="w-full pl-9 pr-4 py-2 text-sm border bg-white border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white transition-all"
               />
             </motion.div>
 

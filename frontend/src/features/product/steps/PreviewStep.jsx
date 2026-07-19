@@ -98,6 +98,7 @@ const PreviewStep = () => {
       const uploads = await Promise.all(
         compressedImages.map((file) => uploadImage(file)),
       );
+
       const uploadedUrls = uploads.map((img) => img.url);
 
       const uploadedFileIds = uploads.map((img) => img.fileId);
@@ -122,9 +123,7 @@ const PreviewStep = () => {
 
         payment_preference: formData.paymentMethod,
 
-        images: uploadedUrls,
-
-        image_file_ids: uploadedFileIds,
+        images: uploads,
 
         pickup_address_snapshot: {
           address_line:
@@ -226,7 +225,7 @@ const PreviewStep = () => {
             </div>
 
             {/* Thumbnails */}
-            <div className="mt-5 flex items-center gap-4 overflow-x-auto">
+            <div className="mt-5 flex items-center gap-4 overflow-x-auto overflow-y-hidden">
               {formData.imagePreviews?.map((image, index) => (
                 <button
                   key={image.id}

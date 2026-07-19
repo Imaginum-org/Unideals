@@ -53,7 +53,7 @@ const [legalTab, setLegalTab] = useState(null);
           onClose={() => setLegalTab(null)}
         />
       )}
-      <div className="w-full rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
+      <div className="w-full text-black dark:texxt-white rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
         {/* Header */}
         <div>
           <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
@@ -95,7 +95,7 @@ const [legalTab, setLegalTab] = useState(null);
                     )
                   }
                   placeholder="999"
-                  className="flex-1 -ml-2 h-full outline-none text-lg xl:text-xl font-semibold"
+                  className="flex-1 bg-white -ml-2 h-full outline-none text-lg xl:text-xl font-semibold"
                 />
               </div>
               {errors.sellingPrice && <FormError error={errors.sellingPrice} />}
@@ -123,7 +123,7 @@ const [legalTab, setLegalTab] = useState(null);
                     )
                   }
                   placeholder="1499"
-                  className="flex-1 h-full -ml-2 outline-none text-lg xl:text-xl font-semibold"
+                  className="flex-1 bg-white h-full -ml-2 outline-none text-lg xl:text-xl font-semibold"
                 />
               </div>
               {errors.originalPrice && (
@@ -307,7 +307,7 @@ const [legalTab, setLegalTab] = useState(null);
                 type="checkbox"
                 checked={formData.termsAccepted}
                 onChange={(e) => updateField("termsAccepted", e.target.checked)}
-                className="mt-1 h-4 w-4 accent-[#2E3FDC] cursor-pointer"
+                className="mt-1 h-4 w-4 accent-[#2E3FDC] bg-wh cursor-pointer"
               />
 
               <p className="text-sm leading-7 text-[#6B7280]">

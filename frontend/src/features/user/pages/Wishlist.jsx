@@ -1,29 +1,32 @@
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import ProductCard from "../../product/components/ProductCard.jsx";
 import { useState, useEffect } from "react";
-import toast from "react-hot-toast";
-import { useWishlist } from "../../../context/useWishlist.js";
+import { useWishlist } from "../../../context/WishlistContext";
 
 function Wishlist() {
-  const { wishlist, fetchWishlist } = useWishlist();
+  const { wishlist } = useWishlist();
   const [visibleWishlist, setVisibleWishlist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const loadWishlist = async () => {
-      try {
-        setIsLoading(true);
-        await fetchWishlist();
-      } catch (error) {
-        console.error("Error loading wishlist:", error);
-        toast.error("Failed to load wishlist");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // useEffect(() => {
+  //   const loadWishlist = async () => {
+  //     try {
+  //       setIsLoading(true);
+  //       await fetchWishlist();
+  //     } catch (error) {
+  //       console.error("Error loading wishlist:", error);
+  //       toast.error("Failed to load wishlist");
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   };
 
-    loadWishlist();
-  }, [fetchWishlist]);
+  //   loadWishlist();
+  // }, [fetchWishlist]);
+
+  useEffect(() => {
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
     setVisibleWishlist(wishlist || []);
@@ -38,6 +41,8 @@ function Wishlist() {
   const handleRestoreView = () => {
     setVisibleWishlist(wishlist || []);
   };
+
+console.log(visibleWishlist);
 
   return (
     <>

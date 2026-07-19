@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
-import { useWishlist } from "../../../context/useWishlist.js";
+import { useWishlist } from "../../../context/WishlistContext";
 import { getUserProducts } from "../../product/api/productApi.js";
 
 // React Icons Imports
@@ -27,13 +27,11 @@ import { FaStar, FaBolt } from "react-icons/fa";
 
 function ProfileOverview() {
   const { userDetails, fetchUserProfile } = useUser();
-  const { wishlist, fetchWishlist } = useWishlist();
+  const { wishlist } = useWishlist();
   const [userProducts, setUserProducts] = useState([]);
 
   useEffect(() => {
     fetchUserProfile();
-    fetchWishlist();
-
     const loadUserProducts = async () => {
       try {
         const res = await getUserProducts();
@@ -46,7 +44,7 @@ function ProfileOverview() {
     };
 
     loadUserProducts();
-  }, [fetchUserProfile, fetchWishlist]);
+  }, [fetchUserProfile]);
 
   const stats = useMemo(() => {
     const activeListings = userProducts.filter((product) =>
@@ -78,7 +76,10 @@ function ProfileOverview() {
     : "October 2022";
 
   const campus = userDetails?.college || userDetails?.campus || "VIT Vellore";
-  const savedItems = (wishlist || []).filter(Boolean).slice(0, 3);
+  const savedItems = useMemo(
+    () => (wishlist ?? []).filter(Boolean).slice(0, 3),
+    [wishlist],
+  );
   const formatPrice = (price) => {
     if (price === undefined || price === null || price === "") return "";
     return `\u20B9${Number(price).toLocaleString("en-IN")}`;

@@ -119,7 +119,9 @@ function ProductListed() {
 
     if (res.data?.success && boostedProduct) {
       setProducts((prev) =>
-        prev.map((p) => (p._id === productId ? { ...p, ...boostedProduct } : p)),
+        prev.map((p) =>
+          p._id === productId ? { ...p, ...boostedProduct } : p,
+        ),
       );
 
       if (res.data?.data?.usage) {
@@ -272,7 +274,7 @@ function ProductListed() {
                       .toLocaleDateString("en-GB")
                       .replace(/\//g, "-")}
                     imageUrl={
-                      p.images?.[0] ||
+                      p.images?.[0].url ||
                       "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=150&q=80"
                     } // Fallback image
                     name={p.title}

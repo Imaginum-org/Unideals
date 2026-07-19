@@ -41,7 +41,7 @@ const ListingLayout = () => {
   const { prevStep } = useProductListing();
 
   return (
-    <div className="w-full min-h-screen bg-[#FAFAFA] dark:bg-[#131313] font-figtree">
+    <div className="w-full min-h-screen text-black dark:text-white bg-[#FAFAFA] dark:bg-[#131313] font-figtree">
       <div className="max-w-6xl w-full mx-auto px-7 sm:px-6 lg:px-8 xl:px-10 py-6 md:py-8">
         {/* Back */}
         <button
