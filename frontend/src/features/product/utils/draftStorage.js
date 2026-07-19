@@ -1,4 +1,4 @@
-const DRAFT_KEY = "campus-mart-product-draft";
+const DRAFT_KEY = "unideals-product-draft";
 
 export const saveDraftToLocal = (data) => {
   try {

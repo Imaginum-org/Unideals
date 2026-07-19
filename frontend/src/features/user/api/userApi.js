@@ -5,6 +5,10 @@ export const getUserProfile = () => axios.get("/api/user/userProfile");
 export const updateProfile = (data) =>
   axios.put("/api/user/updateProfile", data);
 
+export const updateAvatar = (data) => axios.put("/api/user/updateAvatar", data);
+
+export const removeAvatar = () => axios.delete("/api/user/removeAvatar");
+
 export const deleteAccount = () => axios.delete("/api/user/deleteAccount");
 
 export const createAddress = (data) => axios.post("/api/address", data);

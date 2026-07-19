@@ -664,7 +664,7 @@ ${shareUrl}`;
                 <div className="flex items-center gap-3">
                   <AvatarComponent
                     name={product?.seller_id?.name || "Seller"}
-                    imageUrl={product?.seller_id?.avatar}
+                    imageUrl={product?.seller_id?.avatar.url}
                     plan={product?.seller_id?.subscription} // Shows the seller's badge to buyers!
                     size="small"
                     className="lg:scale-125 origin-left" // This keeps your responsive sizing (w-7 to w-9)

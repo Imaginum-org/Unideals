@@ -8,22 +8,6 @@ function Wishlist() {
   const [visibleWishlist, setVisibleWishlist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // useEffect(() => {
-  //   const loadWishlist = async () => {
-  //     try {
-  //       setIsLoading(true);
-  //       await fetchWishlist();
-  //     } catch (error) {
-  //       console.error("Error loading wishlist:", error);
-  //       toast.error("Failed to load wishlist");
-  //     } finally {
-  //       setIsLoading(false);
-  //     }
-  //   };
-
-  //   loadWishlist();
-  // }, [fetchWishlist]);
-
   useEffect(() => {
     setIsLoading(false);
   }, []);
@@ -41,8 +25,6 @@ function Wishlist() {
   const handleRestoreView = () => {
     setVisibleWishlist(wishlist || []);
   };
-
-console.log(visibleWishlist);
 
   return (
     <>
@@ -72,7 +54,7 @@ console.log(visibleWishlist);
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
                 </div>
               ) : visibleWishlist && visibleWishlist.length > 0 ? (
-                <div className="w-full grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-x-5 2xl:gap-x-12  gap-y-7 dark:bg-[#131313]">
+                <div className="w-full grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-x-5 2xl:gap-x-4 gap-y-7 dark:bg-[#131313]">
                   {visibleWishlist.map((product) => (
                     <ProductCard
                       key={product._id}

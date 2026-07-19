@@ -445,7 +445,7 @@ const Header = () => {
                   >
                     <AvatarComponent
                       name={userDetails?.name}
-                      imageUrl={userDetails?.avatar}
+                      imageUrl={userDetails?.avatar.url}
                       size="small"
                       plan={userDetails?.subscription}
                       isLoading={userLoading}
@@ -486,7 +486,7 @@ const Header = () => {
                           <div className="flex items-center gap-4">
                             <AvatarComponent
                               name={userDetails?.name}
-                              imageUrl={userDetails?.avatar}
+                              imageUrl={userDetails?.avatar.url}
                               size="medium"
                               plan={userDetails?.subscription}
                               isLoading={userLoading}
@@ -1201,7 +1201,7 @@ dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-9
                     >
                       <AvatarComponent
                         name={userDetails?.name}
-                        imageUrl={userDetails?.avatar}
+                        imageUrl={userDetails?.avatar.url}
                         size="medium"
                         plan={userDetails?.subscription}
                         isLoading={userLoading}
@@ -1227,7 +1227,7 @@ dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-9
                             <div className="flex items-center gap-4">
                               <AvatarComponent
                                 name={userDetails?.name}
-                                imageUrl={userDetails?.avatar}
+                                imageUrl={userDetails?.avatar.url}
                                 size="medium"
                                 plan={userDetails?.subscription}
                                 isLoading={userLoading}

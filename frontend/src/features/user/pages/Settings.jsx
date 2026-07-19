@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,9 +15,10 @@ import {
   Shield,
   Trash2,
   User,
+  Loader2,
   Zap,
 } from "lucide-react";
-
+import { uploadImage } from "../../../utils/imageUpload";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import Loader from "../../../Components/ui/Loader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
@@ -33,7 +34,9 @@ import {
   getUserProfile,
   setDefaultAddress,
   updateAddress,
+  updateAvatar,
   updateProfile,
+  removeAvatar,
 } from "../api/userApi";
 
 const tabs = [
@@ -92,6 +95,10 @@ function Settings() {
   const [addresses, setAddresses] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
+
+  const fileInputRef = useRef(null);
 
   const defaultAddress = useMemo(
     () => addresses.find((address) => address.isDefault),
@@ -179,6 +186,77 @@ function Settings() {
       return false;
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+    setIsUploadingAvatar(true);
+
+    try {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select a valid image.");
+        return;
+      }
+
+      // Limit file size (5 MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size should be less than 5 MB.");
+        return;
+      }
+
+      // Upload to ImageKit
+      const uploadedImage = await uploadImage(file, "Avatars");
+
+      // Save in database
+      const res = await updateAvatar({
+        avatar: {
+          url: uploadedImage.url,
+          fileId: uploadedImage.fileId,
+        },
+      });
+
+      if (res.data.success) {
+        setUserDetails(res.data.user);
+        updateUserDetails(res.data.user);
+
+        toast.success("Profile photo updated successfully");
+      }
+    } catch (err) {
+      console.error(err);
+
+      toast.error(
+        err?.response?.data?.message || "Failed to update profile photo",
+      );
+    } finally {
+      // Reset input so selecting the same image again still triggers onChange
+      setIsUploadingAvatar(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setIsRemovingAvatar(true);
+    try {
+      const res = await removeAvatar();
+
+      if (res.data.success) {
+        setUserDetails(res.data.user);
+        updateUserDetails(res.data.user);
+
+        toast.success("Profile photo removed successfully");
+      }
+    } catch (err) {
+      console.error(err);
+
+      toast.error(
+        err?.response?.data?.message || "Failed to remove profile photo",
+      );
+    } finally {
+      setIsRemovingAvatar(false);
     }
   };
 
@@ -323,7 +401,7 @@ function Settings() {
                         <div className=" rounded-xl">
                           <AvatarComponent
                             name={userDetails?.name}
-                            imageUrl={userDetails?.avatar}
+                            imageUrl={userDetails?.avatar.url}
                             plan={userDetails?.subscription}
                             size="large"
                             isLoading={loading}
@@ -331,9 +409,52 @@ function Settings() {
                             shape="square"
                           />
                         </div>
-                        <div className="absolute -bottom-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-full border-[3px] border-white bg-[#4F46FF] text-white shadow-sm z-40">
-                          <Camera size={14} />
-                        </div>
+                        <button
+                          type="button"
+                          disabled={isUploadingAvatar || isRemovingAvatar}
+                          onClick={() => {
+                            if (userDetails?.avatar?.url) {
+                              handleRemoveAvatar();
+                            } else {
+                              fileInputRef.current?.click();
+                            }
+                          }}
+                          className={`
+  absolute
+  -bottom-1.5
+  -right-1.5
+  z-40
+  flex
+  h-8
+  w-8
+  items-center
+  justify-center
+  rounded-full
+  border-[3px]
+  border-white
+  text-white
+  shadow-lg
+  transition-all
+  duration-200
+  hover:scale-105
+  active:scale-95
+  disabled:cursor-not-allowed
+  disabled:opacity-60
+  ${
+    userDetails?.avatar?.fileId
+      ? "bg-red-500 hover:bg-red-600 shadow-red-500/25"
+      : "bg-[#4F46FF] hover:bg-[#4338CA] shadow-[#4F46FF]/25"
+  }
+`}
+                        >
+                          {isUploadingAvatar || isRemovingAvatar ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : userDetails?.avatar?.fileId ? (
+                            <Trash2 className="h-4 w-4" />
+                          ) : (
+                            <Camera className="h-4 w-4" />
+                          )}
+                        </button>
                       </div>
 
                       <div>
@@ -352,12 +473,23 @@ function Settings() {
                       </div>
                     </div>
 
-                    <button
+                    {/* <button
                       type="button"
+                      disabled={isUploadingAvatar || isRemovingAvatar}
+                      onClick={() => fileInputRef.current?.click()}
                       className="w-fit rounded-lg bg-[#EEF0FF] px-3.5 py-2 text-xs font-semibold text-[#4F46FF]"
                     >
-                      Change photo
-                    </button>
+                      {isUploadingAvatar ? "Uploading..." : "Change Photo"}
+                    </button> */}
+                    {/* 
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      disabled={isUploadingAvatar || isRemovingAvatar}
+                      className="rounded-lg border border-red-500 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50"
+                    >
+                      {isRemovingAvatar ? "Removing..." : "Remove Photo"}
+                    </button> */}
                   </div>
                 </div>
 
@@ -625,6 +757,13 @@ function Settings() {
               }
             />
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/jpg"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
         </main>
       </div>
     </div>

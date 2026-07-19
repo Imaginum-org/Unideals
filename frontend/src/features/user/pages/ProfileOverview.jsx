@@ -102,7 +102,7 @@ function ProfileOverview() {
               <div className="relative shrink-0 col-span-1 md:row-span-2 self-start md:self-center">
                 <AvatarComponent
                   name={userDetails?.name || "User"}
-                  imageUrl={userDetails?.avatar}
+                  imageUrl={userDetails?.avatar.url}
                   plan={userDetails?.subscription}
                   size="xlarge"
                   className="rounded-2xl"

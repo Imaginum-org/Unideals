@@ -1,5 +1,6 @@
 import userModel from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
+import { deleteImage } from "../utils/imagekit.js";
 
 // GET USER PROFILE
 export const getUserProfile = async (req, res) => {
@@ -98,6 +99,104 @@ export const updateUserProfile = async (req, res) => {
       message: err.message || err,
       success: false,
       error: true,
+    });
+  }
+};
+
+export const updateUserAvatar = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { avatar } = req.body;
+
+    if (!avatar?.url || !avatar?.fileId) {
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: "Avatar URL and fileId are required",
+      });
+    }
+
+    const user = await userModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: true,
+        message: "User not found",
+      });
+    }
+
+    // Delete previous uploaded avatar (don't delete the default avatar)
+    if (user.avatar?.fileId) {
+      await deleteImage(user.avatar.fileId);
+    }
+
+    user.avatar = {
+      url: avatar.url,
+      fileId: avatar.fileId,
+    };
+
+    await user.save();
+
+    const updatedUser = await userModel
+      .findById(userId)
+      .select("-password -refresh_token")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      error: false,
+      message: "Avatar updated successfully",
+      user: updatedUser,
+    });
+  } catch (err) {
+    console.error("Error updating avatar:", err);
+
+    return res.status(500).json({
+      success: false,
+      error: true,
+      message: err.message || "Internal server error",
+    });
+  }
+};
+
+export const removeUserAvatar = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await userModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Delete custom avatar from ImageKit
+    if (user.avatar?.fileId) {
+      await deleteImage(user.avatar.fileId);
+    }
+
+    // Remove custom avatar
+    user.avatar = {
+      url: null,
+      fileId: null,
+    };
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Avatar removed successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Remove avatar error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to remove avatar",
     });
   }
 };
