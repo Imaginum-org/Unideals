@@ -1,74 +1,96 @@
 const verifyEmailTemplate = ({ name, url }) => {
   return `
-    <div style="font-family: 'Inter', 'Poppins', Arial, sans-serif; max-width: 480px; margin: 0 auto; background-color: #ffffff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);">
-      
-      <div style="border-bottom: 1px solid #F1F5F9; padding: 32px 20px; text-align: center; border-top: 4px solid #2563EB; background-image: url('https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/HorizontalBorder.png?updatedAt=1779453128090'); background-size: cover; background-position: center;">
-        <h1 style="color: #2563EB; font-size: 24px; font-weight: 700; margin: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background-color: rgba(255, 255, 255, 0.95); padding: 8px 16px; border-radius: 8px;">
-          <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Group%2014.png" alt="Logo" style="display: inline-block; height: 24px; vertical-align: middle; margin: 0;" />Unideals
-        </h1>
-      </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F1F5F9; padding: 40px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Arial, sans-serif;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width: 480px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0px 8px 24px rgba(15, 23, 42, 0.06); border: 1px solid #EAECF0;">
 
-      <div style="padding: 32px 24px; text-align: center;">
-        
-        <div style="width: 64px; height: 64px; background-color: #EFF6FF; border-radius: 50%; margin: 0 auto 20px auto; position: relative; display: inline-flex; align-items: center; justify-content: center;">
-          <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Icon.svg" alt="Icon" style="display: block; width: 32px; height: 32px;" />
-          <div style="position: absolute; bottom: -6px; right: -6px; display: inline-flex; align-items: center; justify-content: center; background-color: #22C55E; color: white; border-radius: 50%; width: 24px; height: 24px; font-size: 12px; font-weight: bold; border: 2px solid white; line-height: 1;">
-            ✓
-          </div>
-        </div>
+            <!-- Header -->
+            <tr>
+              <td align="center" style="background-color: #3838EC; padding: 28px 24px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="vertical-align: middle; padding-right: 8px;">
+                      <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Group%2014.png" alt="" width="22" height="22" style="display: block; filter: brightness(0) invert(1);" />
+                    </td>
+                    <td style="vertical-align: middle;">
+                      <span style="color: #ffffff; font-size: 19px; font-weight: 700; letter-spacing: -0.2px;">Unideals</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
 
-        <h2 style="color: #0F172A; font-size: 22px; font-weight: 700; margin: 0 0 12px 0;">
-          Verify Your Email Address
-        </h2>
+            <!-- Body -->
+            <tr>
+              <td style="padding: 40px 32px 32px 32px;">
 
-        <p style="color: #64748B; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
-          Hi <strong>${name}</strong>,<br/> Thanks for signing up for our platform! We're excited to have you on board. Please click the button below to verify your email address and activate your account.
-        </p>
+                <!-- Icon badge -->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 24px auto;">
+                  <tr>
+                    <td width="64" height="64" align="center" valign="middle" style="background-color: #EEF0FF; border-radius: 50%; position: relative;">
+                      <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Icon.svg" alt="" width="28" height="28" style="display: block;" />
+                    </td>
+                  </tr>
+                </table>
 
-        <a href="${url}" target="_blank" style="display: inline-block; background-color: #4F46E5; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 6px; margin-bottom: 24px;">
-          Verify Email
-        </a>
+                <h1 style="color: #0F172A; font-size: 21px; font-weight: 700; margin: 0 0 10px 0; text-align: center; letter-spacing: -0.3px;">
+                  Verify your email address
+                </h1>
 
-        <div style="background-color: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-          <p style="color: #64748B; font-size: 12px; margin: 0 0 8px 0; text-align: left;">
-            If the button doesn't work,
-          </p>
-          <div style="background-color: #ffffff; border: 1px solid #E2E8F0; border-radius: 4px; padding: 10px;">
-            <p style="color: #64748B; font-size: 12px; margin: 0;">
-              You can also <a href="${url}" style="color: #4F46E5; font-weight: 700; text-decoration: underline; word-break: break-all;">verify your email here.</a>
-            </p>
-          </div>
-        </div>
+                <p style="color: #64748B; font-size: 14.5px; line-height: 1.65; margin: 0 0 28px 0; text-align: center;">
+                  Hi <strong style="color: #334155;">${name}</strong>, thanks for signing up. Please confirm this is your email address to activate your Unideals account.
+                </p>
 
-        <div style="text-align: left; padding: 0 10px;">
-          <p style="color: #94A3B8; font-size: 11px; line-height: 1.5; margin: 0;">
-            <span style="font-size: 12px;">ⓘ</span> This link will expire in 24 hours. If you didn't create an account with Unideals, you can safely delete this email.
-          </p>
-        </div>
+                <!-- Button -->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 28px auto;">
+                  <tr>
+                    <td align="center" bgcolor="#3838EC" style="border-radius: 8px;">
+                      <a href="${url}" target="_blank" style="display: inline-block; padding: 13px 36px; font-size: 14.5px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">
+                        Verify Email
+                      </a>
+                    </td>
+                  </tr>
+                </table>
 
-      </div>
+                <!-- Fallback link -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8FAFC; border: 1px solid #EEF0F4; border-radius: 10px; margin-bottom: 24px;">
+                  <tr>
+                    <td style="padding: 14px 16px;">
+                      <p style="color: #94A3B8; font-size: 11.5px; margin: 0 0 6px 0;">
+                        Button not working? Paste this link into your browser:
+                      </p>
+                      <a href="${url}" style="color: #3838EC; font-size: 11.5px; font-weight: 600; text-decoration: underline; word-break: break-all;">${url}</a>
+                    </td>
+                  </tr>
+                </table>
 
-      <div style="background-color: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 24px; text-align: center;">
-        
-        <div style="margin-bottom: 12px; color: #94A3B8; font-size: 14px;">
-          <span style="margin: 0 8px;">❓</span>
-          <span style="margin: 0 8px;">⚙️</span>
-          <span style="margin: 0 8px;">🔒</span>
-        </div>
+                <p style="color: #94A3B8; font-size: 11.5px; line-height: 1.6; margin: 0; text-align: center;">
+                  This link expires in 24 hours. If you didn't create an account with Unideals, you can safely ignore this email.
+                </p>
 
-        <p style="color: #94A3B8; font-size: 11px; line-height: 1.6; margin: 0 0 12px 0;">
-          © 2026 Unideals Inc. All rights reserved.<br/>
-          Vellore, India
-        </p>
+              </td>
+            </tr>
 
-        <p style="color: #94A3B8; font-size: 11px; margin: 0;">
-          <a href="#" style="color: #94A3B8; text-decoration: none; font-weight: 500;">Privacy Policy</a> 
-          <span style="margin: 0 8px;">•</span> 
-          <a href="#" style="color: #94A3B8; text-decoration: none; font-weight: 500;">Terms of Service</a>
-        </p>
-      </div>
+            <!-- Footer -->
+            <tr>
+              <td style="background-color: #F8FAFC; border-top: 1px solid #EEF0F4; padding: 22px 24px; text-align: center;">
+                <p style="color: #94A3B8; font-size: 11px; line-height: 1.6; margin: 0 0 10px 0;">
+                  © 2026 Unideals Inc. All rights reserved.<br/>
+                  Vellore, India
+                </p>
+                <p style="color: #94A3B8; font-size: 11px; margin: 0;">
+                  <a href="#" style="color: #94A3B8; text-decoration: none; font-weight: 500;">Privacy Policy</a>
+                  <span style="margin: 0 8px; color: #CBD5E1;">•</span>
+                  <a href="#" style="color: #94A3B8; text-decoration: none; font-weight: 500;">Terms of Service</a>
+                </p>
+              </td>
+            </tr>
 
-    </div>
+          </table>
+        </td>
+      </tr>
+    </table>
   `;
 };
 
