@@ -18,7 +18,7 @@ import {
   Loader2,
   Zap,
 } from "lucide-react";
-import { uploadImage } from "../../../utils/imageUpload";
+import { uploadImage } from "../../../Utils/imageUpload.js";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import Loader from "../../../Components/ui/Loader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
