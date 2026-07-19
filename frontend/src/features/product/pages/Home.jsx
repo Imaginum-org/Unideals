@@ -46,7 +46,7 @@ const Home = () => {
     if (isFirstListing) {
       setShowCelebration(true);
     } else {
-      toast.success("🎉 Listing published successfully");
+      toast.success("Listing published successfully");
     }
 
     navigate(location.pathname, {

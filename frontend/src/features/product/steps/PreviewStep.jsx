@@ -40,9 +40,9 @@ const PreviewStep = () => {
 
       await saveDraftProduct({
         status: "draft",
-        title: formData.title,
+        title: formData.title.trim(),
 
-        description: formData.description,
+        description: formData.description.trim(),
 
         category: formData.category,
 
