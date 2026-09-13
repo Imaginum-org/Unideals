@@ -17,6 +17,10 @@ export const exchangeGoogleOAuthCode = (data) => {
   return axios.post(`${AUTH_BASE_PATH}/google/exchange`, data);
 };
 
+export const loginWithGoogleOneTap = (data) => {
+  return axios.post(`${AUTH_BASE_PATH}/google/one-tap`, data);
+};
+
 export const logoutUser = () => {
   return axios.get(`${AUTH_BASE_PATH}/logoutUser`);
 };

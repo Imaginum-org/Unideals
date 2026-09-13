@@ -23,6 +23,52 @@ const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_REDIRECT_URI,
 );
 
+const findOrCreateGoogleUser = async (payload) => {
+  const email = payload?.email?.toLowerCase();
+
+  if (!email) {
+    const error = new Error("Google did not return a valid email.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const name = payload.name || email.split("@")[0];
+  const picture = payload.picture
+    ? payload.picture.replace("s96-c", "s400-c")
+    : null;
+
+  let user = await userModel.findOne({ email }).select("+password");
+
+  if (!user) {
+    const randomPassword = crypto.randomBytes(32).toString("hex");
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+    user = await userModel.create({
+      name,
+      email,
+      password: hashedPassword,
+      avatar: picture ? { url: picture } : undefined,
+      is_email_verified: true,
+      verifyTokenEmail: "",
+    });
+  } else {
+    if (picture && !user.avatar?.url) {
+      user.avatar = {
+        ...(user.avatar?.toObject?.() || user.avatar || {}),
+        url: picture,
+      };
+    }
+
+    if (!user.is_email_verified) {
+      user.is_email_verified = true;
+    }
+
+    await user.save();
+  }
+
+  return user;
+};
+
 export const registerUserController = async (req, res) => {
   try {
     let { name, email, password } = req.body;
@@ -177,55 +223,7 @@ export const googleAuthCallbackController = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    const email = payload?.email?.toLowerCase();
-
-    if (!email) {
-      return res.status(400).json({
-        message: "Google did not return a valid email.",
-        success: false,
-        error: true,
-      });
-    }
-
-    const name = payload.name || email.split("@")[0];
-
-    // High-quality image
-    const picture = payload.picture
-      ? payload.picture.replace("s96-c", "s400-c")
-      : null;
-
-    let user = await userModel.findOne({ email }).select("+password");
-
-    if (!user) {
-      const randomPassword = crypto.randomBytes(32).toString("hex");
-      const hashedPassword = await bcrypt.hash(randomPassword, 10);
-
-      user = await userModel.create({
-        name,
-        email,
-        password: hashedPassword,
-        avatar: picture || undefined, // only store if exists
-        is_email_verified: true,
-        verifyTokenEmail: "",
-      });
-    } else {
-      // ONLY update avatar if user has default / no avatar
-      if (
-        picture &&
-        (!user.avatar ||
-          user.avatar.includes("avatar-default") ||
-          user.avatar === "")
-      ) {
-        user.avatar = picture;
-      }
-
-      // Ensure verified
-      if (!user.is_email_verified) {
-        user.is_email_verified = true;
-      }
-
-      await user.save();
-    }
+    const user = await findOrCreateGoogleUser(payload);
 
     const oauthLoginCode = crypto.randomBytes(32).toString("hex");
     const hashedOauthLoginCode = crypto
@@ -246,6 +244,66 @@ export const googleAuthCallbackController = async (req, res) => {
     console.error("Google auth callback error:", error);
     return res.status(500).json({
       message: "Google authentication failed.",
+      success: false,
+      error: true,
+    });
+  }
+};
+
+export const googleOneTapController = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        message: "Google credential is required",
+        success: false,
+        error: true,
+      });
+    }
+
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const user = await findOrCreateGoogleUser(ticket.getPayload());
+
+    if (user.status !== USER_STATUS.ACTIVE) {
+      const statusLabel =
+        user.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
+
+      return res.status(403).json({
+        message: `Your account is ${statusLabel}. Please contact support.`,
+        success: false,
+        error: true,
+        accountBlocked: true,
+        accountStatus: user.status,
+      });
+    }
+
+    user.last_login_date = new Date();
+    await user.save();
+
+    const accessToken = await generatedAccessToken(user._id);
+    const refreshToken = await generatedRefreshToken(user._id);
+
+    setAuthCookies(res, accessToken, refreshToken);
+
+    return res.status(200).json({
+      message: "Google login successful",
+      success: true,
+      error: false,
+      data: {
+        accessToken,
+        refreshToken,
+        user: sanitizeAuthUser(user),
+      },
+    });
+  } catch (error) {
+    console.error("Google One Tap error:", error);
+    return res.status(error.statusCode || 500).json({
+      message: error.message || "Google login failed",
       success: false,
       error: true,
     });

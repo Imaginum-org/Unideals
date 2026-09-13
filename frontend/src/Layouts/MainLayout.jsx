@@ -16,6 +16,7 @@ const MainLayout = () => {
     "/contact",
     "/wishlist",
     "/termscondition",
+    "/subscription",
   ];
 
   const shouldShowFooter = !hideFooterRoutes.some((route) =>

@@ -87,11 +87,11 @@ export default function Notification() {
   };
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#F7F8FC] font-figtree dark:bg-[#131313]">
+    <div className="h-full w-full overflow-hidden bg-[#F7F8FC] font-figtree dark:bg-[#131313]">
       <div className="flex h-[calc(100vh-70px)]">
-        <aside className="hidden bg-white dark:bg-[#131313] md:block md:w-auto md:shrink-0">
+        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
           <Profile_left_part />
-        </aside>
+        </div>
 
         <main className="h-full overflow-y-auto bg-[#F7F8FC] px-5 py-6 dark:bg-[#131313] md:flex-1 xl:px-[5.7rem]">
           <div className="mx-auto w-full max-w-4xl pb-10">

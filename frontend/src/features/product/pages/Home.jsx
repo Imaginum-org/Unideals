@@ -12,10 +12,16 @@ import FirstListingCelebration from "../../../Components/FirstListingCelebration
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { CATEGORY_ITEMS } from "../constants/categories";
 import { FiArrowRight } from "react-icons/fi";
+import { useUser } from "../../../context/useUserContext.jsx";
+import { loginWithGoogleOneTap } from "../../auth/api/authApi.js";
+
+const HOME_GOOGLE_LOGIN_TRIGGER_KEY = "homeGoogleLoginTriggered";
+const GOOGLE_ID_SCRIPT_ID = "google-identity-services-script";
 
 const Home = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isLoggedIn, loading: userLoading, fetchUserProfile } = useUser();
 
   //STATE
   const [products, setProducts] = useState([]);
@@ -36,6 +42,73 @@ const Home = () => {
   useEffect(() => {
     hasMoreRef.current = hasMore;
   }, [hasMore]);
+
+  useEffect(() => {
+    if (userLoading || isLoggedIn) return;
+    if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+      console.warn("VITE_GOOGLE_CLIENT_ID is required for Google One Tap.");
+      return;
+    }
+
+    if (sessionStorage.getItem(HOME_GOOGLE_LOGIN_TRIGGER_KEY) === "true") {
+      return;
+    }
+
+    let isActive = true;
+
+    const handleCredentialResponse = async (response) => {
+      try {
+        const res = await loginWithGoogleOneTap({
+          credential: response.credential,
+        });
+        const accessToken = res.data?.data?.accessToken;
+
+        if (accessToken) {
+          localStorage.setItem("accessToken", accessToken);
+        }
+
+        localStorage.setItem("isAuthenticated", "true");
+        await fetchUserProfile();
+      } catch (err) {
+        localStorage.removeItem("isAuthenticated");
+        localStorage.removeItem("accessToken");
+        console.error("Google One Tap login failed:", err);
+      }
+    };
+
+    const showOneTap = () => {
+      if (!isActive || !window.google?.accounts?.id) return;
+
+      sessionStorage.setItem(HOME_GOOGLE_LOGIN_TRIGGER_KEY, "true");
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+        context: "signin",
+        cancel_on_tap_outside: true,
+        itp_support: true,
+      });
+      window.google.accounts.id.prompt();
+    };
+
+    const existingScript = document.getElementById(GOOGLE_ID_SCRIPT_ID);
+
+    if (existingScript) {
+      showOneTap();
+    } else {
+      const script = document.createElement("script");
+      script.id = GOOGLE_ID_SCRIPT_ID;
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = showOneTap;
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      isActive = false;
+      window.google?.accounts?.id?.cancel();
+    };
+  }, [fetchUserProfile, isLoggedIn, userLoading]);
 
   useEffect(() => {
     const listingCreated = location.state?.listingCreated;
