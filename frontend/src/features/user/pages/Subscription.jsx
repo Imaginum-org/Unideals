@@ -137,7 +137,7 @@ function Subscription() {
   };
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
+    <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
       <div className="flex h-[calc(100vh-70px)]">
         <aside className="hidden bg-white dark:bg-[#131313] md:block md:w-auto md:shrink-0">
           <Profile_left_part />

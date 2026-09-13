@@ -18,9 +18,7 @@ function Termscondition() {
         {/* RIGHT PANEL (Main Content Area) */}
         <div
           className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:px-[5.7rem] lg:py-6 ${
-            userDetails?._id
-              ? "w-full md:flex-1"
-              : "mx-auto w-full max-w-5xl"
+            userDetails?._id ? "w-full md:flex-1" : "mx-auto w-full max-w-5xl"
           }`}
         >
           {/* Centered container to match other pages */}
@@ -34,4 +32,3 @@ function Termscondition() {
 }
 
 export default Termscondition;
-
