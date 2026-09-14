@@ -61,7 +61,7 @@ const SOCIAL_LINKS = [
 
 const Footer = () => {
   return (
-    <div className="bg-white p-3 md:p-6 dark:bg-[#131313]">
+    <div className="bg-white p-2 md:p-4 dark:bg-[#131313]">
       <div className="mx-auto w-full max-w-[1600px]">
         <footer
           style={{
@@ -70,25 +70,25 @@ const Footer = () => {
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
           }}
-          className="w-full overflow-hidden rounded-[30px] px-5 pt-5 font-figtree"
+          className="w-full overflow-hidden rounded-[30px] px-4 pt-4 font-figtree"
         >
           <div
             className="rounded-[30px] bg-white dark:bg-[#131313] dark:text-white px-6
-py-8
+              py-4
 sm:px-8
 md:px-12
 lg:px-16 text-[#5d6068] shadow-2xl"
           >
             <div
-              className="grid grid-cols-1
+              className="grid grid-cols-1 text-sm
 sm:grid-cols-2
 lg:grid-cols-[1.5fr_1fr_1fr_1fr]
-gap-8"
+gap-6"
             >
               <div>
                 <Link
                   to="/"
-                  className="mb-6 flex flex-col items-start text-xl font-semibold text-black dark:text-white"
+                  className="mb-4 flex flex-col items-start text-xl font-semibold text-black dark:text-white"
                 >
                   <div className="flex items-center justify-center">
                     <img
@@ -105,22 +105,22 @@ gap-8"
                   </div>
                 </Link>
 
-                <p className="mb-8 max-w-[230px] leading-6 text-base text-[#2D3339] dark:text-slate-500">
+                <p className="mb-5 max-w-[230px] leading-5 text-sm text-[#2D3339] dark:text-slate-500">
                   Your campus connection for buying, selling, and trading.
                 </p>
 
-                <h3 className="mb-4 font-semibold text-base text-[#2D3339]">
+                <h3 className="mb-3 font-semibold text-sm text-[#2D3339]">
                   STAY IN THE LOOP
                 </h3>
-                <form className="mb-6 flex max-w-[330px] gap-3">
+                <form className="mb-4 flex max-w-[330px] gap-3">
                   <input
                     type="email"
                     placeholder="Drop you mail"
-                    className="min-w-0 flex-1 rounded-xl outline-none text-black select-none bg-[#F3F4F8] px-5 py-3 border border-[#E8EAF0] placeholder:text-[#7A8697]"
+                    className="min-w-0 flex-1 rounded-xl outline-none text-sm text-black select-none bg-[#F3F4F8] px-4 py-2.5 border border-[#E8EAF0] placeholder:text-[#7A8697]"
                   />
                   <button
                     type="submit"
-                    className="grid h-12 w-12 place-items-center rounded-2xl bg-[#3838EC] text-xl text-white"
+                    className="grid h-11 w-11 place-items-center rounded-2xl bg-[#3838EC] text-lg text-white"
                   >
                     <FiArrowRight />
                   </button>
@@ -136,8 +136,8 @@ gap-8"
                       aria-label={label}
                       className="
       grid
-      h-11
-      w-11
+      h-10
+      w-10
       place-items-center
       rounded-lg
       bg-[#F3F4F8]
@@ -157,11 +157,11 @@ gap-8"
 
               {FOOTER_LINKS.map(({ title, links }) => (
                 <div key={title}>
-                  <h3 className="mb-6 font-bold uppercase text-[#313131]">
+                  <h3 className="mb-4 font-bold uppercase text-[#313131]">
                     {title}
                   </h3>
 
-                  <ul className="space-y-3">
+                  <ul className="space-y-2.5">
                     {links.map(({ label, href }) => (
                       <li key={label}>
                         <Link
@@ -193,22 +193,22 @@ gap-8"
               ))}
             </div>
 
-            <div className="mt-16 flex flex-col gap-8 border-t border-[#e7e8e9] pt-6 text-sm text-[#9CA3AF] md:flex-row md:items-center md:justify-between">
+            <div className="mt-6 flex flex-col gap-4 border-t border-[#e7e8e9] pt-4 text-xs text-[#9CA3AF] md:flex-row md:items-center md:justify-between">
               <p>© {new Date().getFullYear()} Unideals All rights reserved.</p>
 
               <div className="flex items-center gap-7 text-[#9CA3AF]">
                 <Link to="/termscondition">Terms and Privacy</Link>
-                <ShareButton />
+                <ShareButton className="footer-share-btn" />
               </div>
             </div>
           </div>
 
           <motion.h2
-            initial={{ y: 70, opacity: 0.85 }}
-            whileInView={{ y: 50, opacity: 0.9 }}
+            initial={{ y: 45, opacity: 0.85 }}
+            whileInView={{ y: 32, opacity: 0.9 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
             viewport={{ amount: 0.45 }}
-            className="pointer-events-none mt-[-1.2vh] select-none text-center text-[clamp(4rem,15vw,15rem)] font-bold leading-none text-white"
+            className="pointer-events-none mt-[-0.8vh] select-none text-center text-[clamp(3rem,10vw,10rem)] font-bold leading-none text-white"
           >
             unideals
           </motion.h2>

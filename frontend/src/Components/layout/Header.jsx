@@ -53,7 +53,11 @@ const ProfileDropdown = ({
     [
       { to: "/settings", icon: <LuBadgeCheck />, label: "Campus Verification" },
       { to: "/contact", icon: <LuCircleHelp />, label: "Help Center" },
-      { to: "/privacy-policy", icon: <LuShield />, label: "Privacy & Security" },
+      {
+        to: "/privacy-policy",
+        icon: <LuShield />,
+        label: "Privacy & Security",
+      },
     ],
   ];
 
@@ -74,7 +78,7 @@ const ProfileDropdown = ({
         z-50
         mt-2.5
         max-h-[calc(100vh-6rem)]
-        ${mobile ? "w-[min(calc(100vw-2rem),260px)]" : "w-[270px]"}
+        ${mobile ? "w-[min(calc(100vw-2rem),276px)]" : "w-[286px]"}
         overflow-y-auto
         overflow-x-hidden
         rounded-2xl
@@ -86,8 +90,8 @@ const ProfileDropdown = ({
         dark:bg-[#1A1D20]
       `}
     >
-      <div className="px-4 pb-3 pt-4">
-        <div className="flex items-center gap-3">
+      <div className="px-[17px] pb-[13px] pt-[17px]">
+        <div className="flex items-center gap-[13px]">
           <AvatarComponent
             name={userDetails?.name}
             imageUrl={userDetails?.avatar?.url}
@@ -99,25 +103,27 @@ const ProfileDropdown = ({
           />
 
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold leading-tight text-[#1F2937] dark:text-white">
+            <h1 className="truncate text-[15px] font-semibold leading-tight text-[#1F2937] dark:text-white">
               {userDetails?.name || "User"}
             </h1>
 
-            <p className="truncate text-xs leading-4 text-neutral-400 dark:text-neutral-500">
+            <p className="truncate text-[13px] leading-4 text-neutral-400 dark:text-neutral-500">
               {userDetails?.email || ""}
             </p>
 
-            <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-medium text-[#4B45FF]">
+            <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[13px] font-medium text-[#4B45FF]">
               <GrLocation className="size-3 shrink-0" />
               <span className="truncate">{campus}</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-neutral-200 pt-2.5 text-xs dark:border-neutral-800">
+        <div className="mt-[13px] flex flex-wrap items-center gap-x-[11px] gap-y-1 border-t border-neutral-200 pt-[11px] text-[13px] dark:border-neutral-800">
           <div className="flex min-w-0 items-center gap-1">
             <FaStar className="size-3 shrink-0 text-[#FFB000]" />
-            <span className="font-semibold text-[#4B5563] dark:text-neutral-100">5</span>
+            <span className="font-semibold text-[#4B5563] dark:text-neutral-100">
+              5
+            </span>
             <span className="text-neutral-400">trust</span>
           </div>
 
@@ -125,14 +131,18 @@ const ProfileDropdown = ({
 
           <div className="flex min-w-0 items-center gap-1">
             <BsLightningChargeFill className="size-3 shrink-0 text-[#4B45FF]" />
-            <span className="font-semibold text-[#111827] dark:text-neutral-100">100%</span>
+            <span className="font-semibold text-[#111827] dark:text-neutral-100">
+              100%
+            </span>
             <span className="text-neutral-400">response</span>
           </div>
 
           <div className="h-3.5 w-px bg-neutral-200 dark:bg-neutral-700" />
 
           <div className="whitespace-nowrap text-neutral-400">
-            <span className="font-semibold text-[#9CA3AF] dark:text-neutral-300">{soldCount}</span>{" "}
+            <span className="font-semibold text-[#9CA3AF] dark:text-neutral-300">
+              {soldCount}
+            </span>{" "}
             sold
           </div>
         </div>
@@ -148,9 +158,9 @@ const ProfileDropdown = ({
               key={label}
               to={to}
               onClick={onClose}
-              className="flex items-center gap-3 px-4 py-2 text-xs font-medium text-[#4B5563] transition-colors duration-200 hover:bg-neutral-50 active:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:active:bg-neutral-800"
+              className="flex items-center gap-[13px] px-[17px] py-[9px] text-[13px] font-medium text-[#4B5563] transition-colors duration-200 hover:bg-neutral-50 active:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:active:bg-neutral-800"
             >
-              <span className="text-base text-[#9CA3AF] dark:text-neutral-400">
+              <span className="text-[17px] text-[#9CA3AF] dark:text-neutral-400">
                 {icon}
               </span>
               <span>{label}</span>
@@ -161,9 +171,9 @@ const ProfileDropdown = ({
 
       <button
         onClick={onLogout}
-        className="group flex w-full items-center gap-3 border-t border-neutral-200 px-4 py-3 text-xs font-medium text-[#4B5563] transition-colors duration-200 hover:bg-red-50 hover:text-red-500 active:bg-red-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-red-950/20 dark:hover:text-red-400 dark:active:bg-red-950/20"
+        className="group flex w-full items-center gap-[13px] border-t border-neutral-200 px-[17px] py-[13px] text-[13px] font-medium text-[#4B5563] transition-colors duration-200 hover:bg-red-50 hover:text-red-500 active:bg-red-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-red-950/20 dark:hover:text-red-400 dark:active:bg-red-950/20"
       >
-        <MdOutlineLogout className="text-base text-[#9CA3AF] transition-colors duration-200 group-hover:text-red-500 dark:text-neutral-400" />
+        <MdOutlineLogout className="text-[17px] text-[#9CA3AF] transition-colors duration-200 group-hover:text-red-500 dark:text-neutral-400" />
         <span>Sign Out</span>
       </button>
     </motion.div>
