@@ -339,7 +339,7 @@ function Settings() {
           <Profile_left_part />
         </aside>
 
-        <main className="h-full w-full overflow-y-auto bg-[#F5F6FA] px-4 py-6 dark:bg-[#131313] sm:px-6 md:flex-1 lg:p-8 xl:px-[5.7rem] xl:py-6">
+        <main className="h-full w-full overflow-y-auto no-scrollbar bg-[#F5F6FA] px-4 py-6 dark:bg-[#131313] sm:px-6 md:flex-1 lg:p-8 xl:px-[5.7rem] xl:py-6">
           <div className="mx-auto w-full max-w-5xl pb-8">
             <header className="mb-5">
               <h1 className="text-[1.4rem] font-bold leading-tight text-gray-900 dark:text-white lg:text-2xl xl:text-xl">

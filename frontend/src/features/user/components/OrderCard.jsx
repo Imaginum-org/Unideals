@@ -184,7 +184,7 @@ const OrderCard = ({
       {/* 1. HEADER */}
       <div
         className={`px-4 sm:px-6 py-3.5 border-b dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-3 ${
-          boostActive ? boostTone.header : "bg-gray-100 border-gray-50"
+          boostActive ? boostTone.header : "bg-gray-100 border-gray-50 dark:bg-[#242424] dark:border-gray-800/50"
         }`}
       >
         <div className="text-[12px] sm:text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate flex-1 pr-2">

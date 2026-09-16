@@ -7,6 +7,7 @@ import { IoNotificationsOutline } from "react-icons/io5";
 import { MdSunny } from "react-icons/md";
 import { HiMiniMoon } from "react-icons/hi2";
 import { FiMessageSquare } from "react-icons/fi";
+import { FiSettings } from "react-icons/fi";
 import { FaPlus } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
 import { LuMessageSquare } from "react-icons/lu";
@@ -51,7 +52,7 @@ const ProfileDropdown = ({
       { to: "/notification", icon: <LuBell />, label: "Notifications" },
     ],
     [
-      { to: "/settings", icon: <LuBadgeCheck />, label: "Campus Verification" },
+      { to: "/settings", icon: <FiSettings />, label: "Settings" },
       { to: "/contact", icon: <LuCircleHelp />, label: "Help Center" },
       {
         to: "/privacy-policy",
@@ -1049,7 +1050,7 @@ const Header = () => {
             )}
 
             {/* Search */}
-            <div className="data-search-dropdown relative mx-3 xl:mx-6 xl:mr-80 flex-1 max-w-md items-center">
+            <div className="data-search-dropdown relative mx-3 min-w-0 flex-1 max-w-md items-center lg:max-w-none xl:mx-6 xl:mr-80 xl:max-w-md">
               <input
                 ref={searchInputRef}
                 type="text"
@@ -1190,7 +1191,7 @@ dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-9
             </div>
 
             {/* Actions */}
-            <div className="flex shrink-0 items-center gap-4 lg:gap-5 xl:gap-7">
+            <div className="flex shrink-0 items-center gap-3 lg:gap-4 xl:gap-7">
               {isLoggedIn ? (
                 <>
                   <button

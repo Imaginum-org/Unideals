@@ -252,7 +252,7 @@ function Subscription() {
                 <h2 className="text-[14px] font-extrabold text-[#09111F] dark:text-white">
                   This Month&apos;s Usage
                 </h2>
-                <span className="rounded-full bg-[#F2F4F9] px-3 py-1 text-[10px] font-bold text-[#09111F] dark:text-white">
+                <span className="rounded-full bg-[#F2F4F9] px-3 py-1 text-[10px] font-bold text-[#09111F] dark:text-[#4A3CFF]">
                   Resets Jun 15
                 </span>
               </div>

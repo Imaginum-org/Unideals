@@ -131,7 +131,7 @@ const MyOrdersCard = ({
   return (
     <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden font-figtree mb-1">
       {/* 1. HEADER ROW */}
-      <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800/50 bg-gray-100 flex items-center justify-between">
+      <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800/50 bg-gray-100 dark:bg-[#242424] flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-gray-400 font-medium">
           <FiBox size={16} />
           <span>#{orderId}</span>

@@ -256,9 +256,9 @@ group-hover:pointer-events-auto
                   className="
       rounded-lg
       bg-[#3838EC]
-      px-5
+              px-3 sm:px-5
       py-2.5
-      text-xs
+              text-[11px] sm:text-xs
       xl:text-base
       2xl:text-sm
       font-semibold
@@ -269,6 +269,7 @@ group-hover:pointer-events-auto
       hover:bg-[#2f2fd9]
       hover:scale-[1.04]
                   flex items-center justify-center gap-2
+      whitespace-nowrap
       active:scale-95
     "
                 >
@@ -362,17 +363,17 @@ group-hover:pointer-events-auto
               </h3>
 
               {/* PRICE & DISCOUNT */}
-              <div className="mt-2 flex items-end gap-2">
-                <span className="text-[20px] md:text-lg xl:text-xl font-bold text-[#2A2A2A] dark:text-white">
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                <span className="text-[19px] md:text-lg xl:text-xl font-bold text-[#2A2A2A] dark:text-white whitespace-nowrap">
                   ₹{formattedPrice.selling}
                 </span>
 
                 {savings > 0 && (
                   <>
-                    <span className="text-[14px] md:text-[15px] font-medium text-[#ACACAC] line-through">
+                    <span className="text-[13px] md:text-[15px] font-medium text-[#ACACAC] line-through whitespace-nowrap">
                       ₹{formattedPrice.original}
                     </span>
-                    <div className="bg-[#008000] text-white text-[11px] md:text-[12px] font-medium px-2 py-0.5 md:py-1 rounded-md ml-1">
+                    <div className="bg-[#008000] text-white text-[11px] md:text-[12px] font-medium px-2 py-0.5 md:py-1 rounded-md whitespace-nowrap">
                       Save ₹{formattedPrice.savings}
                     </div>
                   </>
@@ -383,9 +384,9 @@ group-hover:pointer-events-auto
               <div className="my-3.5 h-px bg-[#EEF1F5] dark:bg-zinc-800" />
 
               {/* FOOTER (Avatar, Rating & Location) */}
-              <div className="flex items-center justify-between mt-auto">
+              <div className="flex items-center gap-1.5 mt-auto min-w-0">
                 {/* Left Side: Avatar & Name */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <AvatarComponent
                     name={sellerName}
                     imageUrl={sellerAvatarUrl}
@@ -393,12 +394,12 @@ group-hover:pointer-events-auto
                     // plan={sellerPlan}
                     className="shrink-0 h-6 w-6 md:h-7 md:w-7"
                   />
-                  <span className="capitalize text-[13px] md:text-[14px] font-medium text-zinc-500 dark:text-zinc-400 line-clamp-1 max-w-[80px]">
+                  <span className="capitalize text-[13px] md:text-[14px] font-medium text-zinc-500 dark:text-zinc-400 line-clamp-1 min-w-0 max-w-[56px] sm:max-w-[80px]">
                     {sellerName}
                   </span>
 
                   {/* Rating Badge */}
-                  <div className="flex items-center gap-1 border border-[#E1E1E1] dark:border-zinc-700 rounded-full px-2 py-1 ml-1">
+                  <div className="flex shrink-0 items-center gap-1 border border-[#E1E1E1] dark:border-zinc-700 rounded-full px-1.5 sm:px-2 py-1 ml-0.5 sm:ml-1">
                     <FaStar className="text-yellow-400 text-[13px]" />
                     <span className="text-[13px] font-medium text-zinc-400">
                       {sellerRating}
@@ -409,8 +410,8 @@ group-hover:pointer-events-auto
                 {/* Right Side: Location */}
                 {formattedLocation && (
                   <div className="flex items-center justify-center gap-1 text-[#A2ACB8] shrink-0">
-                    <IoLocationOutline size={18} className="text-[#4A5565]" />
-                    <span className="text-[12px] md:text-[14px] font-medium truncate max-w-[110px]">
+                    <IoLocationOutline size={16} className="text-[#4A5565] md:h-[18px] md:w-[18px]" />
+                    <span className="hidden md:block text-[12px] md:text-[14px] font-medium truncate max-w-[110px]">
                       {formattedLocation}
                     </span>
                   </div>
