@@ -115,6 +115,23 @@ export const USER_TIER = Object.freeze({
   PRO_PLUS: "pro_plus",
 });
 
+export const PAYMENT_STATUS = Object.freeze({
+  CREATED: "created", // Order created in backend
+  PENDING: "pending", // Checkout opened / waiting for payment
+  VERIFIED: "verified", // Signature verified successfully
+  FAILED: "failed", // Payment failed
+  EXPIRED: "expired", // Order expired / abandoned
+  CANCELLED: "cancelled", // Cancelled manually
+  REFUNDED: "refunded", // Payment refunded
+});
+
+export const SUBSCRIPTION_STATUS = Object.freeze({
+  PENDING: "pending", // Payment done but subscription not activated yet
+  ACTIVE: "active",
+  EXPIRED: "expired",
+  CANCELLED: "cancelled",
+});
+
 // UI Labels
 export const PRODUCT_CATEGORY_LABELS = {
   electronics: "Electronics",
