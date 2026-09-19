@@ -1,5 +1,11 @@
 import { USER_TIER } from "./constants.js";
 
+// NOTE: BOOST_PLAN_RULES is the live enforcement for boosts.
+// subscriptionPlans.js documents the monetization targets (0/2/5 credits,
+// 3d/7d durations) for when payments launch. To avoid breaking current
+// Free/Pro behavior (Free currently gets boosts), enforcement keeps legacy
+// limits until payments are wired. Do not change these without migrating
+// existing users. See Subscription_plan.md.
 export const BOOST_PLAN_RULES = Object.freeze({
   [USER_TIER.BASE_USER]: {
     monthlyLimit: 2,

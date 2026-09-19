@@ -39,11 +39,12 @@ const errorMiddleware = (err, req, res, next) => {
     message = "Token expired";
   }
 
-  // Final response
+  // Final response - never expose internals in production
+  const isProd = process.env.NODE_ENV === "production";
   res.status(statusCode).json({
     success: false,
-    message,
-    ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),
+    message: isProd && statusCode >= 500 ? "Internal Server Error" : message,
+    ...(!isProd && { stack: err.stack }),
   });
 };
 

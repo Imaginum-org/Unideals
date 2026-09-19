@@ -86,6 +86,16 @@ const userSchema = new Schema(
       default: "",
     },
 
+    verifyTokenEmailExpiry: {
+      type: Date,
+      default: null,
+    },
+
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
+
     reset_password_token: {
       type: String,
       select: false,

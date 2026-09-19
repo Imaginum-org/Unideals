@@ -152,6 +152,10 @@ const productSchema = new Schema(
       },
     },
 
+    // Campus marketplace: buyer and seller are on the same campus, so the
+    // snapshot only carries the pickup spot (spot name -> address_line,
+    // spot detail -> city). State/pincode are legacy optional fields kept
+    // for old listings, never required for new ones.
     pickup_address_snapshot: {
       address_line: {
         type: String,
@@ -170,16 +174,10 @@ const productSchema = new Schema(
       state: {
         type: String,
         trim: true,
-        required: function () {
-          return this.status !== PRODUCT_STATUS.DRAFT;
-        },
       },
       pincode: {
         type: String,
         trim: true,
-        required: function () {
-          return this.status !== PRODUCT_STATUS.DRAFT;
-        },
         match: [/^\d{6}$/, "Invalid pincode"],
       },
       mobile: {
@@ -285,14 +283,14 @@ productSchema.index({
 
 productSchema.pre("save", async function () {
   try {
-    // Generate slug
-    if (!this.slug) {
+    // Generate slug - skip for drafts without title
+    if (!this.slug && this.title) {
       const baseSlug = slugify(this.title, {
         lower: true,
         strict: true,
       });
 
-      this.slug = `${baseSlug}-${nanoid(6)}`;
+      this.slug = `${baseSlug || "product"}-${nanoid(6)}`;
     }
 
     // Price validation

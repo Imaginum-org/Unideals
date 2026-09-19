@@ -17,19 +17,29 @@ export const UserProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const hasFetchedRef = useRef(false);
 
-  // Load from localStorage
+  const safeParse = (raw) => {
+    try {
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Load from localStorage (non-sensitive cache only).
+  // accessToken is no longer used - auth relies on HttpOnly cookies.
+  // Clear any legacy token to reduce XSS theft window.
   useEffect(() => {
     try {
-      const cachedUser = localStorage.getItem("cachedUserDetails");
+      const cachedUser = safeParse(localStorage.getItem("cachedUserDetails"));
       const authStatus = localStorage.getItem("isAuthenticated");
 
-      if (cachedUser) {
-        try {
-          setUserDetails(JSON.parse(cachedUser));
-        } catch (err) {
-          console.error("Invalid cached user JSON:", err);
-          localStorage.removeItem("cachedUserDetails");
-        }
+      // Migration: drop legacy Bearer tokens stored in localStorage
+      localStorage.removeItem("accessToken");
+
+      if (cachedUser?._id) {
+        setUserDetails(cachedUser);
+      } else if (cachedUser) {
+        localStorage.removeItem("cachedUserDetails");
       }
 
       if (authStatus === "true") {
@@ -67,15 +77,14 @@ export const UserProvider = ({ children }) => {
 
     localStorage.removeItem("cachedUserDetails");
     localStorage.removeItem("isAuthenticated");
+    // Legacy cleanup - no longer written, but may exist from older builds
     localStorage.removeItem("accessToken");
   }, []);
 
-  // Fetch user profile
+  // Fetch user profile - cookie-based (withCredentials). Works even without
+  // isAuthenticated flag so cookie-only sessions recover after cache clear.
   const fetchUserProfile = useCallback(async () => {
-    if (hasFetchedRef.current) return Boolean(userDetails);
-
-    const authStatus = localStorage.getItem("isAuthenticated");
-    if (authStatus !== "true") return false;
+    if (hasFetchedRef.current) return Boolean(userDetails?._id);
 
     hasFetchedRef.current = true;
 
@@ -90,33 +99,44 @@ export const UserProvider = ({ children }) => {
         setUserDetails(user);
         setIsLoggedIn(true);
 
-        // cache
-        localStorage.setItem("cachedUserDetails", JSON.stringify(user));
-        localStorage.setItem("isAuthenticated", "true");
+        // cache non-sensitive profile only
+        try {
+          localStorage.setItem("cachedUserDetails", JSON.stringify(user));
+          localStorage.setItem("isAuthenticated", "true");
+        } catch {
+          // quota errors ignored
+        }
 
         return true;
       }
 
       return false;
     } catch (error) {
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
         clearUserData();
       } else {
-        console.error("Fetch user error:", error);
+        // Network/server error - allow retry later
+        hasFetchedRef.current = false;
+        console.error("Fetch user error:", error?.message || error);
       }
 
       return false;
     } finally {
       setLoading(false);
     }
-  }, [clearUserData, userDetails]);
+  }, [clearUserData, userDetails?._id]);
 
-  // Auto-fetch
+  // Auto-fetch on mount when cache suggests login OR always try once
+  // via cookies to recover sessions. Single attempt only.
   useEffect(() => {
-    if (isLoggedIn && !userDetails) {
-      fetchUserProfile();
+    const authStatus = localStorage.getItem("isAuthenticated");
+    if ((authStatus === "true" || !hasFetchedRef.current) && !userDetails) {
+      // Only auto-fetch if we haven't tried yet
+      if (!hasFetchedRef.current) {
+        fetchUserProfile();
+      }
     }
-  }, [isLoggedIn, userDetails, fetchUserProfile]);
+  }, [userDetails, fetchUserProfile]);
 
   return (
     <UserContext.Provider

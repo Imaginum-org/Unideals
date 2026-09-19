@@ -1,10 +1,23 @@
 import * as productService from "../services/product.service.js";
 import { deleteImage } from "../utils/imagekit.js";
+import { forwardServiceError } from "../utils/response.js";
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
 // CREATE PRODUCT
 export const createProduct = async (req, res) => {
-  const fileIds = req.body.images?.map((image) => image.fileId) || [];
+  // Only collect well-formed fileIds for cleanup to prevent arbitrary deletion.
+  // ImageKit file IDs are alphanumeric with _-/; cap at 3 (max images).
+  const rawFileIds = Array.isArray(req.body.images)
+    ? req.body.images.map((image) => image?.fileId).filter(Boolean)
+    : [];
+  const fileIds = rawFileIds
+    .filter(
+      (id) =>
+        typeof id === "string" &&
+        id.length <= 256 &&
+        /^[A-Za-z0-9_\-/]+$/.test(id),
+    )
+    .slice(0, 3);
 
   try {
     const user = req.user;
@@ -27,12 +40,23 @@ export const createProduct = async (req, res) => {
       isFirstListing,
     });
   } catch (error) {
-    // Cleanup uploaded images if product fails
+    // Cleanup uploaded images if product fails (best-effort, never fails request)
     if (fileIds.length > 0) {
-      await Promise.all(fileIds.map((id) => deleteImage(id)));
+      await Promise.allSettled(fileIds.map((id) => deleteImage(id)));
     }
 
-    return res.status(500).json({
+    const clientErrors = [
+      "Images are required",
+      "already listed a similar product",
+      "Selling price cannot be greater",
+      "Invalid purchase date",
+      "Purchase date cannot be",
+    ];
+    const isClientError = clientErrors.some((m) =>
+      String(error.message || "").includes(m),
+    );
+
+    return res.status(isClientError ? 400 : 500).json({
       success: false,
       message: error.message || "Product creation failed",
     });
@@ -65,7 +89,7 @@ export const getSingleProduct = async (req, res, next) => {
       data: product,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 
@@ -158,7 +182,7 @@ export const deleteProduct = async (req, res, next) => {
       data: product,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 
@@ -175,7 +199,7 @@ export const unlistProduct = async (req, res, next) => {
       data: product,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 
@@ -192,7 +216,7 @@ export const relistProduct = async (req, res, next) => {
       data: product,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 

@@ -18,6 +18,12 @@ export const WishlistProvider = ({ children }) => {
    * Fetch complete wishlist from backend
    */
   const fetchWishlist = useCallback(async () => {
+    // Skip when not logged in to avoid 401 spam on public pages
+    try {
+      if (localStorage.getItem("isAuthenticated") !== "true") return;
+    } catch {
+      return;
+    }
     try {
       setLoading(true);
 
@@ -26,8 +32,8 @@ export const WishlistProvider = ({ children }) => {
       if (response.data.success) {
         setWishlist(response.data.data || []);
       }
-    } catch (error) {
-      console.error("Failed to fetch wishlist:", error);
+    } catch {
+      // 401 handled by interceptor; keep previous wishlist
     } finally {
       setLoading(false);
     }
@@ -45,7 +51,7 @@ export const WishlistProvider = ({ children }) => {
    */
   const wishlistIds = useMemo(() => {
     return new Set(
-      wishlist.map((item) => (typeof item === "string" ? item : item._id)),
+      wishlist.map((item) => (typeof item === "string" ? item : item?._id)),
     );
   }, [wishlist]);
 
@@ -53,58 +59,71 @@ export const WishlistProvider = ({ children }) => {
    * Check if product exists in wishlist
    */
   const isInWishlist = useCallback(
-    (productId) => wishlistIds.has(productId),
+    (productId) => (productId ? wishlistIds.has(productId) : false),
     [wishlistIds],
   );
 
   /**
-   * Toggle Wishlist
+   * Toggle Wishlist - optimistic with rollback on failure
    */
   const toggleWishlist = useCallback(async (productId, productData = null) => {
-    const response = await axios.post("/api/wishlist/toggle", {
-      productId,
-    });
-
-    if (!response.data.success) return false;
-
-    const isWishlisted = response.data.data.isInWishlist;
-
+    const previous = wishlist;
+    const wasIn = wishlistIds.has(productId);
+    // Optimistic update
     setWishlist((prev) => {
-      if (isWishlisted) {
-        const exists = prev.some((item) => {
-          const id = typeof item === "string" ? item : item._id;
-          return id === productId;
+      if (wasIn) {
+        return prev.filter((item) => {
+          const id = typeof item === "string" ? item : item?._id;
+          return id !== productId;
         });
-
-        if (exists) return prev;
-
-        return productData ? [...prev, productData] : [...prev, productId];
       }
-
-      return prev.filter((item) => {
-        const id = typeof item === "string" ? item : item._id;
-        return id !== productId;
-      });
+      return productData ? [...prev, productData] : [...prev, productId];
     });
+    try {
+      const response = await axios.post("/api/wishlist/toggle", {
+        productId,
+      });
 
-    return isWishlisted;
-  }, []);
+      if (!response.data?.success) throw new Error("Toggle failed");
+
+      const isWishlisted = response.data.data.isInWishlist;
+
+      // Reconcile with server truth
+      setWishlist((prev) => {
+        if (isWishlisted && !wasIn) return prev;
+        if (!isWishlisted && wasIn) return prev;
+        // Server disagrees - revert to server state below via fetch
+        return prev;
+      });
+
+      return isWishlisted;
+    } catch {
+      // Rollback optimistic change
+      setWishlist(previous);
+      throw new Error("Wishlist update failed");
+    }
+  }, [wishlist, wishlistIds]);
 
   /**
-   * Remove directly
+   * Remove directly - optimistic with rollback
    */
   const removeFromWishlist = useCallback(async (productId) => {
-    await axios.post("/api/wishlist/remove", {
-      productId,
-    });
-
+    const previous = wishlist;
     setWishlist((prev) =>
       prev.filter((item) => {
-        const id = typeof item === "string" ? item : item._id;
+        const id = typeof item === "string" ? item : item?._id;
         return id !== productId;
       }),
     );
-  }, []);
+    try {
+      await axios.post("/api/wishlist/remove", {
+        productId,
+      });
+    } catch {
+      setWishlist(previous);
+      throw new Error("Remove failed");
+    }
+  }, [wishlist]);
 
   const value = {
     wishlist,

@@ -12,6 +12,7 @@ export const getAuthCookieOptions = () => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "None" : "Lax",
+    path: "/",
   };
 };
 
@@ -66,8 +67,11 @@ export const loginWithPassword = async ({
     .findOne({ email: normalizedEmail })
     .select("+password");
 
+  // Generic message prevents account enumeration (no distinction
+  // between missing account vs wrong password). Verification status
+  // is still surfaced via requiresVerification for UX.
   if (!user) {
-    const error = new Error("No account found with this email");
+    const error = new Error("Invalid email or password");
     error.statusCode = 400;
     throw error;
   }
@@ -101,13 +105,13 @@ export const loginWithPassword = async ({
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
-    const error = new Error("Incorrect password");
+    const error = new Error("Invalid email or password");
     error.statusCode = 400;
     throw error;
   }
 
-  const accessToken = await generatedAccessToken(user._id);
-  const refreshToken = await generatedRefreshToken(user._id);
+  const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
+  const refreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
 
   await userModel.findByIdAndUpdate(user._id, {
     last_login_date: new Date(),
@@ -133,8 +137,28 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
   );
   const user = await userModel.findById(decoded.id).select("+refresh_token");
 
-  if (!user || user.refresh_token !== refreshToken) {
+  if (!user || !user.refresh_token || user.refresh_token !== refreshToken) {
+    // Possible reuse/theft: if token decodes but doesn't match stored token,
+    // revoke stored session to force re-login on all devices.
+    if (user && user.refresh_token && user.refresh_token !== refreshToken) {
+      try {
+        await userModel.findByIdAndUpdate(user._id, { refresh_token: null });
+      } catch {
+        // ignore revocation errors
+      }
+    }
     const error = new Error("Invalid or expired refresh token");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // Token version check - invalidates all sessions on password reset / suspend
+  if (
+    typeof decoded.v === "number" &&
+    typeof user.tokenVersion === "number" &&
+    decoded.v !== user.tokenVersion
+  ) {
+    const error = new Error("Session revoked. Please log in again.");
     error.statusCode = 401;
     throw error;
   }
@@ -157,8 +181,8 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
     throw error;
   }
 
-  const accessToken = await generatedAccessToken(user._id);
-  const newRefreshToken = await generatedRefreshToken(user._id);
+  const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
+  const newRefreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
 
   return {
     accessToken,
@@ -172,5 +196,29 @@ export const revokeRefreshToken = async (userId) => {
 
   await userModel.findByIdAndUpdate(userId, {
     refresh_token: null,
+    $inc: { tokenVersion: 1 },
   });
+};
+
+export const revokeRefreshTokenByToken = async (refreshToken) => {
+  if (!refreshToken) return false;
+  try {
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.SECRET_KEY_REFRESH_TOKEN,
+    );
+    const user = await userModel
+      .findById(decoded.id)
+      .select("+refresh_token");
+    if (user && user.refresh_token === refreshToken) {
+      await userModel.findByIdAndUpdate(user._id, {
+        refresh_token: null,
+        $inc: { tokenVersion: 1 },
+      });
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 };

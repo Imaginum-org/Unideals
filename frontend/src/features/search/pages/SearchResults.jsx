@@ -28,18 +28,20 @@ const SearchResults = () => {
     const fetchSearchResults = async () => {
       try {
         setLoading(true);
-        const res = await searchProducts(query);
+        setError(null);
+        const safeQuery = String(query || "").slice(0, 100);
+        const res = await searchProducts(safeQuery);
 
         setProducts(res.data?.products || res.data?.data || []);
-      } catch (err) {
-        console.error(err);
-        // setError("Failed to load search results");
+      } catch {
+        setError("Failed to load search results");
       } finally {
         setLoading(false);
       }
     };
 
     if (query) fetchSearchResults();
+    else setProducts([]);
   }, [query]);
 
   // HANDLERS

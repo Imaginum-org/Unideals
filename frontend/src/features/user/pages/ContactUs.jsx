@@ -118,10 +118,19 @@ function ContactUs() {
     e.preventDefault();
     setIsSubmitting(true);
 
+    // Client-side length + rate limits (EmailJS quota protection)
+    const lastSent = Number(sessionStorage.getItem("contactLastSent") || 0);
+    if (Date.now() - lastSent < 30000) {
+      toast.error("Please wait before sending another message.");
+      setIsSubmitting(false);
+      return;
+    }
+    const clamp = (s, max) => String(s || "").trim().slice(0, max);
+
     // Base template parameters mapped to your HTML template
     let templateParams = {
-      sender_name: userDetails?.name || "Unregistered User",
-      sender_email: userDetails?.email || "No email provided",
+      sender_name: clamp(userDetails?.name || "Unregistered User", 100),
+      sender_email: clamp(userDetails?.email || "No email provided", 100),
       preferred_reply: "Email",
       reference: "N/A",
     };
@@ -133,12 +142,17 @@ function ContactUs() {
         setIsSubmitting(false);
         return;
       }
+      if (contactForm.message.trim().length > 2000) {
+        toast.error("Message is too long (max 2000 characters).");
+        setIsSubmitting(false);
+        return;
+      }
       templateParams = {
         ...templateParams,
         contact_type: "Support Request",
         priority: "Normal",
-        user_subject: contactForm.topic,
-        user_message: contactForm.message,
+        user_subject: clamp(contactForm.topic, 200),
+        user_message: clamp(contactForm.message, 2000),
       };
     } else if (activeForm === "report") {
       if (!reportForm.category || !reportForm.description.trim()) {
@@ -146,13 +160,18 @@ function ContactUs() {
         setIsSubmitting(false);
         return;
       }
+      if (reportForm.description.trim().length > 2000) {
+        toast.error("Description is too long (max 2000 characters).");
+        setIsSubmitting(false);
+        return;
+      }
       templateParams = {
         ...templateParams,
         contact_type: "Issue / Bug Report",
         priority: "High",
-        reference: reportForm.link || "N/A",
-        user_subject: reportForm.category,
-        user_message: reportForm.description,
+        reference: clamp(reportForm.link || "N/A", 500),
+        user_subject: clamp(reportForm.category, 200),
+        user_message: clamp(reportForm.description, 2000),
       };
     } else if (activeForm === "suggest") {
       if (!suggestForm.title || !suggestForm.description.trim()) {
@@ -160,12 +179,20 @@ function ContactUs() {
         setIsSubmitting(false);
         return;
       }
+      if (
+        suggestForm.description.trim().length > 2000 ||
+        String(suggestForm.title || "").length > 200
+      ) {
+        toast.error("Suggestion is too long.");
+        setIsSubmitting(false);
+        return;
+      }
       templateParams = {
         ...templateParams,
         contact_type: "Feature Suggestion",
         priority: "Low",
-        user_subject: suggestForm.title,
-        user_message: `Description:\n${suggestForm.description}\n\nWhy it is useful:\n${suggestForm.whyUseful || "Not provided"}`,
+        user_subject: clamp(suggestForm.title, 200),
+        user_message: clamp(`Description:\n${suggestForm.description}\n\nWhy it is useful:\n${suggestForm.whyUseful || "Not provided"}`, 2000),
       };
     }
 
@@ -177,6 +204,7 @@ function ContactUs() {
         import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
       );
 
+      sessionStorage.setItem("contactLastSent", String(Date.now()));
       toast.success("Message sent successfully! We'll be in touch soon.");
 
       // Clear forms and reset view
@@ -184,8 +212,7 @@ function ContactUs() {
       setReportForm({ category: "", link: "", description: "" });
       setSuggestForm({ title: "", description: "", whyUseful: "" });
       setActiveForm(null);
-    } catch (error) {
-      console.error("EmailJS Error:", error);
+    } catch {
       toast.error("Failed to send message. Please try again.");
     } finally {
       setIsSubmitting(false);

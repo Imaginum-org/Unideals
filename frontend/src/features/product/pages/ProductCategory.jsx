@@ -103,9 +103,8 @@ const CategoryPage = () => {
         if (!priceRange) {
           setSliderValue([meta.price.min, meta.price.max]);
         }
-      } catch (err) {
+      } catch {
         setError("Failed to load products");
-        console.log(err.message);
       } finally {
         setLoading(false);
       }

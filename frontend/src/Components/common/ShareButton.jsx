@@ -23,6 +23,25 @@ function ShareIcon() {
   );
 }
 
+const sanitizeShareUrl = (raw) => {
+  try {
+    const u = new URL(raw, window.location.origin);
+    // Strip sensitive query params that should never be shared
+    const sensitive = [
+      "oauth_code",
+      "code",
+      "token",
+      "reset_token",
+      "accessToken",
+      "refreshToken",
+    ];
+    sensitive.forEach((k) => u.searchParams.delete(k));
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return raw;
+  }
+};
+
 export default function ShareButton({
   label = "Share Unideals",
   url = typeof window !== "undefined" ? window.location.href : "",
@@ -32,6 +51,8 @@ export default function ShareButton({
   className = "",
 }) {
   const [copied, setCopied] = useState(false);
+  const safeUrl =
+    typeof window !== "undefined" ? sanitizeShareUrl(url) : url;
 
   const handleClick = useCallback(async () => {
     if (onShare) {
@@ -41,23 +62,25 @@ export default function ShareButton({
 
     if (navigator.share) {
       try {
-        await navigator.share({ title, text, url });
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          console.error("Share failed:", err);
-        }
+        await navigator.share({ title, text, url: safeUrl });
+      } catch {
+        // user cancelled - ignore
       }
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(
+        safeUrl.startsWith("http")
+          ? safeUrl
+          : window.location.origin + safeUrl,
+      );
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Clipboard copy failed:", err);
+    } catch {
+      // clipboard unavailable - ignore
     }
-  }, [onShare, title, text, url]);
+  }, [onShare, title, text, safeUrl]);
 
   return (
     <div className={`share-btn-wrapper ${className}`}>

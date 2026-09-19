@@ -101,9 +101,10 @@ function Settings() {
           setGender(res.data.user?.gender || "");
         }
       } catch (err) {
-        if (err.response?.status === 401) {
+        if (err.response?.status === 401 || err.response?.status === 403) {
           localStorage.removeItem("isAuthenticated");
           localStorage.removeItem("cachedUserDetails");
+          localStorage.removeItem("accessToken");
           navigate("/login");
         } else {
           toast.error("Failed to load profile");
@@ -139,7 +140,16 @@ function Settings() {
       setIsSavingProfile(true);
       const updateData = {};
 
-      if (phone) updateData.mobile = phone.replace(/\D/g, "").slice(-10);
+      if (phone) {
+        const digits = String(phone).replace(/\D/g, "");
+        // Validate 10-digit Indian mobile starting 6-9, don't silently truncate
+        if (!/^[6-9]\d{9}$/.test(digits)) {
+          toast.error("Enter a valid 10-digit mobile number starting with 6-9");
+          setIsSavingProfile(false);
+          return false;
+        }
+        updateData.mobile = digits;
+      }
       if (gender) updateData.gender = gender;
 
       const res = await updateProfile(updateData);
@@ -170,9 +180,12 @@ function Settings() {
     setIsUploadingAvatar(true);
 
     try {
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please select a valid image.");
+      // Validate file type - allowlist only (SVG excluded to prevent XSS)
+      const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+      const allowedExts = ["png", "jpg", "jpeg", "webp"];
+      const ext = String(file.name || "").split(".").pop()?.toLowerCase() || "";
+      if (!allowedTypes.includes(file.type) || !allowedExts.includes(ext)) {
+        toast.error("Please select a JPG, PNG or WEBP image.");
         return;
       }
 
@@ -291,6 +304,7 @@ function Settings() {
       if (res.data.success) {
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("cachedUserDetails");
+        localStorage.removeItem("accessToken");
         toast.success("Logged out successfully");
         navigate("/login");
       }

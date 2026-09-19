@@ -47,16 +47,15 @@ const ImagesStep = () => {
     for (const file of selectedFiles) {
       // File Validation
       if (!(file instanceof File)) {
-        console.warn("Skipping invalid file:", file);
         continue;
       }
 
-      // File Type Validation
-      if (
-        !["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(
-          file.type,
-        )
-      ) {
+      // File Type Validation - MIME + extension double-check (prevents spoofing)
+      // Note: image/svg+xml deliberately excluded to prevent stored XSS
+      const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+      const allowedExts = ["png", "jpg", "jpeg", "webp"];
+      const ext = String(file.name || "").split(".").pop()?.toLowerCase() || "";
+      if (!allowedTypes.includes(file.type) || !allowedExts.includes(ext)) {
         toast.error(`${file.name} is not a supported image format`);
         continue;
       }
@@ -187,7 +186,7 @@ const ImagesStep = () => {
             type="file"
             hidden
             multiple
-            accept="image/*"
+            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
             onChange={handleInputChange}
           />
 

@@ -116,6 +116,45 @@ export const updateUserAvatar = async (req, res) => {
       });
     }
 
+    if (
+      typeof avatar.url !== "string" ||
+      !avatar.url.startsWith("https://") ||
+      avatar.url.length > 2048
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: "Invalid avatar URL",
+      });
+    }
+
+    // Pin avatars to ImageKit endpoint when configured, allow Google avatars
+    const endpoint = process.env.IMAGEKIT_URL_ENDPOINT;
+    const isImageKit = endpoint && avatar.url.startsWith(endpoint);
+    const isGoogle = /^https:\/\/lh\d*\.googleusercontent\.com\//.test(avatar.url);
+    if (endpoint && !isImageKit && !isGoogle) {
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: "Avatar must be hosted on our image service",
+      });
+    }
+
+    if (
+      typeof avatar.fileId !== "string" ||
+      !/^[A-Za-z0-9_\-/]+$/.test(avatar.fileId) ||
+      avatar.fileId.length > 256
+    ) {
+      // Google avatars have no fileId - allow empty fileId for them
+      if (!(isGoogle && !avatar.fileId)) {
+        return res.status(400).json({
+          success: false,
+          error: true,
+          message: "Invalid avatar file ID",
+        });
+      }
+    }
+
     const user = await userModel.findById(userId);
 
     if (!user) {
@@ -186,10 +225,15 @@ export const removeUserAvatar = async (req, res) => {
 
     await user.save();
 
+    const safeUser = await userModel
+      .findById(userId)
+      .select("-password -refresh_token -verifyTokenEmail")
+      .lean();
+
     return res.status(200).json({
       success: true,
       message: "Avatar removed successfully",
-      user,
+      user: safeUser,
     });
   } catch (error) {
     console.error("Remove avatar error:", error);
@@ -211,6 +255,7 @@ export const deleteAccount = async (req, res) => {
       {
         status: USER_STATUS.INACTIVE,
         refresh_token: null,
+        $inc: { tokenVersion: 1 },
       },
       { new: true },
     );
@@ -221,6 +266,17 @@ export const deleteAccount = async (req, res) => {
         success: false,
         error: true,
       });
+    }
+
+    // Unlist live listings so ghost storefronts don't remain
+    try {
+      const Product = (await import("../models/Product.model.js")).default;
+      await Product.updateMany(
+        { seller_id: userId, is_deleted: false, status: "listed" },
+        { $set: { status: "unlisted" } },
+      );
+    } catch {
+      // best-effort only
     }
 
     const isProduction = process.env.NODE_ENV === "production";

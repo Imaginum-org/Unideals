@@ -1,10 +1,13 @@
 import mongoose from "mongoose";
 import Conversation from "../models/conversation.model.js";
-import Product from "../models/product.model.js";
+import Product from "../models/Product.model.js";
 import { AppError } from "../utils/appError.js";
 
 /**
  * Create or return an existing conversation
+ * NOTE: Orphaned service - not mounted in routes. Field names aligned
+ * with conversation.model.js (buyer_id/seller_id/product_id) to prevent
+ * future crashes if wired.
  */
 export const createConversation = async ({ buyerId, sellerId, productId }) => {
   // Buyer cannot chat with themselves
@@ -14,7 +17,7 @@ export const createConversation = async ({ buyerId, sellerId, productId }) => {
 
   // Check product exists
   const product = await Product.findById(productId).select(
-    "_id seller_id price negotiationAllowed",
+    "_id seller_id selling_price",
   );
 
   if (!product) {
@@ -23,9 +26,9 @@ export const createConversation = async ({ buyerId, sellerId, productId }) => {
 
   // Check if conversation already exists
   let conversation = await Conversation.findOne({
-    buyer: buyerId,
-    seller: sellerId,
-    product: productId,
+    buyer_id: buyerId,
+    seller_id: sellerId,
+    product_id: productId,
   });
 
   if (conversation) {
@@ -34,10 +37,14 @@ export const createConversation = async ({ buyerId, sellerId, productId }) => {
 
   // Create new conversation
   conversation = await Conversation.create({
-    buyer: buyerId,
-    seller: sellerId,
-    product: productId,
-    negotiationEnabled: product.negotiationAllowed,
+    buyer_id: buyerId,
+    seller_id: sellerId,
+    product_id: productId,
+    product_snapshot: {
+      title: product.title || "Product",
+      image: product.images?.[0]?.url || "",
+      selling_price: product.selling_price || 0,
+    },
   });
 
   return conversation;
@@ -48,9 +55,9 @@ export const createConversation = async ({ buyerId, sellerId, productId }) => {
  */
 export const getConversationById = async (conversationId) => {
   return Conversation.findById(conversationId)
-    .populate("buyer", "name profilePic userTier")
-    .populate("seller", "name profilePic userTier")
-    .populate("product", "title price images status negotiationAllowed");
+    .populate("buyer_id", "name avatar subscription")
+    .populate("seller_id", "name avatar subscription")
+    .populate("product_id", "title selling_price images status");
 };
 
 /**
@@ -60,20 +67,20 @@ export const getUserConversations = async (userId) => {
   return Conversation.find({
     $or: [
       {
-        buyer: userId,
-        "deletedFor.buyer": false,
+        buyer_id: userId,
+        "deleted_for.buyer": false,
       },
       {
-        seller: userId,
-        "deletedFor.seller": false,
+        seller_id: userId,
+        "deleted_for.seller": false,
       },
     ],
   })
-    .populate("buyer", "name profilePic userTier")
-    .populate("seller", "name profilePic userTier")
-    .populate("product", "title price images status")
+    .populate("buyer_id", "name avatar subscription")
+    .populate("seller_id", "name avatar subscription")
+    .populate("product_id", "title selling_price images status")
     .sort({
-      lastActivityAt: -1,
+      last_activity_at: -1,
     });
 };
 
@@ -81,21 +88,24 @@ export const getUserConversations = async (userId) => {
  * Search conversations
  */
 export const searchConversations = async ({ userId, search }) => {
+  const safeSearch = String(search || "")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .slice(0, 100);
   return Conversation.find({
-    $or: [{ buyer: userId }, { seller: userId }],
+    $or: [{ buyer_id: userId }, { seller_id: userId }],
   })
     .populate({
-      path: "product",
+      path: "product_id",
       match: {
         title: {
-          $regex: search,
+          $regex: safeSearch,
           $options: "i",
         },
       },
-      select: "title price images",
+      select: "title selling_price images",
     })
-    .populate("buyer", "name profilePic")
-    .populate("seller", "name profilePic");
+    .populate("buyer_id", "name avatar")
+    .populate("seller_id", "name avatar");
 };
 
 /**
@@ -108,12 +118,12 @@ export const markConversationRead = async ({ conversationId, userId }) => {
     throw new AppError("Conversation not found.", 404);
   }
 
-  if (conversation.buyer.toString() === userId.toString()) {
-    conversation.unreadCount.buyer = 0;
+  if (conversation.buyer_id.toString() === userId.toString()) {
+    conversation.unread_count.buyer = 0;
   }
 
-  if (conversation.seller.toString() === userId.toString()) {
-    conversation.unreadCount.seller = 0;
+  if (conversation.seller_id.toString() === userId.toString()) {
+    conversation.unread_count.seller = 0;
   }
 
   await conversation.save();
@@ -134,10 +144,10 @@ export const updateLastMessage = async ({
   return Conversation.findByIdAndUpdate(
     conversationId,
     {
-      lastMessage: message,
-      lastMessageType: messageType,
-      lastMessageSender: senderId,
-      lastActivityAt: new Date(),
+      last_message: String(message || "").slice(0, 500),
+      last_message_type: messageType,
+      last_message_sender: senderId,
+      last_activity_at: new Date(),
     },
     {
       new: true,
@@ -150,12 +160,12 @@ export const updateLastMessage = async ({
  * Called internally by message service
  */
 export const incrementUnreadCount = async ({ conversation, receiverId }) => {
-  if (conversation.buyer.toString() === receiverId.toString()) {
-    conversation.unreadCount.buyer += 1;
+  if (conversation.buyer_id.toString() === receiverId.toString()) {
+    conversation.unread_count.buyer += 1;
   }
 
-  if (conversation.seller.toString() === receiverId.toString()) {
-    conversation.unreadCount.seller += 1;
+  if (conversation.seller_id.toString() === receiverId.toString()) {
+    conversation.unread_count.seller += 1;
   }
 
   await conversation.save();
@@ -173,12 +183,12 @@ export const deleteConversation = async ({ conversationId, userId }) => {
     throw new AppError("Conversation not found.", 404);
   }
 
-  if (conversation.buyer.toString() === userId.toString()) {
-    conversation.deletedFor.buyer = true;
+  if (conversation.buyer_id.toString() === userId.toString()) {
+    conversation.deleted_for.buyer = true;
   }
 
-  if (conversation.seller.toString() === userId.toString()) {
-    conversation.deletedFor.seller = true;
+  if (conversation.seller_id.toString() === userId.toString()) {
+    conversation.deleted_for.seller = true;
   }
 
   await conversation.save();

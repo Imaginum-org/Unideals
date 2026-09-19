@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "../Layouts/MainLayout.jsx";
 import ProtectedLayout from "../Layouts/ProtectedLayout.jsx";
+import PublicOnlyRoute from "../Layouts/PublicOnlyRoute.jsx";
 // Auth
 import Login from "../features/auth/pages/Login.jsx";
 import Signup from "../features/auth/pages/Signup.jsx";
@@ -31,13 +32,15 @@ import SearchResults from "../features/search/pages/SearchResults.jsx";
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* AUTH (NO HEADER) */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password/:token" element={<ResetPassword />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/checkEmail" element={<CheckEmail />} />
+      {/* AUTH (NO HEADER) - redirect logged-in users to home */}
+      <Route element={<PublicOnlyRoute />}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/checkEmail" element={<CheckEmail />} />
+      </Route>
 
       {/* PUBLIC WITH HEADER */}
       <Route element={<MainLayout />}>
@@ -73,6 +76,9 @@ export default function AppRoutes() {
           <Route path="/contact" element={<ContactUs />} />
         </Route>
       </Route>
+
+      {/* 404 - must be last */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

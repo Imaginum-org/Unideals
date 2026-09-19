@@ -22,6 +22,7 @@ function AlertDialogDemo() {
       if (response.data.success) {
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("cachedUserDetails");
+        localStorage.removeItem("accessToken");
 
         toast.success("Your account has been permanently deleted.");
 

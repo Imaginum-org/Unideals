@@ -35,6 +35,19 @@ const auth = async (req, res, next) => {
       });
     }
 
+    // Token version check - sessions revoked on logout/password reset/suspend
+    if (
+      typeof decoded.v === "number" &&
+      typeof user.tokenVersion === "number" &&
+      decoded.v !== user.tokenVersion
+    ) {
+      return res.status(401).json({
+        message: "Session revoked. Please log in again.",
+        success: false,
+        error: true,
+      });
+    }
+
     // Block inactive/suspended users
     if (user.status !== USER_STATUS.ACTIVE) {
       const statusLabel =

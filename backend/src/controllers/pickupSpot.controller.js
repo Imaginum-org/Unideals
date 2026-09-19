@@ -1,10 +1,21 @@
 import mongoose from "mongoose";
 import PickupSpot from "../models/PickupSpot.model.js";
 
+const parseIsPrimary = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(v)) return true;
+    if (["false", "0", "no", "off", ""].includes(v)) return false;
+  }
+  if (typeof value === "number") return value !== 0;
+  return Boolean(value);
+};
+
 const normalizeSpotInput = (body) => ({
-  name: typeof body.name === "string" ? body.name.trim() : "",
-  detail: typeof body.detail === "string" ? body.detail.trim() : "",
-  isPrimary: Boolean(body.isPrimary),
+  name: typeof body.name === "string" ? body.name.trim().slice(0, 80) : "",
+  detail: typeof body.detail === "string" ? body.detail.trim().slice(0, 180) : "",
+  isPrimary: parseIsPrimary(body.isPrimary),
 });
 
 export const createPickupSpot = async (req, res) => {
@@ -29,10 +40,24 @@ export const createPickupSpot = async (req, res) => {
       });
     }
 
-    const exists = await PickupSpot.findOne({ user: userId, name, detail });
+    const exists = await PickupSpot.findOne({
+      user: userId,
+      name: { $regex: `^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+      detail: { $regex: `^${detail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+    });
     if (exists) {
       return res.status(400).json({
         message: "This pickup spot already exists",
+        success: false,
+        error: true,
+      });
+    }
+
+    // Re-check count atomically-ish to reduce race window
+    const freshCount = await PickupSpot.countDocuments({ user: userId });
+    if (freshCount >= 3) {
+      return res.status(400).json({
+        message: "Maximum 3 pickup spots allowed",
         success: false,
         error: true,
       });
@@ -108,10 +133,28 @@ export const updatePickupSpot = async (req, res) => {
       });
     }
 
-    if (req.body.name !== undefined) pickupSpot.name = req.body.name.trim();
-    if (req.body.detail !== undefined) pickupSpot.detail = req.body.detail.trim();
+    if (req.body.name !== undefined) {
+      if (typeof req.body.name !== "string" || !req.body.name.trim()) {
+        return res.status(400).json({
+          message: "Invalid pickup spot name",
+          success: false,
+          error: true,
+        });
+      }
+      pickupSpot.name = req.body.name.trim().slice(0, 80);
+    }
+    if (req.body.detail !== undefined) {
+      if (typeof req.body.detail !== "string" || !req.body.detail.trim()) {
+        return res.status(400).json({
+          message: "Invalid pickup spot detail",
+          success: false,
+          error: true,
+        });
+      }
+      pickupSpot.detail = req.body.detail.trim().slice(0, 180);
+    }
     if (req.body.isPrimary !== undefined) {
-      pickupSpot.isPrimary = Boolean(req.body.isPrimary);
+      pickupSpot.isPrimary = parseIsPrimary(req.body.isPrimary);
     }
 
     await pickupSpot.save();

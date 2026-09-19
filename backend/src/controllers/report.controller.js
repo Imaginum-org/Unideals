@@ -1,4 +1,5 @@
 import * as reportService from "../services/report.service.js";
+import { forwardServiceError } from "../utils/response.js";
 
 export const reportProduct = async (req, res, next) => {
   try {
@@ -19,7 +20,7 @@ export const reportProduct = async (req, res, next) => {
       data: report,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 
@@ -42,6 +43,6 @@ export const reportUser = async (req, res, next) => {
       data: report,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };

@@ -3,6 +3,34 @@ import { PRODUCT_STATUS } from "../config/constants.js";
 import { deleteImage } from "../utils/imagekit.js";
 
 export const createProduct = async (data, user) => {
+  // Strip privileged fields that must never be client-controlled.
+  // Zod already strips unknown keys, this is defense-in-depth.
+  delete data.seller_id;
+  delete data.is_boosted;
+  delete data.boost_expires_at;
+  delete data.boost_tier;
+  delete data.views_count;
+  delete data.is_deleted;
+  delete data.slug;
+  delete data.location;
+  delete data.meetup_location;
+
+  // Campus pickup-spot model: snapshot carries only spot name/detail.
+  // Drop empty optional snapshot fields so regex validators (pincode,
+  // mobile) never trip on "" from legacy clients.
+  if (data.pickup_address_snapshot && typeof data.pickup_address_snapshot === "object") {
+    for (const key of ["state", "pincode", "mobile", "additional_info"]) {
+      const val = data.pickup_address_snapshot[key];
+      if (val === "" || val === undefined || val === null) {
+        delete data.pickup_address_snapshot[key];
+      } else if (typeof val === "string") {
+        const trimmed = val.trim();
+        if (!trimmed) delete data.pickup_address_snapshot[key];
+        else data.pickup_address_snapshot[key] = trimmed;
+      }
+    }
+  }
+
   if (
     data.status !== PRODUCT_STATUS.DRAFT &&
     (!data.images || data.images.length === 0)
@@ -10,33 +38,42 @@ export const createProduct = async (data, user) => {
     throw new Error("Images are required");
   }
 
-  const normalizedTitle = data.title.trim().toLowerCase();
+  const normalizedTitle = (data.title || "").trim().toLowerCase();
   const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   const safeTitle = escapeRegex(normalizedTitle);
 
   const FIVE_MINUTES_AGO = new Date(Date.now() - 5 * 60 * 1000);
 
-  const existingProduct = await Product.findOne({
-    seller_id: user._id,
-    status: PRODUCT_STATUS.LISTED,
-    category: data.category,
-    title: {
-      $regex: `^${safeTitle}$`,
-      $options: "i",
-    },
-    selling_price: {
-      $gte: data.selling_price * 0.9,
-      $lte: data.selling_price * 1.1,
-    },
-    createdAt: {
-      $gte: FIVE_MINUTES_AGO,
-    },
-    is_deleted: false,
-  });
+  // Only run duplicate guard when we have a complete non-draft payload
+  if (
+    data.status !== PRODUCT_STATUS.DRAFT &&
+    normalizedTitle &&
+    data.category &&
+    Number.isFinite(Number(data.selling_price))
+  ) {
+    const priceNum = Number(data.selling_price);
+    const existingProduct = await Product.findOne({
+      seller_id: user._id,
+      status: PRODUCT_STATUS.LISTED,
+      category: data.category,
+      title: {
+        $regex: `^${safeTitle}$`,
+        $options: "i",
+      },
+      selling_price: {
+        $gte: priceNum * 0.9,
+        $lte: priceNum * 1.1,
+      },
+      createdAt: {
+        $gte: FIVE_MINUTES_AGO,
+      },
+      is_deleted: false,
+    });
 
-  if (existingProduct) {
-    throw new Error("You already listed a similar product recently.");
+    if (existingProduct) {
+      throw new Error("You already listed a similar product recently.");
+    }
   }
 
   data.seller_id = user._id;
@@ -51,7 +88,17 @@ export const createProduct = async (data, user) => {
   }
 
   if (data.attributes?.purchase_date) {
-    data.attributes.purchase_date = new Date(data.attributes.purchase_date);
+    const parsed = new Date(data.attributes.purchase_date);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("Invalid purchase date");
+    }
+    // Reject future dates
+    if (parsed.getTime() > Date.now()) {
+      throw new Error("Purchase date cannot be in the future");
+    }
+    data.attributes.purchase_date = parsed;
+  } else if (data.attributes && data.attributes.purchase_date === null) {
+    delete data.attributes.purchase_date;
   }
 
   if (data.original_price && data.selling_price > data.original_price) {
@@ -80,7 +127,7 @@ export const getBoostedProducts = async () => {
 };
 
 export const getAllProducts = async (query) => {
-  const {
+  let {
     page = 1,
     limit = 10,
     search,
@@ -91,7 +138,15 @@ export const getAllProducts = async (query) => {
     sort = "recommended",
   } = query;
 
-  const skip = (Number(page) - 1) * Number(limit);
+  // Clamp pagination to prevent DoS via huge limit / negative skip
+  page = Number.parseInt(page, 10);
+  limit = Number.parseInt(limit, 10);
+  if (!Number.isInteger(page) || page < 1) page = 1;
+  if (!Number.isInteger(limit) || limit < 1) limit = 10;
+  limit = Math.min(limit, 50);
+  page = Math.min(page, 1000);
+
+  const skip = (page - 1) * limit;
   const now = new Date();
 
   // Base filter
@@ -100,23 +155,28 @@ export const getAllProducts = async (query) => {
     status: PRODUCT_STATUS.LISTED,
   };
 
-  if (category) {
+  if (typeof category === "string" && category) {
     baseMatch.category = category;
   }
 
-  if (condition) {
+  if (typeof condition === "string" && condition) {
     baseMatch.condition = condition;
   }
 
-  if (min_price || max_price) {
+  if (min_price !== undefined || max_price !== undefined) {
     baseMatch.selling_price = {};
 
     if (min_price !== undefined && min_price !== "") {
-      baseMatch.selling_price.$gte = Number(min_price);
+      const minNum = Number(min_price);
+      if (Number.isFinite(minNum)) baseMatch.selling_price.$gte = minNum;
     }
 
     if (max_price !== undefined && max_price !== "") {
-      baseMatch.selling_price.$lte = Number(max_price);
+      const maxNum = Number(max_price);
+      if (Number.isFinite(maxNum)) baseMatch.selling_price.$lte = maxNum;
+    }
+    if (Object.keys(baseMatch.selling_price).length === 0) {
+      delete baseMatch.selling_price;
     }
   }
 
@@ -129,8 +189,8 @@ export const getAllProducts = async (query) => {
   ];
 
   // SEARCH
-  if (search) {
-    const sanitizedQuery = search.trim();
+  if (typeof search === "string" && search.trim()) {
+    const sanitizedQuery = search.trim().slice(0, 100);
 
     const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -208,10 +268,12 @@ export const getAllProducts = async (query) => {
     },
   );
 
-  // SORT
+  // SORT - whitelist to prevent injection
+  const allowedSorts = ["recommended", "latest", "price_low", "price_high"];
+  const safeSort = allowedSorts.includes(sort) ? sort : "recommended";
   const sortOptions = {
     recommended: {
-      ...(search ? { relevanceScore: -1 } : {}),
+      ...(typeof search === "string" && search.trim() ? { relevanceScore: -1 } : {}),
       score: -1,
       createdAt: -1,
     },
@@ -232,11 +294,11 @@ export const getAllProducts = async (query) => {
   };
 
   pipeline.push({
-    $sort: sortOptions[sort] || sortOptions.recommended,
+    $sort: sortOptions[safeSort],
   });
 
   // PAGINATION
-  pipeline.push({ $skip: skip }, { $limit: Number(limit) });
+  pipeline.push({ $skip: skip }, { $limit: limit });
 
   // JOIN SELLER
   pipeline.push(
@@ -262,7 +324,6 @@ export const getAllProducts = async (query) => {
         selling_price: 1,
         original_price: 1,
         category: 1,
-        location: 1,
         attributes: 1,
         createdAt: 1,
         views_count: 1,
@@ -279,10 +340,8 @@ export const getAllProducts = async (query) => {
     },
   );
 
-  // Correct total count
-  const totalPipeline = pipeline.filter(
-    (stage) => !stage.$skip && !stage.$limit && !stage.$lookup,
-  );
+  // Correct total count - only $match stages (avoids $unwind/$project on missing seller)
+  const totalPipeline = pipeline.filter((stage) => stage.$match);
 
   priceMetaPipeline.push({
     $group: {
@@ -316,9 +375,9 @@ export const getAllProducts = async (query) => {
 
     pagination: {
       total,
-      page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(total / limit),
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     },
 
     filterMeta,
@@ -326,6 +385,10 @@ export const getAllProducts = async (query) => {
 };
 
 export const getSingleProduct = async (id) => {
+  const mongoose = await import("mongoose").then((m) => m.default);
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new Error("Product not found");
+  }
   const product = await Product.findOneAndUpdate(
     { _id: id, is_deleted: false },
     { $inc: { views_count: 1 } },
@@ -342,7 +405,9 @@ export const getSingleProduct = async (id) => {
 };
 
 export const getSearchSuggestions = async (query) => {
-  const sanitizedQuery = query.trim().toLowerCase();
+  if (typeof query !== "string") return [];
+  const sanitizedQuery = query.trim().slice(0, 100).toLowerCase();
+  if (sanitizedQuery.length < 2) return [];
 
   const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -359,9 +424,9 @@ export const getSearchSuggestions = async (query) => {
 };
 
 export const searchProducts = async (query) => {
-  if (!query || query.trim().length === 0) return [];
+  if (typeof query !== "string" || query.trim().length === 0) return [];
 
-  const sanitizedQuery = query.trim().toLowerCase();
+  const sanitizedQuery = query.trim().slice(0, 100).toLowerCase();
 
   const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -509,12 +574,17 @@ export const unlistProduct = async (productId, userId) => {
   const product = await Product.findOne({
     _id: productId,
     seller_id: userId,
+    is_deleted: false,
   });
 
   if (!product) {
     throw new Error(
       "Product not found or you don't have permission to unlist it",
     );
+  }
+
+  if (product.status === PRODUCT_STATUS.UNLISTED) {
+    return product;
   }
 
   product.status = PRODUCT_STATUS.UNLISTED;
@@ -526,12 +596,17 @@ export const relistProduct = async (productId, userId) => {
   const product = await Product.findOne({
     _id: productId,
     seller_id: userId,
+    is_deleted: false,
   });
 
   if (!product) {
     throw new Error(
       "Product not found or you don't have permission to relist it",
     );
+  }
+
+  if (product.status === PRODUCT_STATUS.LISTED) {
+    return product;
   }
 
   product.status = PRODUCT_STATUS.LISTED;

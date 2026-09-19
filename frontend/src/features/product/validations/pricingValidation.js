@@ -1,18 +1,33 @@
+const MAX_PRICE = 10000000;
+
 export const validatePricing = (formData) => {
   const errors = {};
 
-  if (!formData.sellingPrice) {
+  const selling = Number(formData.sellingPrice);
+  const original = Number(formData.originalPrice);
+
+  if (!formData.sellingPrice && formData.sellingPrice !== 0) {
     errors.sellingPrice = "Selling price is required";
+  } else if (!Number.isFinite(selling) || selling <= 0) {
+    errors.sellingPrice = "Enter a valid selling price greater than 0";
+  } else if (selling > MAX_PRICE) {
+    errors.sellingPrice = "Selling price is too large";
   }
 
-  if (!formData.originalPrice) {
+  if (!formData.originalPrice && formData.originalPrice !== 0) {
     errors.originalPrice = "Original price is required";
+  } else if (!Number.isFinite(original) || original <= 0) {
+    errors.originalPrice = "Enter a valid original price greater than 0";
+  } else if (original > MAX_PRICE) {
+    errors.originalPrice = "Original price is too large";
   }
 
   if (
-    formData.originalPrice &&
-    formData.sellingPrice &&
-    Number(formData.sellingPrice) > Number(formData.originalPrice)
+    Number.isFinite(selling) &&
+    Number.isFinite(original) &&
+    selling > 0 &&
+    original > 0 &&
+    selling > original
   ) {
     errors.sellingPrice = "Selling price cannot exceed original price";
   }

@@ -115,19 +115,56 @@ export const createBoost = async ({ productId, user }) => {
     startsAt.getTime() + rules.durationHours * 60 * 60 * 1000,
   );
 
-  const boost = await Boost.create({
-    product_id: product._id,
-    user_id: user._id,
-    tier,
-    starts_at: startsAt,
-    expires_at: expiresAt,
-    duration_hours: rules.durationHours,
-  });
+  let boost;
+  try {
+    boost = await Boost.create({
+      product_id: product._id,
+      user_id: user._id,
+      tier,
+      starts_at: startsAt,
+      expires_at: expiresAt,
+      duration_hours: rules.durationHours,
+    });
+  } catch (err) {
+    // Handle duplicate/race gracefully
+    if (err.code === 11000) {
+      throw new Error("This product is already boosted");
+    }
+    throw err;
+  }
 
   product.is_boosted = true;
   product.boost_expires_at = expiresAt;
   product.boost_tier = tier;
   await product.save();
+
+  // Post-create re-check to bound parallel-race over-grant.
+  // If limits are now exceeded, roll back this boost.
+  const [monthlyAfter, activeAfter] = await Promise.all([
+    Boost.countDocuments({
+      user_id: user._id,
+      createdAt: { $gte: start, $lt: end },
+    }),
+    Boost.countDocuments({
+      user_id: user._id,
+      status: "active",
+      expires_at: { $gt: new Date() },
+    }),
+  ]);
+
+  if (
+    monthlyAfter > rules.monthlyLimit ||
+    activeAfter > rules.maxActiveBoosts
+  ) {
+    await Promise.allSettled([
+      Boost.deleteOne({ _id: boost._id }),
+      Product.updateOne(
+        { _id: product._id, boost_expires_at: expiresAt },
+        { $set: { is_boosted: false }, $unset: { boost_expires_at: "", boost_tier: "" } },
+      ),
+    ]);
+    throw new Error("Boost limit reached for your plan. Please try later.");
+  }
 
   return {
     boost,

@@ -58,21 +58,16 @@ const Home = () => {
 
     const handleCredentialResponse = async (response) => {
       try {
-        const res = await loginWithGoogleOneTap({
+        await loginWithGoogleOneTap({
           credential: response.credential,
         });
-        const accessToken = res.data?.data?.accessToken;
-
-        if (accessToken) {
-          localStorage.setItem("accessToken", accessToken);
-        }
+        // Cookie-based session - HttpOnly cookies set by backend
 
         localStorage.setItem("isAuthenticated", "true");
         await fetchUserProfile();
       } catch (err) {
         localStorage.removeItem("isAuthenticated");
-        localStorage.removeItem("accessToken");
-        console.error("Google One Tap login failed:", err);
+        console.error("Google One Tap login failed:", err?.response?.data?.message || err?.message);
       }
     };
 
@@ -205,9 +200,8 @@ const Home = () => {
       );
 
       setPage(pageNumber);
-    } catch (err) {
+    } catch {
       setError("Failed to load products");
-      console.log(err);
     } finally {
       fetchingRef.current = false;
       setLoading(false);

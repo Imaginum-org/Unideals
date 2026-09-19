@@ -3,7 +3,7 @@ import {
   DEAL_STATUS,
   OFFER_STATUS,
   CONVERSATION_ROLE,
-} from "../utils/constants.js";
+} from "../config/constants.js";
 
 const dealSchema = new mongoose.Schema(
   {

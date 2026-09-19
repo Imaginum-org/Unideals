@@ -24,17 +24,42 @@ const router = express.Router();
 router.post("/auth/login", adminLogin);
 router.post("/auth/refresh-token", adminRefreshToken);
 
-router.use(auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT));
+router.get("/auth/me", auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT), adminMe);
+router.post("/auth/logout", auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT), adminLogout);
 
-router.get("/auth/me", adminMe);
-router.post("/auth/logout", adminLogout);
+// Read + moderation (support allowed)
+router.get("/users", auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT), getUsers);
+router.patch(
+  "/users/:id/status",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  updateUserStatus,
+);
 
-router.get("/users", getUsers);
-router.patch("/users/:id/status", updateUserStatus);
-
-router.get("/products", getProducts);
-router.patch("/products/:id/status", updateProductStatus);
-router.patch("/products/:id/soft-delete", softDeleteProduct);
-router.delete("/products/:id", hardDeleteProduct);
+router.get(
+  "/products",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  getProducts,
+);
+router.patch(
+  "/products/:id/status",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  updateProductStatus,
+);
+// Destructive deletes - admin only
+router.patch(
+  "/products/:id/soft-delete",
+  auth,
+  requireRoles(USER_ROLES.ADMIN),
+  softDeleteProduct,
+);
+router.delete(
+  "/products/:id",
+  auth,
+  requireRoles(USER_ROLES.ADMIN),
+  hardDeleteProduct,
+);
 
 export default router;

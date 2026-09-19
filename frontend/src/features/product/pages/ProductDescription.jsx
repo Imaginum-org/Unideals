@@ -63,8 +63,8 @@ const ProductDescription = () => {
         if (fetchedProduct?.images?.length > 0) {
           setActiveImage(fetchedProduct.images[0].url);
         }
-      } catch (error) {
-        console.log(error);
+      } catch {
+        // Product fetch failed - loading state handles UI
       } finally {
         setLoading(false);
       }
@@ -113,8 +113,8 @@ const ProductDescription = () => {
           .slice(0, 4);
 
         setSimilarProducts(filteredProducts);
-      } catch (error) {
-        console.log("Failed to fetch similar products", error);
+      } catch {
+        // Similar products are best-effort only
       } finally {
         setSimilarLoading(false);
       }
@@ -722,7 +722,24 @@ ${shareUrl}`;
 
                 {/* Chat */}
                 <Link
-                  to={`/chat?seller=${product?.seller_id?._id}`}
+                  to={
+                    product?.seller_id?._id
+                      ? `/chat?seller=${encodeURIComponent(product.seller_id._id)}&product=${encodeURIComponent(product._id || "")}`
+                      : "/chat"
+                  }
+                  onClick={(e) => {
+                    // Prevent chatting with own listing (backend also enforces)
+                    try {
+                      const cached = localStorage.getItem("cachedUserDetails");
+                      const me = cached ? JSON.parse(cached)?._id : null;
+                      if (me && product?.seller_id?._id === me) {
+                        e.preventDefault();
+                        toast.error("You cannot chat with yourself");
+                      }
+                    } catch {
+                      // ignore
+                    }
+                  }}
                   className="flex-1 h-[55px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] flex items-center justify-center gap-3 text-white font-semibold text-base tracking-wide shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   <LuMessageSquareText size={20} />
@@ -770,9 +787,18 @@ ${shareUrl}`;
                     <h4 className="mt-1 font-semibold text-[#0F172A] text-base dark:text-white">
                       {product.pickup_address_snapshot?.address_line} <br />
                       {product.pickup_address_snapshot?.city}
-                      <br />
-                      {product.pickup_address_snapshot?.pincode}
-                      {product.pickup_address_snapshot?.state}
+                      {product.pickup_address_snapshot?.pincode ? (
+                        <>
+                          <br />
+                          {product.pickup_address_snapshot.pincode}
+                        </>
+                      ) : null}
+                      {product.pickup_address_snapshot?.state ? (
+                        <>
+                          {" "}
+                          {product.pickup_address_snapshot.state}
+                        </>
+                      ) : null}
                       <br />
                     </h4>
                   </div>

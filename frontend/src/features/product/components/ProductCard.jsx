@@ -68,8 +68,6 @@ const ProductCard = memo(
         seller,
       } = product;
 
-      console.log(product);
-
       const inWishlist = isInWishlist(_id);
 
       const isBoosted =

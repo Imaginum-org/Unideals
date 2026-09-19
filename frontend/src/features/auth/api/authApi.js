@@ -21,8 +21,16 @@ export const loginWithGoogleOneTap = (data) => {
   return axios.post(`${AUTH_BASE_PATH}/google/one-tap`, data);
 };
 
-export const logoutUser = () => {
-  return axios.get(`${AUTH_BASE_PATH}/logoutUser`);
+export const logoutUser = async () => {
+  // POST is CSRF-safe and preferred; backend keeps GET for legacy compat.
+  try {
+    return await axios.post(`${AUTH_BASE_PATH}/logoutUser`);
+  } catch (err) {
+    if (err.response?.status === 404 || err.response?.status === 405) {
+      return axios.get(`${AUTH_BASE_PATH}/logoutUser`);
+    }
+    throw err;
+  }
 };
 
 export const forgotPassword = (data) =>

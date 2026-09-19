@@ -25,14 +25,38 @@ export const scheduleCleanupDeletedProducts = () => {
       );
 
       if (deletedProducts.length > 0) {
-        // Hard delete
-        const result = await Product.deleteMany({
-          is_deleted: true,
-          updatedAt: { $lt: thirtyDaysAgo },
-        });
+        const ids = deletedProducts.map((p) => p._id);
+        // Best-effort ImageKit cleanup
+        try {
+          const { deleteImage } = await import("../utils/imagekit.js");
+          const fileIds = deletedProducts.flatMap((p) =>
+            Array.isArray(p.images)
+              ? p.images.map((i) => i?.fileId).filter(Boolean)
+              : [],
+          );
+          await Promise.allSettled(fileIds.map((id) => deleteImage(id)));
+        } catch {
+          // ignore image cleanup failures
+        }
+        // Hard delete + clean dangling refs
+        const User = (await import("../models/User.model.js")).default;
+        const Report = (await import("../models/Report.model.js")).default;
+        await Promise.all([
+          Product.deleteMany({
+            _id: { $in: ids },
+          }),
+          User.updateMany(
+            { wishlist: { $in: ids } },
+            { $pull: { wishlist: { $in: ids } } },
+          ),
+          Report.deleteMany({
+            target_id: { $in: ids },
+            target_model: "Product",
+          }),
+        ]);
 
         console.log(
-          `[Job] Successfully deleted ${result.deletedCount} products from database`,
+          `[Job] Successfully deleted ${ids.length} products from database`,
         );
       }
 

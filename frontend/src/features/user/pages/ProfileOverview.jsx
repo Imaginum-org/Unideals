@@ -477,7 +477,11 @@ function ProfileOverview() {
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <img
-                              src={item.images?.[0] || "/default-avatar.webp"}
+                              src={
+                                typeof item.images?.[0] === "string"
+                                  ? item.images[0]
+                                  : item.images?.[0]?.url || "/default-avatar.webp"
+                              }
                               alt={item.title || "Saved item"}
                               className="w-10 h-10 rounded-lg object-cover bg-gray-100 shrink-0"
                             />

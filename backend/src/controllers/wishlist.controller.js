@@ -1,15 +1,18 @@
+import mongoose from "mongoose";
 import User from "../models/User.model.js";
 import Product from "../models/Product.model.js";
+
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 export const addToWishlist = async (req, res) => {
   try {
     const userId = req.user._id;
     const { productId } = req.body;
 
-    if (!productId) {
+    if (!productId || !isValidObjectId(productId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Product ID is required" });
+        .json({ success: false, message: "Valid Product ID is required" });
     }
 
     const productExists = await Product.exists({ _id: productId });
@@ -41,7 +44,6 @@ export const addToWishlist = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message,
     });
   }
 };
@@ -51,10 +53,10 @@ export const removeFromWishlist = async (req, res) => {
     const userId = req.user._id;
     const { productId } = req.body;
 
-    if (!productId) {
+    if (!productId || !isValidObjectId(productId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Product ID is required" });
+        .json({ success: false, message: "Valid Product ID is required" });
     }
 
     // $pull removes the item from the array directly in the DB
@@ -80,7 +82,6 @@ export const removeFromWishlist = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message,
     });
   }
 };
@@ -98,7 +99,7 @@ export const getWishlist = async (req, res) => {
         populate: {
           path: "seller_id",
           model: "User",
-          select: "name avatar subscription rating",
+          select: "name avatar subscription",
         },
       })
       .select("wishlist");
@@ -120,7 +121,6 @@ export const getWishlist = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message,
     });
   }
 };
@@ -130,10 +130,10 @@ export const isInWishlist = async (req, res) => {
     const userId = req.user._id;
     const { productId } = req.params;
 
-    if (!productId) {
+    if (!productId || !isValidObjectId(productId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Product ID is required" });
+        .json({ success: false, message: "Valid Product ID is required" });
     }
 
     const userHasProduct = await User.exists({
@@ -150,7 +150,6 @@ export const isInWishlist = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message,
     });
   }
 };
@@ -160,10 +159,10 @@ export const toggleWishlist = async (req, res) => {
     const userId = req.user._id;
     const { productId } = req.body;
 
-    if (!productId) {
+    if (!productId || !isValidObjectId(productId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Product ID is required" });
+        .json({ success: false, message: "Valid Product ID is required" });
     }
 
     const productExists = await Product.exists({ _id: productId });
@@ -208,7 +207,6 @@ export const toggleWishlist = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message,
     });
   }
 };

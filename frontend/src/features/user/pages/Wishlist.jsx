@@ -4,21 +4,19 @@ import { useState, useEffect } from "react";
 import { useWishlist } from "../../../context/WishlistContext";
 
 function Wishlist() {
-  const { wishlist } = useWishlist();
+  const { wishlist, loading } = useWishlist();
   const [visibleWishlist, setVisibleWishlist] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    setIsLoading(false);
-  }, []);
 
   useEffect(() => {
     setVisibleWishlist(wishlist || []);
   }, [wishlist]);
 
+  const getId = (product) =>
+    typeof product === "string" ? product : product?._id;
+
   const handleRemoveFromView = (productId) => {
     setVisibleWishlist((currentWishlist) =>
-      currentWishlist.filter((product) => product._id !== productId),
+      currentWishlist.filter((product) => getId(product) !== productId),
     );
   };
 
@@ -49,21 +47,25 @@ function Wishlist() {
                 </div>
               </div>
 
-              {isLoading ? (
+              {loading ? (
                 <div className="flex justify-center items-center h-64">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
                 </div>
               ) : visibleWishlist && visibleWishlist.length > 0 ? (
                 <div className="w-full grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-x-5 2xl:gap-x-4 gap-y-7 dark:bg-[#131313]">
-                  {visibleWishlist.map((product) => (
-                    <ProductCard
-                      key={product._id}
-                      product={product}
-                      showRemoveButton={true}
-                      onRemove={handleRemoveFromView}
-                      onRemoveError={handleRestoreView}
-                    />
-                  ))}
+                  {visibleWishlist.map((product) => {
+                    const id = getId(product);
+                    if (!id || typeof product === "string") return null;
+                    return (
+                      <ProductCard
+                        key={id}
+                        product={product}
+                        showRemoveButton={true}
+                        onRemove={handleRemoveFromView}
+                        onRemoveError={handleRestoreView}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="flex flex-col justify-center items-center h-64">

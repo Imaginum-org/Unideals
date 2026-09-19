@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { MESSAGE_TYPE, MESSAGE_STATUS } from "../utils/constants.js";
+import { MESSAGE_TYPE, MESSAGE_STATUS } from "../config/constants.js";
 
 const messageSchema = new mongoose.Schema(
   {

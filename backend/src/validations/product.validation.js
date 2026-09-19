@@ -35,6 +35,7 @@ export const createProductSchema = z
         invalid_type_error: "Selling price must be a number",
       })
       .positive("Selling price must be greater than 0")
+      .max(10000000, "Selling price is too large")
       .optional(),
 
     original_price: z.coerce
@@ -42,17 +43,31 @@ export const createProductSchema = z
         invalid_type_error: "Original price must be a number",
       })
       .positive("Original price must be greater than 0")
+      .max(10000000, "Original price is too large")
       .optional(),
 
     is_negotiable: z.boolean().optional(),
 
     payment_preference: z.enum(Object.values(PRODUCT_PAYMENT)).optional(),
 
+    // Legacy frontend field - accepted but ignored server-side
+    meetup_location: z.string().trim().max(200).optional(),
+
     images: z
       .array(
         z.object({
-          url: z.string().url("Invalid image URL"),
-          fileId: z.string().min(1, "Invalid file ID"),
+          url: z
+            .string()
+            .url("Invalid image URL")
+            .max(2048, "Image URL too long")
+            .refine((u) => u.startsWith("https://"), {
+              message: "Image URL must use HTTPS",
+            }),
+          fileId: z
+            .string()
+            .min(1, "Invalid file ID")
+            .max(256, "Invalid file ID")
+            .regex(/^[A-Za-z0-9_\-/]+$/, "Invalid file ID format"),
         }),
       )
       .max(3, "Maximum 3 images allowed")
@@ -76,17 +91,18 @@ export const createProductSchema = z
           .enum(Object.values(PRODUCT_USAGE_DURATION))
           .optional(),
 
-        purchase_date: z.string().optional(),
+        purchase_date: z.string().max(30).nullish(),
       })
+      .catchall(z.never())
       .optional(),
 
     pickup_address_snapshot: z
       .object({
-        address_line: z.string().trim().min(3).optional(),
+        address_line: z.string().trim().min(3).max(300).optional(),
 
-        city: z.string().trim().min(2).optional(),
+        city: z.string().trim().min(2).max(100).optional(),
 
-        state: z.string().trim().min(2).optional(),
+        state: z.string().trim().min(2).max(100).optional(),
 
         pincode: z
           .string()
@@ -100,8 +116,11 @@ export const createProductSchema = z
 
         additional_info: z.string().trim().max(300).optional(),
       })
+      .catchall(z.never())
       .optional(),
   })
+  // Strip unknown privileged keys (is_boosted, views_count, seller_id, etc.)
+  // instead of rejecting to preserve legacy clients.
   .refine(
     (data) => {
       if (data.original_price && data.selling_price) {

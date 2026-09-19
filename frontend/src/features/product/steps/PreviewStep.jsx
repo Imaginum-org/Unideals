@@ -69,9 +69,8 @@ const PreviewStep = () => {
       });
 
       toast.success("Draft saved successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to save draft");
-      console.log(error.message);
     } finally {
       setLoading(false);
     }
@@ -125,6 +124,9 @@ const PreviewStep = () => {
 
         images: uploads,
 
+        // Campus pickup-spot model: snapshot carries only the spot
+        // (name -> address_line, detail -> city). No state/pincode needed
+        // since buyer and seller meet on the same campus.
         pickup_address_snapshot: {
           address_line:
             formData.address?.name ||
@@ -132,10 +134,6 @@ const PreviewStep = () => {
             formData.address?.line1,
 
           city: formData.address?.detail || formData.address?.city,
-
-          state: formData.address?.state,
-
-          pincode: formData.address?.pincode,
         },
 
         meetup_location: formData.meetupLocation,
@@ -149,10 +147,6 @@ const PreviewStep = () => {
           purchase_date: formData.purchaseDate || null,
         },
       });
-
-      console.log("FULL RESPONSE", response.data);
-
-      console.log("IS FIRST LISTING", response.data.isFirstListing);
 
       const isFirstListing = Boolean(response?.data?.isFirstListing);
 

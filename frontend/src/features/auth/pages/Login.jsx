@@ -22,6 +22,27 @@ function Login() {
   const location = useLocation();
   const { fetchUserProfile } = useUser();
 
+  const getReturnTo = () => {
+    const from = location.state?.from?.pathname;
+    return from && from !== "/login" ? from : "/";
+  };
+
+  const stripOAuthCodeFromUrl = () => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("oauth_code")) {
+        url.searchParams.delete("oauth_code");
+        window.history.replaceState(
+          {},
+          document.title,
+          url.pathname + url.search + url.hash,
+        );
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     let isActive = true;
 
@@ -31,11 +52,8 @@ function Login() {
 
       try {
         const response = await exchangeGoogleOAuthCode({ code: oauthCode });
-        const accessToken = response.data?.data?.accessToken;
-
-        if (accessToken) {
-          localStorage.setItem("accessToken", accessToken);
-        }
+        // Cookie-based session - no localStorage token. Backend sets HttpOnly cookies.
+        stripOAuthCodeFromUrl();
 
         localStorage.setItem("isAuthenticated", "true");
         const profileLoaded = await fetchUserProfile();
@@ -44,10 +62,9 @@ function Login() {
 
         if (profileLoaded) {
           toast.success(response.data.message || "Logged in with Google");
-          navigate("/", { replace: true });
+          navigate(getReturnTo(), { replace: true });
         } else {
           localStorage.removeItem("isAuthenticated");
-          localStorage.removeItem("accessToken");
           setFormMessage({
             variant: "error",
             text: "Google login could not be verified. Please try again.",
@@ -56,8 +73,8 @@ function Login() {
       } catch (error) {
         if (!isActive) return;
 
+        stripOAuthCodeFromUrl();
         localStorage.removeItem("isAuthenticated");
-        localStorage.removeItem("accessToken");
         setFormMessage({
           variant: "error",
           text:
@@ -85,7 +102,7 @@ function Login() {
         if (!isActive) return;
 
         if (profileLoaded) {
-          navigate("/", { replace: true });
+          navigate(getReturnTo(), { replace: true });
         } else {
           localStorage.removeItem("isAuthenticated");
           setFormMessage({
@@ -110,15 +127,13 @@ function Login() {
       const response = await loginUser({ email, password });
 
       if (response.data.success) {
-        const accessToken = response.data?.data?.accessToken;
-        if (accessToken) {
-          localStorage.setItem("accessToken", accessToken);
-        }
-
+        // Cookie-based session - backend sets HttpOnly cookies, no token in storage
         toast.success(response.data.message || "Logged in successfully!");
         localStorage.setItem("isAuthenticated", "true");
         await fetchUserProfile();
-        navigate("/");
+        // Honor return-to from ProtectedLayout
+        const from = location.state?.from?.pathname;
+        navigate(from && from !== "/login" ? from : "/");
       }
     } catch (error) {
       if (error.response?.data?.accountBlocked) {

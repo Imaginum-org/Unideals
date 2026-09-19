@@ -5,8 +5,13 @@ import { getRefreshTokenUrl } from "../features/auth/api/authApi";
 let isRefreshing = false;
 let refreshSubscribers = [];
 
-const onRefreshed = (token) => {
-  refreshSubscribers.forEach((callback) => callback(token));
+const onRefreshed = () => {
+  refreshSubscribers.forEach((callback) => callback());
+  refreshSubscribers = [];
+};
+
+const onRefreshFailed = (err) => {
+  refreshSubscribers.forEach((callback) => callback(err));
   refreshSubscribers = [];
 };
 
@@ -17,6 +22,7 @@ const addRefreshSubscriber = (callback) => {
 const clearStoredAuth = () => {
   localStorage.removeItem("isAuthenticated");
   localStorage.removeItem("cachedUserDetails");
+  // Legacy cleanup
   localStorage.removeItem("accessToken");
 };
 
@@ -47,9 +53,13 @@ instance.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        return new Promise((resolve) => {
-          addRefreshSubscriber((token) => {
-            originalRequest.headers["Authorization"] = `Bearer ${token}`;
+        return new Promise((resolve, reject) => {
+          addRefreshSubscriber((refreshErr) => {
+            if (refreshErr) {
+              reject(refreshErr);
+              return;
+            }
+            // Cookies refreshed - retry with credentials (no Bearer needed)
             resolve(instance(originalRequest));
           });
         });
@@ -65,25 +75,22 @@ instance.interceptors.response.use(
           { withCredentials: true },
         );
 
-        if (response.data.success) {
-          const { accessToken } = response.data.data;
-          if (accessToken) {
-            localStorage.setItem("accessToken", accessToken);
-          }
-
+        if (response.data?.success) {
           isRefreshing = false;
-          onRefreshed(accessToken);
+          onRefreshed();
 
           return instance(originalRequest);
         }
+
+        throw new Error("Refresh failed");
       } catch (err) {
+        isRefreshing = false;
+        onRefreshFailed(err);
         clearStoredAuth();
 
         if (err.response?.data?.accountBlocked) {
           notifyAccountBlocked(err.response.data);
         }
-
-        isRefreshing = false;
 
         return Promise.reject(err);
       }
@@ -93,13 +100,9 @@ instance.interceptors.response.use(
   },
 );
 
+// Cookie-based auth: withCredentials sends HttpOnly cookies automatically.
+// No Authorization header is set to avoid XSS theft of long-lived tokens.
 instance.interceptors.request.use((config) => {
-  const accessToken = localStorage.getItem("accessToken");
-
-  if (accessToken && !config.headers.Authorization) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
-
   return config;
 });
 

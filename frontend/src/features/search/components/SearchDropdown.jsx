@@ -13,21 +13,28 @@ const SearchDropdown = ({
 }) => {
   if (!query) return null;
 
+  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   const highlightText = (text, query) => {
-    if (!query) return text;
+    if (!query || typeof text !== "string") return text;
 
-    const regex = new RegExp(`(${query})`, "gi");
-    const parts = text.split(regex);
+    try {
+      const safeQuery = escapeRegExp(query.slice(0, 100));
+      const regex = new RegExp(`(${safeQuery})`, "gi");
+      const parts = text.split(regex);
 
-    return parts.map((part, index) =>
-      part.toLowerCase() === query.toLowerCase() ? (
-        <span key={index} className="font-semibold text-blue-500">
-          {part}
-        </span>
-      ) : (
-        part
-      ),
-    );
+      return parts.map((part, index) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <span key={index} className="font-semibold text-blue-500">
+            {part}
+          </span>
+        ) : (
+          part
+        ),
+      );
+    } catch {
+      return text;
+    }
   };
 
   const itemRefs = useRef([]);
@@ -137,7 +144,7 @@ ${mobile ? "px-4 py-4" : "px-3 py-3"}
         {/* View All */}
         {!loading && results.length > 0 && (
           <Link
-            to={`/search?q=${query}`}
+            to={`/search?q=${encodeURIComponent(query)}`}
             onClick={() => onSelect?.()}
             className={`
               block

@@ -216,10 +216,21 @@ const Header = () => {
   const lastDirection = useRef(null);
 
   useEffect(() => {
-    const storedSearches = localStorage.getItem("recentSearches");
+    try {
+      const storedSearches = localStorage.getItem("recentSearches");
 
-    if (storedSearches) {
-      setRecentSearches(JSON.parse(storedSearches));
+      if (storedSearches) {
+        const parsed = JSON.parse(storedSearches);
+        if (Array.isArray(parsed)) {
+          setRecentSearches(parsed.filter((s) => typeof s === "string").slice(0, 5));
+        }
+      }
+    } catch {
+      try {
+        localStorage.removeItem("recentSearches");
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
@@ -886,7 +897,7 @@ const Header = () => {
                               onClick={() => {
                                 saveRecentSearch(item);
 
-                                navigate(`/search?q=${item}`);
+                                navigate(`/search?q=${encodeURIComponent(item)}`);
 
                                 setShowMobileSearch(false);
                                 setShowDropdown(false);

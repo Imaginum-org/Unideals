@@ -30,3 +30,19 @@ export const errorResponse = (res, message, status = 500, errors = null) => {
 
   return res.status(status).json(response);
 };
+
+// Map known service-layer errors (plain Errors) to HTTP codes before
+// passing to the global handler. Unknown errors keep 500 + masked message.
+export const forwardServiceError = (error, next) => {
+  const msg = String(error.message || "");
+  if (/not found/i.test(msg)) {
+    error.statusCode = 404;
+  } else if (
+    /permission|limit reached|already boosted|already reported|already deleted|only active listed|cannot report/i.test(
+      msg,
+    )
+  ) {
+    error.statusCode = 400;
+  }
+  next(error);
+};

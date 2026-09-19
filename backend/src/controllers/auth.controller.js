@@ -13,6 +13,7 @@ import {
   loginWithPassword,
   refreshSession,
   revokeRefreshToken,
+  revokeRefreshTokenByToken,
   sanitizeAuthUser,
   setAuthCookies,
 } from "../services/auth.service.js";
@@ -32,10 +33,20 @@ const findOrCreateGoogleUser = async (payload) => {
     throw error;
   }
 
+  // Only trust Google-verified emails for auto-verification/linking
+  if (payload?.email_verified === false) {
+    const error = new Error("Google email is not verified.");
+    error.statusCode = 400;
+    throw error;
+  }
+
   const name = payload.name || email.split("@")[0];
-  const picture = payload.picture
-    ? payload.picture.replace("s96-c", "s400-c")
-    : null;
+  // Only accept Google-hosted avatar URLs to prevent stored XSS/phishing
+  const rawPicture = typeof payload.picture === "string" ? payload.picture : null;
+  const isGoogleAvatar =
+    rawPicture &&
+    /^https:\/\/lh\d*\.googleusercontent\.com\//.test(rawPicture);
+  const picture = isGoogleAvatar ? rawPicture.replace("s96-c", "s400-c") : null;
 
   let user = await userModel.findOne({ email }).select("+password");
 
@@ -50,6 +61,7 @@ const findOrCreateGoogleUser = async (payload) => {
       avatar: picture ? { url: picture } : undefined,
       is_email_verified: true,
       verifyTokenEmail: "",
+      verifyTokenEmailExpiry: null,
     });
   } else {
     if (picture && !user.avatar?.url) {
@@ -85,14 +97,17 @@ export const registerUserController = async (req, res) => {
     const existingUser = await userModel.findOne({ email });
 
     if (existingUser && existingUser.is_email_verified) {
+      // Generic response to avoid confirming which emails are registered,
+      // while preserving existing client behavior (400 for verified accounts).
       return res.status(400).json({
-        message: "This email is already registered. Please log in.",
+        message: "If this email is registered, please log in or check your inbox.",
         error: true,
         success: false,
       });
     }
 
     const verifyToken = crypto.randomBytes(32).toString("hex");
+    const verifyExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
 
     let responseMessage = "";
@@ -101,6 +116,7 @@ export const registerUserController = async (req, res) => {
     if (existingUser) {
       await userModel.findByIdAndUpdate(existingUser._id, {
         verifyTokenEmail: verifyToken,
+        verifyTokenEmailExpiry: verifyExpiry,
       });
 
       responseMessage =
@@ -114,6 +130,7 @@ export const registerUserController = async (req, res) => {
         email,
         password: hashedPassword,
         verifyTokenEmail: verifyToken,
+        verifyTokenEmailExpiry: verifyExpiry,
         is_email_verified: false,
       });
 
@@ -223,6 +240,21 @@ export const googleAuthCallbackController = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
+    const previewUser = await userModel
+      .findOne({ email: payload?.email?.toLowerCase() })
+      .select("status")
+      .lean();
+    if (previewUser && previewUser.status !== USER_STATUS.ACTIVE) {
+      const statusLabel =
+        previewUser.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
+      return res.status(403).json({
+        message: `Your account is ${statusLabel}. Please contact support.`,
+        success: false,
+        error: true,
+        accountBlocked: true,
+        accountStatus: previewUser.status,
+      });
+    }
     const user = await findOrCreateGoogleUser(payload);
 
     const oauthLoginCode = crypto.randomBytes(32).toString("hex");
@@ -285,8 +317,8 @@ export const googleOneTapController = async (req, res) => {
     user.last_login_date = new Date();
     await user.save();
 
-    const accessToken = await generatedAccessToken(user._id);
-    const refreshToken = await generatedRefreshToken(user._id);
+    const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
+    const refreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
 
     setAuthCookies(res, accessToken, refreshToken);
 
@@ -327,10 +359,17 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       .update(code)
       .digest("hex");
 
-    const user = await userModel.findOne({
-      oauth_login_token: hashedOauthLoginCode,
-      oauth_login_expiry: { $gt: new Date() },
-    });
+    // Atomic single-use consume to prevent parallel replay
+    const user = await userModel.findOneAndUpdate(
+      {
+        oauth_login_token: hashedOauthLoginCode,
+        oauth_login_expiry: { $gt: new Date() },
+      },
+      {
+        $set: { oauth_login_token: "", oauth_login_expiry: null },
+      },
+      { new: false },
+    );
 
     if (!user) {
       return res.status(401).json({
@@ -340,26 +379,26 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       });
     }
 
-    if (user.status !== USER_STATUS.ACTIVE) {
+    const freshUser = await userModel.findById(user._id);
+
+    if (freshUser.status !== USER_STATUS.ACTIVE) {
       const statusLabel =
-        user.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
+        freshUser.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
 
       return res.status(403).json({
         message: `Your account is ${statusLabel}. Please contact support.`,
         success: false,
         error: true,
         accountBlocked: true,
-        accountStatus: user.status,
+        accountStatus: freshUser.status,
       });
     }
 
-    user.oauth_login_token = "";
-    user.oauth_login_expiry = null;
-    user.last_login_date = new Date();
-    await user.save();
+    freshUser.last_login_date = new Date();
+    await freshUser.save();
 
-    const accessToken = await generatedAccessToken(user._id);
-    const refreshToken = await generatedRefreshToken(user._id);
+    const accessToken = await generatedAccessToken(freshUser._id, freshUser.tokenVersion || 0);
+    const refreshToken = await generatedRefreshToken(freshUser._id, freshUser.tokenVersion || 0);
 
     setAuthCookies(res, accessToken, refreshToken);
 
@@ -370,7 +409,7 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       data: {
         accessToken,
         refreshToken,
-        user: sanitizeAuthUser(user),
+        user: sanitizeAuthUser(freshUser),
       },
     });
   } catch (error) {
@@ -385,7 +424,7 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
 export const verifyEmailController = async (req, res) => {
   try {
     const { code } = req.body;
-    if (!code) {
+    if (!code || typeof code !== "string") {
       return res.status(400).json({
         message: "verification code required ",
         success: false,
@@ -394,6 +433,7 @@ export const verifyEmailController = async (req, res) => {
     }
     const user = await userModel.findOne({
       verifyTokenEmail: code,
+      verifyTokenEmailExpiry: { $gt: new Date() },
     });
     if (!user) {
       return res.status(400).json({
@@ -405,6 +445,7 @@ export const verifyEmailController = async (req, res) => {
 
     user.is_email_verified = true;
     user.verifyTokenEmail = "";
+    user.verifyTokenEmailExpiry = null;
     await user.save();
 
     return res.status(200).json({
@@ -424,7 +465,7 @@ export const verifyEmailController = async (req, res) => {
 export const checkEmailVerificationController = async (req, res) => {
   try {
     const email = req.query.email;
-    if (!email) {
+    if (!email || typeof email !== "string") {
       return res.status(400).json({
         message: "Email is required to check verification status",
         success: false,
@@ -432,12 +473,24 @@ export const checkEmailVerificationController = async (req, res) => {
       });
     }
 
-    const user = await userModel.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
+    const normalized = String(email).trim().toLowerCase();
+    // Basic email shape check to avoid DB probe with garbage
+    if (!/^\S+@\S+\.\S+$/.test(normalized)) {
+      return res.status(400).json({
+        message: "Invalid email format",
         success: false,
         error: true,
+      });
+    }
+
+    const user = await userModel.findOne({ email: normalized });
+    if (!user) {
+      // Generic response to avoid enumeration; frontend treats as unverified
+      return res.status(200).json({
+        message: "Email is not verified yet",
+        success: true,
+        error: false,
+        verified: false,
       });
     }
 
@@ -451,7 +504,7 @@ export const checkEmailVerificationController = async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({
-      message: err.message || err,
+      message: "Unable to check verification status",
       success: false,
       error: true,
     });
@@ -460,7 +513,13 @@ export const checkEmailVerificationController = async (req, res) => {
 
 export const logoutUser = async (req, res) => {
   try {
-    await revokeRefreshToken(req.userId);
+    // Prefer authenticated userId, fallback to refresh-cookie lookup
+    // so legacy GET /logoutUser (no auth middleware) still revokes server-side.
+    if (req.userId) {
+      await revokeRefreshToken(req.userId);
+    } else if (req.cookies?.refreshToken) {
+      await revokeRefreshTokenByToken(req.cookies.refreshToken);
+    }
     clearAuthCookies(res);
 
     return res.status(200).json({
@@ -470,10 +529,11 @@ export const logoutUser = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in logoutUser:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error during logout",
-      error: true,
+    clearAuthCookies(res);
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+      error: false,
     });
   }
 };
@@ -504,40 +564,64 @@ export const refreshAccessTokenController = async (req, res) => {
 export const forgotPasswordController = async (req, res) => {
   try {
     const { email } = req.body;
+    const genericMessage =
+      "If an account exists for this email, a password reset link has been sent. Please check your inbox.";
 
-    const user = await userModel.findOne({ email });
+    if (!email || typeof email !== "string") {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await userModel.findOne({ email: normalizedEmail });
 
     if (!user) {
-      return res.status(404).json({
-        message: "User with this email doesn't exist",
-        success: false,
-        error: true,
+      // Generic success to prevent enumeration
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
       });
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedResetToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
 
     const expireTime = Date.now() + 15 * 60 * 1000;
     await userModel.findByIdAndUpdate(user._id, {
-      reset_password_token: resetToken,
+      reset_password_token: hashedResetToken,
       reset_password_expiry: expireTime,
     });
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
     // 5. Send the email
-    await sendEmail({
-      sendTo: email,
-      subject: "Reset your Unideals password",
-      html: forgotPaswordTemplate({
-        name: user.name,
-        resetUrl,
-      }),
-    });
+    try {
+      await sendEmail({
+        sendTo: normalizedEmail,
+        subject: "Reset your Unideals password",
+        html: forgotPaswordTemplate({
+          name: user.name,
+          resetUrl,
+        }),
+      });
+    } catch (emailErr) {
+      // Roll back token if email fails so stale tokens don't linger
+      await userModel.findByIdAndUpdate(user._id, {
+        reset_password_token: "",
+        reset_password_expiry: null,
+      });
+      throw emailErr;
+    }
 
     return res.status(200).json({
-      message:
-        "Password reset link sent to your email. Please check your inbox.",
+      message: genericMessage,
       success: true,
       error: false,
     });
@@ -556,16 +640,17 @@ export const resetPasswordController = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
-    if (!password) {
+    if (!password || typeof password !== "string" || password.length < 6) {
       return res.status(400).json({
-        message: "Please provide a new password",
+        message: "Please provide a new password of at least 6 characters",
         success: false,
         error: true,
       });
     }
 
+    const hashedToken = crypto.createHash("sha256").update(String(token)).digest("hex");
     const user = await userModel.findOne({
-      reset_password_token: token,
+      reset_password_token: hashedToken,
       reset_password_expiry: { $gt: Date.now() }, // $gt means "greater than" right now
     });
 
@@ -584,6 +669,8 @@ export const resetPasswordController = async (req, res) => {
       password: hashedPassword,
       reset_password_token: "",
       reset_password_expiry: null,
+      refresh_token: null,
+      $inc: { tokenVersion: 1 },
     });
 
     return res.status(200).json({
@@ -605,9 +692,10 @@ export const verifyResetTokenPreCheck = async (req, res) => {
   try {
     const { token } = req.params;
 
+    const hashedToken = crypto.createHash("sha256").update(String(token)).digest("hex");
     // Check if the token exists and hasn't expired yet
     const user = await userModel.findOne({
-      reset_password_token: token,
+      reset_password_token: hashedToken,
       reset_password_expiry: { $gt: Date.now() },
     });
 
@@ -637,13 +725,25 @@ export const verifyResetTokenPreCheck = async (req, res) => {
 export const resendVerificationController = async (req, res) => {
   try {
     const { email } = req.body;
+    const genericMessage = "If this email is registered and unverified, a verification email has been sent.";
 
-    const user = await userModel.findOne({ email });
+    if (!email || typeof email !== "string") {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await userModel.findOne({ email: normalizedEmail });
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ message: "User not found.", success: false, error: true });
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
     }
 
     if (user.is_email_verified) {
@@ -658,12 +758,13 @@ export const resendVerificationController = async (req, res) => {
     const verifyToken = crypto.randomBytes(32).toString("hex");
     await userModel.findByIdAndUpdate(user._id, {
       verifyTokenEmail: verifyToken,
+      verifyTokenEmailExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
     // Send the email
     const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
     await sendEmail({
-      sendTo: email,
+      sendTo: normalizedEmail,
       subject: "Verify your email for Unideals",
       html: verifyEmailTempplate({ name: user.name, url: verifyEmailUrl }),
     });
@@ -676,6 +777,6 @@ export const resendVerificationController = async (req, res) => {
   } catch (error) {
     return res
       .status(500)
-      .json({ message: error.message || error, success: false, error: true });
+      .json({ message: "Unable to resend verification email", success: false, error: true });
   }
 };

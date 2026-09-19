@@ -31,9 +31,8 @@ const [legalTab, setLegalTab] = useState(null);
           pickupSpots.find((spot) => spot.isPrimary) || pickupSpots[0];
 
         updateField("address", primaryPickupSpot || null);
-      } catch (error) {
+      } catch {
         toast.error("Failed to fetch pickup spot");
-        console.log(error.message);
       } finally {
         setLoadingPickupSpot(false);
       }
@@ -53,7 +52,7 @@ const [legalTab, setLegalTab] = useState(null);
           onClose={() => setLegalTab(null)}
         />
       )}
-      <div className="w-full text-black dark:texxt-white rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
+      <div className="w-full text-black dark:text-white rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
         {/* Header */}
         <div>
           <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
