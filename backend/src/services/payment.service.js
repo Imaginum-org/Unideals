@@ -123,6 +123,11 @@ export const createOrder = async ({ plan, productId, user }) => {
       },
     });
   } catch (err) {
+    // Log provider details server-side only; client keeps a generic message.
+    console.error("Razorpay orders.create failed:", {
+      statusCode: err?.statusCode,
+      error: err?.error,
+    });
     const error = new Error("Unable to initiate payment. Please try again.");
     error.statusCode = 502;
     throw error;
@@ -209,7 +214,11 @@ export const verifyPayment = async ({ orderId, paymentId, signature, user }) => 
   let rzpOrder;
   try {
     rzpOrder = await razorpay.orders.fetch(orderId);
-  } catch {
+  } catch (fetchErr) {
+    console.error("Razorpay orders.fetch failed:", {
+      statusCode: fetchErr?.statusCode,
+      error: fetchErr?.error,
+    });
     const error = new Error("Unable to confirm payment. Please try again.");
     error.statusCode = 502;
     throw error;

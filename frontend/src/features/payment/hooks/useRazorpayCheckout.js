@@ -71,6 +71,36 @@ export const useRazorpayCheckout = () => {
               contact: prefill?.contact || "",
             },
             theme: { color: "#3300ff", backdrop_color: "rgba(19,19,19,0.6)" },
+            // Show ONLY Card, UPI and Netbanking. The UPI block renders
+            // both flows (scan QR + enter UPI ID); everything else
+            // (wallets, EMI, pay-later, bank transfer) is hidden.
+            config: {
+              display: {
+                blocks: {
+                  upi: {
+                    name: "UPI",
+                    instruments: [{ method: "upi", flows: ["qr", "collect"] }],
+                  },
+                  card: {
+                    name: "Cards",
+                    instruments: [{ method: "card" }],
+                  },
+                  banks: {
+                    name: "Netbanking",
+                    instruments: [{ method: "netbanking" }],
+                  },
+                  hide: [
+                    { method: "wallet" },
+                    { method: "emi" },
+                    { method: "cardless_emi" },
+                    { method: "paylater" },
+                    { method: "bank_transfer" },
+                  ],
+                },
+                sequence: ["block.upi", "block.card", "block.banks"],
+                preferences: { show_default_blocks: false },
+              },
+            },
             handler: (response) => settle(resolve, response),
             modal: {
               ondismiss: () => settle(reject, new Error("Payment cancelled")),
