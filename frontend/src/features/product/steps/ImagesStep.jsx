@@ -1,7 +1,8 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import { HiOutlineTrash } from "react-icons/hi";
 import useProductListing from "../hooks/useProductListing";
+import PhoneHandoffCard from "../../handoff/components/PhoneHandoffCard.jsx";
 import { RiCameraAiLine } from "react-icons/ri";
 import { IoArrowForward } from "react-icons/io5";
 import { validateImages } from "../validations";
@@ -15,6 +16,8 @@ const ImagesStep = () => {
     useProductListing();
 
   const [isDragging, setIsDragging] = useState(false);
+  // Tracks phone-delivered fileIds so repeat polls never re-add them.
+  const phoneFileIds = useRef(new Set());
 
   useEffect(() => {
     return () => {
@@ -90,6 +93,40 @@ const ImagesStep = () => {
 
     e.target.value = null;
   };
+
+  // PHONE HANDOFF: convert freshly uploaded ImageKit URLs back into File
+  // objects so the rest of the flow (validation, previews, compression,
+  // publish upload) treats them exactly like laptop-picked files.
+  // Stable ref pattern: polls fire seconds after render, so the handler
+  // must always see the LATEST formData, never a stale closure.
+  const processFilesRef = useRef(null);
+  processFilesRef.current = (files) => processFiles(files);
+
+  const handlePhonePhotos = useCallback(async (images) => {
+    const fresh = (images || []).filter((img) => {
+      if (!img?.url || phoneFileIds.current.has(img.fileId)) return false;
+      phoneFileIds.current.add(img.fileId);
+      return true;
+    });
+    if (fresh.length === 0) return;
+
+    try {
+      const files = await Promise.all(
+        fresh.map(async (img, index) => {
+          const res = await fetch(img.url);
+          if (!res.ok) throw new Error(`Download failed (${res.status})`);
+          const blob = await res.blob();
+          const ext = (blob.type.split("/")[1] || "jpg").replace(/[^a-z]/g, "");
+          return new File([blob], `phone-photo-${Date.now()}-${index}.${ext}`, {
+            type: blob.type || "image/jpeg",
+          });
+        }),
+      );
+      processFilesRef.current(files);
+    } catch {
+      toast.error("Could not attach phone photos. Please try again.");
+    }
+  }, []);
 
   // REMOVE IMAGE
   const handleRemoveImage = (index) => {
@@ -219,6 +256,10 @@ const ImagesStep = () => {
           <p className="mt-3 text-sm text-red-500">{errors.images}</p>
         )}
       </div>
+
+      {/* Phone handoff: QR -> gallery/camera -> auto-attach. The laptop
+          upload above is untouched. */}
+      <PhoneHandoffCard onPhotos={handlePhonePhotos} />
 
       {/* Uploaded Images */}
       {formData.imagePreviews?.length > 0 && (

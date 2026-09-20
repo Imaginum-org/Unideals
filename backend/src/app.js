@@ -16,6 +16,7 @@ import wishlistRouter from "./routes/wishlist.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import boostRouter from "./routes/boost.routes.js";
 import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js";
+import handoffRouter from "./routes/handoff.routes.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
@@ -183,6 +184,7 @@ app.use("/api/wishlist", wishlistRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/boost", boostRouter);
 app.use("/api/payments", paymentRouter);
+app.use("/api/handoff", handoffRouter);
 
 // If no route matches
 app.use((req, res) => {

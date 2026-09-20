@@ -27,3 +27,21 @@ export const getFileDetails = async (fileId) => {
   const imagekit = getImagekit();
   return imagekit.getFileDetails(fileId);
 };
+
+// Server-side upload (used by phone-handoff photos). Caller validates
+// type/size; ImageKit re-validates content on receipt.
+export const uploadImageBuffer = async (buffer, fileName, folder = "Products") => {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error("Invalid file data");
+  }
+  const imagekit = getImagekit();
+  const result = await imagekit.upload({
+    file: buffer,
+    fileName: String(fileName || `upload_${Date.now()}.jpg`).slice(0, 100),
+    folder,
+  });
+  if (!result?.url || !result?.fileId) {
+    throw new Error("Image upload failed");
+  }
+  return { url: result.url, fileId: result.fileId };
+};

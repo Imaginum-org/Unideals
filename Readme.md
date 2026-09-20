@@ -60,34 +60,63 @@ Unideals connects students in a campus marketplace. Users can register, verify t
 
 ## Tech Stack
 
-**Frontend**
+**Frontend** (`frontend/` — React 18 + Vite 6)
 
 | Technology | Purpose |
 |---|---|
 | React 18 | UI framework |
-| Vite | Dev server and production bundler |
-| React Router v7 | Client-side routing with protected layouts |
+| Vite 6 | Dev server and production bundler |
+| React Router v7 | Client-side routing (public / protected / auth-only layouts) |
+| Tailwind CSS 3 | Utility-first styling with class-based dark mode |
 | Axios | HTTP client with cookie-based auth and silent token refresh |
-| Tailwind CSS | Utility-first styling |
+| React Context | User, theme, and wishlist state (no external store) |
 | ImageKit JS SDK | Client-side image uploads |
-| Razorpay Checkout | Pro / Pro+ upgrades and boost add-on purchases |
+| browser-image-compression | Image compression before upload |
+| Razorpay Checkout.js (lazy-loaded) | Pro / Pro+ upgrades and boost add-on purchases |
+| react-qr-code | Phone-handoff QR rendering (listing flow) |
 | EmailJS | Contact form email delivery |
-| Framer Motion, Swiper, Radix UI | Animations, carousels, and dialogs |
+| Framer Motion | Animations and transitions |
+| Swiper | Image carousels |
+| Radix UI | Accessible dialogs and primitives |
+| Lucide / react-icons / Heroicons | Icon sets |
+| react-hot-toast, react-toastify | Toast notifications |
+| react-select, react-slider, react-datepicker, react-burger-menu | Form and navigation widgets |
+| date-fns, clsx, canvas-confetti, lenis | Dates, classnames, celebrations, smooth scroll |
 
-**Backend**
+**Backend** (`backend/` — Node.js 22 + Express 5, ESM)
 
 | Technology | Purpose |
 |---|---|
 | Express.js 5 | REST API server |
-| MongoDB + Mongoose | Document database and ODM |
-| JWT + refresh tokens | Cookie-based session authentication |
-| Zod | Request body validation |
-| Resend | Transactional email (verification, password reset) |
-| ImageKit | Image storage, delivery, and server-side deletion |
-| Razorpay | Plan and boost add-on orders, signature verification, webhooks |
-| Google OAuth2 | Social sign-in |
-| node-cron | Scheduled jobs (boost expiry, deleted product cleanup, subscription expiry) |
+| MongoDB + Mongoose 9 | Document database and ODM (incl. TTL indexes) |
+| JWT + refresh tokens | 15-min access + 7-day rotating refresh tokens over HttpOnly cookies, with versioned revocation |
 | bcrypt | Password hashing |
+| Zod 4 | Request body validation |
+| Razorpay SDK 2.x | Plan and boost add-on orders, signature verification, webhooks |
+| ImageKit SDK 6 | Image storage, delivery, signed tokens, server-side upload/deletion |
+| Multer | Phone-handoff multipart uploads (memory storage) |
+| nanoid | Receipts, pairing codes, product slugs |
+| slugify | SEO-friendly product slugs |
+| Resend | Transactional email (verification, password reset) |
+| Google Auth Library | Google OAuth2 + One-Tap sign-in |
+| cookie-parser, CORS | Cookies and cross-origin policy |
+| Helmet | Secure HTTP response headers |
+| express-rate-limit | Per-endpoint abuse protection |
+| xss | Deep XSS sanitization |
+| morgan | Request logging (secrets redacted) |
+| node-cron | Scheduled jobs (boost expiry, deleted-product cleanup, subscription expiry) |
+| dotenv | Environment configuration |
+
+**Infrastructure & Services**
+
+| Technology | Purpose |
+|---|---|
+| Vercel | Frontend hosting (`app.unideals.in`) |
+| Render | Backend hosting (`api.unideals.in`) |
+| MongoDB Atlas | Managed database |
+| ImageKit CDN | Image storage, optimization, and delivery |
+| Razorpay (Test Mode) | Payment gateway: orders, Checkout, webhooks |
+| Resend + EmailJS | Backend transactional email + frontend contact form |
 
 ---
 

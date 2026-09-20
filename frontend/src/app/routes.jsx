@@ -28,6 +28,7 @@ import PrivacyPolicy from "../features/legal/pages/PrivacyPolicy.jsx";
 import Chat from "../features/chat/pages/Chat.jsx";
 import Notification from "../features/notification/pages/Notification.jsx";
 import SearchResults from "../features/search/pages/SearchResults.jsx";
+import PhoneUpload from "../features/handoff/pages/PhoneUpload.jsx";
 
 export default function AppRoutes() {
   return (
@@ -76,6 +77,10 @@ export default function AppRoutes() {
           <Route path="/contact" element={<ContactUs />} />
         </Route>
       </Route>
+
+      {/* Phone photo handoff: public, secret-in-URL auth, no layout.
+          Must stay outside PublicOnlyRoute (logged-in phones use it too). */}
+      <Route path="/p/:code" element={<PhoneUpload />} />
 
       {/* 404 - must be last */}
       <Route path="*" element={<Navigate to="/" replace />} />
