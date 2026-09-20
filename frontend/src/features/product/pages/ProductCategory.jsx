@@ -6,6 +6,7 @@ import {
   PRODUCT_CONDITION_OPTIONS,
 } from "../constants/productOptions.js";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { getBoostedProducts, getProducts } from "../api/productApi";
 import { FaFilter, FaTimes } from "react-icons/fa";
 import useDebounce from "../hooks/useDebounce.js";
@@ -287,7 +288,11 @@ const CategoryPage = () => {
                   : categoryName.replace("_", " ")}
               </h1>
 
-              {loading && <p>Loading...</p>}
+              {loading && (
+                <div className="flex justify-center py-8">
+                  <BrandLoader size="md" label="Loading products…" />
+                </div>
+              )}
               {error && <p className="text-red-500">{error}</p>}
 
               <p className="text-xs xl:text-base font-figtree text-zinc-400 mt-1">

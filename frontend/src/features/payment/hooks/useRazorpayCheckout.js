@@ -38,6 +38,10 @@ export const useRazorpayCheckout = () => {
       if (inFlightRef.current) {
         throw new Error("A payment window is already open");
       }
+      // Fail fast with a clear message instead of opening a broken gateway.
+      if (!import.meta.env.VITE_RAZORPAY_KEY_ID) {
+        throw new Error("Payments are unavailable right now. Please try later.");
+      }
       await loadCheckoutScript();
       if (!window.Razorpay) {
         throw new Error("Unable to load payment gateway");

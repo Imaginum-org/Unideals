@@ -20,7 +20,9 @@ import { getBoostSummary } from "./boost.service.js";
 export const activateTier = async ({ userId, plan, paymentId }) => {
   const planDef = getSubscriptionPlan(plan, ACTIVE_SUBSCRIPTION_TYPE);
   if (!planDef) {
-    throw new Error("Unknown subscription plan.");
+    const error = new Error("Unknown subscription plan.");
+    error.statusCode = 400;
+    throw error;
   }
 
   const now = new Date();

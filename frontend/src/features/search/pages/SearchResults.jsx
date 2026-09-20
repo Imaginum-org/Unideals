@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import ReactSlider from "react-slider";
 
 import ProductCard from "../../product/components/ProductCard";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { searchProducts } from "../api/searchApi";
 
 import { FaFilter, FaTimes } from "react-icons/fa";
@@ -191,7 +192,11 @@ const SearchResults = () => {
                 <span className="text-[#394FF1] font-semibold">"{query}"</span>
               </p>
 
-              {loading && <p>Loading...</p>}
+              {loading && (
+                <div className="flex justify-center py-8">
+                  <BrandLoader size="md" label="Searching…" />
+                </div>
+              )}
               {error && <p className="text-red-500">{error}</p>}
               {!loading && products.length === 0 && (
                 <p className="text-gray-500 mt-2">

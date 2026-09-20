@@ -1,5 +1,6 @@
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import ProductCard from "../../product/components/ProductCard.jsx";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { useState, useEffect } from "react";
 import { useWishlist } from "../../../context/WishlistContext";
 
@@ -49,7 +50,7 @@ function Wishlist() {
 
               {loading ? (
                 <div className="flex justify-center items-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                  <BrandLoader size="md" />
                 </div>
               ) : visibleWishlist && visibleWishlist.length > 0 ? (
                 <div className="w-full grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-x-5 2xl:gap-x-4 gap-y-7 dark:bg-[#131313]">

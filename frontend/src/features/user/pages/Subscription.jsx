@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import Profile_left_part from "../components/Profile_left_part.jsx";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { getBilling } from "../../payment/api/paymentApi.js";
 
 const TIER_TO_ID = {
@@ -186,7 +187,7 @@ function Subscription() {
             <Profile_left_part />
           </div>
           <main className="flex h-full flex-1 items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4A3CFF]"></div>
+            <BrandLoader size="md" />
           </main>
         </div>
       </div>

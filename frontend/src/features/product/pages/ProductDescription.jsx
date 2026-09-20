@@ -22,6 +22,7 @@ import { GoChecklist } from "react-icons/go";
 // color
 import { IoColorPaletteOutline } from "react-icons/io5";
 import { useWishlist } from "../../../context/WishlistContext";
+import LimitModal from "../../../Components/ui/LimitModal.jsx";
 // date of purchase
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaArrowRight } from "react-icons/fa6";
@@ -35,6 +36,7 @@ const ProductDescription = () => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [activeImage, setActiveImage] = useState("");
   const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [limitInfo, setLimitInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [similarLoading, setSimilarLoading] = useState(false);
@@ -263,9 +265,18 @@ ${shareUrl}`;
         id: "wishlist-toast",
       });
     } catch (error) {
-      toast.error("Failed to update wishlist", {
-        id: "wishlist-error",
-      });
+      const code = error?.response?.data?.code;
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update wishlist";
+      if (code === "WISHLIST_LIMIT" || /wishlist limit/i.test(message)) {
+        setLimitInfo({ message });
+      } else {
+        toast.error(message, {
+          id: "wishlist-error",
+        });
+      }
     } finally {
       setWishlistLoading(false);
     }
@@ -1140,6 +1151,13 @@ p-4
             </p>
           </motion.div>
         </div>
+      )}
+      {limitInfo && (
+        <LimitModal
+          title="Wishlist is full"
+          message={limitInfo.message}
+          onClose={() => setLimitInfo(null)}
+        />
       )}
     </motion.div>
   );

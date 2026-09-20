@@ -1,16 +1,13 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useUser } from "../context/useUserContext.jsx";
+import BrandLoader from "../Components/ui/BrandLoader.jsx";
 
 // Redirect authenticated users away from auth pages (login/signup/etc.)
 const PublicOnlyRoute = () => {
   const { userDetails, isLoggedIn, loading } = useUser();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    );
+    return <BrandLoader size="full" />;
   }
 
   if (isLoggedIn && userDetails?._id) {

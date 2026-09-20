@@ -38,6 +38,17 @@ export const addToWishlist = async (req, res) => {
         .json({ success: false, message: "Product not found" });
     }
 
+    // Idempotent: re-adding a saved item is a no-op success even at cap.
+    const alreadySaved = await User.exists({ _id: userId, wishlist: productId });
+    if (alreadySaved) {
+      const user = await User.findById(userId).select("wishlist").lean();
+      return res.status(200).json({
+        success: true,
+        message: "Product added to wishlist",
+        data: user?.wishlist || [],
+      });
+    }
+
     try {
       await assertWishlistCapacity(userId, req.user.subscription);
     } catch (limitErr) {

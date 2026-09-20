@@ -10,6 +10,8 @@ import { uploadImage } from "../../../Utils/imageUpload.js";
 import { compressImage } from "../utils/imageCompression";
 import useProductListing from "../hooks/useProductListing";
 import { saveDraftProduct } from "../api/productApi.js";
+import LimitModal from "../../../Components/ui/LimitModal.jsx";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { RiGraduationCapLine } from "react-icons/ri";
 import { MdOutlineLocationOn } from "react-icons/md";
 
@@ -17,6 +19,7 @@ const PreviewStep = () => {
   const navigate = useNavigate();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [publishStage, setPublishStage] = useState("");
+  const [limitInfo, setLimitInfo] = useState(null);
 
   const { formData, goToStep, loading, setLoading, resetForm } =
     useProductListing();
@@ -162,11 +165,18 @@ const PreviewStep = () => {
       });
     } catch (error) {
       setPublishStage("");
-      toast.error(
+      const code = error?.response?.data?.code;
+      const message =
         error?.response?.data?.message ||
-          error?.message ||
-          "Something went wrong",
-      );
+        error?.message ||
+        "Something went wrong";
+      // Plan cap hit after the full form + uploads: show the upgrade
+      // modal instead of a dead-end toast.
+      if (code === "LISTING_LIMIT" || /listing limit/i.test(message)) {
+        setLimitInfo({ message });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
       setPublishStage("");
@@ -397,7 +407,7 @@ const PreviewStep = () => {
           >
             {loading ? (
               <div className="flex items-center justify-center gap-3">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <BrandLoader size="xs" tone="white" />
                 <span>{publishStage}</span>
               </div>
             ) : (
@@ -430,6 +440,14 @@ const PreviewStep = () => {
           </div>
         </div>
       </div>
+
+      {limitInfo && (
+        <LimitModal
+          title="You're out of listings"
+          message={limitInfo.message}
+          onClose={() => setLimitInfo(null)}
+        />
+      )}
     </div>
   );
 };

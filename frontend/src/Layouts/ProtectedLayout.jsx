@@ -1,16 +1,13 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useUser } from "../context/useUserContext.jsx";
+import BrandLoader from "../Components/ui/BrandLoader.jsx";
 
 const ProtectedLayout = () => {
   const { userDetails, isLoggedIn, loading } = useUser();
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    );
+    return <BrandLoader size="full" />;
   }
 
   // Require both flag and verified profile to avoid trusting forgeable cache alone.

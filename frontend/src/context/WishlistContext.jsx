@@ -97,10 +97,11 @@ export const WishlistProvider = ({ children }) => {
       });
 
       return isWishlisted;
-    } catch {
-      // Rollback optimistic change
+    } catch (originalError) {
+      // Rollback optimistic change, then re-throw the ORIGINAL error so
+      // callers keep response data (message, code like WISHLIST_LIMIT).
       setWishlist(previous);
-      throw new Error("Wishlist update failed");
+      throw originalError;
     }
   }, [wishlist, wishlistIds]);
 
@@ -119,9 +120,9 @@ export const WishlistProvider = ({ children }) => {
       await axios.post("/api/wishlist/remove", {
         productId,
       });
-    } catch {
+    } catch (originalError) {
       setWishlist(previous);
-      throw new Error("Remove failed");
+      throw originalError;
     }
   }, [wishlist]);
 

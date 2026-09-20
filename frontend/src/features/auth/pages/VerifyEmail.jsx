@@ -6,6 +6,7 @@ import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 
 const cardShell =
   "w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none";
@@ -75,13 +76,8 @@ function VerifyEmail() {
 
           <div className="flex min-h-0 flex-1 items-end justify-center md:items-center">
             <div className={cardShell}>
-              <div className="flex flex-col items-center justify-center py-10 text-center md:py-12 lg:py-14 xl:py-16">
-                <div
-                  className={`mb-6 size-12 rounded-full border-4 border-slate-200 border-t-[#393AF2] dark:border-zinc-700 dark:border-t-[#818cf8] sm:mb-8 sm:size-14 md:size-16 ${
-                    loading ? "animate-spin" : ""
-                  }`}
-                  aria-hidden="true"
-                />
+                <div className="flex flex-col items-center justify-center py-10 text-center md:py-12 lg:py-14 xl:py-16">
+                  <BrandLoader size="lg" />
                 <h1 className="font-figtree text-[1.25rem] font-semibold leading-snug text-zinc-900 dark:text-zinc-100 sm:text-[1.125rem] md:text-[1.15rem] lg:text-lg xl:text-[1.45rem] 2xl:text-[1.5rem]">
                   {loading
                     ? "Verifying your email"

@@ -14,12 +14,11 @@ import {
   Shield,
   Trash2,
   User,
-  Loader2,
   Zap,
 } from "lucide-react";
 import { uploadImage } from "../../../Utils/imageUpload.js";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
-import Loader from "../../../Components/ui/Loader.jsx";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { logoutUser } from "../../auth/api/authApi";
 import PickupSpotModal from "../components/PickupSpotModal.jsx";
@@ -316,7 +315,7 @@ function Settings() {
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#F5F6FA] dark:bg-[#131313]">
-        <Loader />
+        <BrandLoader size="lg" />
       </div>
     );
   }
@@ -437,7 +436,7 @@ function Settings() {
 `}
                         >
                           {isUploadingAvatar || isRemovingAvatar ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <BrandLoader size="xs" tone="white" />
                           ) : userDetails?.avatar?.fileId ? (
                             <Trash2 className="h-4 w-4" />
                           ) : (

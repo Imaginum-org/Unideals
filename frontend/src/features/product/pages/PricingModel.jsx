@@ -1,4 +1,4 @@
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle } from "lucide-react";
@@ -64,7 +64,10 @@ const PricingModel = () => {
       });
 
       await fetchUserProfile();
-      toast.success(`Welcome to ${planName}!`);
+      toast.success(`Welcome to ${planName}!`, {
+        id: "plan-upgrade-success",
+        duration: 3000,
+      });
       navigate("/subscription");
     } catch (error) {
       if (error?.response?.data?.code === "ALREADY_SUBSCRIBED") {
@@ -240,14 +243,7 @@ const PricingModel = () => {
 
   return (
     <main className="min-h-screen overflow-hidden bg-white py-8 text-slate-900 dark:bg-[#131313]">
-      {/* Toast notification container */}
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          duration: 1500,
-          maxToasts: 1,
-        }}
-      />
+      {/* Toasts render via the global Toaster in app/App.jsx. */}
 
       {/* Pricing hero and plan cards */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 xl:mt-8">

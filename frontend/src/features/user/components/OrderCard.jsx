@@ -24,6 +24,7 @@ import {
   verifyPayment,
 } from "../../payment/api/paymentApi.js";
 import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
+import LimitModal from "../../../Components/ui/LimitModal.jsx";
 import toast from "react-hot-toast";
 
 const BOOST_ADDONS = [
@@ -62,8 +63,8 @@ const OrderCard = ({
   const [isUnlisting, setIsUnlisting] = useState(false);
   const [isRelisting, setIsRelisting] = useState(false);
   const [isBoosting, setIsBoosting] = useState(false);
-  const [showAddonOptions, setShowAddonOptions] = useState(false);
   const [buyingAddon, setBuyingAddon] = useState(null);
+  const [limitInfo, setLimitInfo] = useState(null);
   const { openCheckout } = useRazorpayCheckout();
 
   const normalized = (status || "").toLowerCase().trim();
@@ -157,7 +158,15 @@ const OrderCard = ({
         if (onProductRelisted) onProductRelisted(orderId);
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to relist product");
+      const code = error?.response?.data?.code;
+      const message =
+        error?.response?.data?.message || "Failed to relist product";
+      // Relisting reactivates against the plan cap: show upgrade modal.
+      if (code === "LISTING_LIMIT" || /listing limit/i.test(message)) {
+        setLimitInfo({ message });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsRelisting(false);
     }
@@ -176,11 +185,11 @@ const OrderCard = ({
         toast.success(res.data.message || "Product boosted successfully");
       }
     } catch (error) {
+      const status = error?.response?.status;
       const msg = error?.response?.data?.message || "Failed to boost product";
-      // Quota exhausted -> offer one-time paid boosts instead.
-      if (/limit reached/i.test(msg)) {
-        setShowAddonOptions(true);
-        toast.error("Boost quota exhausted — or buy an extra boost below");
+      // Quota exhausted (403): paid options are visible below + upgrade link.
+      if (status === 403 || /limit reached/i.test(msg)) {
+        toast.error("Boost quota exhausted — buy an extra boost or upgrade below");
       } else {
         toast.error(msg);
       }
@@ -219,7 +228,6 @@ const OrderCard = ({
 
       if (verifyRes.data?.success) {
         toast.success("Boost purchased! Your listing is now boosted.");
-        setShowAddonOptions(false);
         const updated = verifyRes.data?.data?.product;
         if (updated && onBoostApplied) onBoostApplied(updated);
       }
@@ -377,22 +385,34 @@ const OrderCard = ({
               <span>{isBoosting ? "Boosting..." : boostLabel}</span>
             </button>
 
-            {/* One-time paid boosts when quota is exhausted */}
-            {showAddonOptions && !boostActive && (
-              <div className="flex w-full sm:w-auto items-center gap-2">
-                {BOOST_ADDONS.map((addon) => (
-                  <button
-                    key={addon.id}
-                    onClick={(e) => handleBuyAddon(e, addon)}
-                    disabled={buyingAddon !== null}
-                    className="flex-1 sm:flex-none justify-center px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    <IoRocketOutline size={14} />
-                    {buyingAddon === addon.id
-                      ? "..."
-                      : `${addon.label} · ₹${addon.price}`}
-                  </button>
-                ))}
+            {/* One-time paid boosts: always visible so buyers never hunt
+                for them; quota errors also reveal this block. */}
+            {!boostActive && (
+              <div className="flex w-full sm:w-auto flex-col gap-2">
+                <div className="flex w-full sm:w-auto items-center gap-2">
+                  {BOOST_ADDONS.map((addon) => (
+                    <button
+                      key={addon.id}
+                      onClick={(e) => handleBuyAddon(e, addon)}
+                      disabled={buyingAddon !== null}
+                      className="flex-1 sm:flex-none justify-center px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <IoRocketOutline size={14} />
+                      {buyingAddon === addon.id
+                        ? "..."
+                        : `${addon.label} · ₹${addon.price}`}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/price");
+                  }}
+                  className="text-[11px] font-semibold text-[#4A3CFF] hover:underline self-start"
+                >
+                  or get monthly boosts with Pro →
+                </button>
               </div>
             )}
 
@@ -498,6 +518,13 @@ const OrderCard = ({
         productName={name}
         isLoading={isRelisting}
       />
+      {limitInfo && (
+        <LimitModal
+          title="You're out of listings"
+          message={limitInfo.message}
+          onClose={() => setLimitInfo(null)}
+        />
+      )}
     </div>
   );
 };

@@ -8,7 +8,7 @@ import {
   getUserProducts,
 } from "../api/productApi.js";
 import toast from "react-hot-toast";
-import Loader from "../../../Components/ui/Loader.jsx";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { FiPlus } from "react-icons/fi";
 import {
   EyeIcon,
@@ -266,7 +266,7 @@ function ProductListed() {
             <div className="flex flex-col gap-5 pb-10">
               {loading ? (
                 <div className="flex justify-center items-center py-12">
-                  <Loader />
+                  <BrandLoader size="md" />
                 </div>
               ) : error ? (
                 <div className="py-8 text-center text-red-500 dark:text-red-400 bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">

@@ -5,12 +5,12 @@ import userdp from "/userdp.webp";
 import {
   ChevronLeft,
   Search,
-  Sparkles,
   ExternalLink,
   RefreshCcw,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { IoSend } from "react-icons/io5";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 
 const supportChat = {
   id: "support",
@@ -275,10 +275,7 @@ const Chat = () => {
                 ))}
                 {isTyping && (
                   <div className="flex items-center gap-2 text-zinc-500 text-[11px] font-roboto italic bg-white/80 dark:bg-[#1E2025] w-fit px-4 py-2 rounded-full border border-zinc-100 dark:border-zinc-800 shadow-sm">
-                    <Sparkles
-                      size={14}
-                      className="animate-spin text-indigo-500"
-                    />{" "}
+                    <BrandLoader size="xs" />{" "}
                     Assistant is thinking...
                   </div>
                 )}

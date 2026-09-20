@@ -12,7 +12,7 @@ import {
 } from "@animateicons/react/lucide";
 import { Settings01Icon } from "@animateicons/react/huge";
 import { ChevronLeft, Crown, Menu } from "lucide-react";
-import Loader from "../../../Components/ui/Loader.jsx";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 
@@ -31,7 +31,7 @@ function Profile_left_part() {
   if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[#FBFBFB] dark:bg-[#131313]">
-        <Loader />
+        <BrandLoader size="md" />
       </div>
     );
   }

@@ -132,18 +132,21 @@ app.use(
   }),
 );
 
-app.use(express.json({ limit: "10kb" })); // To prevent large payload attacks
-app.use(express.urlencoded({ extended: true, limit: "10kb" })); // Handles form data from frontend
-app.use(cookieParser());
-
-// Razorpay webhook needs the RAW body for HMAC verification, so it is
-// mounted with express.raw and handled before any JSON parsing of that path.
-// (Router-level: POST /api/payments/webhook, no auth — signature is the auth.)
+// Razorpay webhook needs the RAW body for HMAC verification. It MUST be
+// registered BEFORE express.json(): json() would otherwise consume the
+// request stream, leaving express.raw with an empty body and every
+// legitimate webhook failing signature check. Sanitizers above safely skip
+// the unparsed body (req.body is undefined at that point).
+// (POST /api/payments/webhook, no auth — the HMAC signature is the auth.)
 app.post(
   "/api/payments/webhook",
   express.raw({ type: "application/json", limit: "1mb" }),
   paymentWebhookHandler,
 );
+
+app.use(express.json({ limit: "10kb" })); // To prevent large payload attacks
+app.use(express.urlencoded({ extended: true, limit: "10kb" })); // Handles form data from frontend
+app.use(cookieParser());
 
 // Logging in Development mode only - redact secrets from URLs
 if (process.env.NODE_ENV !== "production") {

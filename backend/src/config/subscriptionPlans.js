@@ -209,12 +209,22 @@ export const getListingLimit = (
   tier,
   subscriptionType = ACTIVE_SUBSCRIPTION_TYPE,
 ) => {
-  return getSubscriptionPlan(tier, subscriptionType)?.activeListings ?? null;
+  // Fail closed: unknown/corrupt tiers get Free limits. Explicit null
+  // (Pro+ unlimited) is preserved — only undefined falls back.
+  const value = getSubscriptionPlan(tier, subscriptionType)?.activeListings;
+  return value === undefined
+    ? SUBSCRIPTION_PLANS[USER_TIER.BASE_USER].activeListings
+    : value;
 };
 
 export const getWishlistLimit = (
   tier,
   subscriptionType = ACTIVE_SUBSCRIPTION_TYPE,
 ) => {
-  return getSubscriptionPlan(tier, subscriptionType)?.wishlistLimit ?? null;
+  // Fail closed: unknown/corrupt tiers get Free limits. Explicit null
+  // (Pro+ unlimited) is preserved — only undefined falls back.
+  const value = getSubscriptionPlan(tier, subscriptionType)?.wishlistLimit;
+  return value === undefined
+    ? SUBSCRIPTION_PLANS[USER_TIER.BASE_USER].wishlistLimit
+    : value;
 };

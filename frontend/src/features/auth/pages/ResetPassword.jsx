@@ -12,6 +12,7 @@ import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
+import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import {
   getPasswordStrength,
   isPasswordStrongEnough,
@@ -146,13 +147,7 @@ function ResetPassword() {
             <div className={cardShell}>
               {isValidating ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center md:py-16">
-                  <div
-                    className="mb-6 size-12 animate-spin rounded-full border-4 border-slate-200 border-t-[#393AF2] dark:border-zinc-700 dark:border-t-[#818cf8] sm:mb-8 sm:size-14 md:size-16"
-                    aria-hidden="true"
-                  />
-                  <p className="font-figtree text-sm font-medium text-zinc-700 animate-pulse dark:text-zinc-300 sm:text-base md:text-lg">
-                    Verifying secure link…
-                  </p>
+                  <BrandLoader size="lg" label="Verifying secure link…" />
                 </div>
               ) : !isTokenValid ? (
                 <div className="flex flex-col">

@@ -157,6 +157,11 @@ export const createOrder = async ({ plan, productId, user }) => {
 
 const verifySignature = ({ orderId, paymentId, signature }) => {
   const { RAZORPAY_KEY_SECRET } = process.env;
+  if (!RAZORPAY_KEY_SECRET) {
+    const error = new Error("Payments are not configured.");
+    error.statusCode = 503;
+    throw error;
+  }
   const expected = crypto
     .createHmac("sha256", RAZORPAY_KEY_SECRET)
     .update(`${orderId}|${paymentId}`)

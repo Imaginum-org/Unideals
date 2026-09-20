@@ -6,6 +6,7 @@ import {
 } from "../services/payment.service.js";
 import { getMySubscription } from "../services/subscription.service.js";
 import { getRazorpayPublicKey } from "../utils/razorpay.js";
+import { isBoostAddon } from "../config/boostAddons.js";
 
 // POST /api/payments/orders { plan, productId? } — idempotent: fresh unpaid order reused.
 export const createPaymentOrder = async (req, res) => {
@@ -46,8 +47,7 @@ export const verifyPaymentOrder = async (req, res) => {
       signature: req.body.razorpay_signature,
       user: req.user,
     });
-    const isAddon =
-      result.plan === "boost_3day" || result.plan === "boost_7day";
+    const isAddon = isBoostAddon(result.plan);
     return res.status(200).json({
       success: true,
       message: result.alreadyVerified
