@@ -40,6 +40,7 @@
     "morgan": "^1.10.1",
     "nanoid": "^5.1.9",
     "node-cron": "^3.0.3",
+    "razorpay": "^2.9.8",
     "resend": "^6.9.4",
     "slugify": "^1.6.9",
     "socket.io": "^4.8.3",

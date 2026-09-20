@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
-  BarChart3,
-  Bot,
   CalendarDays,
   Check,
   CircleDollarSign,
@@ -11,34 +10,35 @@ import {
   FileText,
   Gift,
   Package,
-  PenLine,
+  Heart,
   Rocket,
   WalletCards,
   X,
-  XCircle,
   Zap,
 } from "lucide-react";
 
 import Profile_left_part from "../components/Profile_left_part.jsx";
+import { getBilling } from "../../payment/api/paymentApi.js";
 
+const TIER_TO_ID = {
+  base_user: "free",
+  pro: "pro",
+  pro_plus: "pro-plus",
+};
+
+// Static marketing copy per plan; all numbers that matter (usage, limits,
+// dates, billing) come from GET /api/payments/me.
 const plans = [
   {
     id: "free",
     name: "Free",
     price: 0,
     icon: Gift,
-    action: "Downgrade",
-    usage: [
-      { label: "Listings", icon: Package, used: 2, total: 5, progress: 40 },
-      { label: "Boosts", icon: Zap, used: 0, total: 0, progress: 0 },
-      { label: "AI Score", icon: BarChart3, used: 1, total: 3, progress: 34 },
-      { label: "AI Writing", icon: Bot, used: 0, total: 0, progress: 0 },
-    ],
     included: [
-      "5 Listings / Month",
-      "2 Images per Product",
+      "10 Active Listings",
+      "25 Wishlist Saves",
       "Basic listing visibility",
-      "Limited AI Score",
+      "Standard support",
     ],
   },
   {
@@ -46,19 +46,12 @@ const plans = [
     name: "Pro",
     price: 99,
     icon: Crown,
-    action: "Current",
-    usage: [
-      { label: "Listings", icon: Package, used: 12, total: 25, progress: 68 },
-      { label: "Boosts", icon: Zap, used: 4, total: 10, progress: 60 },
-      { label: "AI Score", icon: BarChart3, used: 7, total: 25, progress: 42 },
-      { label: "AI Writing", icon: Bot, used: 3, total: 5, progress: 82 },
-    ],
     included: [
-      "25 Listings / Month",
-      "5 Images per Product",
-      "Advanced Analytics",
-      "Full AI Score",
-      "10 Trending Boosts - 2 hrs",
+      "25 Active Listings",
+      "100 Wishlist Saves",
+      "2 Monthly Boost Credits (3 days)",
+      "Priority Search Placement",
+      "Priority Support",
     ],
   },
   {
@@ -67,42 +60,69 @@ const plans = [
     price: 199,
     icon: Rocket,
     badge: "Best Value",
-    action: "Switch",
-    usage: [
-      { label: "Listings", icon: Package, used: 12, total: 60, progress: 30 },
-      { label: "Boosts", icon: Zap, used: 4, total: 25, progress: 22 },
-      { label: "AI Score", icon: BarChart3, used: 7, total: 60, progress: 18 },
-      { label: "AI Writing", icon: Bot, used: 3, total: 20, progress: 24 },
-    ],
     included: [
-      "60 Listings / Month",
-      "10 Images per Product",
-      "Priority Analytics",
-      "Full AI Score",
-      "25 Trending Boosts - 2 hrs",
-      "AI Writing Assistant",
+      "Unlimited Active Listings",
+      "Unlimited Wishlist",
+      "5 Monthly Boost Credits (7 days)",
+      "Highest Search Placement",
+      "Highest Priority Support",
     ],
   },
 ];
 
-const subscription = {
-  status: "Active",
-  purchased: "May 15, 2025",
-  nextRenewal: "Jun 15, 2025",
-  daysRemaining: 14,
-  billing: {
-    paymentMethod: "Visa .... 4242",
-  },
+const formatDate = (value) => {
+  if (!value) return null;
+  try {
+    return new Date(value).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return null;
+  }
+};
+
+const formatCount = (used, total) =>
+  total === null || total === undefined ? `${used} / Unlimited` : `${used} / ${total}`;
+
+const progressFor = (used, total) => {
+  if (total === null || total === undefined || total <= 0) return used > 0 ? 100 : 0;
+  return Math.min(100, Math.round((used / total) * 100));
 };
 
 function Subscription() {
-  const [selectedPlanId, setSelectedPlanId] = useState("pro");
+  const navigate = useNavigate();
+  const [billing, setBilling] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
-  const [isCancelOpen, setIsCancelOpen] = useState(false);
-  const [planStatus, setPlanStatus] = useState(subscription.status);
+
+  const fetchBilling = async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const res = await getBilling();
+      if (res.data?.success) {
+        setBilling(res.data.data);
+      } else {
+        setLoadError(true);
+      }
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBilling();
+  }, []);
+
+  const selectedPlanId = TIER_TO_ID[billing?.tier] || "free";
 
   const selectedPlan = useMemo(
-    () => plans.find((plan) => plan.id === selectedPlanId) ?? plans[1],
+    () => plans.find((plan) => plan.id === selectedPlanId) ?? plans[0],
     [selectedPlanId],
   );
 
@@ -111,30 +131,88 @@ function Subscription() {
     [selectedPlan.id],
   );
 
-  const selectPlan = (plan) => {
-    if (plan.id === selectedPlan.id && planStatus === "Active") return;
+  const usageRows = useMemo(() => {
+    if (!billing) return [];
+    const rows = [
+      {
+        label: "Active Listings",
+        icon: Package,
+        used: billing.usage?.activeListings || 0,
+        total: billing.limits?.activeListings ?? null,
+      },
+      {
+        label: "Wishlist",
+        icon: Heart,
+        used: billing.usage?.wishlist || 0,
+        total: billing.limits?.wishlist ?? null,
+      },
+    ];
+    if (billing.usage?.boost) {
+      const monthlyTotal =
+        (billing.usage.boost.monthlyUsed || 0) +
+        (billing.usage.boost.monthlyRemaining || 0);
+      rows.push({
+        label: "Monthly Boosts",
+        icon: Zap,
+        used: billing.usage.boost.monthlyUsed || 0,
+        total: monthlyTotal,
+      });
+    }
+    return rows;
+  }, [billing]);
 
-    setSelectedPlanId(plan.id);
-    setPlanStatus("Active");
+  const isActive = (billing?.status || "active") === "active";
+  const renewalLabel = billing?.isLifetime
+    ? "Never expires (lifetime)"
+    : formatDate(billing?.expiresAt) || "No renewal scheduled";
+  const purchasedLabel = formatDate(billing?.startedAt) || "—";
+  const orderRef =
+    billing?.lastPayment?.razorpay_order_id ||
+    billing?.payments?.[0]?.razorpay_order_id ||
+    null;
+
+  const goToPricing = () => {
     setIsUpgradeOpen(false);
-    toast.success(`${plan.name} plan selected`, {
-      id: "subscription-plan-selected",
-    });
+    navigate("/price");
   };
 
-  const cancelPlan = () => {
-    setPlanStatus("Cancelled");
-    setIsCancelOpen(false);
-    toast.success("Your plan has been cancelled", {
-      id: "subscription-cancelled",
-    });
-  };
+  if (loading) {
+    return (
+      <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
+        <div className="flex h-[calc(100vh-70px)]">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+            <Profile_left_part />
+          </div>
+          <main className="flex h-full flex-1 items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4A3CFF]"></div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
-  const handleGatewayAction = (action) => {
-    toast(`${action} payment flow can be attached here`, {
-      id: `subscription-${action}`,
-    });
-  };
+  if (loadError || !billing) {
+    return (
+      <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
+        <div className="flex h-[calc(100vh-70px)]">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+            <Profile_left_part />
+          </div>
+          <main className="flex h-full flex-1 flex-col items-center justify-center gap-4 px-5">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+              Unable to load your subscription. Please try again.
+            </p>
+            <button
+              onClick={fetchBilling}
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-[#4A3CFF] px-5 text-[12px] font-extrabold text-white"
+            >
+              Retry
+            </button>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
@@ -171,20 +249,23 @@ function Subscription() {
                       </h2>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                          planStatus === "Active"
+                          isActive
                             ? "bg-[#CFF5DD] text-[#059447]"
                             : "bg-red-50 text-[#FF3B3B]"
                         }`}
                       >
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${
-                            planStatus === "Active"
-                              ? "bg-[#059447]"
-                              : "bg-[#FF3B3B]"
+                            isActive ? "bg-[#059447]" : "bg-[#FF3B3B]"
                           }`}
                         />
-                        {planStatus}
+                        {isActive ? "Active" : "Expired"}
                       </span>
+                      {billing.isLifetime && selectedPlan.id !== "free" && (
+                        <span className="inline-flex items-center rounded-full bg-[#F0EEFF] px-2.5 py-1 text-[11px] font-bold text-[#4A3CFF]">
+                          Lifetime
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -193,7 +274,7 @@ function Subscription() {
                   {"\u20B9"}
                   {selectedPlan.price}
                   <span className="text-[12px] font-medium text-[#09111F] dark:text-white">
-                    /month
+                    {selectedPlan.id === "free" ? "" : " one-time"}
                   </span>
                 </p>
               </div>
@@ -204,27 +285,25 @@ function Subscription() {
                   Purchased
                 </div>
                 <p className="font-bold text-[#09111F] dark:text-white">
-                  {subscription.purchased}
+                  {purchasedLabel}
                 </p>
 
                 <div className="flex items-center gap-2 text-[#09111F] dark:text-white">
                   <Clock3 size={14} />
-                  Next renewal
+                  {billing.isLifetime ? "Validity" : "Next renewal"}
                 </div>
                 <p className="font-bold text-[#09111F] dark:text-white">
-                  {planStatus === "Active"
-                    ? subscription.nextRenewal
-                    : "No renewal scheduled"}
+                  {renewalLabel}
                 </p>
 
                 <div className="flex items-center gap-2 text-[#09111F] dark:text-white">
                   <Zap size={14} />
-                  Days remaining
+                  Boosts used this month
                 </div>
                 <p className="font-extrabold text-[#4A3CFF]">
-                  {planStatus === "Active"
-                    ? `${subscription.daysRemaining} days`
-                    : "Cancelled"}
+                  {billing.usage?.boost
+                    ? `${billing.usage.boost.monthlyUsed} used · ${billing.usage.boost.monthlyRemaining} left`
+                    : "—"}
                 </p>
               </div>
 
@@ -234,31 +313,31 @@ function Subscription() {
                   className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#4A3CFF] px-5 text-[12px] font-extrabold text-white shadow-sm shadow-indigo-500/20 transition hover:bg-[#382DE8]"
                 >
                   <CircleDollarSign size={14} />
-                  Upgrade
+                  {selectedPlan.id === "pro-plus" ? "View plans" : "Upgrade"}
                 </button>
-                <button
-                  onClick={() => setIsCancelOpen(true)}
-                  disabled={planStatus !== "Active"}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-2 text-[12px] font-semibold text-[#FF3B3B] transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-[#09111F] disabled:hover:bg-transparent dark:disabled:text-white"
-                >
-                  <XCircle size={13} />
-                  {planStatus === "Active" ? "Cancel plan" : "Plan cancelled"}
-                </button>
+                {billing.isLifetime && selectedPlan.id !== "free" ? (
+                  <span className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-2 text-[12px] font-semibold text-[#059447]">
+                    <Check size={13} />
+                    Lifetime access — no renewals
+                  </span>
+                ) : null}
               </div>
             </section>
 
             <section className="rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-[14px] font-extrabold text-[#09111F] dark:text-white">
-                  This Month&apos;s Usage
+                  Current Usage
                 </h2>
-                <span className="rounded-full bg-[#F2F4F9] px-3 py-1 text-[10px] font-bold text-[#09111F] dark:text-[#4A3CFF]">
-                  Resets Jun 15
-                </span>
+                {!billing.isLifetime && billing.expiresAt && (
+                  <span className="rounded-full bg-[#F2F4F9] px-3 py-1 text-[10px] font-bold text-[#09111F] dark:text-[#4A3CFF]">
+                    Renews {formatDate(billing.expiresAt)}
+                  </span>
+                )}
               </div>
 
               <div className="space-y-4">
-                {selectedPlan.usage.map((item) => (
+                {usageRows.map((item) => (
                   <div key={item.label}>
                     <div className="mb-1.5 flex items-center justify-between text-[12px]">
                       <div className="flex items-center gap-2 text-[#09111F] dark:text-white">
@@ -269,18 +348,26 @@ function Subscription() {
                         {item.label}
                       </div>
                       <p className="text-[11px] font-semibold text-[#09111F] dark:text-white">
-                        {item.used} / {item.total}
+                        {formatCount(item.used, item.total)}
                       </p>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-[#EEF1F7]">
                       <div
                         className="h-full rounded-full bg-[#4A3CFF]"
-                        style={{ width: `${item.progress}%` }}
+                        style={{ width: `${progressFor(item.used, item.total)}%` }}
                       />
                     </div>
                   </div>
                 ))}
               </div>
+
+              <button
+                onClick={() => navigate("/productlisted")}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#F0EEFF] px-3 py-2 text-[11px] font-bold text-[#4A3CFF] transition hover:bg-[#E4E4FF]"
+              >
+                <Zap size={13} />
+                Need more visibility? Buy a 3-day (₹29) or 7-day (₹49) boost from My Listings
+              </button>
             </section>
 
             <section className="rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
@@ -310,7 +397,7 @@ function Subscription() {
                 {otherPlans.map((plan) => (
                   <button
                     key={plan.name}
-                    onClick={() => selectPlan(plan)}
+                    onClick={goToPricing}
                     className="flex w-full flex-col gap-3 rounded-xl border border-[#E6EAF2] bg-white px-4 py-3 text-left transition hover:border-[#4A3CFF] hover:bg-[#FAFAFF] dark:border-gray-800 dark:bg-[#1c1c1c] sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex min-w-0 items-center gap-3">
@@ -330,13 +417,13 @@ function Subscription() {
                         </div>
                         <p className="mt-0.5 text-[10px] font-medium text-[#09111F] dark:text-white">
                           {"\u20B9"}
-                          {plan.price}/month
+                          {plan.price}
+                          {plan.id === "free" ? "" : " one-time"}
                         </p>
                       </div>
                     </div>
                     <span className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-[#F0EEFF] px-3 text-[11px] font-bold text-[#4A3CFF] sm:w-auto sm:bg-transparent sm:px-0">
-                      {plan.action}
-                      {plan.action !== "Current" && " >"}
+                      View {">"}
                     </span>
                   </button>
                 ))}
@@ -352,9 +439,8 @@ function Subscription() {
                   <p className="font-semibold text-[#09111F] dark:text-white">
                     Order ID
                   </p>
-                  <p className="mt-1 font-extrabold text-[#09111F] dark:text-white">
-                    ORD-{selectedPlan.name.toUpperCase().replace(" ", "-")}
-                    -29481
+                  <p className="mt-1 font-extrabold text-[#09111F] dark:text-white break-all">
+                    {orderRef || "No payments yet"}
                   </p>
                 </div>
                 <div>
@@ -362,17 +448,15 @@ function Subscription() {
                     Purchased
                   </p>
                   <p className="mt-1 font-extrabold text-[#09111F] dark:text-white">
-                    {subscription.purchased}
+                    {purchasedLabel}
                   </p>
                 </div>
                 <div>
                   <p className="font-semibold text-[#09111F] dark:text-white">
-                    Next Renewal
+                    Validity
                   </p>
                   <p className="mt-1 font-extrabold text-[#09111F] dark:text-white">
-                    {planStatus === "Active"
-                      ? subscription.nextRenewal
-                      : "No renewal"}
+                    {renewalLabel}
                   </p>
                 </div>
                 <div>
@@ -383,27 +467,49 @@ function Subscription() {
                     <span className="flex h-5 w-7 items-center justify-center rounded bg-[#4A3CFF] text-white">
                       <WalletCards size={13} />
                     </span>
-                    {subscription.billing.paymentMethod}
+                    Razorpay secure checkout
                   </p>
                 </div>
               </div>
 
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <button
-                  onClick={() => handleGatewayAction("Update")}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E6EAF2] px-3 py-2 text-[11px] font-bold text-[#09111F] transition hover:border-[#4A3CFF] hover:text-[#4A3CFF] dark:text-white"
-                >
-                  <PenLine size={13} />
-                  Update payment
-                </button>
-                <button
-                  onClick={() => handleGatewayAction("Download invoice")}
+                  onClick={() =>
+                    toast("Receipts are emailed by Razorpay after each payment", {
+                      id: "subscription-receipt",
+                    })
+                  }
                   className="inline-flex items-center justify-center gap-2 rounded-lg px-2 py-2 text-[11px] font-extrabold text-[#4A3CFF] transition hover:bg-[#F0EEFF]"
                 >
                   <FileText size={13} />
                   Download Invoice
                 </button>
               </div>
+
+              {billing.payments && billing.payments.length > 0 && (
+                <div className="mt-4 border-t border-[#E9EDF5] pt-4">
+                  <p className="mb-3 text-[11px] font-bold text-[#09111F] dark:text-white">
+                    Recent payments
+                  </p>
+                  <div className="space-y-2">
+                    {billing.payments.slice(0, 5).map((p) => (
+                      <div
+                        key={p._id || p.razorpay_order_id}
+                        className="flex items-center justify-between text-[11px] text-[#09111F] dark:text-white"
+                      >
+                        <span className="font-semibold capitalize">
+                          {p.plan === "pro_plus" ? "Pro Plus" : p.plan} ·{" "}
+                          {formatDate(p.createdAt) || ""}
+                        </span>
+                        <span className="font-extrabold">
+                          {"\u20B9"}
+                          {(p.amount || 0) / 100} · {p.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           </div>
         </main>
@@ -417,7 +523,7 @@ function Subscription() {
                     Choose a plan
                   </h2>
                   <p className="mt-1 text-xs font-medium text-[#09111F] dark:text-white">
-                    Pick a pack and your subscription details will update.
+                    Compare plans and check out securely with Razorpay.
                   </p>
                 </div>
                 <button
@@ -432,13 +538,13 @@ function Subscription() {
 
               <div className="space-y-3">
                 {plans.map((plan) => {
-                  const isSelected = plan.id === selectedPlan.id;
+                  const isSelected = plan.id === selectedPlanId;
 
                   return (
                     <button
                       key={plan.id}
                       type="button"
-                      onClick={() => selectPlan(plan)}
+                      onClick={goToPricing}
                       className={`w-full rounded-xl border p-4 text-left transition ${
                         isSelected
                           ? "border-[#4A3CFF] bg-[#F7F6FF]"
@@ -475,56 +581,13 @@ function Subscription() {
                           {"\u20B9"}
                           {plan.price}
                           <span className="text-xs font-medium text-[#09111F] dark:text-white">
-                            /month
+                            {plan.id === "free" ? "" : " one-time"}
                           </span>
                         </p>
                       </div>
                     </button>
                   );
                 })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isCancelOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-            <div className="w-full max-w-[440px] rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-[#1c1c1c]">
-              <div className="mb-4 flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-[#FF3B3B]">
-                  <XCircle size={20} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-extrabold text-[#09111F] dark:text-white">
-                    Cancel {selectedPlan.name} plan?
-                  </h2>
-                  <p className="mt-1 text-xs font-medium leading-5 text-[#09111F] dark:text-white">
-                    Your plan will stay visible, but renewal will be stopped and
-                    the subscription status will change to cancelled.
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-[#F6F8FC] p-4 text-xs font-medium text-[#09111F] dark:bg-[#151515] dark:text-white">
-                You can choose any plan again later to reactivate your
-                subscription.
-              </div>
-
-              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsCancelOpen(false)}
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-[#E6EAF2] px-4 text-[12px] font-bold text-[#09111F] transition hover:border-[#4A3CFF] hover:text-[#4A3CFF] dark:text-white"
-                >
-                  Keep plan
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelPlan}
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-[#FF3B3B] px-4 text-[12px] font-extrabold text-white transition hover:bg-[#E62929]"
-                >
-                  Confirm cancel
-                </button>
               </div>
             </div>
           </div>

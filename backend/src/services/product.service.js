@@ -1,5 +1,6 @@
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
+import { getListingLimit } from "../config/subscriptionPlans.js";
 import { deleteImage } from "../utils/imagekit.js";
 
 export const createProduct = async (data, user) => {
@@ -79,6 +80,27 @@ export const createProduct = async (data, user) => {
   data.seller_id = user._id;
   data.status = data.status || PRODUCT_STATUS.LISTED;
   data.is_deleted = false;
+
+  // Plan entitlement: cap active (listed, visible) listings per tier.
+  // Drafts never count. null limit = unlimited (Pro+).
+  if (data.status === PRODUCT_STATUS.LISTED) {
+    const listingLimit = getListingLimit(user.subscription);
+    if (typeof listingLimit === "number") {
+      const activeCount = await Product.countDocuments({
+        seller_id: user._id,
+        status: PRODUCT_STATUS.LISTED,
+        is_deleted: false,
+      });
+      if (activeCount >= listingLimit) {
+        const error = new Error(
+          `Listing limit reached (${listingLimit} active listings on your plan). Upgrade to list more.`,
+        );
+        error.statusCode = 403;
+        error.code = "LISTING_LIMIT";
+        throw error;
+      }
+    }
+  }
 
   if (user.current_lat != null && user.current_long != null) {
     data.location = {
@@ -394,7 +416,7 @@ export const getSingleProduct = async (id) => {
     { $inc: { views_count: 1 } },
     { new: true },
   )
-    .populate("seller_id", "name avatar")
+    .populate("seller_id", "name avatar subscription")
     .lean();
 
   if (!product) {
@@ -607,6 +629,28 @@ export const relistProduct = async (productId, userId) => {
 
   if (product.status === PRODUCT_STATUS.LISTED) {
     return product;
+  }
+
+  // Relisting reactivates against the plan cap — same rule as creation.
+  const { default: UserModel } = await import("../models/User.model.js");
+  const owner = await UserModel.findById(product.seller_id)
+    .select("subscription")
+    .lean();
+  const listingLimit = getListingLimit(owner?.subscription);
+  if (typeof listingLimit === "number") {
+    const activeCount = await Product.countDocuments({
+      seller_id: product.seller_id,
+      status: PRODUCT_STATUS.LISTED,
+      is_deleted: false,
+    });
+    if (activeCount >= listingLimit) {
+      const error = new Error(
+        `Listing limit reached (${listingLimit} active listings on your plan). Upgrade to list more.`,
+      );
+      error.statusCode = 403;
+      error.code = "LISTING_LIMIT";
+      throw error;
+    }
   }
 
   product.status = PRODUCT_STATUS.LISTED;

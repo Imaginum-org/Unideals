@@ -1,8 +1,24 @@
 import mongoose from "mongoose";
 import User from "../models/User.model.js";
 import Product from "../models/Product.model.js";
+import { getWishlistLimit } from "../config/subscriptionPlans.js";
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+// Plan entitlement: null limit = unlimited (Pro+).
+const assertWishlistCapacity = async (userId, subscription) => {
+  const limit = getWishlistLimit(subscription);
+  if (typeof limit !== "number") return;
+  const user = await User.findById(userId).select("wishlist").lean();
+  if ((user?.wishlist?.length || 0) >= limit) {
+    const error = new Error(
+      `Wishlist limit reached (${limit} items on your plan). Upgrade to save more.`,
+    );
+    error.statusCode = 403;
+    error.code = "WISHLIST_LIMIT";
+    throw error;
+  }
+};
 
 export const addToWishlist = async (req, res) => {
   try {
@@ -20,6 +36,16 @@ export const addToWishlist = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Product not found" });
+    }
+
+    try {
+      await assertWishlistCapacity(userId, req.user.subscription);
+    } catch (limitErr) {
+      return res.status(limitErr.statusCode || 403).json({
+        success: false,
+        message: limitErr.message,
+        code: limitErr.code,
+      });
     }
 
     const user = await User.findByIdAndUpdate(
@@ -182,6 +208,19 @@ export const toggleWishlist = async (req, res) => {
     const isAlreadyInWishlist = user.wishlist.some(
       (id) => id.toString() === productId.toString(),
     );
+
+    // Only adding counts against the plan cap; removing is always allowed.
+    if (!isAlreadyInWishlist) {
+      try {
+        await assertWishlistCapacity(userId, req.user.subscription);
+      } catch (limitErr) {
+        return res.status(limitErr.statusCode || 403).json({
+          success: false,
+          message: limitErr.message,
+          code: limitErr.code,
+        });
+      }
+    }
 
     const updateQuery = isAlreadyInWishlist
       ? { $pull: { wishlist: productId } }

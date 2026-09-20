@@ -391,6 +391,7 @@ function Settings() {
                             name={userDetails?.name}
                             imageUrl={userDetails?.avatar?.url}
                             plan={userDetails?.subscription}
+                            showBadge
                             size="large"
                             isLoading={loading}
                             className="rounded-xl object-cover"

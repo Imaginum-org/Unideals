@@ -1,68 +1,160 @@
 import toast, { Toaster } from "react-hot-toast";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { useUser } from "../../../context/useUserContext.jsx";
+import {
+  createPaymentOrder,
+  verifyPayment,
+} from "../../payment/api/paymentApi.js";
+import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
+
+const PLAN_TIER = {
+  free: "base_user",
+  pro: "pro",
+  "pro-plus": "pro_plus",
+};
+
+const TIER_RANK = { base_user: 0, pro: 1, pro_plus: 2 };
 
 const PricingModel = () => {
   // Shared primary brand color used across cards, buttons, and highlights.
   const PRIMARY_BLUE = "#3300ff";
+  const navigate = useNavigate();
+  const { userDetails, isLoggedIn, fetchUserProfile } = useUser();
+  const { openCheckout } = useRazorpayCheckout();
+  const payingRef = useRef(false);
+  const [payingPlan, setPayingPlan] = useState(null);
 
-  // Handles upgrade actions until the payment flow is connected.
-  const handleUpgrade = () => {
-    toast("Coming Soon!", { id: "pricing-toast" });
+  const currentTier = userDetails?.subscription || "base_user";
+
+  // Upgrade flow: server order -> Razorpay Checkout -> server verify.
+  // payingRef blocks double orders from double clicks.
+  const handleUpgrade = async (planId) => {
+    if (payingRef.current) return;
+    if (!isLoggedIn) {
+      toast.error("Please log in to upgrade");
+      navigate("/login", { state: { from: { pathname: "/price" } } });
+      return;
+    }
+    payingRef.current = true;
+    setPayingPlan(planId);
+    try {
+      const orderRes = await createPaymentOrder({ plan: PLAN_TIER[planId] });
+      const { orderId, amount, currency } = orderRes.data?.data || {};
+      if (!orderId) throw new Error("Unable to initiate payment");
+
+      const planName = planId === "pro" ? "Pro" : "Pro Plus";
+      const paymentRes = await openCheckout({
+        orderId,
+        amount,
+        currency,
+        planName,
+        prefill: {
+          name: userDetails?.name,
+          email: userDetails?.email,
+          contact: userDetails?.mobile,
+        },
+      });
+
+      await verifyPayment({
+        razorpay_order_id: paymentRes.razorpay_order_id,
+        razorpay_payment_id: paymentRes.razorpay_payment_id,
+        razorpay_signature: paymentRes.razorpay_signature,
+      });
+
+      await fetchUserProfile();
+      toast.success(`Welcome to ${planName}!`);
+      navigate("/subscription");
+    } catch (error) {
+      if (error?.response?.data?.code === "ALREADY_SUBSCRIBED") {
+        toast.error("You are already on this plan or higher");
+      } else if (error?.message !== "Payment cancelled") {
+        toast.error(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Payment failed. Please try again.",
+        );
+      }
+    } finally {
+      payingRef.current = false;
+      setPayingPlan(null);
+    }
   };
 
-  // Pricing cards data.
+  // Button state per tier: current/higher tiers show disabled status,
+  // lower tiers offer upgrade.
+  const getButtonState = (planId) => {
+    const tier = PLAN_TIER[planId];
+    if ((TIER_RANK[currentTier] || 0) > (TIER_RANK[tier] || 0)) {
+      return { text: "Included", disabled: true };
+    }
+    if (currentTier === tier) {
+      return { text: "Current Plan", disabled: true };
+    }
+    if (planId === "free") {
+      return { text: "Current", disabled: true };
+    }
+    return { text: "Upgrade Now", disabled: false };
+  };
+
+  // Pricing cards data — mirrors Subscription_plan.md (Founder phase).
   const plans = [
     {
+      id: "free",
       name: "Free",
       price: "0",
-      buttonText: "Current",
-      buttonDisabled: true,
       footerTitle: "Start for free",
       footerSubtitle: "It all yours",
       features: [
-        "7 Listings / Month",
-        "2 Images per Product",
-        "Basic Analytics",
-        "AI Sellability Score (First 2)",
-        "3 Boosts (30 mins each)",
+        "10 Active Listings",
+        "25 Wishlist Saves",
+        "Buy & Sell + Unlimited Chats",
+        "Standard Support",
+        "Buy extra boosts anytime",
       ],
     },
     {
+      id: "pro",
       name: "Pro",
       price: "99",
-      buttonText: "Upgrade Now",
       highlighted: true,
       footerTitle: "Best for active seller",
       footerSubtitle: "Time to become leader",
       features: [
-        "25 Listings / Month",
-        "5 Images per Product",
-        "Advanced Analytics",
-        "Full AI Sellability Score",
-        "10 Trending Boosts (2 hrs each)",
+        "25 Active Listings",
+        "100 Wishlist Saves",
+        "2 Monthly Boosts (3 days each)",
+        "Priority in Search + Chats",
+        "Priority Support",
       ],
     },
     {
+      id: "pro-plus",
       name: "Pro Plus",
       price: "199",
-      buttonText: "Upgrade Now",
       footerTitle: "For Serious sellers",
       footerSubtitle: "here no one s above you",
       features: [
-        "Unlimited Listings",
-        "8 Images per Product",
-        "Pro Plus Badge",
-        "Deep Analytics Insights",
-        "Unlimited Boosts (4 hrs each)",
+        "Unlimited Active Listings",
+        "Unlimited Wishlist",
+        "5 Monthly Boosts (7 days each)",
+        "Highest Search + Chat Priority",
+        "Highest Priority Support",
       ],
     },
   ];
 
-  // Detailed comparison table data.
+  // Detailed comparison table data — mirrors Subscription_plan.md.
   const comparisonRows = [
-    { feature: "Monthly Uploads", free: "7", pro: "25", proPlus: "Unlimited" },
-    { feature: "Images per Product", free: "2", pro: "5", proPlus: "8" },
+    { feature: "Active Listings", free: "10", pro: "25", proPlus: "Unlimited" },
+    { feature: "Monthly Boost Credits", free: "0", pro: "2", proPlus: "5" },
+    {
+      feature: "Boost Duration",
+      free: "—",
+      pro: "3 Days",
+      proPlus: "7 Days",
+    },
     {
       feature: "Search Ranking",
       free: "Normal",
@@ -70,34 +162,17 @@ const PricingModel = () => {
       proPlus: "Highest",
     },
     { feature: "Chat with Buyers", free: true, pro: true, proPlus: "Priority" },
-    { feature: "Wishlist Support", free: true, pro: true, proPlus: true },
-    { feature: "Basic Analytics", free: true, pro: true, proPlus: true },
     {
-      feature: "Advanced Analytics",
-      free: false,
-      pro: true,
-      proPlus: true,
-      featureHighlight: true,
+      feature: "Wishlist Limit",
+      free: "25",
+      pro: "100",
+      proPlus: "Unlimited",
     },
     {
-      feature: "AI Sellability Score",
-      free: "Limited",
-      pro: "Full",
-      proPlus: "Advanced",
-    },
-    {
-      feature: "Seller Badge",
-      free: false,
-      pro: "PRO",
-      proPlus: "PRO PLUS",
-      pill: true,
-    },
-    {
-      feature: "Trending Placement",
-      free: false,
-      pro: "Limited",
-      proPlus: "Guaranteed",
-      orangeDot: true,
+      feature: "Customer Support",
+      free: "Standard",
+      pro: "Priority",
+      proPlus: "Highest Priority",
     },
   ];
 
@@ -241,29 +316,36 @@ const PricingModel = () => {
                     ₹{plan.price}
                   </span>
                   <span className="pb-1 text-xs font-medium text-slate-500 dark:text-[#D7D7D7] font-figtree">
-                    /month
+                    {plan.id === "free" ? "free forever" : "one-time"}
                   </span>
                 </div>
 
                 {/* Card action button */}
-                <button
-                  type="button"
-                  onClick={plan.buttonDisabled ? undefined : handleUpgrade}
-                  disabled={plan.buttonDisabled}
-                  aria-disabled={plan.buttonDisabled}
-                  style={
-                    plan.buttonDisabled
-                      ? undefined
-                      : { backgroundColor: PRIMARY_BLUE }
-                  }
-                  className={`mt-5 h-10 w-full rounded-lg px-4 text-sm font-semibold transition font-figtree ${
-                    plan.buttonDisabled
-                      ? "cursor-default bg-slate-200 text-slate-800 shadow-none dark:bg-white/15 dark:text-white"
-                      : "text-white shadow-lg hover:opacity-90"
-                  }`}
-                >
-                  {plan.buttonText}
-                </button>
+                {(() => {
+                  const state = getButtonState(plan.id);
+                  const isPaying = payingPlan === plan.id;
+                  const disabled = state.disabled || payingPlan !== null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={state.disabled ? undefined : () => handleUpgrade(plan.id)}
+                      disabled={disabled}
+                      aria-disabled={disabled}
+                      style={
+                        state.disabled
+                          ? undefined
+                          : { backgroundColor: PRIMARY_BLUE }
+                      }
+                      className={`mt-5 h-10 w-full rounded-lg px-4 text-sm font-semibold transition font-figtree ${
+                        state.disabled
+                          ? "cursor-default bg-slate-200 text-slate-800 shadow-none dark:bg-white/15 dark:text-white"
+                          : "text-white shadow-lg hover:opacity-90"
+                      }`}
+                    >
+                      {isPaying ? "Processing..." : state.text}
+                    </button>
+                  );
+                })()}
 
                 {/* Card feature list */}
                 <ul className="mt-5 space-y-2.5">

@@ -2,7 +2,6 @@ import Boost from "../models/Boost.model.js";
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
 import { getBoostPlanRules } from "../config/boostPlans.js";
-
 const getMonthWindow = (date = new Date()) => {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
@@ -182,4 +181,47 @@ export const createBoost = async ({ productId, user }) => {
       durationHours: rules.durationHours,
     },
   };
+};
+
+// One-time purchased boost (₹29/₹49 add-ons). Same ownership/listed guards
+// as quota boosts but NO monthly/active quota checks — the payment is the
+// entitlement. Throws if the listing can't take a boost; callers that run
+// after money moved must surface this for support follow-up.
+export const applyPurchasedBoost = async ({ productId, user, durationHours }) => {
+  const product = await Product.findOne({
+    _id: productId,
+    seller_id: user._id,
+    is_deleted: false,
+  });
+
+  if (!product) {
+    throw new Error("Product not found or you do not have permission to boost it");
+  }
+
+  if (product.status !== PRODUCT_STATUS.LISTED) {
+    throw new Error("Only active listed products can be boosted");
+  }
+
+  if (product.is_boosted && product.boost_expires_at > new Date()) {
+    throw new Error("This product is already boosted");
+  }
+
+  const startsAt = new Date();
+  const expiresAt = new Date(startsAt.getTime() + durationHours * 60 * 60 * 1000);
+
+  const boost = await Boost.create({
+    product_id: product._id,
+    user_id: user._id,
+    tier: user.subscription,
+    starts_at: startsAt,
+    expires_at: expiresAt,
+    duration_hours: durationHours,
+  });
+
+  product.is_boosted = true;
+  product.boost_expires_at = expiresAt;
+  product.boost_tier = user.subscription;
+  await product.save();
+
+  return { boost, product };
 };

@@ -135,6 +135,17 @@ function ProductListed() {
     return res;
   };
 
+  // Merges a listing updated by a one-time paid boost purchase.
+  const handleBoostApplied = (updatedProduct) => {
+    if (!updatedProduct?._id) return;
+    setProducts((prev) =>
+      prev.map((p) =>
+        p._id === updatedProduct._id ? { ...p, ...updatedProduct } : p,
+      ),
+    );
+    fetchBoostSummary();
+  };
+
   return (
     <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
       <div className="flex h-[calc(100vh-70px)] ">
@@ -296,6 +307,7 @@ function ProductListed() {
                     boostExpiresAt={p.boost_expires_at}
                     boostTier={p.boost_tier}
                     onBoostProduct={handleBoostProduct}
+                    onBoostApplied={handleBoostApplied}
                   />
                 ))
               )}

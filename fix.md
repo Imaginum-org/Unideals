@@ -225,10 +225,46 @@
 ---
 
 ## Preserved (intentionally unchanged to avoid breakage)
+
+### Razorpay Integration (Pro ₹99 / Pro+ ₹199 Founder lifetime, per Subscription_plan.md)
+
+Spec: `Subscription_plan.md` (Founder: Pro ₹99, Pro+ ₹199, lifetime; Free 10 / Pro 25 / Pro+ unlimited listings; wishlist 25/100/unlimited; boosts 0/2/5). The earlier `add payment gateway v1` commit had only shipped the plan catalog + enums + empty stubs — the gateway below is the full implementation.
+
+**Backend (`/api/payments`)**
+- `src/utils/razorpay.js` (new) — lazy SDK singleton (missing env fails only on payment use, never at boot); `npm i razorpay@2.9.8`.
+- `src/models/Payment.model.js` (new) — one doc per order: user/plan/amount in paise (server-computed)/receipt/`razorpay_order_id` unique, `razorpay_payment_id` sparse-unique (webhook idempotency), `created→verified/failed/expired/cancelled/refunded`.
+- `src/models/Subscription.model.js` (new) — one doc per user: tier/type/status/lifetime/started/expires/last_payment; semester rows swept by job, founder rows never expire.
+- `src/services/payment.service.js` (new) — `createOrder` (server-side amount, `ALREADY_SUBSCRIBED` guard, 15-min reuse of fresh unpaid order = no double orders on double-click); `verifyPayment` (HMAC-SHA256 timing-safe → Razorpay order-fetch amount/currency/status cross-check → atomic `created→verified` claim, losers get `alreadyVerified`); `verifyWebhookSignature` + `handleWebhookEvent` (`payment.captured` reconciles with amount guard + single activation, `payment.failed` marks failed, all idempotent).
+- `src/services/subscription.service.js` (new) — `activateTier` (single activation point, upsert + `user.subscription`/`subscription_details` set), `getMySubscription` (tier/plan/status + LIVE usage: active listings, wishlist count, boost summary + last payment + 10-row history), `expireDueSubscriptions` (downgrades expired semester to Free).
+- `src/controllers/payment.controller.js` (was empty) — `POST /orders`, `POST /verify`, `GET /me`, `POST /webhook` (raw-body HMAC, always 200 except bad signature → 400).
+- `src/routes/payment.routes.js` (was empty) — 10 req/10min limiter on orders+verify, auth on all but webhook.
+- `src/validations/payment.validation.js` (was empty) — strict Zod: plan enum pro/pro_plus only (amount never client-controlled).
+- `src/middlewares/plan.middleware.js` (was empty) — `requireTier(...tiers)` with `PLAN_REQUIRED` code.
+- `src/jobs/expireSubscriptions.job.js` (was empty) — daily 3 AM sweep; scheduled in `server.js`.
+- `src/seeds/plans.seed.js` (was empty) — catalog self-check script (`node src/seeds/plans.seed.js`).
+- `src/app.js` — `express.raw` webhook mounted before JSON parsing + `app.use("/api/payments", paymentRouter)`.
+- `src/utils/response.js` — added shared `forwardServiceError` (not-found→404, permission/limit→400); wired into product/boost/report controllers (fixes not-found returning 500).
+- Entitlements enforced: `product.service createProduct` + `relistProduct` check active-listing cap (`LISTING_LIMIT` 403, drafts exempt, null = unlimited); `wishlist.controller add/toggle` check wishlist cap (`WISHLIST_LIMIT` 403, removals exempt).
+- `getSingleProduct` populate now includes `subscription` so seller PRO badges render.
+- `.env.sample` — added `RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET/RAZORPAY_WEBHOOK_SECRET` (keys only).
+
+**Frontend**
+- `features/payment/api/paymentApi.js` + `features/payment/hooks/useRazorpayCheckout.js` (new) — order/verify/me calls; lazy checkout.js loader with retry, in-flight guard against double windows, dismiss/failure handling.
+- `features/product/pages/PricingModel.jsx` — Upgrade buttons run order→checkout→verify→profile refresh→`/subscription`; per-tier button states (Current/Included/Upgrade, processing + disabled during flight); price suffix corrected to `one-time` (founder lifetime) instead of `/month`.
+- `features/user/pages/Subscription.jsx` — replaced all mocks with `GET /api/payments/me`: live tier/status/lifetime chip, real usage bars (listings/wishlist/boosts), real dates, real order ID + payment history; upgrade routes to `/price`; cancel hidden for lifetime (shows "Lifetime access — no renewals").
+- Badges post-payment: enabled `plan={sellerPlan}` + `showBadge` in `ProductCard` (was commented out), `showBadge` in `ProductDescription` seller card, `Profile_left_part`, `Settings` (Header/Profile already had it). All render from `user.subscription`, refreshed via `fetchUserProfile()` after verify.
+- `.env.sample` — added `VITE_RAZORPAY_KEY_ID`.
+
+**Operator setup required (not in repo)**
+- Backend `.env`: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` (API keys), `RAZORPAY_WEBHOOK_SECRET` (from Dashboard → Webhooks).
+- Frontend `.env`: `VITE_RAZORPAY_KEY_ID` (public key id only — never the secret).
+- Razorpay Dashboard → Webhooks: URL `https://<api>/api/payments/webhook`, events `payment.captured` + `payment.failed`, secret pasted to backend env.
+- Flip to semester mode later: set `ACTIVE_SUBSCRIPTION_TYPE = semester` in `subscriptionPlans.js` (₹149/₹249, 180d expiry enforced by job).
+
 - All API shapes: `{success,message,data/user/products/pagination/filterMeta/isFirstListing}` kept.
 - Legacy `GET /logoutUser` kept alongside `POST`.
 - Tokens still returned in JSON for old clients, but new frontend ignores them (cookies authoritative).
-- Boost quotas (2/10/30) kept despite docs drift — documented in `boostPlans.js` for payment migration.
+- Boost quotas are spec-derived: `boostPlans.js` reads `subscriptionPlans.js` (Free 0, Pro 2×72h, Pro+ 5×168h; `maxActiveBoosts` 1/1/3 anti-spam cap). Semester prices aligned to spec (₹99/₹199).
 - Mock Chat/Notification/Myorders UI kept functional — only hardened underneath.
 - No new required env vars. Existing `.env` continues to work. New `User.tokenVersion` / `verifyTokenEmailExpiry` default safely for old docs.
 - Old verification links (pre-deploy, no expiry) will require resend — one-time, secure by design.

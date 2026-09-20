@@ -88,7 +88,7 @@ export const SUBSCRIPTION_PLANS = Object.freeze({
 
       displayName: "Pro",
 
-      amountInPaise: 14900,
+      amountInPaise: 9900,
 
       subscriptionType: SUBSCRIPTION_TYPE.SEMESTER,
 
@@ -142,7 +142,7 @@ export const SUBSCRIPTION_PLANS = Object.freeze({
 
       displayName: "Pro+",
 
-      amountInPaise: 24900,
+      amountInPaise: 19900,
 
       subscriptionType: SUBSCRIPTION_TYPE.SEMESTER,
 

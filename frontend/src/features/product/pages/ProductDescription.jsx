@@ -666,6 +666,7 @@ ${shareUrl}`;
                     name={product?.seller_id?.name || "Seller"}
                     imageUrl={product?.seller_id?.avatar?.url}
                     plan={product?.seller_id?.subscription} // Shows the seller's badge to buyers!
+                    showBadge
                     size="small"
                     className="lg:scale-125 origin-left" // This keeps your responsive sizing (w-7 to w-9)
                   />

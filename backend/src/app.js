@@ -15,6 +15,7 @@ import imagekitRouter from "./routes/imagekit.routes.js";
 import wishlistRouter from "./routes/wishlist.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import boostRouter from "./routes/boost.routes.js";
+import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
@@ -135,6 +136,15 @@ app.use(express.json({ limit: "10kb" })); // To prevent large payload attacks
 app.use(express.urlencoded({ extended: true, limit: "10kb" })); // Handles form data from frontend
 app.use(cookieParser());
 
+// Razorpay webhook needs the RAW body for HMAC verification, so it is
+// mounted with express.raw and handled before any JSON parsing of that path.
+// (Router-level: POST /api/payments/webhook, no auth — signature is the auth.)
+app.post(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json", limit: "1mb" }),
+  paymentWebhookHandler,
+);
+
 // Logging in Development mode only - redact secrets from URLs
 if (process.env.NODE_ENV !== "production") {
   morgan.token("redacted-url", (req) => {
@@ -169,6 +179,7 @@ app.use("/api/imagekit", imagekitRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/boost", boostRouter);
+app.use("/api/payments", paymentRouter);
 
 // If no route matches
 app.use((req, res) => {
@@ -204,6 +215,7 @@ app.use((err, req, res, next) => {
   return res.status(statusCode).json({
     success: false,
     message,
+    ...(err.code ? { code: err.code } : {}),
   });
 });
 

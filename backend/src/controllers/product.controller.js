@@ -51,14 +51,16 @@ export const createProduct = async (req, res) => {
       "Selling price cannot be greater",
       "Invalid purchase date",
       "Purchase date cannot be",
+      "Listing limit reached",
     ];
-    const isClientError = clientErrors.some((m) =>
-      String(error.message || "").includes(m),
-    );
+    const isClientError =
+      error.code === "LISTING_LIMIT" ||
+      clientErrors.some((m) => String(error.message || "").includes(m));
 
-    return res.status(isClientError ? 400 : 500).json({
+    return res.status(error.code === "LISTING_LIMIT" ? 403 : isClientError ? 400 : 500).json({
       success: false,
       message: error.message || "Product creation failed",
+      ...(error.code ? { code: error.code } : {}),
     });
   }
 };

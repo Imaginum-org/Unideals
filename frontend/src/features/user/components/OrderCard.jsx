@@ -19,7 +19,17 @@ import {
   unlistProduct,
   relistProduct,
 } from "../../product/api/productApi.js";
+import {
+  createPaymentOrder,
+  verifyPayment,
+} from "../../payment/api/paymentApi.js";
+import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
 import toast from "react-hot-toast";
+
+const BOOST_ADDONS = [
+  { id: "boost_3day", label: "3-day", price: 29 },
+  { id: "boost_7day", label: "7-day", price: 49 },
+];
 
 const OrderCard = ({
   orderId,
@@ -36,6 +46,7 @@ const OrderCard = ({
   onProductUnlisted,
   onProductRelisted,
   onBoostProduct,
+  onBoostApplied,
   isBoosted = false,
   boostExpiresAt,
   boostTier,
@@ -51,6 +62,9 @@ const OrderCard = ({
   const [isUnlisting, setIsUnlisting] = useState(false);
   const [isRelisting, setIsRelisting] = useState(false);
   const [isBoosting, setIsBoosting] = useState(false);
+  const [showAddonOptions, setShowAddonOptions] = useState(false);
+  const [buyingAddon, setBuyingAddon] = useState(null);
+  const { openCheckout } = useRazorpayCheckout();
 
   const normalized = (status || "").toLowerCase().trim();
   const isActive =
@@ -162,9 +176,63 @@ const OrderCard = ({
         toast.success(res.data.message || "Product boosted successfully");
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to boost product");
+      const msg = error?.response?.data?.message || "Failed to boost product";
+      // Quota exhausted -> offer one-time paid boosts instead.
+      if (/limit reached/i.test(msg)) {
+        setShowAddonOptions(true);
+        toast.error("Boost quota exhausted — or buy an extra boost below");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsBoosting(false);
+    }
+  };
+
+  // One-time paid boost (₹29/₹49): server order -> Checkout -> verify.
+  // buyingAddon guards double orders from double clicks.
+  const handleBuyAddon = async (e, addon) => {
+    e.stopPropagation();
+
+    if (buyingAddon || boostActive) return;
+    setBuyingAddon(addon.id);
+    try {
+      const orderRes = await createPaymentOrder({
+        plan: addon.id,
+        productId: orderId,
+      });
+      const { orderId: rzpOrderId, amount, currency } = orderRes.data?.data || {};
+      if (!rzpOrderId) throw new Error("Unable to initiate payment");
+
+      const paymentRes = await openCheckout({
+        orderId: rzpOrderId,
+        amount,
+        currency,
+        planName: `${addon.label} Boost`,
+      });
+
+      const verifyRes = await verifyPayment({
+        razorpay_order_id: paymentRes.razorpay_order_id,
+        razorpay_payment_id: paymentRes.razorpay_payment_id,
+        razorpay_signature: paymentRes.razorpay_signature,
+      });
+
+      if (verifyRes.data?.success) {
+        toast.success("Boost purchased! Your listing is now boosted.");
+        setShowAddonOptions(false);
+        const updated = verifyRes.data?.data?.product;
+        if (updated && onBoostApplied) onBoostApplied(updated);
+      }
+    } catch (error) {
+      if (error?.message !== "Payment cancelled") {
+        toast.error(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Boost purchase failed. Please try again.",
+        );
+      }
+    } finally {
+      setBuyingAddon(null);
     }
   };
 
@@ -308,6 +376,25 @@ const OrderCard = ({
               <IoRocketOutline size={16} />
               <span>{isBoosting ? "Boosting..." : boostLabel}</span>
             </button>
+
+            {/* One-time paid boosts when quota is exhausted */}
+            {showAddonOptions && !boostActive && (
+              <div className="flex w-full sm:w-auto items-center gap-2">
+                {BOOST_ADDONS.map((addon) => (
+                  <button
+                    key={addon.id}
+                    onClick={(e) => handleBuyAddon(e, addon)}
+                    disabled={buyingAddon !== null}
+                    className="flex-1 sm:flex-none justify-center px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <IoRocketOutline size={14} />
+                    {buyingAddon === addon.id
+                      ? "..."
+                      : `${addon.label} · ₹${addon.price}`}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Secondary actions span evenly on mobile, group right on desktop */}
             <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">

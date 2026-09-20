@@ -131,6 +131,7 @@ function Profile_left_part() {
               name={userDetails?.name || "User"}
               imageUrl={userDetails?.avatar?.url}
               plan={userDetails?.subscription}
+              showBadge
               className="rounded-full bg-blue-50 dark:bg-gray-800"
               size="xmedium"
             />

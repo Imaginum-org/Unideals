@@ -142,7 +142,11 @@ const ProductCard = memo(
             updatedWishlist ? "Added to Wishlist" : "Removed from Wishlist",
           );
         } catch (error) {
-          toast.error("Please login to add wishlist");
+          toast.error(
+            error?.response?.data?.message ||
+              error?.message ||
+              "Please login to add wishlist",
+          );
         } finally {
           setLoading(false);
         }
@@ -389,7 +393,8 @@ group-hover:pointer-events-auto
                     name={sellerName}
                     imageUrl={sellerAvatarUrl}
                     size="small"
-                    // plan={sellerPlan}
+                    plan={sellerPlan}
+                    showBadge
                     className="shrink-0 h-6 w-6 md:h-7 md:w-7"
                   />
                   <span className="capitalize text-[13px] md:text-[14px] font-medium text-zinc-500 dark:text-zinc-400 line-clamp-1 min-w-0 max-w-[56px] sm:max-w-[80px]">
