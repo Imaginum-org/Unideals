@@ -55,8 +55,10 @@ const paymentSchema = new Schema(
     },
     razorpay_payment_id: {
       type: String,
-      default: null,
-      // Sparse unique: many docs have null until paid; each real payment_id unique.
+      default: undefined,
+      // Sparse unique: the field is ABSENT until paid (never stored as null,
+      // because MongoDB treats explicit null as an indexed value and would
+      // reject the second unpaid order). Each real payment_id is unique.
       // Drives webhook/verify idempotency.
       unique: true,
       sparse: true,

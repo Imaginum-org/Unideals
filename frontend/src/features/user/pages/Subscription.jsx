@@ -26,6 +26,8 @@ const TIER_TO_ID = {
   pro_plus: "pro-plus",
 };
 
+const PLAN_RANK = { free: 0, pro: 1, "pro-plus": 2 };
+
 // Static marketing copy per plan; all numbers that matter (usage, limits,
 // dates, billing) come from GET /api/payments/me.
 const plans = [
@@ -539,16 +541,23 @@ function Subscription() {
               <div className="space-y-3">
                 {plans.map((plan) => {
                   const isSelected = plan.id === selectedPlanId;
+                  // Lower tiers are folded into the current paid plan.
+                  const isIncluded =
+                    (PLAN_RANK[plan.id] || 0) < (PLAN_RANK[selectedPlanId] || 0);
 
                   return (
                     <button
                       key={plan.id}
                       type="button"
-                      onClick={goToPricing}
+                      onClick={isIncluded ? undefined : goToPricing}
+                      disabled={isIncluded}
+                      aria-disabled={isIncluded}
                       className={`w-full rounded-xl border p-4 text-left transition ${
                         isSelected
                           ? "border-[#4A3CFF] bg-[#F7F6FF]"
-                          : "border-[#E6EAF2] bg-white hover:border-[#4A3CFF] hover:bg-[#FAFAFF] dark:border-gray-800 dark:bg-[#1c1c1c]"
+                          : isIncluded
+                            ? "cursor-default border-[#E6EAF2] bg-[#F8F9FC] opacity-80 dark:border-gray-800 dark:bg-[#151515]"
+                            : "border-[#E6EAF2] bg-white hover:border-[#4A3CFF] hover:bg-[#FAFAFF] dark:border-gray-800 dark:bg-[#1c1c1c]"
                       }`}
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -561,7 +570,7 @@ function Subscription() {
                               <p className="text-sm font-extrabold text-[#09111F] dark:text-white">
                                 {plan.name}
                               </p>
-                              {plan.badge && (
+                              {plan.badge && !isIncluded && (
                                 <span className="rounded-full bg-[#4A3CFF] px-2 py-0.5 text-[9px] font-extrabold text-white">
                                   {plan.badge}
                                 </span>
@@ -571,9 +580,16 @@ function Subscription() {
                                   Selected
                                 </span>
                               )}
+                              {isIncluded && (
+                                <span className="rounded-full bg-[#EEF1F7] px-2 py-0.5 text-[9px] font-extrabold text-[#5B6472] dark:bg-gray-800 dark:text-gray-300">
+                                  Included already
+                                </span>
+                              )}
                             </div>
                             <p className="mt-1 text-xs font-medium text-[#09111F] dark:text-white">
-                              {plan.included.slice(0, 2).join(" | ")}
+                              {isIncluded
+                                ? "Covered by your current plan"
+                                : plan.included.slice(0, 2).join(" | ")}
                             </p>
                           </div>
                         </div>
