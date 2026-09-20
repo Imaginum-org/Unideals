@@ -71,33 +71,36 @@ export const useRazorpayCheckout = () => {
               contact: prefill?.contact || "",
             },
             theme: { color: "#3300ff", backdrop_color: "rgba(19,19,19,0.6)" },
-            // Show ONLY Card, UPI and Netbanking. The UPI block renders
-            // both flows (scan QR + enter UPI ID); everything else
-            // (wallets, EMI, pay-later, bank transfer) is hidden.
+            // Single "Payment Options" block listing ONLY UPI, Cards and
+            // Netbanking (in that order). One block => no separate
+            // "Recommended" tab; default blocks off; everything else
+            // (wallets, EMI, pay-later, bank transfer) hidden via `hide`
+            // at the display level (per Razorpay block-config docs).
+            // NOTE: whether the UPI screen offers QR, UPI-ID/collect or
+            // both is controlled by the Razorpay account's UPI settings —
+            // enable the Collect flow in Dashboard payment methods if the
+            // ID field is missing. No `flows` key exists in the API, so
+            // none is sent here.
             config: {
               display: {
                 blocks: {
-                  upi: {
-                    name: "UPI",
-                    instruments: [{ method: "upi", flows: ["qr", "collect"] }],
+                  methods: {
+                    name: "Payment Options",
+                    instruments: [
+                      { method: "upi" },
+                      { method: "card" },
+                      { method: "netbanking" },
+                    ],
                   },
-                  card: {
-                    name: "Cards",
-                    instruments: [{ method: "card" }],
-                  },
-                  banks: {
-                    name: "Netbanking",
-                    instruments: [{ method: "netbanking" }],
-                  },
-                  hide: [
-                    { method: "wallet" },
-                    { method: "emi" },
-                    { method: "cardless_emi" },
-                    { method: "paylater" },
-                    { method: "bank_transfer" },
-                  ],
                 },
-                sequence: ["block.upi", "block.card", "block.banks"],
+                hide: [
+                  { method: "wallet" },
+                  { method: "emi" },
+                  { method: "cardless_emi" },
+                  { method: "paylater" },
+                  { method: "bank_transfer" },
+                ],
+                sequence: ["block.methods"],
                 preferences: { show_default_blocks: false },
               },
             },
