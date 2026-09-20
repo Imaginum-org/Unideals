@@ -73,13 +73,19 @@ export const getMySubscription = async (user) => {
     .lean();
 
   // Live usage (never marketing copy): listing + wishlist counts vs plan caps.
+  // Wishlist counts only products that still exist, exactly matching what
+  // GET /api/wishlist renders (dead refs from deleted listings are excluded).
+  const wishlistIds =
+    (await User.findById(user._id).select("wishlist").lean())?.wishlist || [];
   const [activeListings, wishlistCount, boost] = await Promise.all([
     Product.countDocuments({
       seller_id: user._id,
       status: "listed",
       is_deleted: false,
     }),
-    User.findById(user._id).select("wishlist").lean().then((u) => u?.wishlist?.length || 0),
+    wishlistIds.length > 0
+      ? Product.countDocuments({ _id: { $in: wishlistIds } })
+      : 0,
     getBoostSummary(user).catch(() => null),
   ]);
 

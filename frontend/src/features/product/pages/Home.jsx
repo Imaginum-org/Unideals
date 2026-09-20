@@ -567,7 +567,7 @@ const Home = () => {
                 <p className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-[#394FF1] dark:text-blue-400">
                   Featured
                 </p>
-                <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
+                <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm text-blac7k">
                   Boosted Products
                 </h1>
               </div>

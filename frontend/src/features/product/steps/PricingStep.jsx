@@ -10,14 +10,22 @@ import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
 import { validatePricing } from "../validations";
 import FormError from "../components/shared/FormError";
 import LegalAgreementModal from "../../auth/components/LegalAgreementModal";
+import PickupSpotModal from "../../user/components/PickupSpotModal.jsx";
+import { createPickupSpot } from "../../user/api/userApi.js";
+import { FiPlus } from "react-icons/fi";
+
+const MAX_SPOTS = 3;
 
 const PricingStep = () => {
   const { formData, updateField, nextStep, errors, validateAndProceed } =
     useProductListing();
 const [legalTab, setLegalTab] = useState(null);
   const [loadingPickupSpot, setLoadingPickupSpot] = useState(false);
+  const [pickupSpots, setPickupSpots] = useState([]);
+  const [showSpotModal, setShowSpotModal] = useState(false);
+  const [isSavingSpot, setIsSavingSpot] = useState(false);
 
-  // FETCH PICKUP SPOT
+  // FETCH PICKUP SPOTS
   useEffect(() => {
     const fetchPickupSpot = async () => {
       try {
@@ -25,10 +33,11 @@ const [legalTab, setLegalTab] = useState(null);
 
         const res = await axios.get("/api/pickup-spots");
 
-        const pickupSpots = res.data?.pickupSpots || [];
+        const spots = res.data?.pickupSpots || [];
+        setPickupSpots(spots);
 
         const primaryPickupSpot =
-          pickupSpots.find((spot) => spot.isPrimary) || pickupSpots[0];
+          spots.find((spot) => spot.isPrimary) || spots[0];
 
         updateField("address", primaryPickupSpot || null);
       } catch {
@@ -40,8 +49,55 @@ const [legalTab, setLegalTab] = useState(null);
 
     if (!formData.address) {
       fetchPickupSpot();
+    } else {
+      // Keep the dropdown in sync when returning to this step; fall back
+      // to primary/first if the saved address is no longer in the list.
+      axios
+        .get("/api/pickup-spots")
+        .then((res) => {
+          const spots = res.data?.pickupSpots || [];
+          setPickupSpots(spots);
+          const stillThere =
+            formData.address?._id &&
+            spots.some((s) => String(s._id) === String(formData.address._id));
+          if (!stillThere) {
+            updateField(
+              "address",
+              spots.find((s) => s.isPrimary) || spots[0] || null,
+            );
+          }
+        })
+        .catch(() => {});
     }
   }, []);
+
+  const handleSelectSpot = (spotId) => {
+    const spot = pickupSpots.find((s) => String(s._id) === String(spotId));
+    if (spot) updateField("address", spot);
+  };
+
+  // Inline creation: same modal as Settings, saved without leaving the flow.
+  const handleCreateSpot = async (spotData) => {
+    if (pickupSpots.length >= MAX_SPOTS) {
+      toast.error(`Maximum ${MAX_SPOTS} pickup spots allowed`);
+      return;
+    }
+    setIsSavingSpot(true);
+    try {
+      const res = await createPickupSpot(spotData);
+      const created =
+        res.data?.pickupSpot || res.data?.data || { ...spotData };
+      setPickupSpots((prev) => [...prev, created]);
+      updateField("address", created);
+      toast.success("Pickup spot added");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to add pickup spot");
+      // Swallow here (already toasted) so the modal stays open for retry.
+      throw err;
+    } finally {
+      setIsSavingSpot(false);
+    }
+  };
 
   return (
     <>
@@ -260,22 +316,30 @@ const [legalTab, setLegalTab] = useState(null);
                       <p className="text-sm text-[#6B7280]">
                         Loading pickup spot...
                       </p>
-                    ) : formData.address ? (
+                    ) : pickupSpots.length > 0 ? (
                       <>
-                        <p className="font-medium text-[#111827] leading-6">
-                          {formData.address.name ||
-                            formData.address.address_line ||
-                            formData.address.line1}
-                        </p>
+                        <select
+                          value={formData.address?._id || ""}
+                          onChange={(e) => handleSelectSpot(e.target.value)}
+                          className="w-full rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2.5 text-sm font-semibold text-[#111827] outline-none transition focus:border-[#4F46E5] focus:ring-4 focus:ring-[#4F46E5]/10"
+                          aria-label="Choose pickup spot"
+                        >
+                          {pickupSpots.map((spot) => (
+                            <option key={spot._id} value={spot._id}>
+                              {spot.name}
+                              {spot.isPrimary ? " (Primary)" : ""} —{" "}
+                              {spot.detail}
+                            </option>
+                          ))}
+                        </select>
 
                         <p className="mt-2 text-sm text-[#6B7280] leading-6">
-                          {formData.address.detail ||
-                            [formData.address.city, formData.address.state]
-                              .filter(Boolean)
-                              .join(", ")}
+                          {formData.address?.detail ||
+                            formData.address?.city ||
+                            "Select a spot above"}
                         </p>
 
-                        {formData.address.pincode && (
+                        {formData.address?.pincode && (
                           <p className="text-sm text-[#6B7280]">
                             {formData.address.pincode}
                           </p>
@@ -283,14 +347,32 @@ const [legalTab, setLegalTab] = useState(null);
                       </>
                     ) : (
                       <p className="text-sm text-red-500">
-                        No pickup spot found
+                        No pickup spot found — add one to continue
                       </p>
                     )}
                   </div>
 
-                  <button className="mt-4 text-sm font-semibold text-[#4F46E5] self-start">
-                    <a href="/settings">Change</a>
-                  </button>
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowSpotModal(true)}
+                      disabled={
+                        isSavingSpot || pickupSpots.length >= MAX_SPOTS
+                      }
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#4F46E5] hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FiPlus size={16} />
+                      {pickupSpots.length === 0
+                        ? "Add pickup spot"
+                        : "Add another spot"}
+                    </button>
+                    <a
+                      href="/settings"
+                      className="text-sm font-medium text-[#9CA3AF] hover:text-[#4B5563]"
+                    >
+                      Manage in Settings
+                    </a>
+                  </div>
                 </div>
                 {errors.address && <FormError error={errors.address} />}
               </div>
@@ -379,6 +461,14 @@ const [legalTab, setLegalTab] = useState(null);
           </div>
         </div>
       </div>
+
+      {/* Inline add-spot modal: same popup as Settings, no page switch */}
+      <PickupSpotModal
+        isOpen={showSpotModal}
+        onClose={() => setShowSpotModal(false)}
+        onSave={handleCreateSpot}
+        mode="create"
+      />
     </>
   );
 };

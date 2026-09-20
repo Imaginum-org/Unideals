@@ -53,6 +53,8 @@ const PickupSpotModal = ({
       try {
         await onSave(formData);
         onClose();
+      } catch {
+        // onSave surfaces its own errors (toast); keep modal open for retry.
       } finally {
         setIsSubmitting(false);
       }

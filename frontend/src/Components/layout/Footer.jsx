@@ -156,7 +156,7 @@ gap-6"
               </div>
 
               {FOOTER_LINKS.map(({ title, links }) => (
-                <div key={title}>
+                <div key={title} className="mt-4">
                   <h3 className="mb-4 font-bold uppercase text-[#313131]">
                     {title}
                   </h3>

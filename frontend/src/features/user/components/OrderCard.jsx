@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiEye,
@@ -18,6 +18,7 @@ import {
   deleteProduct,
   unlistProduct,
   relistProduct,
+  getProductById,
 } from "../../product/api/productApi.js";
 import {
   createPaymentOrder,
@@ -65,7 +66,20 @@ const OrderCard = ({
   const [isBoosting, setIsBoosting] = useState(false);
   const [buyingAddon, setBuyingAddon] = useState(null);
   const [limitInfo, setLimitInfo] = useState(null);
+  // Local paint guarantee: set on purchase success so the boosted visuals
+  // appear instantly even if the parent list merge is delayed or skipped.
+  // Cleared automatically once parent props reflect the boost.
+  const [localBoost, setLocalBoost] = useState(null);
   const { openCheckout } = useRazorpayCheckout();
+
+  // Parent caught up (or boost lapsed): drop the local override.
+  useEffect(() => {
+    if (!localBoost) return;
+    const parentBoosted =
+      isBoosted && new Date(boostExpiresAt || 0) > new Date();
+    const lapsed = new Date(localBoost.expires_at || 0) <= new Date();
+    if (parentBoosted || lapsed) setLocalBoost(null);
+  }, [localBoost, isBoosted, boostExpiresAt]);
 
   const normalized = (status || "").toLowerCase().trim();
   const isActive =
@@ -74,14 +88,25 @@ const OrderCard = ({
     normalized === "in progress";
   const isUnlisted = normalized === "unlisted";
   const isDelivered = normalized === "delivered" || normalized === "sold";
-  const boostActive = isBoosted && new Date(boostExpiresAt || 0) > new Date();
-  const boostLabel = boostActive
-    ? `Boosted until ${new Date(boostExpiresAt).toLocaleTimeString("en-IN", {
+  // Parent props are the source of truth; localBoost (set at purchase)
+  // paints instantly and yields once props catch up or the boost lapses.
+  const effBoosted = isBoosted || Boolean(localBoost);
+  const effExpiresAt = localBoost?.expires_at || boostExpiresAt;
+  const effTier = localBoost?.tier || boostTier;
+  const boostActive =
+    effBoosted && new Date(effExpiresAt || 0) > new Date();
+  const boostEndText = boostActive
+    ? new Date(effExpiresAt).toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
         hour: "2-digit",
         minute: "2-digit",
-      })}`
+      })
+    : "";
+  const boostLabel = boostActive
+    ? `Boosted till ${boostEndText}`
     : "Boost Visibility";
-  const normalizedBoostTier = (boostTier || "").toLowerCase();
+  const normalizedBoostTier = (effTier || "").toLowerCase();
   const isProPlusBoost = normalizedBoostTier === "pro_plus";
   const isProBoost = normalizedBoostTier === "pro";
   const boostTone = isProPlusBoost
@@ -228,7 +253,24 @@ const OrderCard = ({
 
       if (verifyRes.data?.success) {
         toast.success("Boost purchased! Your listing is now boosted.");
-        const updated = verifyRes.data?.data?.product;
+        // Prefer the product in the verify response; fall back to a fresh
+        // fetch so the boosted border paints immediately even if the
+        // response shape ever drifts.
+        let updated = verifyRes.data?.data?.product;
+        if (!updated?._id) {
+          try {
+            const fresh = await getProductById(orderId);
+            updated = fresh.data?.data || fresh.data?.product;
+          } catch {
+            updated = null;
+          }
+        }
+        if (updated?.boost_expires_at) {
+          setLocalBoost({
+            expires_at: updated.boost_expires_at,
+            tier: updated.boost_tier,
+          });
+        }
         if (updated && onBoostApplied) onBoostApplied(updated);
       }
     } catch (error) {

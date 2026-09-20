@@ -1,28 +1,35 @@
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import ProductCard from "../../product/components/ProductCard.jsx";
 import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useWishlist } from "../../../context/WishlistContext";
 
 function Wishlist() {
-  const { wishlist, loading } = useWishlist();
-  const [visibleWishlist, setVisibleWishlist] = useState([]);
+  // Single source of truth: the shared wishlist context (freshly fetched
+  // on mount). No local copy, so the count here can never drift from the
+  // Subscription tab, which reads the same server data.
+  const { wishlist, loading, fetchWishlist, setWishlist } = useWishlist();
 
   useEffect(() => {
-    setVisibleWishlist(wishlist || []);
-  }, [wishlist]);
+    fetchWishlist();
+  }, [fetchWishlist]);
 
   const getId = (product) =>
     typeof product === "string" ? product : product?._id;
 
+  const visibleItems = (wishlist || []).filter(
+    (product) => getId(product) && typeof product !== "string",
+  );
+
   const handleRemoveFromView = (productId) => {
-    setVisibleWishlist((currentWishlist) =>
-      currentWishlist.filter((product) => getId(product) !== productId),
+    setWishlist((currentWishlist) =>
+      (currentWishlist || []).filter((product) => getId(product) !== productId),
     );
   };
 
   const handleRestoreView = () => {
-    setVisibleWishlist(wishlist || []);
+    // Restore from the server, not from possibly stale local state.
+    fetchWishlist();
   };
 
   return (
@@ -42,8 +49,8 @@ function Wishlist() {
                     Wishlist
                   </h1>
                   <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                    {visibleWishlist?.length || 0} saved item
-                    {visibleWishlist?.length === 1 ? "" : "s"}
+                    {visibleItems?.length || 0} saved item
+                    {visibleItems?.length === 1 ? "" : "s"}
                   </p>
                 </div>
               </div>
@@ -52,11 +59,10 @@ function Wishlist() {
                 <div className="flex justify-center items-center h-64">
                   <BrandLoader size="md" />
                 </div>
-              ) : visibleWishlist && visibleWishlist.length > 0 ? (
+              ) : visibleItems && visibleItems.length > 0 ? (
                 <div className="w-full grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-x-5 2xl:gap-x-4 gap-y-7 dark:bg-[#131313]">
-                  {visibleWishlist.map((product) => {
+                  {visibleItems.map((product) => {
                     const id = getId(product);
-                    if (!id || typeof product === "string") return null;
                     return (
                       <ProductCard
                         key={id}
