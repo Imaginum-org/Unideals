@@ -10,7 +10,7 @@ import Stepper from "../stepper/Stepper";
 import TipsCard from "../shared/TipsCard";
 
 const ListingLayout = () => {
-  const { step } = useProductListing();
+  const { step, isEditMode } = useProductListing();
 
   useEffect(() => {
     window.scrollTo({
@@ -66,11 +66,13 @@ const ListingLayout = () => {
         {/* Header */}
         <div className="mt-7">
           <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
-            Sell Your Product
+            {isEditMode ? "Edit Your Product" : "Sell Your Product"}
           </h1>
 
           <p className="mt-2 xl:mt-1 text-[#475569] dark:text-[#A1A1AA] text-sm md:text-base">
-            Provide the basic details to help buyers find your product.
+            {isEditMode
+              ? "Update your listing details below."
+              : "Provide the basic details to help buyers find your product."}
           </p>
         </div>
 

@@ -9,7 +9,7 @@ import axios from "../../../services/axiosInstance";
 import { uploadImage } from "../../../Utils/imageUpload.js";
 import { compressImage } from "../utils/imageCompression";
 import useProductListing from "../hooks/useProductListing";
-import { saveDraftProduct } from "../api/productApi.js";
+import { saveDraftProduct, updateProduct } from "../api/productApi.js";
 import LimitModal from "../../../Components/ui/LimitModal.jsx";
 import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { RiGraduationCapLine } from "react-icons/ri";
@@ -21,7 +21,7 @@ const PreviewStep = () => {
   const [publishStage, setPublishStage] = useState("");
   const [limitInfo, setLimitInfo] = useState(null);
 
-  const { formData, goToStep, loading, setLoading, resetForm } =
+  const { formData, goToStep, loading, setLoading, resetForm, isEditMode, editProductId } =
     useProductListing();
 
   // DISCOUNT
@@ -79,7 +79,85 @@ const PreviewStep = () => {
     }
   };
 
-  // SUBMIT
+  // SAVE CHANGES (edit mode)
+  const handleSaveChanges = async () => {
+    if (loading) return;
+
+    try {
+      setLoading(true);
+
+      // Separate existing (already uploaded) images from newly added File blobs.
+      const existingImagePreviews = formData.imagePreviews.filter(
+        (item) => item.isExisting,
+      );
+      const newFileBlobs = formData.images; // these are File objects
+
+      let newUploads = [];
+      if (newFileBlobs.length > 0) {
+        setPublishStage("Preparing New Images...");
+        const compressed = await Promise.all(
+          newFileBlobs.map((file) => compressImage(file)),
+        );
+        setPublishStage("Uploading New Images...");
+        newUploads = await Promise.all(
+          compressed.map((file) => uploadImage(file)),
+        );
+      }
+
+      setPublishStage("Saving Changes...");
+
+      // Merge: keep existing image objects + append new ones.
+      const mergedImages = [
+        ...existingImagePreviews.map((item) => ({
+          url: item.url,
+          fileId: item.fileId,
+        })),
+        ...newUploads,
+      ];
+
+      await updateProduct(editProductId, {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        condition: formData.condition,
+        selling_price: Number(formData.sellingPrice),
+        original_price: Number(formData.originalPrice),
+        is_negotiable: formData.negotiable,
+        payment_preference: formData.paymentMethod,
+        images: mergedImages,
+        pickup_address_snapshot: {
+          address_line:
+            formData.address?.name ||
+            formData.address?.address_line ||
+            formData.address?.line1,
+          city: formData.address?.detail || formData.address?.city,
+        },
+        meetup_location: formData.meetupLocation,
+        attributes: {
+          brand: formData.brand,
+          color: formData.color,
+          usage_duration: formData.usageDuration,
+          purchase_date: formData.purchaseDate || null,
+        },
+      });
+
+      setPublishStage("");
+      toast.success("Product updated successfully!");
+      navigate("/productlisted");
+    } catch (error) {
+      setPublishStage("");
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to save changes";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+      setPublishStage("");
+    }
+  };
+
+  // SUBMIT (create new product)
   const handlePublish = async () => {
     if (loading) return;
 
@@ -395,7 +473,7 @@ const PreviewStep = () => {
         <div className="mt-14 flex flex-col items-center">
           {/* Publish */}
           <button
-            onClick={handlePublish}
+            onClick={isEditMode ? handleSaveChanges : handlePublish}
             disabled={loading}
             className={`w-full max-w-[360px] h-[62px] rounded-2xl font-bold text-lg transition-all duration-200
               
@@ -412,8 +490,8 @@ const PreviewStep = () => {
               </div>
             ) : (
               <div className="flex items-center gap-2 justify-center">
-                <span>Publish Now</span>
-                <GoRocket />
+                <span>{isEditMode ? "Save Changes" : "Publish Now"}</span>
+                {!isEditMode && <GoRocket />}
               </div>
             )}
           </button>
@@ -425,18 +503,22 @@ const PreviewStep = () => {
               className="flex items-center gap-2 text-[#4B5563] hover:text-[#111827]"
             >
               <HiOutlinePencil size={16} />
-              Edit Listing
+              {isEditMode ? "Back to Edit" : "Edit Listing"}
             </button>
 
-            <div className="w-[4px] h-[4px] rounded-full bg-[#D1D5DB]" />
-
-            <button
-              disabled={loading}
-              onClick={handleSaveDraft}
-              className="text-[#4B5563] hover:text-[#111827]"
-            >
-              Save as Draft
-            </button>
+            {/* Only show Save as Draft for new listings (not edit mode) */}
+            {!isEditMode && (
+              <>
+                <div className="w-[4px] h-[4px] rounded-full bg-[#D1D5DB]" />
+                <button
+                  disabled={loading}
+                  onClick={handleSaveDraft}
+                  className="text-[#4B5563] hover:text-[#111827]"
+                >
+                  Save as Draft
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

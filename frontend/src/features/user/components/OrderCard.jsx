@@ -461,7 +461,10 @@ const OrderCard = ({
             {/* Secondary actions span evenly on mobile, group right on desktop */}
             <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
               <button
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/upload/${orderId}`);
+                }}
                 className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2"
               >
                 <FiEdit2 size={14} />
@@ -500,6 +503,17 @@ const OrderCard = ({
 
         {isUnlisted && (
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/upload/${orderId}`);
+              }}
+              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-2"
+            >
+              <FiEdit2 size={14} />
+              Edit Details
+            </button>
+
             <button
               onClick={(e) => {
                 e.stopPropagation();

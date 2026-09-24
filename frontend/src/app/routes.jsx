@@ -75,6 +75,7 @@ export default function AppRoutes() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/notification" element={<Notification />} />
           <Route path="/upload" element={<ProductListing />} />
+          <Route path="/upload/:productId" element={<ProductListing />} />
           <Route path="/productlisted" element={<ProductListed />} />
           <Route path="/contact" element={<ContactUs />} />
         </Route>

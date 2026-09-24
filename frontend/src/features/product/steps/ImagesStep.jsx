@@ -129,44 +129,54 @@ const ImagesStep = () => {
   }, []);
 
   // REMOVE IMAGE
+  // In edit mode imagePreviews can contain existing (already-uploaded) images
+  // that have no corresponding entry in formData.images (File blobs).
+  // We must remove by preview index, then figure out whether to also drop a
+  // blob from formData.images.
   const handleRemoveImage = (index) => {
-    const updatedImages = [...formData.images];
-
     const updatedPreviews = [...formData.imagePreviews];
+    const removedPreview = updatedPreviews[index];
 
-    updatedImages.splice(index, 1);
-
-    URL.revokeObjectURL(updatedPreviews[index].preview);
-
+    // Revoke blob URL only for locally-picked files.
+    if (!removedPreview?.isExisting && removedPreview?.preview?.startsWith("blob:")) {
+      URL.revokeObjectURL(removedPreview.preview);
+    }
     updatedPreviews.splice(index, 1);
-
-    updateField("images", updatedImages);
-
     updateField("imagePreviews", updatedPreviews);
+
+    // If the removed preview was a new file blob, also remove it from images[].
+    if (!removedPreview?.isExisting) {
+      // Count how many previews before this index are existing (no blob)
+      const existingBefore = formData.imagePreviews
+        .slice(0, index)
+        .filter((p) => p.isExisting).length;
+      const blobIndex = index - existingBefore;
+      const updatedImages = [...formData.images];
+      updatedImages.splice(blobIndex, 1);
+      updateField("images", updatedImages);
+    }
   };
 
   const handleSetCover = (index) => {
     if (index === 0) return;
 
     const updatedPreviews = [...formData.imagePreviews];
-
-    const selectedPreview = updatedPreviews[index];
-
-    updatedPreviews.splice(index, 1);
-
+    const selectedPreview = updatedPreviews.splice(index, 1)[0];
     updatedPreviews.unshift(selectedPreview);
-
-    const updatedImages = [...formData.images];
-
-    const selectedImage = updatedImages[index];
-
-    updatedImages.splice(index, 1);
-
-    updatedImages.unshift(selectedImage);
-
     updateField("imagePreviews", updatedPreviews);
 
-    updateField("images", updatedImages);
+    // Only reorder images[] (File blobs) if both the selected and the first
+    // preview are new files (not existing).
+    if (!selectedPreview?.isExisting && !formData.imagePreviews[0]?.isExisting) {
+      const existingBefore = formData.imagePreviews
+        .slice(0, index)
+        .filter((p) => p.isExisting).length;
+      const blobIndex = index - existingBefore;
+      const updatedImages = [...formData.images];
+      const [moved] = updatedImages.splice(blobIndex, 1);
+      updatedImages.unshift(moved);
+      updateField("images", updatedImages);
+    }
   };
 
   // DRAG EVENTS
