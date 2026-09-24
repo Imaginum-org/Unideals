@@ -164,6 +164,43 @@ const userSchema = new Schema(
         ref: "Product",
       },
     ],
+
+    gamification: {
+      _id: false,
+      total_xp: {
+        type: Number,
+        default: 0,
+      },
+      level: {
+        type: Number,
+        default: 1,
+      },
+      rank_title: {
+        type: String,
+        default: "Seedling",
+      },
+      last_computed_at: {
+        type: Date,
+        default: null,
+      },
+      badges: [
+        {
+          _id: false,
+          badge_id: { type: String, required: true },
+          category: {
+            type: String,
+            enum: ["seller", "buyer", "communication", "trust", "milestone"],
+          },
+          tier: {
+            type: String,
+            enum: ["bronze", "silver", "gold", "special"],
+            default: "bronze",
+          },
+          earned_at: { type: Date, default: Date.now },
+          xp_granted: { type: Number, default: 0 },
+        },
+      ],
+    },
   },
   {
     timestamps: true,

@@ -11,8 +11,8 @@ import {
   FolderIcon,
 } from "@animateicons/react/lucide";
 import { Settings01Icon } from "@animateicons/react/huge";
-import { ChevronLeft, Crown, Menu } from "lucide-react";
-import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import { ChevronLeft, Crown, Menu, Trophy } from "lucide-react";
+import Loader from "../../../Components/ui/Loader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 
@@ -43,6 +43,7 @@ function Profile_left_part() {
     { path: "/myorders", label: "Orders", icon: BoxIcon },
     { path: "/productlisted", label: "My Listings", icon: ShoppingBagIcon },
     { path: "/wishlist", label: "Wishlist", icon: HeartIcon },
+    { path: "/achievements", label: "Achievements", icon: Trophy },
   ];
 
   const accountMenu = [

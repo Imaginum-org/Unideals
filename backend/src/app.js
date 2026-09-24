@@ -16,7 +16,10 @@ import wishlistRouter from "./routes/wishlist.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import boostRouter from "./routes/boost.routes.js";
 import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js";
+import badgeRouter from "./routes/badgeRoutes.js";
 import handoffRouter from "./routes/handoff.routes.js";
+import badgeRouter from "./routes/badgeRoutes.js";
+import badgeRouter from "./routes/badgeRoutes.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
@@ -42,6 +45,7 @@ app.use(
     crossOriginResourcePolicy: false,
   }),
 );
+
 
 // Prevent NoSQL injection - deep sanitize body, params, query, cookies
 app.use((req, res, next) => {
@@ -184,7 +188,10 @@ app.use("/api/wishlist", wishlistRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/boost", boostRouter);
 app.use("/api/payments", paymentRouter);
+app.use("/api/badges", badgeRouter);
 app.use("/api/handoff", handoffRouter);
+app.use("/api/badges", badgeRouter);
+app.use("/api/badges", badgeRouter);
 
 // If no route matches
 app.use((req, res) => {

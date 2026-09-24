@@ -18,6 +18,7 @@ import ProductCategory from "../features/product/pages/ProductCategory.jsx";
 import PricingModel from "../features/product/pages/PricingModel.jsx";
 // User
 import ProfileOverview from "../features/user/pages/ProfileOverview.jsx";
+import Achievements from "../features/user/pages/Achievements.jsx";
 import Settings from "../features/user/pages/Settings.jsx";
 import Subscription from "../features/user/pages/Subscription.jsx";
 import Wishlist from "../features/user/pages/Wishlist.jsx";
@@ -69,6 +70,7 @@ export default function AppRoutes() {
             element={<Navigate to="/settings" replace />}
           />
           <Route path="/wishlist" element={<Wishlist />} />
+          <Route path="/achievements" element={<Achievements />} />
           <Route path="/myorders" element={<Myorders />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/notification" element={<Notification />} />

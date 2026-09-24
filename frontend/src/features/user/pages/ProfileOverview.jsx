@@ -5,6 +5,8 @@ import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { useWishlist } from "../../../context/WishlistContext";
 import { getUserProducts } from "../../product/api/productApi.js";
+import BadgeMiniStrip from "../components/BadgeMiniStrip.jsx";
+import { fetchMyBadges } from "../api/badgeApi.js";
 
 // React Icons Imports
 import {
@@ -29,6 +31,8 @@ function ProfileOverview() {
   const { userDetails, fetchUserProfile } = useUser();
   const { wishlist } = useWishlist();
   const [userProducts, setUserProducts] = useState([]);
+  const [gamification, setGamification] = useState(null);
+  const [gamificationLoading, setGamificationLoading] = useState(true);
 
   useEffect(() => {
     fetchUserProfile();
@@ -44,6 +48,15 @@ function ProfileOverview() {
     };
 
     loadUserProducts();
+
+    const loadGamification = async () => {
+      try {
+        const res = await fetchMyBadges();
+        if (res.data.success) setGamification(res.data.data);
+      } catch (_) {}
+      finally { setGamificationLoading(false); }
+    };
+    loadGamification();
   }, [fetchUserProfile]);
 
   const stats = useMemo(() => {
@@ -298,6 +311,11 @@ function ProfileOverview() {
                     Response Time
                   </p>
                 </div>
+              </div>
+
+              {/* Level & Badges Mini Widget */}
+              <div className="mt-5 sm:mt-6">
+                <BadgeMiniStrip gamification={gamification} loading={gamificationLoading} />
               </div>
             </div>
 
