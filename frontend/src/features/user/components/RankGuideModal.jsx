@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
   X,
   Sparkles,
-  Trophy,
   Zap,
   CheckCircle2,
   Lock,
@@ -32,19 +31,19 @@ export default function RankGuideModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 sm:p-6 overflow-y-auto animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 sm:p-6 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#181818] rounded-3xl max-w-2xl w-full shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col max-h-[90vh] my-auto"
+        className="bg-white dark:bg-[#181818] rounded-3xl max-w-2xl w-full shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col max-h-[88vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="relative px-6 py-5 sm:px-8 sm:py-6 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-indigo-50/70 via-purple-50/40 to-pink-50/60 dark:from-indigo-950/20 dark:via-purple-950/20 dark:to-pink-950/20">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
-                <Trophy size={22} />
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0 text-xl">
+                🏆
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -270,7 +269,7 @@ export default function RankGuideModal({
             onClick={onClose}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
           >
-            <Trophy size={14} />
+            <span>??</span>
             View All Badges & Milestones
             <ArrowRight size={13} />
           </Link>

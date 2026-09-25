@@ -18,8 +18,6 @@ import boostRouter from "./routes/boost.routes.js";
 import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js";
 import badgeRouter from "./routes/badgeRoutes.js";
 import handoffRouter from "./routes/handoff.routes.js";
-import badgeRouter from "./routes/badgeRoutes.js";
-import badgeRouter from "./routes/badgeRoutes.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
@@ -190,8 +188,6 @@ app.use("/api/boost", boostRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/badges", badgeRouter);
 app.use("/api/handoff", handoffRouter);
-app.use("/api/badges", badgeRouter);
-app.use("/api/badges", badgeRouter);
 
 // If no route matches
 app.use((req, res) => {

@@ -71,6 +71,7 @@ export default function AppRoutes() {
           />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/achievements" element={<Achievements />} />
+          <Route path="/badge" element={<Navigate to="/achievements" replace />} />
           <Route path="/myorders" element={<Myorders />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/notification" element={<Notification />} />

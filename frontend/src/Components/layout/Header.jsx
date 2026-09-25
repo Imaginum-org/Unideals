@@ -17,6 +17,7 @@ import { LuBadgeCheck } from "react-icons/lu";
 import { LuCircleHelp } from "react-icons/lu";
 import { LuShield } from "react-icons/lu";
 import { LuBell } from "react-icons/lu";
+import { LuTrophy } from "react-icons/lu";
 import { BsBoxSeam } from "react-icons/bs";
 import { BsLightningChargeFill } from "react-icons/bs";
 import { IoIosHeartEmpty } from "react-icons/io";
@@ -48,6 +49,7 @@ const ProfileDropdown = ({
       { to: "/productlisted", icon: <LuPackage />, label: "My Listings" },
       { to: "/myorders", icon: <BsBoxSeam />, label: "Orders" },
       { to: "/wishlist", icon: <IoIosHeartEmpty />, label: "Wishlist" },
+      { to: "/achievements", icon: <LuTrophy />, label: "Achievements" },
       { to: "/chat", icon: <FiMessageSquare />, label: "Messages" },
       { to: "/notification", icon: <LuBell />, label: "Notifications" },
     ],
@@ -148,6 +150,58 @@ const ProfileDropdown = ({
           </div>
         </div>
       </div>
+
+      {/* ── Gamification XP Strip ── */}
+      {(() => {
+        const g = userDetails?.gamification;
+        if (!g) return null;
+        const rankIcons = { Seedling: "🌱", Explorer: "🔵", Dealer: "⚡", Hustler: "🔥", Legend: "💎", "Campus King": "👑", "Campus Queen": "👑", "Campus Royale": "👑" };
+        const rankColors = { Seedling: "#22C55E", Explorer: "#06B6D4", Dealer: "#6366F1", Hustler: "#F97316", Legend: "#F59E0B", "Campus King": "#7C3AED", "Campus Queen": "#EC4899", "Campus Royale": "#8B5CF6" };
+        const rank = g.rank_title || "Seedling";
+        const level = g.level || 1;
+        const totalXp = g.total_xp || 0;
+        const progress = Math.min(g.progress_percent || 0, 100);
+        const xpToNext = g.xp_to_next_level || 0;
+        const badgeCount = (g.badges || []).length;
+        const rankColor = rankColors[rank] || "#6366F1";
+        const rankIcon = rankIcons[rank] || "⚡";
+        return (
+          <Link
+            to="/achievements"
+            onClick={onClose}
+            className="mx-[13px] mb-[7px] block rounded-xl border border-neutral-200 dark:border-neutral-700 bg-gradient-to-r from-neutral-50 to-white dark:from-neutral-800/60 dark:to-neutral-800 px-3 py-2.5 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-200 group"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-base leading-none">{rankIcon}</span>
+                <span className="text-[12px] font-extrabold" style={{ color: rankColor }}>{rank}</span>
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-neutral-100 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-300">
+                  Lv. {level}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-neutral-400">{totalXp.toLocaleString("en-IN")} XP</span>
+                {badgeCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300">
+                    {badgeCount} 🏅
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${rankColor}99, ${rankColor})` }}
+              />
+            </div>
+            {xpToNext > 0 && (
+              <p className="text-[9px] text-neutral-400 mt-1 text-right font-medium">
+                {xpToNext.toLocaleString("en-IN")} XP to next level →
+              </p>
+            )}
+          </Link>
+        );
+      })()}
 
       {menuGroups.map((group, groupIndex) => (
         <div
