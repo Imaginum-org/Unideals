@@ -16,6 +16,64 @@ import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 
+// ─── NavItem defined OUTSIDE the parent so hooks are stable across renders ───
+// Having it inside caused React to reset state (including isCollapsed) on every
+// navigation because the component reference changed each render.
+const NavItem = ({ path, label, icon: Icon, badge, isCollapsed, pathname }) => {
+  const iconRef = useRef(null);
+  const isActive =
+    pathname === path ||
+    (path === "/profile" && pathname === "/profileoverview");
+
+  return (
+    <Link to={path} className="block w-full">
+      <div
+        onMouseEnter={() => iconRef.current?.startAnimation?.()}
+        onMouseLeave={() => iconRef.current?.stopAnimation?.()}
+        title={isCollapsed ? label : undefined}
+        className={`relative flex items-center rounded-xl py-2.5 transition-all duration-300 cursor-pointer ${
+          isCollapsed ? "justify-center px-2" : "px-4"
+        } ${
+          isActive
+            ? isCollapsed
+              ? "bg-[#EEEAFE] text-[#3838EC]"
+              : "bg-[#3838EC] text-white shadow-md shadow-blue-500/20"
+            : "text-[#64707D] dark:text-[#AAB9C5] hover:bg-gray-100 dark:hover:bg-[#1c1c1c] hover:text-gray-900 dark:hover:text-white"
+        }`}
+      >
+        <Icon
+          ref={iconRef}
+          size={17}
+          className={isActive && !isCollapsed ? "text-white" : ""}
+          strokeWidth={isActive ? 2.5 : 1.5}
+        />
+
+        {!isCollapsed && (
+          <span
+            className={`ml-2.5 text-[14px] ${isActive ? "font-semibold" : "font-medium"}`}
+          >
+            {label}
+          </span>
+        )}
+
+        {badge !== undefined && badge > 0 && (
+          <span
+            className={`absolute flex items-center justify-center rounded-full text-[10px] font-bold ${
+              isCollapsed
+                ? "h-[1.05rem] w-[1.05rem] right-[0.2rem] top-[0.2rem]"
+                : "h-5 w-5 right-4"
+            } ${
+              isActive ? "bg-white text-[#364EF2]" : "bg-red-500 text-white"
+            }`}
+          >
+            {badge}
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+};
+
 function Profile_left_part() {
   const { userDetails, loading } = useUser();
   const navigate = useNavigate();
@@ -35,6 +93,7 @@ function Profile_left_part() {
       </div>
     );
   }
+
   // MENU CONFIGURATIONS
   const mainMenu = [
     { path: "/profile", label: "Overview", icon: DashboardIcon },
@@ -53,67 +112,11 @@ function Profile_left_part() {
     { path: "/termscondition", label: "Terms and Privacy", icon: FolderIcon },
   ];
 
-  const NavItem = ({ path, label, icon: Icon, badge }) => {
-    // Create a reference for the icon
-    const iconRef = useRef(null);
-    const isActive =
-      pathname === path ||
-      (path === "/profile" && pathname === "/profileoverview");
-
-    return (
-      <Link to={path} className="block w-full">
-        <div
-          // Trigger the animation manually on container hover
-          onMouseEnter={() => iconRef.current?.startAnimation?.()}
-          onMouseLeave={() => iconRef.current?.stopAnimation?.()}
-          title={isCollapsed ? label : undefined}
-          className={`relative flex items-center rounded-xl py-2.5 transition-all duration-300 cursor-pointer ${
-            isCollapsed ? "justify-center px-2" : "px-4"
-          } ${
-            isActive
-              ? isCollapsed
-                ? "bg-[#EEEAFE] text-[#3838EC]"
-                : "bg-[#3838EC] text-white shadow-md shadow-blue-500/20"
-              : "text-[#64707D] dark:text-[#AAB9C5] hover:bg-gray-100 dark:hover:bg-[#1c1c1c] hover:text-gray-900 dark:hover:text-white"
-          }`}
-        >
-          {/* Attach the ref to the animate-icon */}
-          <Icon
-            ref={iconRef}
-            size={17}
-            className={isActive && !isCollapsed ? "text-white" : ""}
-            strokeWidth={isActive ? 2.5 : 1.5}
-          />
-
-          {!isCollapsed && (
-            <span
-              className={`ml-2.5 text-[14px] ${isActive ? "font-semibold" : "font-medium"}`}
-            >
-              {label}
-            </span>
-          )}
-
-          {badge !== undefined && badge > 0 && (
-            <span
-              className={`absolute flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
-                isCollapsed ? "right-1 top-1" : "right-4"
-              } ${
-                isActive ? "bg-white text-[#364EF2]" : "bg-red-500 text-white"
-              }`}
-            >
-              {badge}
-            </span>
-          )}
-        </div>
-      </Link>
-    );
-  };
-
   return (
     <div
       className={`h-full flex flex-col font-figtree relative border-r border-gray-100 bg-white transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-gray-800/50 dark:bg-[#131313] ${
         isCollapsed
-          ? "w-[5.75rem]"
+          ? "w-[4.9rem]"
           : "w-[12.6rem] lg:w-[14.7rem] xl:w-[17.15rem] xl:max-w-[17.15rem]"
       }`}
     >
@@ -179,7 +182,12 @@ function Profile_left_part() {
           }`}
         >
           {mainMenu.map((item) => (
-            <NavItem key={item.path} {...item} />
+            <NavItem
+              key={item.path}
+              {...item}
+              isCollapsed={isCollapsed}
+              pathname={pathname}
+            />
           ))}
         </nav>
 
@@ -197,7 +205,12 @@ function Profile_left_part() {
         </div>
         <nav className="flex flex-col gap-1.5 pb-4">
           {accountMenu.map((item) => (
-            <NavItem key={item.path} {...item} />
+            <NavItem
+              key={item.path}
+              {...item}
+              isCollapsed={isCollapsed}
+              pathname={pathname}
+            />
           ))}
         </nav>
       </div>
