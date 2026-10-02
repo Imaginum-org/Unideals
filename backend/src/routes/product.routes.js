@@ -10,6 +10,7 @@ import {
   getSingleProduct,
   getBoostedProducts,
   getSearchSuggestions,
+  getTrendingProducts,
   searchProducts,
   getMyProducts,
   getMyDraftProducts,
@@ -27,10 +28,20 @@ const createProductLimiter = rateLimit({
   message: "Too many product listings, please try later",
 });
 
+// Public aggregation endpoints: generous but bounded (per-keystroke traffic).
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many searches, please slow down" },
+});
+
 // Boosted products (must be before :id)
 router.get("/boosted", getBoostedProducts);
-router.get("/search", searchProducts);
-router.get("/search-suggestions", getSearchSuggestions);
+router.get("/search", searchLimiter, searchProducts);
+router.get("/search-suggestions", searchLimiter, getSearchSuggestions);
+router.get("/trending", searchLimiter, getTrendingProducts);
 
 // User's products (must be before :id)
 router.get("/user/my-products", auth, getMyProducts);

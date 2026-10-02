@@ -28,7 +28,7 @@ import { useUser } from "../../context/useUserContext.jsx";
 import { logoutUser } from "../../features/auth/api/authApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import useDebounce from "../../features/search/hooks/useDebounce";
-import { searchProducts } from "../../features/search/api/searchApi";
+import { searchProducts, getTrendingProducts } from "../../features/search/api/searchApi";
 import SearchDropdown from "../../features/search/components/SearchDropdown";
 import { toast } from "react-hot-toast";
 
@@ -251,6 +251,10 @@ const Header = () => {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
+  const [resultsTotal, setResultsTotal] = useState(null);
+  const [matchedCategories, setMatchedCategories] = useState([]);
+  const [trending, setTrending] = useState([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showmenu, setShowmenu] = useState(false);
@@ -373,28 +377,65 @@ const Header = () => {
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
       setResults([]);
+      setResultsTotal(null);
+      setMatchedCategories([]);
       setHasSearched(false);
       return;
     }
+
+    // AbortController + request id: a slow earlier response must never
+    // overwrite fresher results (classic keystroke race).
+    const controller = new AbortController();
+    let stale = false;
 
     const fetch = async () => {
       try {
         setSearchLoading(true);
 
-        const res = await searchProducts(debouncedQuery);
+        // Full /search engine (limit 6) so the dropdown shares ranking,
+        // prices, categories, and totals with the results page.
+        const res = await searchProducts(
+          {
+            q: debouncedQuery.trim().slice(0, 100),
+            limit: 6,
+          },
+          { signal: controller.signal },
+        );
 
+        if (stale) return;
         setResults(res.data?.products || []);
+        setResultsTotal(res.data?.pagination?.total ?? null);
+        setMatchedCategories(res.data?.matchedCategories || []);
         setSelectedIndex(-1);
         setHasSearched(true);
       } catch (err) {
-        console.error(err);
+        if (stale || err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
+          return;
+        }
+        setResults([]);
+        setResultsTotal(null);
+        setMatchedCategories([]);
       } finally {
-        setSearchLoading(false);
+        if (!stale) setSearchLoading(false);
       }
     };
 
     fetch();
+    return () => {
+      stale = true;
+      controller.abort();
+    };
   }, [debouncedQuery]);
+
+  // Trending for the empty-query dropdown state (fetched once, lazily).
+  const ensureTrending = () => {
+    if (trending.length > 0 || trendingLoading) return;
+    setTrendingLoading(true);
+    getTrendingProducts()
+      .then((res) => setTrending(res.data?.data || []))
+      .catch(() => {})
+      .finally(() => setTrendingLoading(false));
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -576,7 +617,20 @@ const Header = () => {
 
     setRecentSearches(updatedSearches);
 
-    localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
+    try {
+      localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
+    } catch {
+      // Quota/private-mode: in-memory list still works for the session.
+    }
+  };
+
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem("recentSearches");
+    } catch {
+      // ignore
+    }
   };
 
   const handleLogoutClick = async () => {
@@ -824,6 +878,9 @@ const Header = () => {
                   <div className="relative flex-1">
                     <input
                       type="text"
+                      role="combobox"
+                      aria-expanded={showDropdown && query.trim().length > 0}
+                      aria-label="Search products"
                       value={search}
                       onChange={(e) => {
                         handleSearchBar(e);
@@ -834,8 +891,16 @@ const Header = () => {
                           setShowDropdown(false);
                         }
                       }}
-                      onFocus={() => setShowDropdown(true)}
+                      onFocus={() => {
+                        ensureTrending();
+                        setShowDropdown(true);
+                      }}
                       onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          setShowDropdown(false);
+                          setSelectedIndex(-1);
+                          return;
+                        }
                         if (e.key === "Enter") {
                           const trimmedQuery = query.trim();
 
@@ -889,9 +954,17 @@ const Header = () => {
                   {showDropdown && query.trim() ? (
                     <SearchDropdown
                       results={results}
+                      total={resultsTotal}
+                      matchedCategories={matchedCategories}
+                      trending={trending}
+                      recentSearches={recentSearches}
+                      onClearRecents={clearRecentSearches}
                       loading={searchLoading}
                       query={query}
+                      mobile
                       hasSearched={hasSearched}
+                      selectedIndex={selectedIndex}
+                      setSelectedIndex={setSelectedIndex}
                       onSelect={() => {
                         setShowDropdown(false);
                       }}
@@ -940,9 +1013,19 @@ const Header = () => {
 
                       {/* Recent Searches */}
                       <div className="mt-8">
-                        <h2 className="mb-3 text-sm font-semibold text-[#090A0B] dark:text-white">
-                          Recent Searches
-                        </h2>
+                        <div className="mb-3 flex items-center justify-between">
+                          <h2 className="text-sm font-semibold text-[#090A0B] dark:text-white">
+                            Recent Searches
+                          </h2>
+                          {recentSearches.length > 0 && (
+                            <button
+                              onClick={clearRecentSearches}
+                              className="text-xs font-semibold text-blue-500 hover:underline"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
 
                         <div className="flex flex-col">
                           {recentSearches.map((item) => (
@@ -979,6 +1062,58 @@ const Header = () => {
                           ))}
                         </div>
                       </div>
+
+                      {/* Trending on campus */}
+                      {trending.length > 0 && (
+                        <div className="mt-8">
+                          <h2 className="mb-3 text-sm font-semibold text-[#090A0B] dark:text-white">
+                            Trending on campus
+                          </h2>
+                          <div className="flex flex-col">
+                            {trending.slice(0, 4).map((item) => (
+                              <button
+                                key={item._id}
+                                onClick={() => {
+                                  navigate(`/product/${item._id}`);
+                                  setShowMobileSearch(false);
+                                  setShowDropdown(false);
+                                }}
+                                className="
+                flex
+                items-center
+                gap-3
+                rounded-xl
+                px-3
+                py-2.5
+                text-left
+                text-sm
+                text-neutral-700
+                transition-colors
+                duration-200
+                active:bg-neutral-100
+                dark:text-neutral-300
+                dark:active:bg-neutral-800
+              "
+                              >
+                                <img
+                                  src={item.images?.[0]?.url || "/placeholder.png"}
+                                  alt=""
+                                  loading="lazy"
+                                  className="h-10 w-10 rounded-lg object-cover"
+                                />
+                                <span className="min-w-0 flex-1 truncate font-medium">
+                                  {item.title}
+                                </span>
+                                {item.selling_price != null && (
+                                  <span className="shrink-0 text-xs font-bold text-[#394FF1]">
+                                    ₹{Number(item.selling_price).toLocaleString("en-IN")}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1119,10 +1254,20 @@ const Header = () => {
               <input
                 ref={searchInputRef}
                 type="text"
+                role="combobox"
+                aria-expanded={showDropdown && query.trim().length > 0}
+                aria-controls="search-suggestions"
+                aria-label="Search products"
                 value={search}
                 onChange={handleSearchBar}
                 onKeyDown={(e) => {
                   const visibleResults = results.slice(0, 5);
+
+                  if (e.key === "Escape") {
+                    setShowDropdown(false);
+                    setSelectedIndex(-1);
+                    return;
+                  }
 
                   if (e.key === "ArrowDown") {
                     setShowDropdown(true);
@@ -1182,9 +1327,8 @@ const Header = () => {
                   setTimeout(() => setShowDropdown(false), 150);
                 }}
                 onFocus={() => {
-                  if (query.trim()) {
-                    setShowDropdown(true);
-                  }
+                  ensureTrending();
+                  setShowDropdown(true);
                 }}
                 className="h-10 w-full rounded-xl border border-[#eaecec]
 bg-gradient-to-b from-[#FFFFFF] to-[#f4f4f5]
@@ -1240,10 +1384,15 @@ dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-9
                 className="absolute right-3 xl:right-7 top-1/2 -translate-y-1/2 text-[#090A0B] dark:text-neutral-400"
               />
 
-              {showDropdown && query.trim() && (
+              {showDropdown && (
                 <SearchDropdown
                   results={results}
-                  loading={searchLoading}
+                  total={resultsTotal}
+                  matchedCategories={matchedCategories}
+                  trending={trending}
+                  recentSearches={recentSearches}
+                  onClearRecents={clearRecentSearches}
+                  loading={searchLoading || trendingLoading}
                   query={query}
                   hasSearched={hasSearched}
                   selectedIndex={selectedIndex}

@@ -135,20 +135,52 @@ export const getSearchSuggestions = async (req, res, next) => {
 
 export const searchProducts = async (req, res, next) => {
   try {
-    const { q } = req.query;
+    const {
+      q,
+      page,
+      limit,
+      sort,
+      category,
+      condition,
+      min_price,
+      max_price,
+    } = req.query;
 
-    if (!q || q.trim().length === 0) {
+    if (!q || String(q).trim().length === 0) {
       return res.status(200).json({
         success: true,
         products: [],
+        pagination: { total: 0, page: 1, limit: 20, totalPages: 1 },
       });
     }
 
-    const products = await productService.searchProducts(q);
+    const result = await productService.searchProducts({
+      q,
+      page,
+      limit,
+      sort,
+      category,
+      condition,
+      min_price,
+      max_price,
+    });
 
     return res.status(200).json({
       success: true,
-      products,
+      ...result, // { products, pagination } — `products` key retained
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTrendingProducts = async (req, res, next) => {
+  try {
+    const products = await productService.getTrendingProducts();
+    return res.status(200).json({
+      success: true,
+      message: "Trending products fetched successfully",
+      data: products,
     });
   } catch (error) {
     next(error);

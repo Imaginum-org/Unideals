@@ -1,5 +1,9 @@
 import Product from "../models/Product.model.js";
-import { PRODUCT_STATUS } from "../config/constants.js";
+import {
+  PRODUCT_STATUS,
+  PRODUCT_CATEGORIES,
+  PRODUCT_CATEGORY_LABELS,
+} from "../config/constants.js";
 import { getListingLimit } from "../config/subscriptionPlans.js";
 import { deleteImage } from "../utils/imagekit.js";
 
@@ -445,27 +449,247 @@ export const getSearchSuggestions = async (query) => {
     .lean();
 };
 
-export const searchProducts = async (query) => {
-  if (typeof query !== "string" || query.trim().length === 0) return [];
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Typo tolerance: single adjacent transpositions per token ("laptpo" ->
+// "laptop"). Bounded: tokens capped, only tokens with 4+ chars qualify.
+const transpositionVariants = (token) => {
+  const variants = new Set();
+  if (token.length >= 4 && token.length <= 20) {
+    for (let i = 0; i < token.length - 1; i++) {
+      const chars = token.split("");
+      [chars[i], chars[i + 1]] = [chars[i + 1], chars[i]];
+      const swapped = chars.join("");
+      if (swapped !== token) variants.add(escapeRegex(swapped));
+    }
+  }
+  return [...variants].slice(0, 8);
+};
+
+// Campus-marketplace synonym groups (bidirectional). Query terms expand to
+// group members so "mobile" finds "phone" listings and vice versa.
+const SYNONYM_GROUPS = [
+  ["laptop", "notebook", "macbook", "thinkpad"],
+  ["mobile", "phone", "smartphone", "iphone"],
+  ["cycle", "bicycle", "bike"],
+  ["book", "textbook", "novel", "notes"],
+  ["bottle", "flask", "sipper"],
+  ["bag", "backpack", "rucksack"],
+  ["headphones", "headphone", "earphones", "earbuds", "headset"],
+  ["shoes", "shoe", "sneakers", "footwear"],
+  ["watch", "smartwatch"],
+  ["calculator", "calc"],
+  ["charger", "adapter"],
+  ["mouse", "keyboard", "monitor", "speaker"],
+  ["jersey", "tshirt", "t-shirt"],
+  ["bat", "ball", "racket", "dumbbell"],
+  ["mattress", "matress", "bedding"],
+  ["lamp", "lantern"],
+  ["kettle", "iron", "heater"],
+  ["guitar", "instrument"],
+  ["coat", "apron"],
+  ["table", "chair", "stool"],
+];
+
+const synonymVariants = (tokens) => {
+  const out = new Set();
+  const lowered = tokens.map((t) => t.toLowerCase());
+  for (const group of SYNONYM_GROUPS) {
+    if (lowered.some((t) => group.includes(t))) {
+      for (const member of group) {
+        if (!lowered.includes(member)) out.add(escapeRegex(member));
+      }
+    }
+    if (out.size >= 20) break;
+  }
+  return [...out].slice(0, 20);
+};
+
+// Naive stemming assist: plural-stripped variant ("books" -> "book").
+// Singular queries already substring-match plurals, so one direction suffices.
+const stemVariants = (tokens) => {
+  const out = new Set();
+  for (const raw of tokens) {
+    const t = raw.toLowerCase();
+    if (t.length > 4 && t.endsWith("s") && !t.endsWith("ss")) {
+      out.add(escapeRegex(t.slice(0, -1)));
+    }
+  }
+  return [...out].slice(0, 5);
+};
+
+// Category intelligence: detect category values/labels mentioned in the
+// query ("study material" <-> "study_material") so category intent ranks
+// and is exposed to clients for shortcut chips.
+const detectCategories = (sanitizedQuery) => {
+  const normalized = sanitizedQuery.toLowerCase();
+  const squashed = normalized.replace(/[\s_]+/g, "");
+  const found = [];
+  for (const value of Object.values(PRODUCT_CATEGORIES)) {
+    const label = (PRODUCT_CATEGORY_LABELS[value] || "").toLowerCase();
+    const valueSquashed = value.replace(/_/g, "");
+    const labelSquashed = label.replace(/[\s_]+/g, "");
+    if (
+      (value.length >= 4 && normalized.includes(value.replace(/_/g, " "))) ||
+      (label.length >= 4 && normalized.includes(label)) ||
+      (valueSquashed.length >= 6 && squashed.includes(valueSquashed)) ||
+      (labelSquashed.length >= 6 && squashed.includes(labelSquashed))
+    ) {
+      found.push({ value, label: PRODUCT_CATEGORY_LABELS[value] || value });
+    }
+  }
+  return found.slice(0, 3);
+};
+
+export const searchProducts = async (queryOrOptions = {}) => {
+  const options =
+    typeof queryOrOptions === "string" ? { q: queryOrOptions } : queryOrOptions || {};
+  const {
+    q: query,
+    sort = "relevant",
+    category,
+    condition,
+    min_price,
+    max_price,
+  } = options;
+  let { page = 1, limit = 20 } = options;
+
+  page = Number.parseInt(page, 10);
+  limit = Number.parseInt(limit, 10);
+  if (!Number.isInteger(page) || page < 1) page = 1;
+  if (!Number.isInteger(limit) || limit < 1) limit = 20;
+  limit = Math.min(limit, 50);
+  page = Math.min(page, 1000);
+  const skip = (page - 1) * limit;
+
+  if (typeof query !== "string" || query.trim().length === 0) {
+    return {
+      products: [],
+      pagination: { total: 0, page, limit, totalPages: 1 },
+    };
+  }
 
   const sanitizedQuery = query.trim().slice(0, 100).toLowerCase();
-
-  const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   const safeQuery = escapeRegex(sanitizedQuery);
 
   const compactQuery = escapeRegex(sanitizedQuery.replace(/\s+/g, ""));
-  const tokens = sanitizedQuery.split(/\s+/).map(escapeRegex);
+  const rawTokens = sanitizedQuery.split(/\s+/).slice(0, 5);
+  const tokens = rawTokens.map(escapeRegex);
+  const typoVariants = [
+    ...new Set(tokens.flatMap(transpositionVariants)),
+  ].slice(0, 12);
+  // Similar-meaning + stemming expansion for the fallback matcher.
+  const synonymClauses = synonymVariants(rawTokens);
+  const stemClauses = stemVariants(rawTokens);
+  const matchedCategories = detectCategories(sanitizedQuery);
 
   const now = new Date();
 
-  const pipeline = [
+  // Base visibility filter + whitelisted facet filters.
+  const baseMatch = {
+    is_deleted: false,
+    status: PRODUCT_STATUS.LISTED,
+  };
+  if (typeof category === "string" && category) {
+    baseMatch.category = category;
+  }
+  if (typeof condition === "string" && condition) {
+    baseMatch.condition = condition;
+  }
+  const priceRange = {};
+  if (min_price !== undefined && min_price !== "") {
+    const minNum = Number(min_price);
+    if (Number.isFinite(minNum)) priceRange.$gte = minNum;
+  }
+  if (max_price !== undefined && max_price !== "") {
+    const maxNum = Number(max_price);
+    if (Number.isFinite(maxNum)) priceRange.$lte = maxNum;
+  }
+  if (Object.keys(priceRange).length > 0) {
+    baseMatch.selling_price = priceRange;
+  }
+
+  // Speed: indexed $text first pass scopes candidates (stemming included).
+  // Falls back to the full set when $text finds nothing (typos live there).
+  let matchScope = baseMatch;
+  if (sanitizedQuery.length >= 2) {
+    try {
+      const textSearch = sanitizedQuery.replace(/[-"\\]/g, " ").slice(0, 100);
+      const textIds = await Product.find(
+        { ...baseMatch, $text: { $search: textSearch } },
+        { _id: 1 },
+      )
+        .limit(500)
+        .lean();
+      if (textIds.length > 0) {
+        matchScope = { ...baseMatch, _id: { $in: textIds.map((d) => d._id) } };
+      }
+    } catch {
+      // Malformed $text input or missing index: full regex scan below.
+    }
+  }
+
+  const relevanceAdds = [
     {
-      $match: {
-        is_deleted: false,
-        status: PRODUCT_STATUS.LISTED,
-      },
+      $cond: [
+        {
+          $regexMatch: {
+            input: "$title",
+            regex: safeQuery,
+            options: "i",
+          },
+        },
+        10,
+        0,
+      ],
     },
+  ];
+  // $or requires at least one clause — only score typos when variants exist.
+  if (typoVariants.length > 0) {
+    relevanceAdds.push({
+      $cond: [
+        {
+          $or: typoVariants.map((variant) => ({
+            $regexMatch: { input: "$title", regex: variant, options: "i" },
+          })),
+        },
+        4,
+        0,
+      ],
+    });
+  }
+  // Similar-meaning (+2) and explicit category intent (+6) scoring.
+  if (synonymClauses.length > 0) {
+    relevanceAdds.push({
+      $cond: [
+        {
+          $or: synonymClauses.map((syn) => ({
+            $regexMatch: { input: "$title", regex: syn, options: "i" },
+          })),
+        },
+        2,
+        0,
+      ],
+    });
+  }
+  if (matchedCategories.length > 0) {
+    relevanceAdds.push({
+      $cond: [
+        {
+          $in: [
+            "$category",
+            matchedCategories.map((c) => c.value),
+          ],
+        },
+        6,
+        0,
+      ],
+    });
+  }
+
+  const pipeline = [
+    { $match: matchScope },
 
     {
       $match: {
@@ -478,29 +702,25 @@ export const searchProducts = async (query) => {
           ...tokens.map((token) => ({
             title: { $regex: token, $options: "i" },
           })),
+
+          ...typoVariants.map((variant) => ({
+            title: { $regex: variant, $options: "i" },
+          })),
+
+          ...synonymClauses.map((syn) => ({
+            title: { $regex: syn, $options: "i" },
+          })),
+
+          ...stemClauses.map((stem) => ({
+            title: { $regex: stem, $options: "i" },
+          })),
         ],
       },
     },
 
     {
       $addFields: {
-        relevanceScore: {
-          $add: [
-            {
-              $cond: [
-                {
-                  $regexMatch: {
-                    input: "$title",
-                    regex: safeQuery,
-                    options: "i",
-                  },
-                },
-                10,
-                0,
-              ],
-            },
-          ],
-        },
+        relevanceScore: { $add: relevanceAdds },
       },
     },
 
@@ -527,28 +747,75 @@ export const searchProducts = async (query) => {
         },
       },
     },
+  ];
 
-    {
-      $sort: {
-        finalScore: -1,
-        createdAt: -1,
-      },
-    },
+  const allowedSorts = ["relevant", "latest", "price_low", "price_high"];
+  const safeSort = allowedSorts.includes(sort) ? sort : "relevant";
+  const sortStage = {
+    relevant: { finalScore: -1, createdAt: -1 },
+    latest: { createdAt: -1 },
+    price_low: { selling_price: 1, createdAt: -1 },
+    price_high: { selling_price: -1, createdAt: -1 },
+  }[safeSort];
 
-    { $limit: 20 },
+  pipeline.push({ $sort: sortStage });
+  pipeline.push({ $skip: skip }, { $limit: limit });
 
+  pipeline.push(
     {
       $project: {
         title: 1,
         images: 1,
         selling_price: 1,
+        original_price: 1,
         category: 1,
+        condition: 1,
         createdAt: 1,
+        is_boosted: 1,
+        boost_tier: 1,
       },
     },
-  ];
+  );
 
-  return await Product.aggregate(pipeline);
+  // Total from match stages only (same pattern as the feed).
+  const totalPipeline = pipeline.filter((stage) => stage.$match);
+  const [products, totalResult] = await Promise.all([
+    Product.aggregate(pipeline),
+    Product.aggregate([...totalPipeline, { $count: "total" }]),
+  ]);
+  const total = totalResult[0]?.total || 0;
+
+  return {
+    products,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+    matchedCategories,
+  };
+};
+
+// Trending searches fallback: most-viewed live listings, cached 10 minutes.
+let trendingCache = { data: [], at: 0 };
+const TRENDING_TTL_MS = 10 * 60 * 1000;
+
+export const getTrendingProducts = async (limit = 8) => {
+  const now = Date.now();
+  if (trendingCache.data.length > 0 && now - trendingCache.at < TRENDING_TTL_MS) {
+    return trendingCache.data.slice(0, limit);
+  }
+  const products = await Product.find({
+    is_deleted: false,
+    status: PRODUCT_STATUS.LISTED,
+  })
+    .select("title images selling_price category views_count")
+    .sort({ views_count: -1, createdAt: -1 })
+    .limit(8)
+    .lean();
+  trendingCache = { data: products, at: now };
+  return products.slice(0, limit);
 };
 
 // GET USER PRODUCTS

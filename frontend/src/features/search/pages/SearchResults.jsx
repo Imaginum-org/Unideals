@@ -1,85 +1,185 @@
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
 import ReactSlider from "react-slider";
 
 import ProductCard from "../../product/components/ProductCard";
 import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
-import { searchProducts } from "../api/searchApi";
+import { searchProducts, getTrendingProducts } from "../api/searchApi";
+import { CATEGORY_ITEMS } from "../../product/constants/categories.js";
 
 import { FaFilter, FaTimes } from "react-icons/fa";
 
-const SearchResults = () => {
-  const [params] = useSearchParams();
-  const navigate = useNavigate();
+const PRICE_MIN = 0;
+const PRICE_MAX = 100000;
 
-  const query = params.get("q");
+// Backend condition enum values (must match server whitelist).
+const CONDITIONS = [
+  { value: "", label: "All" },
+  { value: "brand_new", label: "Brand New" },
+  { value: "like_new", label: "Like New" },
+  { value: "gently_used", label: "Gently Used" },
+  { value: "well_used", label: "Well Used" },
+  { value: "for_parts_or_not_working", label: "For Parts" },
+];
+
+const SORTS = [
+  { value: "relevant", label: "Most Relevant" },
+  { value: "latest", label: "Latest" },
+  { value: "price_low", label: "Price: Low to High" },
+  { value: "price_high", label: "Price: High to Low" },
+];
+
+const SearchResults = () => {
+  const [params, setParams] = useSearchParams();
+
+  const query = params.get("q") || "";
+  const page = Math.max(1, Number.parseInt(params.get("page") || "1", 10) || 1);
+  const minPrice = params.get("min") || "";
+  const maxPrice = params.get("max") || "";
+  const condition = params.get("condition") || "";
+  const category = params.get("category") || "";
+  const sort = params.get("sort") || "relevant";
 
   const [open, setOpen] = useState(false);
 
   const [products, setProducts] = useState([]);
+  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [trending, setTrending] = useState([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
 
-  const [priceRange, setPriceRange] = useState([200, 500]);
-  const [selectedCondition, setSelectedCondition] = useState("Excellent");
-  const [sortBy, setSortBy] = useState("Latest");
+  // Local slider state mirrors URL only after commit (drag floods router).
+  const [sliderValue, setSliderValue] = useState([
+    minPrice !== "" ? Number(minPrice) : PRICE_MIN,
+    maxPrice !== "" ? Number(maxPrice) : PRICE_MAX,
+  ]);
 
-  // FETCH SEARCH RESULTS
   useEffect(() => {
-    const fetchSearchResults = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const safeQuery = String(query || "").slice(0, 100);
-        const res = await searchProducts(safeQuery);
+    setSliderValue([
+      minPrice !== "" ? Number(minPrice) : PRICE_MIN,
+      maxPrice !== "" ? Number(maxPrice) : PRICE_MAX,
+    ]);
+  }, [minPrice, maxPrice]);
 
-        setProducts(res.data?.products || res.data?.data || []);
+  const updateParams = useCallback(
+    (updates, resetPage = true) => {
+      const next = new URLSearchParams(params);
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === "" || value === null || value === undefined) {
+          next.delete(key);
+        } else {
+          next.set(key, String(value));
+        }
+      }
+      if (resetPage) next.delete("page");
+      setParams(next, { replace: false });
+    },
+    [params, setParams],
+  );
+
+  // FETCH SEARCH RESULTS — refires on any URL param change so filters,
+  // sort, and pagination are shareable and survive back/forward.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSearchResults = async () => {
+      const isPaging = page > 1;
+      try {
+        if (isPaging) setLoadingMore(true);
+        else {
+          setLoading(true);
+          setProducts([]);
+        }
+        setError(null);
+        const res = await searchProducts({
+          q: query.slice(0, 100),
+          page,
+          limit: 20,
+          sort,
+          ...(category ? { category } : {}),
+          ...(condition ? { condition } : {}),
+          ...(minPrice !== "" ? { min_price: minPrice } : {}),
+          ...(maxPrice !== "" ? { max_price: maxPrice } : {}),
+        });
+
+        if (cancelled) return;
+        const items = res.data?.products || [];
+        const paging = res.data?.pagination || null;
+        setProducts((prev) => (isPaging ? [...prev, ...items] : items));
+        setPagination(paging);
       } catch {
-        setError("Failed to load search results");
+        if (!cancelled) setError("Failed to load search results");
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     };
 
     if (query) fetchSearchResults();
-    else setProducts([]);
-  }, [query]);
+    else {
+      setProducts([]);
+      setPagination(null);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [query, page, sort, category, condition, minPrice, maxPrice]);
 
-  // HANDLERS
+  // Trending fallback for empty query / zero results (server-cached).
+  useEffect(() => {
+    let cancelled = false;
+    const needsTrending = !query || (!loading && products.length === 0 && !error);
+    if (!needsTrending || trending.length > 0) return;
+    setTrendingLoading(true);
+    getTrendingProducts()
+      .then((res) => {
+        if (!cancelled) setTrending(res.data?.data || []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setTrendingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [query, loading, products.length, error, trending.length]);
+
   const handleClear = () => {
-    setPriceRange([200, 500]);
-    setSelectedCondition("Excellent");
-    setSortBy("Latest");
+    setParams({ q: query }, { replace: false });
     setOpen(false);
   };
 
-  // const handleCategoryChange = (e) => {
-  //   const value = e.target.value;
-  //   if (value) {
-  //     const slug = value.toLowerCase().replace(/\s+/g, "-");
-  //     navigate(`/category/${slug}`);
-  //   }
-  // };
+  const commitPriceRange = (value) => {
+    const [lo, hi] = value;
+    updateParams({
+      min: lo <= PRICE_MIN ? "" : lo,
+      max: hi >= PRICE_MAX ? "" : hi,
+    });
+  };
 
-  // SIDEBAR (SAME AS CATEGORY PAGE)
+  const hasMore =
+    pagination != null && pagination.totalPages > pagination.page;
+
+  const FilterChip = ({ label, onClear }) => (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#394FF1]/10 py-1.5 pl-3 pr-2 text-xs font-bold text-[#394FF1]">
+      {label}
+      <button
+        onClick={onClear}
+        aria-label={`Remove filter ${label}`}
+        className="flex h-4 w-4 items-center justify-center rounded-full text-xs leading-none hover:bg-[#394FF1]/20"
+      >
+        <FaTimes size={10} />
+      </button>
+    </span>
+  );
+
+  // SIDEBAR
   const SidebarContent = () => (
     <div className="flex flex-col gap-5 font-robotoFlex">
-      {/* <div>
-        <h4 className="font-bold mb-3 dark:text-white text-sm">Category</h4>
-        <select
-          onChange={handleCategoryChange}
-          className="w-full p-2 border rounded-lg bg-transparent dark:border-zinc-700 dark:text-zinc-300 outline-none appearance-none cursor-pointer"
-        >
-          <option value="">Select</option>
-          <option value="electronics">Electronics</option>
-          <option value="books">Books</option>
-          <option value="essentials">Essentials</option>
-          <option value="cycles">Cycles</option>
-          <option value="matress">Matress</option>
-          <option value="others">Others</option>
-        </select>
-      </div> */}
-
       <div>
         <h4 className="font-bold mb-6 dark:text-white text-sm">Price Range</h4>
         <div className="px-2">
@@ -87,46 +187,48 @@ const SearchResults = () => {
             className="w-full h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full flex items-center"
             thumbClassName="size-4 bg-[#394FF1] border-2 border-white rounded-full cursor-grab active:cursor-grabbing outline-none"
             trackClassName="h-1 rounded-full"
-            min={0}
-            max={1000}
-            value={priceRange}
-            onChange={(value) => setPriceRange(value)}
-            minDistance={50}
+            min={PRICE_MIN}
+            max={PRICE_MAX}
+            step={1000}
+            value={sliderValue}
+            onChange={(value) => setSliderValue(value)}
+            onAfterChange={commitPriceRange}
+            minDistance={1000}
           />
         </div>
 
         <div className="flex justify-between mt-4 text-[10px] text-zinc-400 font-bold uppercase">
           <div className="flex flex-col">
             <span>Min</span>
-            <span className="text-zinc-800 dark:text-zinc-200">₹0</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span>₹{priceRange[0]}</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span>₹{priceRange[1]}</span>
+            <span className="text-zinc-800 dark:text-zinc-200">
+              ₹{sliderValue[0].toLocaleString("en-IN")}
+            </span>
           </div>
           <div className="flex flex-col items-end">
             <span>Max</span>
-            <span className="text-zinc-800 dark:text-zinc-200">₹1000+</span>
+            <span className="text-zinc-800 dark:text-zinc-200">
+              {sliderValue[1] >= PRICE_MAX
+                ? "₹1L+"
+                : `₹${sliderValue[1].toLocaleString("en-IN")}`}
+            </span>
           </div>
         </div>
       </div>
 
       <div>
         <h4 className="font-bold mb-3 dark:text-white text-sm">Condition</h4>
-        <div className="flex gap-3">
-          {["Excellent", "Good"].map((c) => (
+        <div className="flex flex-wrap gap-2">
+          {CONDITIONS.map((c) => (
             <button
-              key={c}
-              onClick={() => setSelectedCondition(c)}
-              className={`px-5 py-2 border rounded-lg text-xs font-bold transition-all ${
-                selectedCondition === c
+              key={c.value || "all"}
+              onClick={() => updateParams({ condition: c.value })}
+              className={`px-4 py-2 border rounded-lg text-xs font-bold transition-all ${
+                condition === c.value
                   ? "border-[#394FF1] text-[#394FF1] bg-blue-50 dark:bg-blue-900/10"
                   : "border-zinc-200 dark:border-zinc-800 text-zinc-500"
               }`}
             >
-              {c}
+              {c.label}
             </button>
           ))}
         </div>
@@ -135,24 +237,24 @@ const SearchResults = () => {
       <div>
         <h4 className="font-bold mb-3 dark:text-white text-sm">Sort By</h4>
         <div className="flex flex-col gap-3">
-          {["Latest", "Price: Low to High", "Price: High to Low"].map((opt) => (
+          {SORTS.map((opt) => (
             <label
-              key={opt}
+              key={opt.value}
               className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer dark:border-zinc-800"
             >
               <input
                 type="radio"
                 name="sort"
-                checked={sortBy === opt}
-                onChange={() => setSortBy(opt)}
+                checked={sort === opt.value}
+                onChange={() => updateParams({ sort: opt.value })}
                 className="size-4 accent-[#394FF1]"
               />
               <span
                 className={`text-xs ${
-                  sortBy === opt ? "font-bold dark:text-white" : "text-zinc-500"
+                  sort === opt.value ? "font-bold dark:text-white" : "text-zinc-500"
                 }`}
               >
-                {opt}
+                {opt.label}
               </span>
             </label>
           ))}
@@ -161,7 +263,7 @@ const SearchResults = () => {
 
       <button
         onClick={handleClear}
-        className="mt-4 text-[#61758A] font-bold text-sm hover:underline"
+        className="mt-4 text-[#61758A] font-bold text-sm hover:underline self-start"
       >
         Clear Filters
       </button>
@@ -184,33 +286,161 @@ const SearchResults = () => {
           <div className="max-w-[1100px] mx-auto">
             <div className="mb-6">
               <h1 className="text-lg lg:text-xl xl:text-3xl font-bold text-[#121417] dark:text-white font-manrope">
-                Search Results
+                {query ? "Search Results" : "Explore"}
               </h1>
 
-              <p className="text-sm text-zinc-400 mt-1">
-                Showing results for{" "}
-                <span className="text-[#394FF1] font-semibold">"{query}"</span>
-              </p>
+              {query ? (
+                <p className="text-sm text-zinc-400 mt-1">
+                  {pagination != null && !loading ? (
+                    <>
+                      <span className="text-[#394FF1] font-semibold">
+                        {pagination.total.toLocaleString("en-IN")}
+                      </span>{" "}
+                      result{pagination.total === 1 ? "" : "s"} for{" "}
+                    </>
+                  ) : (
+                    <>Showing results for </>
+                  )}
+                  <span className="text-[#394FF1] font-semibold">"{query}"</span>
+                </p>
+              ) : (
+                <p className="text-sm text-zinc-400 mt-1">
+                  Type to search, or browse what others are viewing.
+                </p>
+              )}
 
               {loading && (
                 <div className="flex justify-center py-8">
                   <BrandLoader size="md" label="Searching…" />
                 </div>
               )}
-              {error && <p className="text-red-500">{error}</p>}
-              {!loading && products.length === 0 && (
+              {error && (
+                <div className="mt-4 flex flex-col items-start gap-3">
+                  <p className="text-red-500">{error}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="rounded-xl bg-[#394FF1] px-5 py-2.5 text-sm font-bold text-white"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!loading && !error && query && products.length === 0 && (
                 <p className="text-gray-500 mt-2">
                   No results found. Try different keywords.
                 </p>
               )}
             </div>
 
-            {/* PRODUCT GRID */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 lg:gap-6 pb-20">
-              {products.map((product) => (
-                <ProductCard key={product._id} product={product} />
-              ))}
-            </div>
+              {/* CATEGORY PILLS + ACTIVE FILTER CHIPS */}
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => updateParams({ category: "" })}
+                  className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                    !category
+                      ? "bg-[#394FF1] text-white shadow-md shadow-blue-500/30"
+                      : "border border-zinc-200 bg-white text-zinc-500 dark:border-zinc-800 dark:bg-[#1A1D20] dark:text-zinc-400"
+                  }`}
+                >
+                  All
+                </button>
+                {CATEGORY_ITEMS.map((cat) => (
+                  <button
+                    key={cat.value}
+                    onClick={() => updateParams({ category: cat.value })}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                      category === cat.value
+                        ? "bg-[#394FF1] text-white shadow-md shadow-blue-500/30"
+                        : "border border-zinc-200 bg-white text-zinc-500 dark:border-zinc-800 dark:bg-[#1A1D20] dark:text-zinc-400"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {(condition || sort !== "relevant" || minPrice !== "" || maxPrice !== "" || category) && (
+                <div className="mb-6 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-zinc-400">
+                    Active filters:
+                  </span>
+                  {category && (
+                    <FilterChip
+                      label={CATEGORY_ITEMS.find((c) => c.value === category)?.label || category}
+                      onClear={() => updateParams({ category: "" })}
+                    />
+                  )}
+                  {condition && (
+                    <FilterChip
+                      label={CONDITIONS.find((c) => c.value === condition)?.label || condition}
+                      onClear={() => updateParams({ condition: "" })}
+                    />
+                  )}
+                  {(minPrice !== "" || maxPrice !== "") && (
+                    <FilterChip
+                      label={`₹${minPrice || "0"} – ${maxPrice ? `₹${maxPrice}` : "∞"}`}
+                      onClear={() => updateParams({ min: "", max: "" })}
+                    />
+                  )}
+                  {sort !== "relevant" && (
+                    <FilterChip
+                      label={SORTS.find((s) => s.value === sort)?.label || sort}
+                      onClear={() => updateParams({ sort: "" })}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* PRODUCT GRID */}
+              {!loading && products.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 lg:gap-6 pb-6">
+                  {products.map((product) => (
+                    <ProductCard key={product._id} product={product} />
+                  ))}
+                </div>
+              )}
+
+            {/* LOAD MORE */}
+            {!loading && !error && hasMore && (
+              <div className="flex justify-center pb-20">
+                <button
+                  onClick={() => updateParams({ page: page + 1 }, false)}
+                  disabled={loadingMore}
+                  className="rounded-2xl bg-[#394FF1] px-8 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition hover:bg-[#2f3fd6] disabled:opacity-60"
+                >
+                  {loadingMore ? "Loading…" : "Load more results"}
+                </button>
+              </div>
+            )}
+            {loadingMore && (
+              <div className="flex justify-center pb-20">
+                <BrandLoader size="sm" />
+              </div>
+            )}
+
+            {/* TRENDING FALLBACK */}
+            {!loading &&
+              !error &&
+              (products.length === 0 || !query) &&
+              (trendingLoading || trending.length > 0) && (
+                <div className="pb-20">
+                  <h2 className="text-lg font-bold text-[#121417] dark:text-white mb-4">
+                    Trending on campus
+                  </h2>
+                  {trendingLoading ? (
+                    <div className="flex justify-center py-8">
+                      <BrandLoader size="sm" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 lg:gap-6">
+                      {trending.map((product) => (
+                        <ProductCard key={product._id} product={product} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            {!loading && products.length > 0 && <div className="pb-20" />}
           </div>
         </main>
       </div>
@@ -219,6 +449,7 @@ const SearchResults = () => {
       <button
         onClick={() => setOpen(true)}
         className="lg:hidden fixed bottom-6 right-6 z-40 bg-[#394FF1] text-white p-4 rounded-full shadow-2xl scale-110 active:scale-95 transition-transform"
+        aria-label="Open filters"
       >
         <FaFilter />
       </button>
@@ -238,6 +469,7 @@ const SearchResults = () => {
               <button
                 onClick={() => setOpen(false)}
                 className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full"
+                aria-label="Close filters"
               >
                 <FaTimes className="text-zinc-500" />
               </button>
