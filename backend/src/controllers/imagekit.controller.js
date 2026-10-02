@@ -16,9 +16,11 @@ const getImagekit = () => {
 export const getAuthParams = (req, res) => {
   try {
     const imagekit = getImagekit();
-    // Short-lived signatures (5 min): a leaked auth blob is useless fast.
+    // Short-lived signatures (5 min from now, as a Unix timestamp —
+    // the SDK signs token+expire, so a leaked auth blob dies fast).
     // Pair with the 20/min route limiter and dashboard-side folder rules.
-    const result = imagekit.getAuthenticationParameters(undefined, 5 * 60);
+    const expire = Math.floor(Date.now() / 1000) + 5 * 60;
+    const result = imagekit.getAuthenticationParameters(undefined, expire);
     res.json(result);
   } catch (err) {
     return res.status(500).json({
