@@ -1,15 +1,21 @@
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import confetti from "canvas-confetti";
 import { HiXMark, HiArrowRight, HiCheckBadge } from "react-icons/hi2";
 
 const FirstListingCelebration = ({ onClose }) => {
   useEffect(() => {
+    let cancelled = false;
     const duration = 3000;
     const end = Date.now() + duration;
 
+    // canvas-confetti loads on demand — never in the initial bundle.
+    const fire = (opts) =>
+      import("canvas-confetti").then((m) => {
+        if (!cancelled) m.default(opts);
+      });
+
     const frame = () => {
-      confetti({
+      fire({
         particleCount: 2,
         angle: 60,
         spread: 55,
@@ -17,7 +23,7 @@ const FirstListingCelebration = ({ onClose }) => {
         colors: ["#3838EC", "#8B8BFF", "#1F1F8F"],
       });
 
-      confetti({
+      fire({
         particleCount: 2,
         angle: 120,
         spread: 55,
@@ -30,7 +36,7 @@ const FirstListingCelebration = ({ onClose }) => {
       }
     };
 
-    confetti({
+    fire({
       particleCount: 180,
       spread: 120,
       startVelocity: 35,
@@ -44,7 +50,10 @@ const FirstListingCelebration = ({ onClose }) => {
       onClose?.();
     }, 6000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [onClose]);
 
   return (

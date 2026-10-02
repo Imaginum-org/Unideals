@@ -1,4 +1,6 @@
 import Product from "../models/Product.model.js";
+import Campus from "../models/Campus.model.js";
+import mongoose from "mongoose";
 import {
   PRODUCT_STATUS,
   PRODUCT_CATEGORIES,
@@ -6,6 +8,26 @@ import {
 } from "../config/constants.js";
 import { getListingLimit } from "../config/subscriptionPlans.js";
 import { deleteImage } from "../utils/imagekit.js";
+
+const campusError = (statusCode, message, code) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  if (code) error.code = code;
+  return error;
+};
+
+// Every public query must be campus-scoped. The campus ObjectId is required
+// so a missing campus fails loudly instead of leaking cross-campus data.
+const requireCampusId = (campusId) => {
+  if (!campusId) {
+    throw campusError(
+      400,
+      "Campus is required. Please pick your campus.",
+      "CAMPUS_REQUIRED",
+    );
+  }
+  return new mongoose.Types.ObjectId(campusId);
+};
 
 export const createProduct = async (data, user) => {
   // Strip privileged fields that must never be client-controlled.
@@ -19,6 +41,8 @@ export const createProduct = async (data, user) => {
   delete data.slug;
   delete data.location;
   delete data.meetup_location;
+  // Campus is never client-controlled — stamped from the seller below.
+  delete data.campus_id;
 
   // Campus pickup-spot model: snapshot carries only spot name/detail.
   // Drop empty optional snapshot fields so regex validators (pincode,
@@ -82,8 +106,33 @@ export const createProduct = async (data, user) => {
   }
 
   data.seller_id = user._id;
+  // Defense-in-depth alongside the zod whitelist: privileged states are
+  // never client-settable (prevents limit bypass via status:"sold").
+  if (data.status && ![PRODUCT_STATUS.DRAFT, PRODUCT_STATUS.LISTED].includes(data.status)) {
+    throw campusError(400, "Invalid listing status.", "INVALID_STATUS");
+  }
   data.status = data.status || PRODUCT_STATUS.LISTED;
   data.is_deleted = false;
+
+  // Listings belong to the seller's campus. Campus-less accounts pass the
+  // onboarding gate first, so this is a guardrail, not a flow.
+  const sellerCampusId = user.campus_id?._id || user.campus_id;
+  if (!sellerCampusId) {
+    throw campusError(
+      400,
+      "Campus is required. Please pick your campus first.",
+      "CAMPUS_REQUIRED",
+    );
+  }
+  const campus = await Campus.findById(sellerCampusId).select("is_active").lean();
+  if (!campus || !campus.is_active) {
+    throw campusError(
+      400,
+      "Your campus is unavailable. Please pick your campus again.",
+      "CAMPUS_INACTIVE",
+    );
+  }
+  data.campus_id = campus._id;
 
   // Plan entitlement: cap active (listed, visible) listings per tier.
   // Drafts never count. null limit = unlimited (Pro+).
@@ -134,10 +183,11 @@ export const createProduct = async (data, user) => {
   return await Product.create(data);
 };
 
-export const getBoostedProducts = async () => {
+export const getBoostedProducts = async (campusId) => {
   const now = new Date();
 
   return await Product.find({
+    campus_id: requireCampusId(campusId),
     is_boosted: true,
     boost_expires_at: { $gt: now },
     is_deleted: false,
@@ -152,7 +202,7 @@ export const getBoostedProducts = async () => {
     .lean();
 };
 
-export const getAllProducts = async (query) => {
+export const getAllProducts = async (query, campusId) => {
   let {
     page = 1,
     limit = 10,
@@ -175,8 +225,10 @@ export const getAllProducts = async (query) => {
   const skip = (page - 1) * limit;
   const now = new Date();
 
-  // Base filter
+  // Base filter — campus first: legacy campus-less listings are excluded
+  // from every feed (their sellers assign campus via the onboarding gate).
   const baseMatch = {
+    campus_id: requireCampusId(campusId),
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
   };
@@ -410,27 +462,51 @@ export const getAllProducts = async (query) => {
   };
 };
 
-export const getSingleProduct = async (id) => {
-  const mongoose = await import("mongoose").then((m) => m.default);
+export const getSingleProduct = async (id, campusId, requesterId = null) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new Error("Product not found");
   }
-  const product = await Product.findOneAndUpdate(
-    { _id: id, is_deleted: false },
-    { $inc: { views_count: 1 } },
-    { new: true },
-  )
+  const viewerCampusId = requireCampusId(campusId);
+
+  // Read first so cross-campus views never increment views_count.
+  const product = await Product.findOne({ _id: id, is_deleted: false })
     .populate("seller_id", "name avatar subscription")
+    .populate("campus_id", "slug name short_name")
     .lean();
 
   if (!product) {
     throw new Error("Product not found");
   }
 
+  // Legacy campus-less listings and other-campus listings are invisible.
+  if (
+    !product.campus_id ||
+    product.campus_id._id.toString() !== viewerCampusId.toString()
+  ) {
+    throw campusError(
+      404,
+      "This product is not available at your campus.",
+      "CAMPUS_MISMATCH",
+    );
+  }
+
+  await Product.updateOne({ _id: id }, { $inc: { views_count: 1 } });
+  product.views_count = (product.views_count || 0) + 1;
+
+  // Pickup snapshot carries seller mobile/pincode — visible to the owner
+  // only. Buyers keep the public meetup fields (spot name/city).
+  const sellerId = product.seller_id?._id || product.seller_id;
+  if (!requesterId || String(sellerId) !== String(requesterId)) {
+    if (product.pickup_address_snapshot) {
+      delete product.pickup_address_snapshot.mobile;
+      delete product.pickup_address_snapshot.pincode;
+    }
+  }
+
   return product;
 };
 
-export const getSearchSuggestions = async (query) => {
+export const getSearchSuggestions = async (query, campusId) => {
   if (typeof query !== "string") return [];
   const sanitizedQuery = query.trim().slice(0, 100).toLowerCase();
   if (sanitizedQuery.length < 2) return [];
@@ -440,6 +516,7 @@ export const getSearchSuggestions = async (query) => {
   const safeQuery = escapeRegex(sanitizedQuery);
 
   return await Product.find({
+    campus_id: requireCampusId(campusId),
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
     title: { $regex: safeQuery, $options: "i" },
@@ -541,7 +618,7 @@ const detectCategories = (sanitizedQuery) => {
   return found.slice(0, 3);
 };
 
-export const searchProducts = async (queryOrOptions = {}) => {
+export const searchProducts = async (queryOrOptions = {}, campusId) => {
   const options =
     typeof queryOrOptions === "string" ? { q: queryOrOptions } : queryOrOptions || {};
   const {
@@ -588,6 +665,7 @@ export const searchProducts = async (queryOrOptions = {}) => {
 
   // Base visibility filter + whitelisted facet filters.
   const baseMatch = {
+    campus_id: requireCampusId(campusId),
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
   };
@@ -797,16 +875,21 @@ export const searchProducts = async (queryOrOptions = {}) => {
   };
 };
 
-// Trending searches fallback: most-viewed live listings, cached 10 minutes.
-let trendingCache = { data: [], at: 0 };
+// Trending searches fallback: most-viewed live listings, cached 10 minutes
+// per campus (a global cache would leak one campus's trends into another's).
+const trendingCache = new Map();
 const TRENDING_TTL_MS = 10 * 60 * 1000;
 
-export const getTrendingProducts = async (limit = 8) => {
+export const getTrendingProducts = async (limit = 8, campusId) => {
+  const campusObjectId = requireCampusId(campusId);
+  const cacheKey = campusObjectId.toString();
   const now = Date.now();
-  if (trendingCache.data.length > 0 && now - trendingCache.at < TRENDING_TTL_MS) {
-    return trendingCache.data.slice(0, limit);
+  const cached = trendingCache.get(cacheKey);
+  if (cached && cached.data.length > 0 && now - cached.at < TRENDING_TTL_MS) {
+    return cached.data.slice(0, limit);
   }
   const products = await Product.find({
+    campus_id: campusObjectId,
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
   })
@@ -814,7 +897,9 @@ export const getTrendingProducts = async (limit = 8) => {
     .sort({ views_count: -1, createdAt: -1 })
     .limit(8)
     .lean();
-  trendingCache = { data: products, at: now };
+  trendingCache.set(cacheKey, { data: products, at: now });
+  // Bound memory: campuses are few, but never grow unbounded.
+  if (trendingCache.size > 100) trendingCache.clear();
   return products.slice(0, limit);
 };
 

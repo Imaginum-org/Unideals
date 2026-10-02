@@ -137,7 +137,7 @@ function AuthPageRightPart() {
                 >
                   <img
                     src={HomepagePreview}
-                    alt="image"
+                    alt="Unideals marketplace preview"
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                 </div>

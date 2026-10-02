@@ -28,7 +28,7 @@ const userSchema = new Schema(
       type: String,
       required: [true, "Please provide your password"],
       select: false, // never return password
-      minlength: [6, "Password must be at least 6 characters"],
+      minlength: [8, "Password must be at least 8 characters"],
     },
 
     avatar: {
@@ -55,6 +55,15 @@ const userSchema = new Schema(
       lowercase: true,
       enum: ["male", "female", "other"],
       default: null,
+    },
+
+    // Campus marketplace: every user belongs to exactly one campus.
+    // Null only for legacy accounts until they pass the onboarding gate.
+    campus_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Campus",
+      default: null,
+      index: true,
     },
 
     subscription: {

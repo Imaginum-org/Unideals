@@ -7,10 +7,12 @@ import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
+import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 
 function CheckEmail() {
   const location = useLocation();
   const navigate = useNavigate();
+  const safeTimeout = useSafeTimeout();
 
   // Grab the email passed from the signup page.
   // If someone visits this page directly without signing up, it falls back to empty.
@@ -90,7 +92,7 @@ function CheckEmail() {
             variant: "success",
             text: "Email verified! Redirecting to sign in…",
           });
-          window.setTimeout(() => navigate("/login"), 900);
+          safeTimeout(() => navigate("/login"), 900);
         } else {
           setFormMessage({
             variant: "info",

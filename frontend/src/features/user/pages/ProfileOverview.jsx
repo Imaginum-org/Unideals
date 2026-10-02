@@ -35,15 +35,16 @@ function ProfileOverview() {
   const [gamificationLoading, setGamificationLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     fetchUserProfile();
     const loadUserProducts = async () => {
       try {
         const res = await getUserProducts();
-        if (res.data.success) {
+        if (!cancelled && res.data.success) {
           setUserProducts(res.data.data || []);
         }
       } catch (error) {
-        console.error("Failed to load profile products:", error);
+        if (!cancelled) console.error("Failed to load profile products:", error);
       }
     };
 
@@ -52,12 +53,16 @@ function ProfileOverview() {
     const loadGamification = async () => {
       try {
         const res = await fetchMyBadges();
-        if (res.data.success) setGamification(res.data.data);
+        if (!cancelled && res.data.success) setGamification(res.data.data);
       } catch (_) {}
-      finally { setGamificationLoading(false); }
+      finally { if (!cancelled) setGamificationLoading(false); }
     };
     loadGamification();
-  }, [fetchUserProfile]);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stats = useMemo(() => {
     const activeListings = userProducts.filter((product) =>
@@ -88,7 +93,13 @@ function ProfileOverview() {
       })
     : "October 2022";
 
-  const campus = userDetails?.college || userDetails?.campus || "VIT Vellore";
+  const campus =
+    (userDetails?.campus_id && typeof userDetails.campus_id === "object"
+      ? userDetails.campus_id.name
+      : null) ||
+    userDetails?.college ||
+    userDetails?.campus ||
+    "Set campus";
   const savedItems = useMemo(
     () => (wishlist ?? []).filter(Boolean).slice(0, 3),
     [wishlist],
@@ -330,9 +341,12 @@ function ProfileOverview() {
                     Your latest transactions
                   </p>
                 </div>
-                <button className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline">
+                <Link
+                  to="/myorders"
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
+                >
                   View all <FiArrowUpRight size={14} />
-                </button>
+                </Link>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -402,9 +416,12 @@ function ProfileOverview() {
                   <h2 className="text-sm font-bold text-gray-900 dark:text-white">
                     Recent Chats
                   </h2>
-                  <button className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                  <Link
+                    to="/chat"
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                  >
                     View all
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="flex flex-col gap-2">

@@ -138,6 +138,17 @@ export const UserProvider = ({ children }) => {
     }
   }, [userDetails, fetchUserProfile]);
 
+  // Cross-tab sync: logging out in one tab clears sessions everywhere.
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (event.key === "isAuthenticated" && event.newValue !== "true") {
+        clearUserData();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [clearUserData]);
+
   return (
     <UserContext.Provider
       value={{

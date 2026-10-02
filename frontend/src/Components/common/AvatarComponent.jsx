@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import { ik } from "../../utils/imageTransform.js";
 
 const AvatarComponent = ({
   name,
@@ -46,6 +47,8 @@ const AvatarComponent = ({
 
   const initials = useMemo(() => generateInitials(name), [name]);
   const backgroundColor = useMemo(() => stringToColor(name), [name]);
+  // Static gradient for reduced-motion users; slow spin otherwise.
+  const reduceMotion = useReducedMotion();
 
   const sizeStyles = {
     small: { container: "w-7 h-7", text: "text-[10px]" },
@@ -87,15 +90,12 @@ const AvatarComponent = ({
     <div
       className={`relative inline-flex items-center justify-center ${currentSize.container} ${className}`}
     >
-      {/* Glow Layer (Behind everything) */}
+      {/* Glow Layer (Behind everything) — static: the blurred layer never
+          rotates, halving per-frame repaint cost with no visual change. */}
       {isPremium && (
-        <motion.div
+        <div
           className={`absolute inset-0 ${borderRadiusClass} ${gradientClass} opacity-50 z-0`}
           style={{ filter: "blur(6px)" }}
-          animate={
-            isSquare ? {} : { rotate: 360, scale: isProPlus ? [1, 1.08, 1] : 1 }
-          }
-          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
         />
       )}
 
@@ -103,8 +103,8 @@ const AvatarComponent = ({
       {isPremium && (
         <motion.div
           className={`absolute inset-0 ${borderRadiusClass} ${gradientClass} z-0`}
-          animate={isSquare ? {} : { rotate: 360 }}
-          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+          animate={isSquare || reduceMotion ? {} : { rotate: 360 }}
+          transition={{ duration: 8, repeat: reduceMotion ? 0 : Infinity, ease: "linear" }}
         />
       )}
 
@@ -116,7 +116,7 @@ const AvatarComponent = ({
       >
         {shouldShowImage ? (
           <img
-            src={cachedImage}
+            src={ik(cachedImage, { w: 192, h: 192, q: 60 })}
             alt={name || "Avatar"}
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"

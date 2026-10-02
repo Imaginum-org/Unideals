@@ -26,19 +26,24 @@ export default function Achievements() {
   const [error, setError] = useState(null);
   const [showGuideModal, setShowGuideModal] = useState(false);
 
-  const loadBadges = async () => {
-    try {
-      setLoading(true);
-      const res = await fetchMyBadges();
-      if (res.data.success) setData(res.data.data);
-    } catch (err) {
-      setError("Failed to load your achievements.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadBadges(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        setLoading(true);
+        const res = await fetchMyBadges();
+        if (!cancelled && res.data.success) setData(res.data.data);
+      } catch (err) {
+        if (!cancelled) setError("Failed to load your achievements.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleRecompute = async () => {
     try {
@@ -122,7 +127,27 @@ export default function Achievements() {
             {loading ? (
               <div className="h-40 rounded-2xl bg-white dark:bg-[#1c1c1c] animate-pulse border border-gray-100 dark:border-gray-800" />
             ) : error ? (
-              <div className="text-sm text-red-500 p-4">{error}</div>
+              <div className="flex flex-col items-start gap-3 p-4">
+                <div className="text-sm text-red-500">{error}</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setLoading(true);
+                    fetchMyBadges()
+                      .then((res) => {
+                        if (res.data.success) setData(res.data.data);
+                      })
+                      .catch(() =>
+                        setError("Failed to load your achievements."),
+                      )
+                      .finally(() => setLoading(false));
+                  }}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  Retry
+                </button>
+              </div>
             ) : data ? (
               <LevelCard
                 total_xp={data.total_xp}

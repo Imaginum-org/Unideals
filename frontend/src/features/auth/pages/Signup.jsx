@@ -20,6 +20,7 @@ import {
   getPasswordStrength,
   isPasswordStrongEnough,
 } from "../utils/passwordStrength.js";
+import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 
 function Signup() {
   const [email, setEmail] = useState("");
@@ -32,6 +33,7 @@ function Signup() {
   const [acceptedLegal, setAcceptedLegal] = useState(false);
 
   const navigate = useNavigate();
+  const safeTimeout = useSafeTimeout();
   const strength = getPasswordStrength(password);
   const showPasswordOk = isPasswordStrongEnough(password);
   const showPasswordRequirements =
@@ -67,7 +69,7 @@ function Signup() {
             response.data.message ||
             "Account created successfully! Check your email to verify your account.",
         });
-        window.setTimeout(() => {
+        safeTimeout(() => {
           navigate("/checkEmail", { state: { email } });
         }, 1400);
       }

@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import helmet from "helmet";
@@ -13,14 +14,20 @@ import reportRouter from "./routes/report.routes.js";
 import pickupSpotRouter from "./routes/pickupSpot.routes.js";
 import imagekitRouter from "./routes/imagekit.routes.js";
 import wishlistRouter from "./routes/wishlist.routes.js";
+import campusRouter from "./routes/campus.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import boostRouter from "./routes/boost.routes.js";
 import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js";
 import badgeRouter from "./routes/badgeRoutes.js";
 import handoffRouter from "./routes/handoff.routes.js";
+import { verifyOrigin } from "./middlewares/csrf.middleware.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
+
+// Behind Render/ELB the client IP comes from X-Forwarded-For — required
+// for express-rate-limit to key per client instead of per proxy.
+app.set("trust proxy", 1);
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -158,6 +165,7 @@ if (process.env.NODE_ENV !== "production") {
       const url = req.originalUrl || req.url || "";
       return url
         .replace(/(oauth_code|code|token)=[^&]*/gi, "$1=[REDACTED]")
+        .replace(/([?&]k=)[^&]*/gi, "$1[REDACTED]")
         .replace(/\/reset-password\/[^/\s?]+/gi, "/reset-password/[REDACTED]");
     } catch {
       return req.url;
@@ -166,16 +174,16 @@ if (process.env.NODE_ENV !== "production") {
   app.use(morgan(":method :redacted-url :status :response-time ms"));
 }
 
-// Health check route
+// Health check route (minimal — no uptime/internals for fingerprinting)
 app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "OK",
-    uptime: process.uptime(),
-    timestamp: new Date(),
-  });
+  res.status(200).json({ status: "OK" });
 });
 
+// Gzip JSON + thumbs metadata (threshold keeps tiny auth payloads fast).
+app.use(compression({ threshold: 1024 }));
+
 // Routes
+app.use(verifyOrigin);
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
 app.use("/api/product", productRouter);
@@ -183,6 +191,7 @@ app.use("/api/report", reportRouter);
 app.use("/api/pickup-spots", pickupSpotRouter);
 app.use("/api/imagekit", imagekitRouter);
 app.use("/api/wishlist", wishlistRouter);
+app.use("/api/campuses", campusRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/boost", boostRouter);
 app.use("/api/payments", paymentRouter);
@@ -199,6 +208,11 @@ app.use((req, res) => {
 
 // Global error handler - never leak internals, preserve status codes
 app.use((err, req, res, next) => {
+  // CORS origin rejection: blocked before any route logic — no stack needed.
+  if (err && /not allowed by cors/i.test(err.message || "")) {
+    return res.status(403).json({ success: false, message: "Origin not allowed" });
+  }
+
   const statusCode = err.statusCode || err.status || 500;
 
   // Log full error server-side only

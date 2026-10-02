@@ -1,4 +1,5 @@
 import * as productService from "../services/product.service.js";
+import { resolveRequestCampus } from "../services/campus.service.js";
 import { deleteImage } from "../utils/imagekit.js";
 import { forwardServiceError } from "../utils/response.js";
 import Product from "../models/Product.model.js";
@@ -52,6 +53,9 @@ export const createProduct = async (req, res) => {
       "Invalid purchase date",
       "Purchase date cannot be",
       "Listing limit reached",
+      "Invalid listing status",
+      "Campus is required",
+      "campus is unavailable",
     ];
     const isClientError =
       error.code === "LISTING_LIMIT" ||
@@ -59,7 +63,7 @@ export const createProduct = async (req, res) => {
 
     return res.status(error.code === "LISTING_LIMIT" ? 403 : isClientError ? 400 : 500).json({
       success: false,
-      message: error.message || "Product creation failed",
+      message: isClientError ? error.message : "Product creation failed",
       ...(error.code ? { code: error.code } : {}),
     });
   }
@@ -68,7 +72,8 @@ export const createProduct = async (req, res) => {
 // GET ALL PRODUCTS
 export const getAllProducts = async (req, res, next) => {
   try {
-    const result = await productService.getAllProducts(req.query);
+    const campus = await resolveRequestCampus(req);
+    const result = await productService.getAllProducts(req.query, campus._id);
 
     return res.status(200).json({
       success: true,
@@ -83,8 +88,15 @@ export const getAllProducts = async (req, res, next) => {
 // GET SINGLE PRODUCT
 export const getSingleProduct = async (req, res, next) => {
   try {
-    const product = await productService.getSingleProduct(req.params.id);
+    const campus = await resolveRequestCampus(req);
+    const product = await productService.getSingleProduct(
+      req.params.id,
+      campus._id,
+      req.userId || null,
+    );
 
+    // Owner sees extra snapshot fields — never share across users.
+    res.set("Cache-Control", "private, max-age=30, must-revalidate");
     return res.status(200).json({
       success: true,
       message: "Product fetched successfully",
@@ -98,8 +110,11 @@ export const getSingleProduct = async (req, res, next) => {
 // GET BOOSTED PRODUCTS
 export const getBoostedProducts = async (req, res, next) => {
   try {
-    const products = await productService.getBoostedProducts();
+    const campus = await resolveRequestCampus(req);
+    const products = await productService.getBoostedProducts(campus._id);
 
+    // Same content per campus URL for every viewer — edge-cacheable.
+    res.set("Cache-Control", "public, max-age=60, s-maxage=300");
     return res.status(200).json({
       success: true,
       message: "Boosted products fetched successfully",
@@ -122,7 +137,11 @@ export const getSearchSuggestions = async (req, res, next) => {
       });
     }
 
-    const suggestions = await productService.getSearchSuggestions(q);
+    const campus = await resolveRequestCampus(req);
+    const suggestions = await productService.getSearchSuggestions(
+      q,
+      campus._id,
+    );
 
     return res.status(200).json({
       success: true,
@@ -154,16 +173,19 @@ export const searchProducts = async (req, res, next) => {
       });
     }
 
-    const result = await productService.searchProducts({
-      q,
-      page,
-      limit,
-      sort,
-      category,
-      condition,
-      min_price,
-      max_price,
-    });
+    const result = await productService.searchProducts(
+      {
+        q,
+        page,
+        limit,
+        sort,
+        category,
+        condition,
+        min_price,
+        max_price,
+      },
+      (await resolveRequestCampus(req))._id,
+    );
 
     return res.status(200).json({
       success: true,
@@ -176,7 +198,10 @@ export const searchProducts = async (req, res, next) => {
 
 export const getTrendingProducts = async (req, res, next) => {
   try {
-    const products = await productService.getTrendingProducts();
+    const campus = await resolveRequestCampus(req);
+    const products = await productService.getTrendingProducts(8, campus._id);
+    // Same content per campus URL for every viewer — edge-cacheable.
+    res.set("Cache-Control", "public, max-age=60, s-maxage=300");
     return res.status(200).json({
       success: true,
       message: "Trending products fetched successfully",

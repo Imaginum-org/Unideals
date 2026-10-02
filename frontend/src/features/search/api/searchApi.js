@@ -19,7 +19,7 @@ export const getSearchSuggestions = (query, signal) => {
   });
 };
 
-// Most-viewed listings for empty states (10-min server cache).
-export const getTrendingProducts = () => {
-  return axios.get("/api/product/trending");
+// Most-viewed listings for empty states (10-min server cache, per campus).
+export const getTrendingProducts = (params = {}) => {
+  return axios.get("/api/product/trending", { params });
 };

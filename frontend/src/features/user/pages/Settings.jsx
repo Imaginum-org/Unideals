@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import {
@@ -20,6 +20,7 @@ import { uploadImage } from "../../../Utils/imageUpload.js";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
+import { useCampus } from "../../../context/CampusContext.jsx";
 import { logoutUser } from "../../auth/api/authApi";
 import PickupSpotModal from "../components/PickupSpotModal.jsx";
 import AlertDialogDemo from "../components/Deletebutton.jsx";
@@ -56,12 +57,14 @@ const formatPhone = (phone) => {
 function Settings() {
   const navigate = useNavigate();
   const { userDetails: contextUserDetails, updateUserDetails } = useUser();
+  const { campuses, campus: activeCampus } = useCampus();
 
   const [activeTab, setActiveTab] = useState("Profile");
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
+  const [campusSlug, setCampusSlug] = useState("");
   const [isProfileEditing, setIsProfileEditing] = useState(false);
   const [profileChanged, setProfileChanged] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -73,16 +76,16 @@ function Settings() {
 
   const fileInputRef = useRef(null);
 
-  const primaryPickupSpot = useMemo(
-    () => pickupSpots.find((spot) => spot.isPrimary),
-    [pickupSpots],
-  );
-
   useEffect(() => {
     if (contextUserDetails) {
       setUserDetails(contextUserDetails);
       setPhone(contextUserDetails?.mobile || "");
       setGender(contextUserDetails?.gender || "");
+      const slug =
+        typeof contextUserDetails?.campus_id === "object"
+          ? contextUserDetails.campus_id?.slug
+          : null;
+      setCampusSlug(slug || "");
       setLoading(false);
     }
   }, [contextUserDetails]);
@@ -98,6 +101,11 @@ function Settings() {
           setUserDetails(res.data.user);
           setPhone(res.data.user?.mobile || "");
           setGender(res.data.user?.gender || "");
+          const slug =
+            typeof res.data.user?.campus_id === "object"
+              ? res.data.user.campus_id?.slug
+              : null;
+          setCampusSlug(slug || "");
         }
       } catch (err) {
         if (err.response?.status === 401 || err.response?.status === 403) {
@@ -116,18 +124,18 @@ function Settings() {
     fetchUser();
   }, [contextUserDetails, navigate]);
 
-  const fetchPickupSpots = async () => {
+  const fetchPickupSpots = useCallback(async () => {
     try {
       const res = await getUserPickupSpots();
       if (res.data.success) setPickupSpots(res.data.pickupSpots);
     } catch {
       toast.error("Failed to load pickup spots");
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchPickupSpots();
-  }, []);
+  }, [fetchPickupSpots]);
 
   const handleSaveProfile = async () => {
     if (!profileChanged) {
@@ -150,15 +158,32 @@ function Settings() {
         updateData.mobile = digits;
       }
       if (gender) updateData.gender = gender;
+      const currentSlug =
+        typeof userDetails?.campus_id === "object"
+          ? userDetails.campus_id?.slug
+          : activeCampus?.slug;
+      if (campusSlug && campusSlug !== currentSlug) {
+        updateData.campus_slug = campusSlug;
+      }
 
       const res = await updateProfile(updateData);
 
       if (res.data.success) {
-        toast.success("Profile updated successfully");
+        const moved = res.data.movedListings || 0;
+        toast.success(
+          moved > 0
+            ? `Campus updated · ${moved} listing${moved > 1 ? "s" : ""} moved`
+            : "Profile updated successfully",
+        );
         setUserDetails(res.data.user);
         updateUserDetails(res.data.user);
         setPhone(res.data.user?.mobile || "");
         setGender(res.data.user?.gender || "");
+        const slug =
+          typeof res.data.user?.campus_id === "object"
+            ? res.data.user.campus_id?.slug
+            : null;
+        setCampusSlug(slug || "");
         setProfileChanged(false);
         setIsProfileEditing(false);
         return true;
@@ -340,10 +365,23 @@ function Settings() {
     },
     {
       label: "Campus",
-      value: primaryPickupSpot?.name || "VIT Vellore",
+      value:
+        campuses.find((c) => c.slug === (campusSlug || activeCampus?.slug))
+          ?.name ||
+        activeCampus?.name ||
+        "Not set",
       icon: MapPin,
+      editable: true,
+      field: "campus",
     },
   ];
+
+  const currentCampusSlug =
+    (typeof userDetails?.campus_id === "object" &&
+      userDetails.campus_id?.slug) ||
+    activeCampus?.slug ||
+    "";
+  const campusChanged = Boolean(campusSlug) && campusSlug !== currentCampusSlug;
 
   return (
     <div className="h-full w-full overflow-hidden bg-[#F7F9FD] font-figtree text-[#111827] dark:bg-[#131313] dark:text-white">
@@ -400,6 +438,11 @@ function Settings() {
                         <button
                           type="button"
                           disabled={isUploadingAvatar || isRemovingAvatar}
+                          aria-label={
+                            userDetails?.avatar?.url
+                              ? "Remove profile photo"
+                              : "Upload profile photo"
+                          }
                           onClick={() => {
                             if (userDetails?.avatar?.url) {
                               handleRemoveAvatar();
@@ -455,8 +498,10 @@ function Settings() {
                           )}
                         </div>
                         <p className=" text-[0.8rem]  font-medium text-gray-400">
-                          VIT Vellore ·{" "}
-                          {formatMemberSince(userDetails?.createdAt)}
+                          {activeCampus?.short_name ||
+                            activeCampus?.name ||
+                            "Campus not set"}{" "}
+                          · {formatMemberSince(userDetails?.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -532,6 +577,30 @@ function Settings() {
                                   placeholder="10 digit mobile number"
                                   className="mt-1.5 w-full rounded-xl border border-[#D8DDEA] bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                                 />
+                              ) : isProfileEditing && row.field === "campus" ? (
+                                <>
+                                  <select
+                                    value={campusSlug}
+                                    onChange={(event) => {
+                                      setCampusSlug(event.target.value);
+                                      setProfileChanged(true);
+                                    }}
+                                    className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
+                                  >
+                                    <option value="">Select campus</option>
+                                    {campuses.map((c) => (
+                                      <option key={c.slug} value={c.slug}>
+                                        {c.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {campusChanged && (
+                                    <p className="mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                      Your live listings move to the new campus
+                                      on save.
+                                    </p>
+                                  )}
+                                </>
                               ) : (
                                 <div className="mt-1 break-words text-[0.9rem] font-medium">
                                   {row.value}

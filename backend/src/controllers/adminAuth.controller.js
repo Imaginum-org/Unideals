@@ -7,6 +7,7 @@ import {
   sanitizeAuthUser,
   setAuthCookies,
 } from "../services/auth.service.js";
+import { safeErrorMessage } from "../utils/response.js";
 
 const ADMIN_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SUPPORT];
 
@@ -14,7 +15,7 @@ const sendAuthError = (res, error) =>
   res.status(error.statusCode || 500).json({
     success: false,
     error: true,
-    message: error.message || "Admin authentication failed",
+    message: safeErrorMessage(error, "Admin authentication failed"),
     accountBlocked: Boolean(error.accountBlocked),
     accountStatus: error.accountStatus,
   });

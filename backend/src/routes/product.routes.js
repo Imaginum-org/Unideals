@@ -1,7 +1,7 @@
 import express from "express";
 import { createProductSchema } from "../validations/product.validation.js";
 import { validate } from "../middlewares/validation.middleware.js";
-import auth from "../middlewares/auth.middleware.js";
+import auth, { optionalAuth } from "../middlewares/auth.middleware.js";
 import rateLimit from "express-rate-limit";
 
 import {
@@ -38,10 +38,10 @@ const searchLimiter = rateLimit({
 });
 
 // Boosted products (must be before :id)
-router.get("/boosted", getBoostedProducts);
-router.get("/search", searchLimiter, searchProducts);
-router.get("/search-suggestions", searchLimiter, getSearchSuggestions);
-router.get("/trending", searchLimiter, getTrendingProducts);
+router.get("/boosted", optionalAuth, getBoostedProducts);
+router.get("/search", searchLimiter, optionalAuth, searchProducts);
+router.get("/search-suggestions", searchLimiter, optionalAuth, getSearchSuggestions);
+router.get("/trending", searchLimiter, optionalAuth, getTrendingProducts);
 
 // User's products (must be before :id)
 router.get("/user/my-products", auth, getMyProducts);
@@ -49,7 +49,7 @@ router.get("/user/my-products", auth, getMyProducts);
 // Draft
 router.get("/user/drafts", auth, getMyDraftProducts);
 
-router.get("/", getAllProducts);
+router.get("/", optionalAuth, getAllProducts);
 
 router.post(
   "/",
@@ -64,6 +64,6 @@ router.delete("/:id", auth, deleteProduct);
 router.patch("/:id/unlist", auth, unlistProduct);
 router.patch("/:id/relist", auth, relistProduct);
 
-router.get("/:id", getSingleProduct);
+router.get("/:id", optionalAuth, getSingleProduct);
 
 export default router;

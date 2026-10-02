@@ -21,7 +21,9 @@ const auth = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
+    const decoded = jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN, {
+      algorithms: ["HS256"],
+    });
 
     const user = await User.findById(decoded.id)
       .select("-password -refresh_token")
@@ -73,6 +75,51 @@ const auth = async (req, res, next) => {
       error: true,
     });
   }
+};
+
+// Optional auth for public routes: attaches req.user when a valid session
+// cookie is present, never rejects. Lets campus-scoped public endpoints
+// (feed, search, detail) use the profile campus for logged-in users while
+// staying open to guests (who scope via campus_slug instead).
+export const optionalAuth = async (req, res, next) => {
+  try {
+    let token;
+
+    if (req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
+    } else if (req.headers.authorization?.startsWith("Bearer ")) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    if (!token) return next();
+
+    const decoded = jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN, {
+      algorithms: ["HS256"],
+    });
+
+    const user = await User.findById(decoded.id)
+      .select("-password -refresh_token")
+      .lean();
+
+    if (!user) return next();
+
+    if (
+      typeof decoded.v === "number" &&
+      typeof user.tokenVersion === "number" &&
+      decoded.v !== user.tokenVersion
+    ) {
+      return next();
+    }
+
+    if (user.status !== USER_STATUS.ACTIVE) return next();
+
+    req.userId = user._id;
+    req.user = user;
+  } catch {
+    // Expired/invalid session on a public route: fall through as guest.
+  }
+
+  next();
 };
 
 export default auth;

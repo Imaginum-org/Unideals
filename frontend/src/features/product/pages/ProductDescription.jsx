@@ -1,11 +1,12 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getProducts } from "../api/productApi";
-import { Share2, MessageSquare, Eye, ShieldCheck, Clock3 } from "lucide-react";
+import { MessageSquare, Eye, ShieldCheck, Clock3 } from "lucide-react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
+import ProductGallery from "../../../features/product/components/ProductGallery.jsx";
+import ImageLightbox from "../../../features/product/components/ImageLightbox.jsx";
 import toast from "react-hot-toast";
-import { Expand, Minimize2 } from "lucide-react";
 import { LuMessageSquareText } from "react-icons/lu";
 import { useParams, Link } from "react-router-dom";
 import { IoIosArrowForward } from "react-icons/io";
@@ -15,24 +16,29 @@ import { MdLocationPin } from "react-icons/md";
 import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import { motion } from "framer-motion";
 import { FaWhatsapp, FaTelegram, FaLink } from "react-icons/fa";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 // condition
 import { GoChecklist } from "react-icons/go";
 // color
 import { IoColorPaletteOutline } from "react-icons/io5";
 import { useWishlist } from "../../../context/WishlistContext";
+import { useCampus } from "../../../context/CampusContext.jsx";
+import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
+import { ikThumb } from "../../../utils/imageTransform.js";
 import LimitModal from "../../../Components/ui/LimitModal.jsx";
 // date of purchase
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaArrowRight } from "react-icons/fa6";
 
-const FALLBACK_IMAGE = "/image10.png";
+const FALLBACK_IMAGE = "/logo.svg";
 
 const ProductDescription = () => {
   const { toggleWishlist, isInWishlist } = useWishlist();
+  const { campus, campusSlug } = useCampus();
+  const safeTimeout = useSafeTimeout();
   const { id } = useParams();
   const [product, setProduct] = useState(null);
+  const [notAtCampus, setNotAtCampus] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [activeImage, setActiveImage] = useState("");
   const [wishlistLoading, setWishlistLoading] = useState(false);
@@ -41,7 +47,7 @@ const ProductDescription = () => {
   const [similarProducts, setSimilarProducts] = useState([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isContainMode, setIsContainMode] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   const staticCTARef = useRef(null);
   const floatingCTARef = useRef(null);
@@ -50,14 +56,26 @@ const ProductDescription = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }, [id]);
 
   useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        const res = await getProductById(id);
+    let cancelled = false;
+    const controller = new AbortController();
 
+    const fetchProduct = async () => {
+      if (!campusSlug) return;
+      setLoading(true);
+      setNotAtCampus(false);
+      setProduct(null);
+      try {
+        const res = await getProductById(
+          id,
+          { campus_slug: campusSlug },
+          { signal: controller.signal },
+        );
+
+        if (cancelled) return;
         const fetchedProduct = res?.data?.data;
 
         setProduct(fetchedProduct);
@@ -65,15 +83,25 @@ const ProductDescription = () => {
         if (fetchedProduct?.images?.length > 0) {
           setActiveImage(fetchedProduct.images[0].url);
         }
-      } catch {
-        // Product fetch failed - loading state handles UI
+      } catch (error) {
+        if (cancelled) return;
+        // Cross-campus direct links resolve to CAMPUS_MISMATCH (404) —
+        // show a dedicated state instead of generic "not found".
+        if (error?.response?.data?.code === "CAMPUS_MISMATCH") {
+          setNotAtCampus(true);
+        }
+        // Other failures: loading state handles UI
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchProduct();
-  }, [id]);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [id, campusSlug]);
 
   // useEffect(() => {
   //   let isMounted = true;
@@ -100,16 +128,19 @@ const ProductDescription = () => {
   // }, [productId, checkProductInWishlist]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchSimilarProducts = async () => {
-      if (!product?.category) return;
+      if (!product?.category || !campusSlug) return;
 
       try {
         setSimilarLoading(true);
 
         const res = await getProducts({
           category: product.category,
+          campus_slug: campusSlug,
         });
 
+        if (cancelled) return;
         const filteredProducts = (res?.data?.data || [])
           .filter((item) => item._id !== product._id)
           .slice(0, 4);
@@ -118,12 +149,15 @@ const ProductDescription = () => {
       } catch {
         // Similar products are best-effort only
       } finally {
-        setSimilarLoading(false);
+        if (!cancelled) setSimilarLoading(false);
       }
     };
 
     fetchSimilarProducts();
-  }, [product]);
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.category, product?._id, campusSlug]);
 
   useEffect(() => {
     let rafId;
@@ -155,7 +189,7 @@ const ProductDescription = () => {
           const floating = floatingCTARef.current;
 
           floating.style.transition = "none";
-          floating.style.bottom = "16px";
+          floating.style.bottom = "max(16px, env(safe-area-inset-bottom))";
           floating.style.left = "16px";
           floating.style.right = "16px";
           floating.style.opacity = "1";
@@ -195,22 +229,6 @@ ${shareUrl}`;
       url: shareUrl,
     };
   };
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "ArrowLeft") {
-        goToPreviousImage();
-      }
-
-      if (e.key === "ArrowRight") {
-        goToNextImage();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeImage]);
 
   // const handleShare = async () => {
   //   const shareData = getShareData();
@@ -282,6 +300,54 @@ ${shareUrl}`;
     }
   };
 
+  // Gallery state (hooks above early returns to satisfy rules-of-hooks).
+  const images = useMemo(
+    () =>
+      product?.images?.length > 0
+        ? product.images.map((image) => image.url)
+        : [FALLBACK_IMAGE],
+    [product],
+  );
+
+  const foundIndex = images.findIndex((img) => img === activeImage);
+  const currentImageIndex = foundIndex >= 0 ? foundIndex : 0;
+
+  const goToImage = useCallback(
+    (nextIndex) => {
+      if (images.length === 0) return;
+      const wrapped =
+        ((nextIndex % images.length) + images.length) % images.length;
+      setActiveImage(images[wrapped]);
+    },
+    [images],
+  );
+
+  const goToPreviousImage = useCallback(() => {
+    goToImage(currentImageIndex - 1);
+  }, [goToImage, currentImageIndex]);
+
+  const goToNextImage = useCallback(() => {
+    goToImage(currentImageIndex + 1);
+  }, [goToImage, currentImageIndex]);
+
+  // Inline gallery arrows. ImageLightbox owns keyboard nav while open.
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (isLightboxOpen) return;
+      if (e.key === "ArrowLeft") {
+        goToPreviousImage();
+      }
+
+      if (e.key === "ArrowRight") {
+        goToNextImage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goToPreviousImage, goToNextImage, isLightboxOpen]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F7F9FD] animate-pulse">
@@ -302,8 +368,26 @@ ${shareUrl}`;
 
   if (!product) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA]">
-        Product not found
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA] px-6">
+        <div className="text-center">
+          <p className="text-5xl">🎓</p>
+          <h1 className="mt-4 text-xl font-bold text-[#0F172A]">
+            {notAtCampus
+              ? "Not available at your campus"
+              : "Product not found"}
+          </h1>
+          <p className="mt-2 text-sm text-[#64748B]">
+            {notAtCampus
+              ? "This listing belongs to another campus marketplace."
+              : "This listing may have been removed or sold."}
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="mt-6 rounded-xl bg-[#3938EC] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
     );
   }
@@ -334,25 +418,6 @@ ${shareUrl}`;
     }
 
     return "Just now";
-  };
-
-  const images =
-    product?.images?.length > 0
-      ? product.images.map((image) => image.url)
-      : [FALLBACK_IMAGE];
-
-  const currentImageIndex = images.findIndex((img) => img === activeImage);
-
-  const goToPreviousImage = () => {
-    if (currentImageIndex > 0) {
-      setActiveImage(images[currentImageIndex - 1]);
-    }
-  };
-
-  const goToNextImage = () => {
-    if (currentImageIndex < images.length - 1) {
-      setActiveImage(images[currentImageIndex + 1]);
-    }
   };
 
   return (
@@ -418,130 +483,15 @@ ${shareUrl}`;
           <div className="flex flex-col gap-4">
             {/* Image Card */}
             <div className="bg-[#FFFFFF] dark:bg-[#1A1D20] dark:border-0 rounded-xl border border-[#C9D1DC] p-3 md:p-4 xl:p-4">
-              {/* Main Image */}
-              <div className="relative group overflow-hidden rounded-2xl bg-[#F8FAFC]">
-                <motion.img
-                  key={activeImage}
-                  src={activeImage}
-                  initial={{
-                    opacity: 0,
-                    scale: 1.02,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    scale: 1,
-                  }}
-                  transition={{
-                    duration: 0.25,
-                  }}
-                  alt="Product"
-                  className={`w-full aspect-[1/0.93] transition-all duration-300 ${
-                    isContainMode ? "object-contain" : "object-cover"
-                  }`}
-                />
-
-                {images.length > 1 && currentImageIndex > 0 && (
-                  <button
-                    onClick={goToPreviousImage}
-                    className="
-      absolute
-      left-4
-      top-1/2
-      -translate-y-1/2
-      h-11
-      w-11
-      rounded-full
-      bg-white/90
-      backdrop-blur-md
-      shadow-lg
-      flex
-      items-center
-      justify-center
-      z-20
-      transition-all
-      duration-200
-      opacity-100
-      md:opacity-0
-      md:group-hover:opacity-100
-      hover:scale-105
-    "
-                  >
-                    <FiChevronLeft size={24} />
-                  </button>
-                )}
-
-                {images.length > 1 && currentImageIndex < images.length - 1 && (
-                  <button
-                    onClick={goToNextImage}
-                    className="
-      absolute
-      right-4
-      top-1/2
-      -translate-y-1/2
-      h-11
-      w-11
-      rounded-full
-      bg-white/90
-      backdrop-blur-md
-      shadow-lg
-      flex
-      items-center
-      justify-center
-      z-20
-      transition-all
-      duration-200
-      opacity-100
-      md:opacity-0
-      md:group-hover:opacity-100
-      hover:scale-105
-    "
-                  >
-                    <FiChevronRight size={24} />
-                  </button>
-                )}
-
-                {/* Image Fit Toggle */}
-                <button
-                  onClick={() => setIsContainMode((prev) => !prev)}
-                  className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center hover:scale-105 transition-all duration-200"
-                >
-                  {isContainMode ? (
-                    <Minimize2 size={18} className="text-[#181C1F]" />
-                  ) : (
-                    <Expand size={18} className="text-[#181C1F]" />
-                  )}
-                </button>
-                {/* Top Actions */}
-                <div className="absolute top-3 right-3 flex items-center gap-2">
-                  <button
-                    onClick={() => setShowShareMenu(true)}
-                    className="w-10 h-10 md:w-11 md:h-11 lg:w-9 lg:h-9 rounded-full bg-white shadow-md flex items-center justify-center"
-                  >
-                    <Share2 size={18} className="text-[#181C1F]" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Thumbnails */}
-              <div className="mt-3 flex gap-3 overflow-x-auto scrollbar-hide">
-                {images.map((img, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setActiveImage(img)}
-                    className={`min-w-[74px] sm:min-w-[84px] w-[74px] sm:w-[90px] h-[74px] sm:h-[90px] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                      activeImage === img
-                        ? "border-[#4F46E5]"
-                        : "border-[#ECECEC]"
-                    }`}
-                  >
-                    <img
-                      src={img}
-                      alt={`Preview ${index}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
+              <ProductGallery
+                images={images}
+                activeIndex={currentImageIndex}
+                onSelect={goToImage}
+                onPrev={goToPreviousImage}
+                onNext={goToNextImage}
+                onOpen={() => setIsLightboxOpen(true)}
+                onShare={() => setShowShareMenu(true)}
+              />
 
               {/* Stats */}
               <div className="mt-4 border border-[#E2E8F0] rounded-xl px-3 bg-[#FFFFFF] dark:bg-[#131313] dark:border-0 py-3 flex flex-wrap items-center justify-between gap-3 text-[12px] md:text-sm text-[#6B7280]">
@@ -781,7 +731,9 @@ ${shareUrl}`;
                     </p>
 
                     <h4 className="mt-1 font-semibold text-[#0F172A] text-base dark:text-white">
-                      VIT Vellore
+                      {product.campus_id?.name ||
+                        campus?.name ||
+                        "Campus marketplace"}
                     </h4>
                   </div>
                 </div>
@@ -872,7 +824,7 @@ ${shareUrl}`;
         className="sm:hidden"
         style={{
           position: "fixed",
-          bottom: "16px",
+          bottom: "max(16px, env(safe-area-inset-bottom))",
           left: "16px",
           right: "16px",
           zIndex: 50,
@@ -993,7 +945,10 @@ dark:border-white/5
                 </p>
               </div>
 
-              <button onClick={() => setShowShareMenu(false)}>
+              <button
+                onClick={() => setShowShareMenu(false)}
+                aria-label="Close share dialog"
+              >
                 <IoClose className="text-black dark:text-white" size={24} />
               </button>
             </div>
@@ -1016,7 +971,12 @@ dark:border-zinc-800
 "
             >
               <img
-                src={product?.images?.[0]?.url || FALLBACK_IMAGE}
+                src={
+                  product?.images?.[0]?.url
+                    ? ikThumb(product.images[0].url)
+                    : FALLBACK_IMAGE
+                }
+                alt={product?.title || "Product"}
                 className="
     w-20
     h-20
@@ -1092,7 +1052,7 @@ dark:border-zinc-800
 
                   setCopied(true);
 
-                  setTimeout(() => {
+                  safeTimeout(() => {
                     setCopied(false);
                   }, 2000);
 
@@ -1159,6 +1119,13 @@ p-4
           onClose={() => setLimitInfo(null)}
         />
       )}
+      <ImageLightbox
+        open={isLightboxOpen}
+        images={images}
+        index={currentImageIndex}
+        onClose={() => setIsLightboxOpen(false)}
+        onIndexChange={goToImage}
+      />
     </motion.div>
   );
 };

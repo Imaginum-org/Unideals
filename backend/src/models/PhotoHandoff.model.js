@@ -34,6 +34,14 @@ const photoHandoffSchema = new Schema(
       ],
       default: [],
     },
+    // Hybrid-upload sync: desktop sets how many more photos may come from
+    // the phone given what's already attached on the laptop (1–3).
+    maxFiles: {
+      type: Number,
+      default: 3,
+      min: 1,
+      max: 3,
+    },
     expiresAt: {
       type: Date,
       required: true,

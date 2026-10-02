@@ -53,6 +53,15 @@ const Chat = () => {
     document.documentElement.classList.contains("dark"),
   );
   const messagesEndRef = useRef(null);
+  const supportRunRef = useRef(0);
+
+  useEffect(() => {
+    const runRef = supportRunRef;
+    return () => {
+      // Invalidate any in-flight support flow on unmount.
+      runRef.current += 1;
+    };
+  }, []);
 
   const users = [
     { id: 1, name: "Sarthak", url: "/userdp2.webp" },
@@ -108,12 +117,18 @@ const Chat = () => {
   };
 
   const handleSupportFlow = async (category) => {
+    // Guard against overlapping flows / unmount mid-sequence: only the
+    // latest flow may write messages.
+    const runId = ++supportRunRef.current;
+    const alive = () => runId === supportRunRef.current;
     addMessage(supportChat.id, category.label, "user");
     setIsTyping(true);
     await new Promise((res) => setTimeout(res, 1000));
+    if (!alive()) return;
     setIsTyping(false);
     addMessage(supportChat.id, category.aiResponse, "support");
     await new Promise((res) => setTimeout(res, 500));
+    if (!alive()) return;
     addMessage(
       supportChat.id,
       "Did that resolve your issue? If not, you can talk to a human representative.",
@@ -188,6 +203,7 @@ const Chat = () => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setSelectedUser(null)}
+                    aria-label="Back to conversations"
                     className="lg:hidden p-1 hover:bg-zinc-100 rounded-full transition-colors"
                   >
                     <ChevronLeft className="w-6 h-6 text-[#394ff1]" />
@@ -196,7 +212,7 @@ const Chat = () => {
                     <img
                       src={selectedUser.url || userdp}
                       className="size-10 rounded-full border-2 border-white shadow-sm object-cover"
-                      alt=""
+                      alt={selectedUser.name || "Chat participant"}
                     />
                     <span className="absolute bottom-0 right-0 size-3 bg-green-500 border-2 border-white rounded-full"></span>
                   </div>
@@ -212,6 +228,7 @@ const Chat = () => {
                 {selectedUser.id === "support" && (
                   <button
                     onClick={resetSupport}
+                    aria-label="Restart assistant conversation"
                     className="p-2 text-zinc-400 hover:text-[#394ff1] transition-colors"
                     title="Restart Assistant"
                   >
@@ -289,6 +306,7 @@ const Chat = () => {
                   <input
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
+                    aria-label="Type a message"
                     placeholder={
                       selectedUser.id === "support"
                         ? "Select a category above..."
@@ -299,6 +317,7 @@ const Chat = () => {
                   <button
                     type="submit"
                     disabled={!chatInput.trim()}
+                    aria-label="Send message"
                     className="bg-[#394ff1] disabled:opacity-50 disabled:scale-100 p-2.5 rounded-xl text-white hover:scale-105 transition-all shadow-md active:bg-[#2d3ec9]"
                   >
                     <IoSend size={20} />
@@ -310,7 +329,7 @@ const Chat = () => {
             <div className="hidden lg:flex flex-1 flex-col items-center gap-3 justify-center p-8">
               <img
                 src="/logo.svg"
-                alt="image"
+                alt="Unideals logo"
                 className="size-12 object-contain drop-shadow-md"
               />
 

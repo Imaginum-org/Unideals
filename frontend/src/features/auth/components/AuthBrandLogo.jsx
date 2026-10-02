@@ -11,12 +11,12 @@ function AuthBrandLogo() {
       <img
         src={cmlogo}
         className="h-10 w-10 object-cover mb-1 hidden md:block"
-        alt="image"
+        alt="Unideals logo"
       />
       <img
         src={whitecmlogo}
         className="mb-1 block h-7 w-6  size-5 md:hidden sm:h-7.5 sm:w-6"
-        alt="image"
+        alt="Unideals logo"
       />
       <span className="text-xl md:text-lg lg:text-xl font-semibold  dark:text-white">
         Unideals

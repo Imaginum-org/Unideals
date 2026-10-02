@@ -31,9 +31,15 @@ export const errorResponse = (res, message, status = 500, errors = null) => {
   return res.status(status).json(response);
 };
 
-// Map known service-layer errors (plain Errors) to HTTP codes before
-// passing to the global handler. Never downgrades an explicitly set code
-// (e.g. 403 LISTING_LIMIT stays 403). Unknown errors keep 500 + masked message.
+// 500-path message masking: expected 4xx messages pass through, but
+// anything else becomes a generic message so DB/driver internals
+// (collection names, E11000 keys, mailer errors) never reach clients.
+export const safeErrorMessage = (error, fallback = "Internal server error") => {
+  const status = error?.statusCode || error?.status;
+  if (status && Number(status) < 500) return error.message || fallback;
+  return fallback;
+};
+
 export const forwardServiceError = (error, next) => {
   if (!error.statusCode) {
     const msg = String(error.message || "");

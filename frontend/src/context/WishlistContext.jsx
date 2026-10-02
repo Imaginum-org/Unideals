@@ -98,12 +98,16 @@ export const WishlistProvider = ({ children }) => {
 
       return isWishlisted;
     } catch (originalError) {
-      // Rollback optimistic change, then re-throw the ORIGINAL error so
-      // callers keep response data (message, code like WISHLIST_LIMIT).
-      setWishlist(previous);
+      // Rollback via server refetch: restoring a captured snapshot would
+      // clobber concurrent optimistic updates from other cards.
+      try {
+        await fetchWishlist();
+      } catch {
+        setWishlist(previous);
+      }
       throw originalError;
     }
-  }, [wishlist, wishlistIds]);
+  }, [wishlist, wishlistIds, fetchWishlist]);
 
   /**
    * Remove directly - optimistic with rollback
@@ -121,10 +125,14 @@ export const WishlistProvider = ({ children }) => {
         productId,
       });
     } catch (originalError) {
-      setWishlist(previous);
+      try {
+        await fetchWishlist();
+      } catch {
+        setWishlist(previous);
+      }
       throw originalError;
     }
-  }, [wishlist]);
+  }, [wishlist, fetchWishlist]);
 
   const value = {
     wishlist,

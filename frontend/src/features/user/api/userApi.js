@@ -9,7 +9,8 @@ export const updateAvatar = (data) => axios.put("/api/user/updateAvatar", data);
 
 export const removeAvatar = () => axios.delete("/api/user/removeAvatar");
 
-export const deleteAccount = () => axios.delete("/api/user/deleteAccount");
+export const deleteAccount = (data = {}) =>
+  axios.delete("/api/user/deleteAccount", { data });
 
 export const createPickupSpot = (data) => axios.post("/api/pickup-spots", data);
 

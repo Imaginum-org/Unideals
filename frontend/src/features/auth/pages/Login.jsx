@@ -9,6 +9,7 @@ import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import SignInwithGoogle from "../components/signinWithGoogle";
 import { useUser } from "../../../context/useUserContext.jsx";
+import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -18,6 +19,7 @@ function Login() {
   const [formMessage, setFormMessage] = useState(null);
 
   const navigate = useNavigate();
+  const safeTimeout = useSafeTimeout();
   const clearFormMessage = () => setFormMessage(null);
   const location = useLocation();
   const { fetchUserProfile } = useUser();
@@ -148,7 +150,7 @@ function Login() {
           variant: "info",
           text: "Please verify your email first. Redirecting you to the verification page…",
         });
-        setTimeout(() => navigate("/checkEmail", { state: { email } }), 1500);
+        safeTimeout(() => navigate("/checkEmail", { state: { email } }), 1500);
         return;
       }
       setFormMessage({

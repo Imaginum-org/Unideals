@@ -51,16 +51,21 @@ const findLiveSession = async (code, { withSecret = false } = {}) => {
   return session;
 };
 
-export const createHandoff = async (userId) => {
+export const createHandoff = async (userId, maxFiles = MAX_HANDOFF_IMAGES) => {
   const code = nanocode();
   const secret = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + HANDOFF_TTL_MS);
+  const slots = Math.min(
+    MAX_HANDOFF_IMAGES,
+    Math.max(1, Number.parseInt(maxFiles, 10) || MAX_HANDOFF_IMAGES),
+  );
 
   await PhotoHandoff.create({
     code,
     secretHash: hashSecret(secret),
     user: userId,
     images: [],
+    maxFiles: slots,
     expiresAt,
   });
 
@@ -69,6 +74,7 @@ export const createHandoff = async (userId) => {
     code,
     secret, // returned once; the desktop embeds it in the QR, never stored client-side
     url: `${base}/p/${code}?k=${secret}`,
+    maxFiles: slots,
     expiresAt,
   };
 };
@@ -79,6 +85,7 @@ export const getHandoffStatus = async ({ code, userId }) => {
   if (String(session.user) !== String(userId)) {
     throw notFoundError();
   }
+  const cap = session.maxFiles || MAX_HANDOFF_IMAGES;
   return {
     code: session.code,
     images: session.images.map((img) => ({
@@ -86,6 +93,8 @@ export const getHandoffStatus = async ({ code, userId }) => {
       fileId: img.fileId,
     })),
     imageCount: session.images.length,
+    maxFiles: cap,
+    remainingSlots: Math.max(0, cap - session.images.length),
     expiresAt: session.expiresAt,
   };
 };
@@ -105,16 +114,22 @@ export const addHandoffPhotos = async ({ code, secret, files }) => {
     error.statusCode = 400;
     throw error;
   }
-  if (session.images.length + incoming.length > MAX_HANDOFF_IMAGES) {
+  const cap = session.maxFiles || MAX_HANDOFF_IMAGES;
+  const remaining = cap - session.images.length;
+  if (incoming.length > remaining) {
     const error = new Error(
-      `Maximum ${MAX_HANDOFF_IMAGES} photos per listing.`,
+      remaining <= 0
+        ? "This listing already has all its photos. Remove one on your laptop to send another."
+        : `Only ${remaining} more photo${remaining === 1 ? " fits" : "s fit"} — ${session.images.length} already attached.`,
     );
     error.statusCode = 400;
+    error.code = "HANDOFF_FULL";
     throw error;
   }
 
-  const uploaded = [];
-  for (const file of incoming) {
+  // Upload in parallel (max 3 files) — sequential awaits were the main
+  // server-side latency on multi-photo sends.
+  const uploadOne = async (file) => {
     // Defense in depth: multer already gates MIME + size; re-check here
     // since this endpoint is reachable with only the QR secret.
     if (!/^image\/(png|jpe?g|webp)$/.test(file.mimetype || "")) {
@@ -125,12 +140,9 @@ export const addHandoffPhotos = async ({ code, secret, files }) => {
     const safeName = String(file.originalname || "photo.jpg")
       .replace(/[^a-zA-Z0-9._-]/g, "_")
       .slice(0, 100);
-    const result = await uploadImageBuffer(
-      file.buffer,
-      `${Date.now()}_${safeName}`,
-    );
-    uploaded.push(result);
-  }
+    return uploadImageBuffer(file.buffer, `${Date.now()}_${safeName}`);
+  };
+  const uploaded = await Promise.all(incoming.map(uploadOne));
 
   session.images.push(
     ...uploaded.map((img) => ({ url: img.url, fileId: img.fileId })),

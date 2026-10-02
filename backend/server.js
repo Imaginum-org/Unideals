@@ -1,6 +1,11 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+if (!process.env.SECRET_KEY_ACCESS_TOKEN || !process.env.SECRET_KEY_REFRESH_TOKEN) {
+  console.error("Missing JWT secrets (SECRET_KEY_ACCESS_TOKEN / SECRET_KEY_REFRESH_TOKEN)");
+  process.exit(1);
+}
+
 import app from "./src/app.js";
 import { connectDB } from "./src/config/db.js";
 import { scheduleCleanupDeletedProducts } from "./src/jobs/cleanupDeletedProducts.job.js";

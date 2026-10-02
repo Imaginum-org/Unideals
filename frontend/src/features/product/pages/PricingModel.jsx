@@ -180,7 +180,7 @@ const PricingModel = () => {
   ];
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
   // Converts table values into icons, pills, dotted labels, or styled text.
   const renderComparisonValue = (value, plan, row) => {

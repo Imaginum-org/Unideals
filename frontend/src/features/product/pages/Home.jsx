@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
 import Category from "../../../features/product/components/Category.jsx";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
@@ -8,11 +8,15 @@ import { IoIosArrowForward } from "react-icons/io";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import FirstListingCelebration from "../../../Components/FirstListingCelebration.jsx";
+// Celebration (and its canvas-confetti dep) loads only when shown.
+const LazyCelebration = lazy(
+  () => import("../../../Components/FirstListingCelebration.jsx"),
+);
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { CATEGORY_ITEMS } from "../constants/categories";
 import { FiArrowRight } from "react-icons/fi";
 import { useUser } from "../../../context/useUserContext.jsx";
+import { useCampus } from "../../../context/CampusContext.jsx";
 import { loginWithGoogleOneTap } from "../../auth/api/authApi.js";
 
 const HOME_GOOGLE_LOGIN_TRIGGER_KEY = "homeGoogleLoginTriggered";
@@ -22,6 +26,7 @@ const Home = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isLoggedIn, loading: userLoading, fetchUserProfile } = useUser();
+  const { campusSlug } = useCampus();
 
   //STATE
   const [products, setProducts] = useState([]);
@@ -38,6 +43,8 @@ const Home = () => {
   const sliderRef = useRef(null);
   const fetchingRef = useRef(false);
   const hasMoreRef = useRef(true);
+  // Guards late responses after a campus switch (no mixed-campus lists).
+  const fetchCampusRef = useRef(null);
 
   useEffect(() => {
     hasMoreRef.current = hasMore;
@@ -173,16 +180,22 @@ const Home = () => {
   const fetchProducts = useCallback(async (pageNumber = 1) => {
     if (fetchingRef.current) return;
     if (!hasMoreRef.current) return;
+    if (!campusSlug) return;
 
     try {
       fetchingRef.current = true;
+      fetchCampusRef.current = campusSlug;
 
       setLoading(true);
 
       const res = await getProducts({
         page: pageNumber,
         limit: 10,
+        campus_slug: campusSlug,
       });
+
+      // Campus switched mid-flight — drop this stale page entirely.
+      if (fetchCampusRef.current !== campusSlug) return;
 
       const newProducts = res.data?.data || [];
       const pagination = res.data?.pagination || {};
@@ -207,7 +220,7 @@ const Home = () => {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, []);
+  }, [campusSlug]);
 
   useEffect(() => {
     const slider = sliderRef.current;
@@ -230,10 +243,19 @@ const Home = () => {
     fetchProducts(1);
   }, [fetchProducts]);
 
+  // Campus switch starts a clean feed — never append across campuses.
+  useEffect(() => {
+    setProducts([]);
+    setPage(1);
+    setHasMore(true);
+    hasMoreRef.current = true;
+  }, [campusSlug]);
+
   useEffect(() => {
     const fetchBoostedProducts = async () => {
+      if (!campusSlug) return;
       try {
-        const res = await getBoostedProducts();
+        const res = await getBoostedProducts({ campus_slug: campusSlug });
         setBoostedProducts(res.data?.data || []);
       } catch (err) {
         console.error("Failed to load boosted products", err);
@@ -241,7 +263,7 @@ const Home = () => {
     };
 
     fetchBoostedProducts();
-  }, []);
+  }, [campusSlug]);
 
   const scrollLeft = () => {
     sliderRef.current?.scrollBy({
@@ -287,6 +309,10 @@ const Home = () => {
     [hasMore, page, fetchProducts],
   );
 
+  useEffect(() => {
+    return () => observerRef.current?.disconnect();
+  }, []);
+
   return (
     <motion.div className="w-full bg-white dark:bg-[#131313] relative">
       <div className="flex flex-col">
@@ -312,13 +338,6 @@ const Home = () => {
         >
           {/* Black Overlay for text */}
           {/* <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-black/10 z-0" /> */}
-
-          {/* <img
-            width={170}
-            src="\assets\circle.png"
-            alt="image"
-            className="absolute bottom-0 xl:left-72 lg:left-48 md:left-40 md:bottom-[-1.3vh] lg:bottom-0 hidden md:block "
-          /> */}
 
           {/* Left Image */}
           <div
@@ -649,7 +668,11 @@ const Home = () => {
           </div>
 
           {loading && (
-            <p className="w-full text-center mt-4 text-gray-500">
+            <p
+              role="status"
+              aria-live="polite"
+              className="w-full text-center mt-4 text-gray-500"
+            >
               Loading more products...
             </p>
           )}
@@ -692,7 +715,9 @@ const Home = () => {
       </Link>
 
       {showCelebration && (
-        <FirstListingCelebration onClose={() => setShowCelebration(false)} />
+        <Suspense fallback={null}>
+          <LazyCelebration onClose={() => setShowCelebration(false)} />
+        </Suspense>
       )}
     </motion.div>
   );

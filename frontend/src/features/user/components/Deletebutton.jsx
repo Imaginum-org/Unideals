@@ -10,14 +10,19 @@ import { deleteAccount } from "../../../features/user/api/userApi.js";
 function AlertDialogDemo() {
   const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
+  const [password, setPassword] = React.useState("");
 
   const handleDeleteAccount = async () => {
     if (loading) return; // prevent double click
+    if (!password) {
+      toast.error("Please enter your password to confirm deletion.");
+      return;
+    }
 
     try {
       setLoading(true);
 
-      const response = await deleteAccount();
+      const response = await deleteAccount({ password });
 
       if (response.data.success) {
         localStorage.removeItem("isAuthenticated");
@@ -60,6 +65,23 @@ function AlertDialogDemo() {
               This action cannot be undone. This will permanently delete your
               account and remove your data from our servers.
             </AlertDialog.Description>
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-sm font-medium text-gray-700">
+                Confirm with your password
+              </span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+              />
+              <span className="mt-1.5 block text-xs text-gray-500">
+                Signed up with Google? Set a password via Forgot Password
+                first.
+              </span>
+            </label>
             <div
               style={{
                 display: "flex",

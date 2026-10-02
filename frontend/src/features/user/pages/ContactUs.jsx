@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "../../../context/useUserContext.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
-import emailjs from "@emailjs/browser";
 import toast from "react-hot-toast";
 import {
   Search,
@@ -197,6 +196,8 @@ function ContactUs() {
     }
 
     try {
+      // emailjs loads only when a message is actually sent.
+      const { default: emailjs } = await import("@emailjs/browser");
       await emailjs.send(
         import.meta.env.VITE_EMAILJS_SERVICE_ID,
         import.meta.env.VITE_EMAILJS_TEMPLATE_ID,

@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import xss from "xss";
 import { OAuth2Client } from "google-auth-library";
 import userModel from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
@@ -17,6 +18,7 @@ import {
   sanitizeAuthUser,
   setAuthCookies,
 } from "../services/auth.service.js";
+import { safeErrorMessage } from "../utils/response.js";
 
 const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -40,7 +42,7 @@ const findOrCreateGoogleUser = async (payload) => {
     throw error;
   }
 
-  const name = payload.name || email.split("@")[0];
+  const name = xss(String(payload.name || email.split("@")[0]).slice(0, 100));
   // Only accept Google-hosted avatar URLs to prevent stored XSS/phishing
   const rawPicture = typeof payload.picture === "string" ? payload.picture : null;
   const isGoogleAvatar =
@@ -93,16 +95,26 @@ export const registerUserController = async (req, res) => {
       });
     }
 
+    // Server-side backstop (frontend already enforces a stronger policy).
+    if (typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters.",
+        error: true,
+        success: false,
+      });
+    }
+
     email = email.trim().toLowerCase();
     const existingUser = await userModel.findOne({ email });
 
     if (existingUser && existingUser.is_email_verified) {
-      // Generic response to avoid confirming which emails are registered,
-      // while preserving existing client behavior (400 for verified accounts).
-      return res.status(400).json({
-        message: "If this email is registered, please log in or check your inbox.",
-        error: true,
-        success: false,
+      // Uniform success: distinct statuses/messages would let anyone
+      // probe which emails hold verified accounts.
+      return res.status(200).json({
+        message:
+          "If this email is registered, please log in or check your inbox for verification.",
+        error: false,
+        success: true,
       });
     }
 
@@ -156,7 +168,7 @@ export const registerUserController = async (req, res) => {
   } catch (err) {
     console.error("Registration Error:", err);
     return res.status(500).json({
-      message: err.message || "Internal server error",
+      message: safeErrorMessage(err, "Internal server error"),
       error: true,
       success: false,
     });
@@ -171,21 +183,19 @@ export const loginController = async (req, res) => {
 
     setAuthCookies(res, accessToken, refreshToken);
 
+    // Tokens travel via HttpOnly cookies only — never in the JSON body,
+    // where any XSS could exfiltrate the 7-day refresh token.
     return res.status(200).json({
       message: "Login successfully",
       success: true,
       error: false,
       data: {
-        refreshtoken: refreshToken,
-        accesstoken: accessToken,
-        refreshToken,
-        accessToken,
         user,
       },
     });
   } catch (err) {
     return res.status(err.statusCode || 500).json({
-      message: err.message || err,
+      message: safeErrorMessage(err, "Login failed"),
       success: false,
       error: true,
       requiresVerification: Boolean(err.requiresVerification),
@@ -197,10 +207,20 @@ export const loginController = async (req, res) => {
 
 export const googleAuthRedirectController = async (req, res) => {
   try {
+    // OAuth state binds the callback to this browser (login-CSRF defense).
+    const state = crypto.randomBytes(16).toString("hex");
+    res.cookie("oauth_state", state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 5 * 60 * 1000,
+      path: "/",
+    });
     const authorizeUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: ["openid", "email", "profile"],
       prompt: "select_account",
+      state,
     });
 
     return res.redirect(authorizeUrl);
@@ -216,7 +236,7 @@ export const googleAuthRedirectController = async (req, res) => {
 
 export const googleAuthCallbackController = async (req, res) => {
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) {
       return res.status(400).json({
         message: "Google authorization code is missing.",
@@ -224,6 +244,16 @@ export const googleAuthCallbackController = async (req, res) => {
         error: true,
       });
     }
+    // State must match the cookie set at redirect time — otherwise this
+    // login was planted by someone else (login CSRF / session fixation).
+    if (!state || state !== req.cookies?.oauth_state) {
+      return res.status(403).json({
+        message: "Google login session mismatch. Please try again.",
+        success: false,
+        error: true,
+      });
+    }
+    res.clearCookie("oauth_state", { path: "/" });
 
     const { tokens } = await oauth2Client.getToken(code);
     if (!tokens?.id_token) {
@@ -327,8 +357,6 @@ export const googleOneTapController = async (req, res) => {
       success: true,
       error: false,
       data: {
-        accessToken,
-        refreshToken,
         user: sanitizeAuthUser(user),
       },
     });
@@ -407,14 +435,12 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       success: true,
       error: false,
       data: {
-        accessToken,
-        refreshToken,
         user: sanitizeAuthUser(freshUser),
       },
     });
   } catch (error) {
     return res.status(500).json({
-      message: error.message || "Google login failed",
+      message: safeErrorMessage(error, "Google login failed"),
       success: false,
       error: true,
     });
@@ -550,11 +576,11 @@ export const refreshAccessTokenController = async (req, res) => {
       message: "Token refreshed successfully",
       success: true,
       error: false,
-      data: session,
+      data: { user: session.user },
     });
   } catch (err) {
     return res.status(err.statusCode || 401).json({
-      message: err.message || "Invalid refresh token",
+      message: safeErrorMessage(err, "Invalid refresh token"),
       success: false,
       error: true,
     });
@@ -579,7 +605,9 @@ export const forgotPasswordController = async (req, res) => {
     const user = await userModel.findOne({ email: normalizedEmail });
 
     if (!user) {
-      // Generic success to prevent enumeration
+      // Generic success to prevent enumeration; small delay so missing
+      // accounts take ~as long as the email-sending path below.
+      await new Promise((resolve) => setTimeout(resolve, 600));
       return res.status(200).json({
         message: genericMessage,
         success: true,
@@ -627,8 +655,10 @@ export const forgotPasswordController = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({
-      message:
-        error.message || "An error occurred while sending the reset email",
+      message: safeErrorMessage(
+        error,
+        "An error occurred while sending the reset email",
+      ),
       success: false,
       error: true,
     });
@@ -640,9 +670,9 @@ export const resetPasswordController = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
-    if (!password || typeof password !== "string" || password.length < 6) {
+    if (!password || typeof password !== "string" || password.length < 8) {
       return res.status(400).json({
-        message: "Please provide a new password of at least 6 characters",
+        message: "Please provide a new password of at least 8 characters",
         success: false,
         error: true,
       });
@@ -680,8 +710,10 @@ export const resetPasswordController = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({
-      message:
-        error.message || "An error occurred while resetting the password",
+      message: safeErrorMessage(
+        error,
+        "An error occurred while resetting the password",
+      ),
       success: false,
       error: true,
     });
@@ -747,10 +779,11 @@ export const resendVerificationController = async (req, res) => {
     }
 
     if (user.is_email_verified) {
-      return res.status(400).json({
-        message: "Email is already verified. Please log in.",
-        success: false,
-        error: true,
+      // Uniform success: a distinct 400 would confirm verified accounts.
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
       });
     }
 

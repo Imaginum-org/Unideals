@@ -2,6 +2,8 @@ import { memo, forwardRef, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { FaStar, FaHeart, FaRegHeart, FaCrown } from "react-icons/fa";
 import { useWishlist } from "../../../context/WishlistContext.jsx";
+import { useCampus } from "../../../context/CampusContext.jsx";
+import { ikCard } from "../../../utils/imageTransform.js";
 import LimitModal from "../../../Components/ui/LimitModal.jsx";
 import toast from "react-hot-toast";
 import { IoLocationOutline } from "react-icons/io5";
@@ -9,7 +11,7 @@ import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
 import { MdOutlineChatBubbleOutline } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 
-const FALLBACK_IMAGE = "/image10.png";
+const FALLBACK_IMAGE = "/logo.svg";
 const INR_FORMATTER = new Intl.NumberFormat("en-IN");
 
 // Helper function to get tier-specific styles (retained for your logic)
@@ -52,12 +54,13 @@ const ProductCard = memo(
     ({ product, showRemoveButton = false, onRemove, onRemoveError }, ref) => {
       const { toggleWishlist, removeFromWishlist, isInWishlist } =
         useWishlist();
+      const { campus } = useCampus();
       const [loading, setLoading] = useState(false);
       const [limitInfo, setLimitInfo] = useState(null);
       const navigate = useNavigate();
 
-      if (!product) return null;
-
+      // Hooks must run unconditionally (rules-of-hooks): the null guard
+      // lives after all hooks, just before render.
       const {
         _id,
         title,
@@ -68,12 +71,12 @@ const ProductCard = memo(
         location,
         seller_id,
         seller,
-      } = product;
+      } = product || {};
 
       const inWishlist = isInWishlist(_id);
 
       const isBoosted =
-        product.is_boosted &&
+        product?.is_boosted &&
         (!product.boost_expires_at ||
           new Date(product.boost_expires_at) > new Date());
 
@@ -82,7 +85,7 @@ const ProductCard = memo(
           ? seller_id
           : seller;
 
-      const currentTier = isBoosted ? product.boost_tier || "pro" : "regular";
+      const currentTier = isBoosted ? product?.boost_tier || "pro" : "regular";
 
       const tierStyles = getTierStyles(currentTier);
 
@@ -95,20 +98,23 @@ const ProductCard = memo(
         sellerInfo?.subscription ||
         (currentTier === "regular" ? "base_user" : currentTier);
 
-      // Fallback seller rating for design match (can be replaced with dynamic data: sellerInfo?.rating)
-      const sellerRating = sellerInfo?.rating ?? 4.9;
+      // Only show a rating badge when the backend provides a real one —
+      // never a hardcoded number.
+      const sellerRating =
+        typeof sellerInfo?.rating === "number" ? sellerInfo.rating : null;
 
       const imageUrl = useMemo(() => {
         if (!images?.length) return FALLBACK_IMAGE;
 
         const firstImage = images[0];
 
-        // Support both old and new schema during migration
+        // Support both old and new schema during migration.
+        // Sized ImageKit variant: cards never need full-res uploads.
         if (typeof firstImage === "string") {
-          return firstImage;
+          return ikCard(firstImage);
         }
 
-        return firstImage?.url || FALLBACK_IMAGE;
+        return firstImage?.url ? ikCard(firstImage.url) : FALLBACK_IMAGE;
       }, [images]);
 
       const savings = useMemo(
@@ -129,7 +135,7 @@ const ProductCard = memo(
       );
 
       const handleClick = useCallback(() => {
-        window.scrollTo({ top: 0, behavior: "instant" });
+        window.scrollTo({ top: 0, behavior: "auto" });
       }, []);
 
       const handleWishlistClick = async (e) => {
@@ -189,7 +195,10 @@ const ProductCard = memo(
         e.currentTarget.src = FALLBACK_IMAGE;
       }, []);
 
-      const formattedLocation = location || "VIT Vellore";
+      const formattedLocation =
+        location || campus?.name || campus?.short_name || "";
+
+      if (!product) return null;
 
       return (
         <>
@@ -410,13 +419,15 @@ group-hover:pointer-events-auto
                     {sellerName}
                   </span>
 
-                  {/* Rating Badge */}
-                  <div className="flex shrink-0 items-center gap-1 border border-[#E1E1E1] dark:border-zinc-700 rounded-full px-1.5 sm:px-2 py-1 ml-0.5 sm:ml-1">
-                    <FaStar className="text-yellow-400 text-[13px]" />
-                    <span className="text-[13px] font-medium text-zinc-400">
-                      {sellerRating}
-                    </span>
-                  </div>
+                  {/* Rating Badge (real data only) */}
+                  {sellerRating !== null && (
+                    <div className="flex shrink-0 items-center gap-1 border border-[#E1E1E1] dark:border-zinc-700 rounded-full px-1.5 sm:px-2 py-1 ml-0.5 sm:ml-1">
+                      <FaStar className="text-yellow-400 text-[13px]" />
+                      <span className="text-[13px] font-medium text-zinc-400">
+                        {sellerRating}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Side: Location */}

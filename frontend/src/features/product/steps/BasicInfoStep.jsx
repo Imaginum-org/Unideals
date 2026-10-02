@@ -1,4 +1,4 @@
-import Select from "react-select";
+import { Suspense, lazy } from "react";
 import { IoArrowForward } from "react-icons/io5";
 import useProductListing from "../hooks/useProductListing";
 import {
@@ -10,6 +10,13 @@ import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
 import { validateBasicInfo } from "../validations";
 import FormError from "../components/shared/FormError";
 import { motion } from "framer-motion";
+
+// react-select loads only with the listing flow (never in Home/search).
+const LazySelect = lazy(() => import("react-select"));
+
+const SelectFallback = (
+  <div className="h-[38px] animate-pulse rounded-lg border border-zinc-200 bg-zinc-50" />
+);
 
 const CategoryOption = (props) => {
   const { data, innerRef, innerProps, isFocused, isSelected } = props;
@@ -224,7 +231,8 @@ const BasicInfoStep = () => {
             </label>
 
             <div className="mt-2">
-              <Select
+              <Suspense fallback={SelectFallback}>
+              <LazySelect
                 name="category"
                 menuPlacement="auto"
                 menuShouldScrollIntoView={false}
@@ -245,6 +253,7 @@ const BasicInfoStep = () => {
                   updateField("category", selected?.value || "")
                 }
               />
+              </Suspense>
 
               <p className="mt-2 text-sm text-[#94A3B8]">
                 Choose the category that best matches your product.
@@ -321,7 +330,8 @@ const BasicInfoStep = () => {
             </label>
 
             <div className="mt-2">
-              <Select
+              <Suspense fallback={SelectFallback}>
+              <LazySelect
                 name="condition"
                 options={PRODUCT_CONDITION_OPTIONS}
                 styles={selectStyles}
@@ -336,6 +346,7 @@ const BasicInfoStep = () => {
                   updateField("condition", selected?.value || "")
                 }
               />
+              </Suspense>
               <FormError error={errors.condition} />
             </div>
           </div>
@@ -348,7 +359,8 @@ const BasicInfoStep = () => {
             </label>
 
             <div className="mt-2">
-              <Select
+              <Suspense fallback={SelectFallback}>
+              <LazySelect
                 name="usageDuration"
                 options={PRODUCT_USAGE_OPTIONS}
                 styles={selectStyles}
@@ -364,6 +376,7 @@ const BasicInfoStep = () => {
                 }
                 className="bg-[#F7F8FA]"
               />
+              </Suspense>
               <FormError error={errors.usageDuration} />
             </div>
           </div>

@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "prod": "NODE_ENV=production node server.js",
+    "seed:campuses": "node src/seeds/campuses.seed.js",
     "lint": "echo \"Add ESLint here\"",
     "format": "echo \"Add Prettier here\""
   },
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "crypto": "^1.0.1",

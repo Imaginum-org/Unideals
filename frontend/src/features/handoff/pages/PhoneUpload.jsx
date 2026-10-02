@@ -5,9 +5,19 @@ import { MdPhotoLibrary, MdPhotoCamera, MdCheckCircle } from "react-icons/md";
 import { uploadHandoffPhotos } from "../api/handoffApi.js";
 import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 
-const MAX_FILES = 3;
+const DEFAULT_MAX_FILES = 3;
 const MAX_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+
+// Phone-side compression targets: uploads shrink ~10x on mobile networks.
+// Lazy-loaded so the landing chunk stays lean.
+const COMPRESS_OPTIONS = {
+  maxSizeMB: 1,
+  maxWidthOrHeight: 1600,
+  useWebWorker: true,
+  initialQuality: 0.85,
+  fileType: "image/jpeg",
+};
 
 // Mobile page opened by scanning the desktop QR. No login needed — the `k`
 // secret in the URL is the capability token (15-min TTL, server-enforced).
@@ -15,12 +25,23 @@ const PhoneUpload = () => {
   const { code } = useParams();
   const [searchParams] = useSearchParams();
   const secret = searchParams.get("k") || "";
+  // Hybrid slots from the desktop QR: how many more fit + what's already
+  // on the laptop. Falls back to the listing-wide cap of 3.
+  const maxFiles = Math.min(
+    DEFAULT_MAX_FILES,
+    Math.max(1, Number.parseInt(searchParams.get("max"), 10) || DEFAULT_MAX_FILES),
+  );
+  const laptopCount = Math.max(
+    0,
+    Number.parseInt(searchParams.get("used"), 10) || 0,
+  );
   const galleryRef = useRef(null);
   const cameraRef = useRef(null);
 
   const [files, setFiles] = useState([]); // File[]
   const [previews, setPreviews] = useState([]); // object URLs
   const [uploading, setUploading] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
   const [failed, setFailed] = useState("");
@@ -37,7 +58,16 @@ const PhoneUpload = () => {
   }
 
   const addFiles = (list) => {
-    const picked = Array.from(list || []).slice(0, MAX_FILES - files.length);
+    const remaining = maxFiles - files.length;
+    if (remaining <= 0) {
+      toast.error(
+        laptopCount > 0
+          ? `${laptopCount} already on the laptop — only ${maxFiles} more fit.`
+          : `Only ${maxFiles} photo${maxFiles === 1 ? "" : "s"} fit.`,
+      );
+      return;
+    }
+    const picked = Array.from(list || []).slice(0, remaining);
     const valid = [];
     for (const file of picked) {
       if (!ALLOWED_TYPES.includes(file.type)) {
@@ -65,13 +95,34 @@ const PhoneUpload = () => {
   };
 
   const handleUpload = async () => {
-    if (files.length === 0 || uploading) return;
+    if (files.length === 0 || uploading || optimizing) return;
     setUploading(true);
+    setOptimizing(true);
     setProgress(0);
     setFailed("");
     try {
+      // Compress on-device first: a 10MB camera shot becomes ~1MB, which
+      // is the actual speedup on slow mobile networks. Files already
+      // under ~1MB skip recompression.
+      const { default: imageCompression } = await import(
+        "browser-image-compression"
+      );
+      const optimized = await Promise.all(
+        files.map(async (file) => {
+          try {
+            if (file.size <= 1024 * 1024) return file;
+            const out = await imageCompression(file, COMPRESS_OPTIONS);
+            return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), {
+              type: out.type || "image/jpeg",
+            });
+          } catch {
+            return file; // never block the send on compression failure
+          }
+        }),
+      );
+      setOptimizing(false);
       const formData = new FormData();
-      files.forEach((file) => formData.append("photos", file, file.name));
+      optimized.forEach((file) => formData.append("photos", file, file.name));
       await uploadHandoffPhotos(code, secret, formData, (event) => {
         if (event.total) setProgress(Math.round((event.loaded / event.total) * 100));
       });
@@ -91,6 +142,7 @@ const PhoneUpload = () => {
       }
     } finally {
       setUploading(false);
+      setOptimizing(false);
     }
   };
 
@@ -122,11 +174,16 @@ const PhoneUpload = () => {
       ) : null}
 
       {/* Pickers */}
+      {laptopCount > 0 && (
+        <p className="mt-4 rounded-xl bg-[#EEF2FF] px-4 py-2.5 text-center text-sm font-semibold text-[#4F46E5]">
+          {laptopCount} already on the laptop — you can send {maxFiles} more
+        </p>
+      )}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={() => galleryRef.current?.click()}
-          disabled={uploading || files.length >= MAX_FILES}
+          disabled={uploading || files.length >= maxFiles}
           className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#D1D5DB] bg-[#F8FAFC] p-5 text-sm font-bold text-[#374151] transition active:scale-[0.98] disabled:opacity-50"
         >
           <MdPhotoLibrary size={28} className="text-[#4F46E5]" />
@@ -135,7 +192,7 @@ const PhoneUpload = () => {
         <button
           type="button"
           onClick={() => cameraRef.current?.click()}
-          disabled={uploading || files.length >= MAX_FILES}
+          disabled={uploading || files.length >= maxFiles}
           className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#D1D5DB] bg-[#F8FAFC] p-5 text-sm font-bold text-[#374151] transition active:scale-[0.98] disabled:opacity-50"
         >
           <MdPhotoCamera size={28} className="text-[#4F46E5]" />
@@ -196,7 +253,9 @@ const PhoneUpload = () => {
         {uploading ? (
           <>
             <BrandLoader size="xs" tone="white" />
-            <span>Sending… {progress}%</span>
+            <span>
+              {optimizing ? "Optimizing…" : `Sending… ${progress}%`}
+            </span>
           </>
         ) : (
           <span>
@@ -205,7 +264,7 @@ const PhoneUpload = () => {
         )}
       </button>
       <p className="mt-3 text-center text-xs leading-5 text-[#9CA3AF]">
-        Photos attach to your listing draft automatically. Max {MAX_FILES}, 10MB each.
+        Photos attach to your listing draft automatically. Max {maxFiles}, 10MB each.
       </p>
     </MobileShell>
   );

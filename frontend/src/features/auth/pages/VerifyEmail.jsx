@@ -7,6 +7,7 @@ import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 
 const cardShell =
   "w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none";
@@ -14,6 +15,7 @@ const cardShell =
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const safeTimeout = useSafeTimeout();
   const [loading, setLoading] = useState(true);
   const [formMessage, setFormMessage] = useState(null);
 
@@ -42,7 +44,7 @@ function VerifyEmail() {
               response.data.message ||
               "Email verified successfully! Redirecting to sign in…",
           });
-          window.setTimeout(() => navigate("/login", { replace: true }), 1200);
+          safeTimeout(() => navigate("/login", { replace: true }), 1200);
         } else {
           setFormMessage({
             variant: "error",
@@ -62,7 +64,7 @@ function VerifyEmail() {
     };
 
     verifyEmail();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, safeTimeout]);
 
   return (
     <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-white dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden">

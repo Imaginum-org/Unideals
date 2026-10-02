@@ -151,7 +151,11 @@ function Profile_left_part() {
               {userDetails?.name || "User"}
             </h2>
             <p className="text-xs font-medium text-[#94A3B8] dark:text-gray-500 mt-0.5">
-              {userDetails?.college || "VIT Vellore"}
+              {(userDetails?.campus_id &&
+                typeof userDetails.campus_id === "object" &&
+                userDetails.campus_id.name) ||
+                userDetails?.college ||
+                "Set campus"}
             </p>
           </div>
           <button
@@ -222,7 +226,7 @@ function Profile_left_part() {
           <div className="flex items-center justify-center">
             <img
               src="/logo.svg"
-              alt="image"
+              alt="Unideals logo"
               className="h-8 w-8 object-contain"
             />
           </div>

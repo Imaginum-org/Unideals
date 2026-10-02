@@ -10,7 +10,9 @@ import {
 
 export const createProductSchema = z
   .object({
-    status: z.enum(Object.values(PRODUCT_STATUS)).optional(),
+    // Client may only create drafts or live listings — privileged states
+    // (sold/blocked/unlisted) are server transitions, never inputs.
+    status: z.enum([PRODUCT_STATUS.DRAFT, PRODUCT_STATUS.LISTED]).optional(),
 
     title: z
       .string()

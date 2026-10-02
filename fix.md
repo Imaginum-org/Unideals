@@ -268,3 +268,191 @@ Spec: `Subscription_plan.md` (Founder: Pro ₹99, Pro+ ₹199, lifetime; Free 10
 - Mock Chat/Notification/Myorders UI kept functional — only hardened underneath.
 - No new required env vars. Existing `.env` continues to work. New `User.tokenVersion` / `verifyTokenEmailExpiry` default safely for old docs.
 - Old verification links (pre-deploy, no expiry) will require resend — one-time, secure by design.
+
+---
+
+# Update — 2026-10-02
+
+**Scope:** Product gallery lightbox, campus-locked marketplace, guest default-campus browsing, full audit remediation (security + bugs + UX). Production-grade, backwards-compatible — API shapes, routes, and UI flows preserved unless noted.
+**Verification:** `frontend` `npm run build` passes, `backend` `node --check` passes on all touched files, live smoke tests against Atlas dev DB (campus directory, scoped feeds, CSRF/origin enforcement, password policy).
+
+---
+
+## Backend Fixes
+
+### `backend/src/models/Campus.model.js` (new)
+- New `Campus` collection: immutable `slug` (unique, validated), `name`, `short_name`, `city/state`, `email_domains[]` (suggestion-only, never auto-assign), `is_active` kill-switch + `{ is_active, name }` index.
+
+### `backend/src/seeds/campuses.seed.js` (new) + `backend/package.json`
+- Idempotent upsert seed for all 4 VIT campuses (Vellore, Chennai, Bhopal, **Amaravati** — previously missing from the hardcoded list of 3). Run: `npm run seed:campuses`.
+
+### `backend/src/services/campus.service.js` (new)
+- Single resolver for "which campus?": profile `campus_id` for logged-in (client param ignored — tamper-proof), validated `campus_slug` for guests, flagship `DEFAULT_CAMPUS_SLUG` fallback (never unscoped). Throws `CAMPUS_REQUIRED / CAMPUS_INVALID / CAMPUS_INACTIVE` with status codes. 5-min in-memory directory cache.
+
+### `backend/src/controllers/campus.controller.js` (new) + `backend/src/routes/campus.routes.js` (new) + `backend/src/validations/campus.validation.js` (new)
+- Public `GET /api/campuses` (active only, cached); admin CRUD under `/api/admin/campuses` with zod validation (slug immutable on update).
+
+### `backend/src/app.js`
+- Mounted `/api/campuses`; added `verifyOrigin` CSRF middleware on all mutations (Origin/Referer allowlist, webhook + non-browser exempt, fail-open when unconfigured for dev); `trust proxy: 1` for correct rate-limit client keys behind Render/ELB; morgan redacts `?k=` handoff secrets; `/health` minimized to `{status:"OK"}`; CORS rejection now maps to `403 Origin not allowed` instead of silent 500.
+
+### `backend/src/middlewares/csrf.middleware.js` (new)
+- Origin/Referer gate for POST/PUT/PATCH/DELETE (see above).
+
+### `backend/src/middlewares/auth.middleware.js`
+- JWT `algorithms: ["HS256"]` pinned in both `auth` and `optionalAuth`.
+
+### `backend/src/models/User.model.js`
+- Added `campus_id` ref (indexed, null only for legacy accounts until gated); password `minlength 6 → 8`.
+
+### `backend/src/models/Product.model.js`
+- Added denormalized `campus_id` ref (indexed) + campus-first compound indexes `{campus_id,status,is_deleted,createdAt}`, `{campus_id,category,selling_price}`.
+
+### `backend/src/controllers/user.controller.js`
+- `getUserProfile` populates campus; `updateUserProfile` accepts `campus_slug` (active-only), bulk-migrates live listings, returns `movedListings`; `deleteAccount` now requires password re-auth (Google-only users get a "set one via Forgot Password" message) ; avatar endpoint fails closed when `IMAGEKIT_URL_ENDPOINT` unset; all 500s masked via `safeErrorMessage`.
+
+### `backend/src/routes/user.routes.js`
+- `DELETE /deleteAccount` gets 3/hr limiter.
+
+### `backend/src/services/product.service.js`
+- `createProduct`: strips client `campus_id`, stamps seller's active campus (throws `CAMPUS_REQUIRED/INACTIVE` otherwise); `status` whitelisted to `draft/listed` (closes sold-state limit bypass).
+- `getAllProducts/searchProducts/trending/suggestions/boosted`: mandatory campus-first `baseMatch` (legacy campus-less listings excluded); trending cache keyed per-campus (was global — would have leaked trends across campuses).
+- `getSingleProduct(id, campusId, requesterId)`: campus mismatch → `404 CAMPUS_MISMATCH` without incrementing views; seller mobile/pincode stripped for non-owners (meetup spot text kept).
+
+### `backend/src/controllers/product.controller.js`
+- All public endpoints resolve campus via `resolveRequestCampus` and thread it (plus `requesterId`) into services; creation errors for bad status/campus map to 400 (no internals leak).
+
+### `backend/src/routes/product.routes.js`
+- `optionalAuth` on all public GETs so logged-in scoping uses profile campus even without a slug param.
+
+### `backend/src/controllers/auth.controller.js`
+- Tokens removed from all login/refresh JSON bodies (cookies authoritative — frontend verified cookie-only); register min-8 password backstop; verified-account register/resend now uniform `200` generic (kills enumeration oracle); Google display name XSS-sanitized; OAuth `state` cookie + callback verification (login-CSRF fix); forgot-password missing-user 600ms timing equalizer; all 500s masked via `safeErrorMessage`.
+
+### `backend/src/routes/auth.routes.js`
+- `probeLimiter` (30/15m) on verify/check-verification/reset-precheck/refresh; removed legacy `GET /logoutUser` (logout-CSRF vector — frontend already POST-first).
+
+### `backend/src/services/auth.service.js`
+- Dummy bcrypt compare for missing accounts (timing-equalized login); refresh `jwt.verify` pinned to HS256.
+
+### `backend/src/routes/admin.routes.js`
+- `adminAuthLimiter` (10/15m) on admin login + refresh (was unlimited); admin campus CRUD routes (support-read, admin-write).
+
+### `backend/src/controllers/adminAuth.controller.js` + `admin.product.controller.js` + `admin.user.controller.js`
+- 500s masked via `safeErrorMessage` (admin login was already token-clean — verified).
+
+### `backend/src/validations/product.validation.js`
+- `status` whitelisted to `draft/listed` (privileged states are server transitions only).
+
+### `backend/src/validations/campus.validation.js` (new)
+- Zod schemas for campus create/update + slug input.
+
+### `backend/src/controllers/imagekit.controller.js`
+- Auth signatures now expire in 5 minutes (was default TTL).
+
+### `backend/src/controllers/pickupSpot.controller.js`
+- 500s masked; `deletePickupSpot` gets the same `ObjectId.isValid` guard as update/set-primary (was CastError 500).
+
+### `backend/src/controllers/badgeController.js`
+- 500s masked; leaderboard scoped to viewer's campus (comment already promised this); removed dead dynamic import of `frontend-badge-config-placeholder.js`; `POST /compute` limited to 5/hr (`routes/badgeRoutes.js`).
+
+### `backend/src/controllers/handoff.controller.js` + `backend/src/features/handoff/api/handoffApi.js` (frontend)
+- Upload secret moved from `?k=` query to `x-handoff-secret` header (stops history/log/Referer persistence).
+
+### `backend/src/services/conversation.service.js` (still unmounted)
+- Participant assertion on get/read/delete so it's safe if ever mounted.
+
+### `backend/server.js`
+- Boot check: exits if JWT secrets missing.
+
+### `backend/.env` + `backend/.env.sample`
+- Added `DEFAULT_CAMPUS_SLUG=vit-vellore` (guest browsing flagship, per-env override).
+
+---
+
+## Frontend Fixes
+
+### `frontend/src/features/product/components/ProductGallery.jsx` (new)
+- Inline PDP gallery extracted from `ProductDescription`: fixed `object-cover`, click/Enter/Space opens fullscreen, premium glass arrows with infinite loop (always mounted — no appear/disappear jump), swipe support, synced thumbnails, neighbour preloading. Fit-toggle and counter badge removed per design.
+
+### `frontend/src/features/product/components/ImageLightbox.jsx` (new)
+- Fullscreen portal viewer: zoom 1x–3x (buttons/wheel/double-click, real CSS transform — fixed the bug where framer `animate.scale` overrode zoom state), bounded hand-tool pan (clamped to scaled overflow, active only when zoomed, pointer-capture + `touch-action:none`), gesture-only swipe nav (no visual dragging), keyboard (`←/→/Esc/+/-/0`), filmstrip, scroll-lock, focus management.
+
+### `frontend/src/features/campus/api/campusApi.js` (new) + `frontend/src/context/CampusContext.jsx` (new)
+- `GET /api/campuses`, `PUT updateProfile {campus_slug}`; provider resolves effective campus (profile for members, stored pick else flagship default for guests), `needsGate` (logged-in-only), one-time login switch-notice toast, directory refresh.
+
+### `frontend/src/features/campus/components/CampusGate.jsx` (new)
+- Blocking one-screen onboarding (campus cards + search + confirm + moved-listings success beat + logout); rendered by `MainLayout` instead of page content when a logged-in user has no campus.
+
+### `frontend/src/layouts/MainLayout.jsx` + `frontend/src/app/main.jsx`
+- `CampusProvider` mounted inside `UserProvider`; gate renders only when identity/directory are loaded and `needsGate` is true (no flash on refresh).
+
+### `frontend/src/Components/layout/Header.jsx`
+- Fake local-state campus dropdown deleted; locked campus chip with full name + lock icon (members) / guest-only browse switcher dropdown (guests); profile menu reads populated `campus_id`; search + trending send `campus_slug`; interval inner-timeout cleanup, blur-timer ref (no swallowed suggestion clicks), functional recent-searches update; logo/trending `alt` text fixed; notification bell `aria-label`.
+
+### `frontend/src/features/product/pages/Home.jsx`
+- Feed + boosted send `campus_slug`; campus switch resets list (no mixed-campus append), stale in-flight pages dropped, observer disconnects on unmount; loader text has `role="status"`; removed dead commented image block.
+
+### `frontend/src/features/product/pages/ProductCategory.jsx`
+- Sends `campus_slug` (incl. boosted page); refetches on campus change.
+
+### `frontend/src/features/search/pages/SearchResults.jsx`
+- Sends `campus_slug` (results + trending); Retry refetches in place (was full-page reload); `h-screen → 100dvh`; FAB/drawer safe-area insets; drawer `90dvh`.
+
+### `frontend/src/features/product/pages/ProductDescription.jsx`
+- Detail + similar fetch send `campus_slug` with AbortController/cancel guards (no stale-product overwrite); dedicated "Not available at your campus" state for `CAMPUS_MISMATCH`; PDP campus block shows product/viewer campus name; share dialog close `aria-label`, preview `alt`; floating CTA respects safe-area; `scrollTo behavior:"auto"`; copy-link timer unmount-safe.
+
+### `frontend/src/features/product/api/productApi.js` + `frontend/src/features/search/api/searchApi.js`
+- `getProductById` accepts abort `config`; boosted/trending accept params passthrough.
+
+### `frontend/src/features/product/components/ProductCard.jsx`
+- Hooks-order violation fixed (null guard moved below all hooks, null-safe accesses); fake `4.9` rating only renders with real backend data; location shows full campus name (`VIT Vellore`).
+
+### `frontend/src/features/product/steps/PricingStep.jsx` + `steps/PreviewStep.jsx`
+- Hardcoded "VIT Vellore" replaced with live campus chip (locked, no fake Change button).
+
+### `frontend/src/features/user/pages/Settings.jsx`
+- Campus row with change flow (select + "listings move on save" warning, `movedListings` toast); member line + profile rows use live campus; `fetchPickupSpots` memoized; avatar button `aria-label`; removed dead `primaryPickupSpot` memo.
+
+### `frontend/src/features/user/pages/ProfileOverview.jsx` + `components/Profile_left_part.jsx`
+- Campus labels read populated `campus_id` (fallback "Set campus"); dead "View all" buttons now link to `/myorders` and `/chat`.
+
+### `frontend/src/features/user/components/Deletebutton.jsx` + `frontend/src/features/user/api/userApi.js`
+- Delete dialog requires password confirmation (Google-user hint included); API sends body with DELETE.
+
+### `frontend/src/features/handoff/api/handoffApi.js`
+- Secret via header (see backend handoff entry).
+
+### `frontend/src/context/WishlistContext.jsx`
+- Failure rollback refetches server truth (was restoring snapshots that clobbered concurrent updates).
+
+### `frontend/src/context/useUserContext.jsx`
+- Cross-tab logout sync via `storage` listener.
+
+### `frontend/src/hooks/useSafeTimeout.js` (new)
+- Unmount-safe `setTimeout` replacement; adopted in Login/Signup/VerifyEmail/CheckEmail/ForgotPassword/ResetPassword/PDP/ShareButton (kills post-unmount navigation yank + setState leaks).
+
+### `frontend/src/features/auth/*` (Login/Signup/VerifyEmail/CheckEmail/ResetPassword/ForgotPassword/AuthMobileBanner)
+- All delayed navigations/timers unmount-safe; banner interval keyed on content (no stale taglines).
+
+### `frontend/src/features/chat/pages/Chat.jsx`
+- Support flow guarded by run-id + unmount invalidation (no cross-thread messages); icon buttons + input labelled; avatar `alt` fixed.
+
+### `frontend/src/features/user/pages/Achievements.jsx` + `Subscription.jsx`
+- Fetch-on-mount converted to cancellable effects (mount-safe retry preserved; Subscription retry kept working via shared cancelled ref).
+
+### `frontend/src/components/common/ShareButton.jsx`
+- Copied-timer unmount-safe.
+
+### `frontend/src/components/layout/Footer.jsx` + `Profile_left_part.jsx` + `AuthBrandLogo.jsx` + `AuthPageRightPart.jsx`
+- Meaningful `alt` text on all brand/preview imagery.
+
+### `frontend/src/features/search/components/SearchDropdown.jsx`
+- Product thumbnails get real `alt` (title) instead of empty.
+
+---
+
+## Preserved (intentionally untouched this round)
+
+- Chat threads, orders data, notification counts/badges, and profile placeholder rows belong to not-yet-implemented features — code hygiene fixed around them (guards, labels, links) but no backends invented and no placeholder UI removed.
+- Fake social-proof stats (`18 users chatted`, response-rate copy) left as content decisions for the feature builds.
+- `LegalDocuments` static `dangerouslySetInnerHTML` left (local constants only — sanitize if ever CMS-driven).
+- All API shapes, routes, and user flows preserved; the only intentional behavior changes are the security fixes listed above (tokens out of bodies, password-gated delete, campus scoping, login-gated logout POST).

@@ -6,9 +6,11 @@ import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
+import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");
+  const safeTimeout = useSafeTimeout();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -59,7 +61,7 @@ function ForgotPassword() {
             "If an account exists for this email, we’ve sent a reset link. Check your inbox.",
         });
         setResendCooldown(120);
-        window.setTimeout(() => setIsSubmitted(true), 900);
+        safeTimeout(() => setIsSubmitted(true), 900);
       }
     } catch (error) {
       setFormMessage({

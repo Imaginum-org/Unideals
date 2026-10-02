@@ -12,6 +12,7 @@ import FormError from "../components/shared/FormError";
 import LegalAgreementModal from "../../auth/components/LegalAgreementModal";
 import PickupSpotModal from "../../user/components/PickupSpotModal.jsx";
 import { createPickupSpot } from "../../user/api/userApi.js";
+import { useCampus } from "../../../context/CampusContext.jsx";
 import { FiPlus } from "react-icons/fi";
 
 const MAX_SPOTS = 3;
@@ -19,6 +20,7 @@ const MAX_SPOTS = 3;
 const PricingStep = () => {
   const { formData, updateField, nextStep, errors, validateAndProceed } =
     useProductListing();
+  const { campus } = useCampus();
 const [legalTab, setLegalTab] = useState(null);
   const [loadingPickupSpot, setLoadingPickupSpot] = useState(false);
   const [pickupSpots, setPickupSpots] = useState([]);
@@ -290,16 +292,18 @@ const [legalTab, setLegalTab] = useState(null);
 
                 <div className="mt-2 min-h-[110px] rounded-xl border bg-white p-4 flex flex-col justify-between">
                   <div>
-                    <p className="font-medium text-[#111827]">VIT Vellore</p>
+                    <p className="font-medium text-[#111827]">
+                      {campus?.name || "Your campus"}
+                    </p>
 
                     <p className="mt-2 text-sm text-[#6B7280] leading-6">
-                      Main campus location for product pickup and meetup.
+                      Your listing goes live on your campus marketplace.
                     </p>
                   </div>
 
-                  <button className="mt-4 text-sm font-semibold text-[#4F46E5] self-start">
-                    Change
-                  </button>
+                  <p className="mt-4 text-sm font-semibold text-[#4F46E5]">
+                    Locked to your campus
+                  </p>
                 </div>
               </div>
 

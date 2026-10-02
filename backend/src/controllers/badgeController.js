@@ -1,5 +1,6 @@
 import { computeAndAwardBadges, getGamificationData } from "../services/badgeService.js";
 import User from "../models/User.model.js";
+import { safeErrorMessage } from "../utils/response.js";
 
 /**
  * GET /api/badges/me
@@ -10,7 +11,7 @@ export const getMyBadges = async (req, res) => {
     const data = await getGamificationData(req.user._id);
     return res.status(200).json({ success: true, data });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: safeErrorMessage(err) });
   }
 };
 
@@ -27,20 +28,24 @@ export const recomputeMyBadges = async (req, res) => {
       data,
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: safeErrorMessage(err) });
   }
 };
 
 /**
  * GET /api/badges/leaderboard
- * Top 20 users by XP, scoped to same campus (if available).
+ * Top 20 users by XP, scoped to the viewer's campus.
  */
 export const getLeaderboard = async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
 
+    const viewer = await User.findById(req.user._id).select("campus_id").lean();
+    const match = { "gamification.total_xp": { $gt: 0 } };
+    if (viewer?.campus_id) match.campus_id = viewer.campus_id;
+
     const users = await User.find(
-      { "gamification.total_xp": { $gt: 0 } },
+      match,
       {
         name: 1,
         avatar: 1,
@@ -66,7 +71,7 @@ export const getLeaderboard = async (req, res) => {
 
     return res.status(200).json({ success: true, data: leaderboard });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: safeErrorMessage(err) });
   }
 };
 
@@ -75,10 +80,7 @@ export const getLeaderboard = async (req, res) => {
  * Returns the full badge catalogue (no auth required).
  */
 export const getBadgeConfig = async (req, res) => {
-  const { BADGE_CONFIG } = await import("../../frontend-badge-config-placeholder.js").catch(
-    () => ({ BADGE_CONFIG: [] })
-  );
-  // Return a static config inline so the frontend doesn't need a separate fetch
+  res.set("Cache-Control", "public, max-age=300, s-maxage=3600");
   return res.status(200).json({ success: true, data: BADGE_CATALOGUE });
 };
 

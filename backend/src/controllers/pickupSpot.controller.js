@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import PickupSpot from "../models/PickupSpot.model.js";
+import { safeErrorMessage } from "../utils/response.js";
 
 const parseIsPrimary = (value) => {
   if (typeof value === "boolean") return value;
@@ -79,7 +80,7 @@ export const createPickupSpot = async (req, res) => {
   } catch (err) {
     console.error("createPickupSpot error:", err);
     return res.status(500).json({
-      message: err.message || "Server error",
+      message: safeErrorMessage(err, "Server error"),
       success: false,
       error: true,
     });
@@ -101,7 +102,7 @@ export const getUserPickupSpots = async (req, res) => {
   } catch (err) {
     console.error("getUserPickupSpots error:", err);
     return res.status(500).json({
-      message: err.message || "Server error",
+      message: safeErrorMessage(err, "Server error"),
       success: false,
       error: true,
     });
@@ -168,7 +169,7 @@ export const updatePickupSpot = async (req, res) => {
   } catch (err) {
     console.error("updatePickupSpot error:", err);
     return res.status(500).json({
-      message: err.message || "Server error",
+      message: safeErrorMessage(err, "Server error"),
       success: false,
       error: true,
     });
@@ -178,6 +179,14 @@ export const updatePickupSpot = async (req, res) => {
 export const deletePickupSpot = async (req, res) => {
   try {
     const { pickupSpotId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(pickupSpotId)) {
+      return res.status(400).json({
+        message: "Invalid pickup spot ID",
+        success: false,
+        error: true,
+      });
+    }
 
     const pickupSpot = await PickupSpot.findOneAndDelete({
       _id: pickupSpotId,
@@ -201,7 +210,7 @@ export const deletePickupSpot = async (req, res) => {
   } catch (err) {
     console.error("deletePickupSpot error:", err);
     return res.status(500).json({
-      message: err.message || "Server error",
+      message: safeErrorMessage(err, "Server error"),
       success: false,
       error: true,
     });
@@ -250,7 +259,7 @@ export const setPrimaryPickupSpot = async (req, res) => {
   } catch (err) {
     console.error("setPrimaryPickupSpot error:", err);
     return res.status(500).json({
-      message: err.message || "Server error",
+      message: safeErrorMessage(err, "Server error"),
       success: false,
       error: true,
     });

@@ -1,6 +1,5 @@
 import { upload } from "@imagekit/javascript";
 import instance from "../services/axiosInstance";
-import { compressImage } from "../features/product/utils/imageCompression.js";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -25,12 +24,16 @@ export const uploadImage = async (file, folder = "Products") => {
   
   const compressedFile =
       folder === "Avatars"
-        ? await compressImage(file, {
+        ? await (
+            await import("../features/product/utils/imageCompression.js")
+          ).compressImage(file, {
             maxSizeMB: 0.3,
             maxWidthOrHeight: 512,
             initialQuality: 0.85,
           })
-        : await compressImage(file);
+        : await (
+            await import("../features/product/utils/imageCompression.js")
+          ).compressImage(file);
 
   // Re-validate after compression
   if (!ALLOWED_TYPES.includes(compressedFile.type || file.type)) {

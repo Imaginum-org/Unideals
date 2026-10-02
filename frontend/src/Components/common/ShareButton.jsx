@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import useSafeTimeout from "../../hooks/useSafeTimeout.js";
 import "./ShareButton.css";
 
 function ShareIcon() {
@@ -51,6 +52,7 @@ export default function ShareButton({
   className = "",
 }) {
   const [copied, setCopied] = useState(false);
+  const safeTimeout = useSafeTimeout();
   const safeUrl =
     typeof window !== "undefined" ? sanitizeShareUrl(url) : url;
 
@@ -76,11 +78,11 @@ export default function ShareButton({
           : window.location.origin + safeUrl,
       );
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      safeTimeout(() => setCopied(false), 2000);
     } catch {
       // clipboard unavailable - ignore
     }
-  }, [onShare, title, text, safeUrl]);
+  }, [onShare, title, text, safeUrl, safeTimeout]);
 
   return (
     <div className={`share-btn-wrapper ${className}`}>

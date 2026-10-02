@@ -7,7 +7,13 @@ import {
 // POST /api/handoff — desktop creates a pairing session (auth).
 export const createHandoffSession = async (req, res) => {
   try {
-    const result = await createHandoff(req.userId);
+    // Desktop passes how many more photos may come from the phone given
+    // what's already attached on the laptop (clamped 1–3 server-side).
+    const maxFiles = Number.parseInt(req.body?.max_files, 10);
+    const result = await createHandoff(
+      req.userId,
+      Number.isInteger(maxFiles) ? maxFiles : undefined,
+    );
     return res.status(201).json({
       success: true,
       message: "Photo session created. Scan the QR with your phone.",
@@ -15,6 +21,7 @@ export const createHandoffSession = async (req, res) => {
         code: result.code,
         url: result.url,
         secret: result.secret,
+        maxFiles: result.maxFiles,
         expiresAt: result.expiresAt,
       },
     });
@@ -53,7 +60,9 @@ export const getHandoffSession = async (req, res) => {
 // POST /api/handoff/:code/photos — phone uploads (QR-secret auth, no login).
 export const uploadHandoffPhotos = async (req, res) => {
   try {
-    const secret = req.query.k || req.body?.k;
+    // Secret via header or body — never the query string, which persists
+    // in browser history, proxy logs, Referer headers, and server logs.
+    const secret = req.headers["x-handoff-secret"] || req.body?.k;
     const result = await addHandoffPhotos({
       code: req.params.code,
       secret,

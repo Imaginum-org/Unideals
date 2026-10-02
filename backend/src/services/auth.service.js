@@ -71,6 +71,12 @@ export const loginWithPassword = async ({
   // between missing account vs wrong password). Verification status
   // is still surfaced via requiresVerification for UX.
   if (!user) {
+    // Dummy compare so missing accounts take ~as long as real ones
+    // (blocks timing-based enumeration).
+    await bcrypt.compare(
+      "invalid-credential-dummy",
+      "$2b$10$invalidinvalidinvalidinvalidinvalidinvali",
+    );
     const error = new Error("Invalid email or password");
     error.statusCode = 400;
     throw error;
@@ -134,6 +140,7 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
   const decoded = jwt.verify(
     refreshToken,
     process.env.SECRET_KEY_REFRESH_TOKEN,
+    { algorithms: ["HS256"] },
   );
   const user = await userModel.findById(decoded.id).select("+refresh_token");
 
@@ -206,6 +213,7 @@ export const revokeRefreshTokenByToken = async (refreshToken) => {
     const decoded = jwt.verify(
       refreshToken,
       process.env.SECRET_KEY_REFRESH_TOKEN,
+      { algorithms: ["HS256"] },
     );
     const user = await userModel
       .findById(decoded.id)

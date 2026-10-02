@@ -17,6 +17,7 @@ import { LuBadgeCheck } from "react-icons/lu";
 import { LuCircleHelp } from "react-icons/lu";
 import { LuShield } from "react-icons/lu";
 import { LuBell } from "react-icons/lu";
+import { LuLock } from "react-icons/lu";
 import { LuTrophy } from "react-icons/lu";
 import { BsBoxSeam } from "react-icons/bs";
 import { BsLightningChargeFill } from "react-icons/bs";
@@ -25,6 +26,8 @@ import { MdOutlineLogout } from "react-icons/md";
 import { IoChevronBackOutline } from "react-icons/io5";
 import AvatarComponent from "../common/AvatarComponent.jsx";
 import { useUser } from "../../context/useUserContext.jsx";
+import { useCampus } from "../../context/CampusContext.jsx";
+import { ikFirstThumb } from "../../utils/imageTransform.js";
 import { logoutUser } from "../../features/auth/api/authApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import useDebounce from "../../features/search/hooks/useDebounce";
@@ -40,7 +43,12 @@ const ProfileDropdown = ({
   onLogout,
   mobile = false,
 }) => {
-  const campus = userDetails?.college || userDetails?.campus || "VIT Vellore";
+  const campus = userDetails?.campus_id;
+  const campusLabel =
+    (campus && typeof campus === "object" ? campus.name : null) ||
+    userDetails?.college ||
+    userDetails?.campus ||
+    null;
   const soldCount = userDetails?.soldCount ?? userDetails?.stats?.sold ?? 0;
 
   const menuGroups = [
@@ -116,7 +124,7 @@ const ProfileDropdown = ({
 
             <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[13px] font-medium text-[#4B45FF]">
               <GrLocation className="size-3 shrink-0" />
-              <span className="truncate">{campus}</span>
+              <span className="truncate">{campusLabel || "Set campus"}</span>
             </div>
           </div>
         </div>
@@ -244,9 +252,17 @@ const Header = () => {
     clearUserData,
   } = useUser();
 
-  const campuses = ["VIT Vellore", "VIT Chennai", "VIT Bhopal"];
-
   const { darkMode, toggleDarkMode } = useTheme();
+
+  // Campus marketplace scope (locked for members — changed only via
+  // Settings; guests may switch their browse campus freely).
+  const {
+    campus: activeCampus,
+    campusSlug,
+    campuses,
+    selectCampus,
+  } = useCampus();
+  const [showCampusDropdown, setShowCampusDropdown] = useState(false);
 
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -262,16 +278,24 @@ const Header = () => {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [fade, setFade] = useState(true);
-  const [selectedCampus, setSelectedCampus] = useState("VIT Vellore");
-  const [showCampusDropdown, setShowCampusDropdown] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const [recentSearches, setRecentSearches] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
   const [showHeader, setShowHeader] = useState(true);
 
   const lastScrollY = useRef(0);
   const scrollStartY = useRef(0);
   const lastDirection = useRef(null);
+  // Delayed dropdown close: tracked so focus/unmount can cancel it before
+  // it swallows an in-flight suggestion click.
+  const blurTimerRef = useRef(null);
+
+  useEffect(() => {
+    const timerRef = blurTimerRef;
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -398,6 +422,7 @@ const Header = () => {
           {
             q: debouncedQuery.trim().slice(0, 100),
             limit: 6,
+            ...(campusSlug ? { campus_slug: campusSlug } : {}),
           },
           { signal: controller.signal },
         );
@@ -425,30 +450,34 @@ const Header = () => {
       stale = true;
       controller.abort();
     };
-  }, [debouncedQuery]);
+  }, [debouncedQuery, campusSlug]);
 
   // Trending for the empty-query dropdown state (fetched once, lazily).
   const ensureTrending = () => {
     if (trending.length > 0 || trendingLoading) return;
     setTrendingLoading(true);
-    getTrendingProducts()
+    getTrendingProducts(campusSlug ? { campus_slug: campusSlug } : undefined)
       .then((res) => setTrending(res.data?.data || []))
       .catch(() => {})
       .finally(() => setTrendingLoading(false));
   };
 
   useEffect(() => {
+    let timeoutId;
     const interval = setInterval(() => {
       setFade(false);
 
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         setPlaceholderIndex((prev) => (prev + 1) % placeholderWords.length);
 
         setFade(true);
       }, 300);
     }, 2500);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
@@ -608,20 +637,23 @@ const Header = () => {
   const saveRecentSearch = (searchTerm) => {
     if (!searchTerm.trim()) return;
 
-    const updatedSearches = [
-      searchTerm,
-      ...recentSearches.filter(
-        (item) => item.toLowerCase() !== searchTerm.toLowerCase(),
-      ),
-    ].slice(0, 5);
+    // Functional update: rapid consecutive saves never clobber each other.
+    setRecentSearches((prev) => {
+      const updatedSearches = [
+        searchTerm,
+        ...prev.filter(
+          (item) => item.toLowerCase() !== searchTerm.toLowerCase(),
+        ),
+      ].slice(0, 5);
 
-    setRecentSearches(updatedSearches);
+      try {
+        localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
+      } catch {
+        // Quota/private-mode: in-memory list still works for the session.
+      }
 
-    try {
-      localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
-    } catch {
-      // Quota/private-mode: in-memory list still works for the session.
-    }
+      return updatedSearches;
+    });
   };
 
   const clearRecentSearches = () => {
@@ -677,7 +709,7 @@ const Header = () => {
             <Link to="/" className="flex items-center gap-2">
               <img
                 src="/logo.svg"
-                alt="image"
+                alt="Unideals home"
                 className="h-11 w-11 object-cover"
               />
 
@@ -1096,8 +1128,8 @@ const Header = () => {
               "
                               >
                                 <img
-                                  src={item.images?.[0]?.url || "/placeholder.png"}
-                                  alt=""
+                                  src={ikFirstThumb(item.images?.[0])}
+                                  alt={item.title || "Product"}
                                   loading="lazy"
                                   className="h-10 w-10 rounded-lg object-cover"
                                 />
@@ -1127,7 +1159,7 @@ const Header = () => {
             <Link to="/" className="flex shrink-0 items-center">
               <img
                 src="/logo.svg"
-                alt="image"
+                alt="Unideals home"
                 className="h-11 w-11 object-cover"
               />
 
@@ -1136,12 +1168,46 @@ const Header = () => {
               </span>
             </Link>
 
-            {/* Location */}
-            {isLoggedIn ? (
+            {/* Campus — full name; locked for members, switchable for guests */}
+            {activeCampus ? (
               <div className="relative ml-3 xl:ml-5">
-                <button
-                  onClick={() => setShowCampusDropdown((prev) => !prev)}
-                  className="
+                {isLoggedIn ? (
+                  <div title="Your campus marketplace. Change it in Settings.">
+                    <div
+                      className="
+      flex
+      items-center
+      gap-2
+      rounded-xl
+      border
+      border-[#F2F4F8]
+      bg-white
+      px-2 xl:px-3
+      py-2
+      dark:border-neutral-700
+      dark:bg-[#1A1D20]
+    "
+                    >
+                      <GrLocation className="size-4 shrink-0 text-[#2E40DC]" />
+
+                      <span className="hidden whitespace-nowrap text-sm font-medium text-[#090A0B] xl:block dark:text-white">
+                        {activeCampus.name}
+                      </span>
+
+                      <LuLock
+                        size={12}
+                        className="hidden shrink-0 text-neutral-400 xl:block"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowCampusDropdown((prev) => !prev)}
+                      title="Choose a campus to browse"
+                      aria-expanded={showCampusDropdown}
+                      className="
       flex
       items-center
       gap-2
@@ -1158,41 +1224,41 @@ const Header = () => {
       dark:bg-[#1A1D20]
       dark:hover:bg-neutral-800
     "
-                >
-                  <GrLocation className="size-4 text-[#2E40DC]" />
+                    >
+                      <GrLocation className="size-4 shrink-0 text-[#2E40DC]" />
 
-                  <span className="hidden xl:block text-sm font-medium text-[#090A0B] dark:text-white">
-                    {selectedCampus}
-                  </span>
+                      <span className="hidden whitespace-nowrap text-sm font-medium text-[#090A0B] xl:block dark:text-white">
+                        {activeCampus.name}
+                      </span>
 
-                  <svg
-                    className={`hidden xl:block h-4 w-4 transition-transform duration-200 ${
-                      showCampusDropdown ? "rotate-180" : ""
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </button>
+                      <svg
+                        className={`hidden h-4 w-4 shrink-0 transition-transform duration-200 xl:block ${
+                          showCampusDropdown ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
 
-                <AnimatePresence>
-                  {showCampusDropdown && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                      transition={{
-                        duration: 0.18,
-                        ease: [0.22, 1, 0.36, 1],
-                      }}
-                      className="
+                    <AnimatePresence>
+                      {showCampusDropdown && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                          transition={{
+                            duration: 0.18,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                          className="
           absolute
           left-0
           top-full
@@ -1208,15 +1274,16 @@ const Header = () => {
           dark:border-neutral-800
           dark:bg-[#1A1D20]
         "
-                    >
-                      {campuses.map((campus) => (
-                        <button
-                          key={campus}
-                          onClick={() => {
-                            setSelectedCampus(campus);
-                            setShowCampusDropdown(false);
-                          }}
-                          className={`
+                        >
+                          {(campuses || []).map((c) => (
+                            <button
+                              key={c.slug}
+                              type="button"
+                              onClick={() => {
+                                selectCampus(c.slug);
+                                setShowCampusDropdown(false);
+                              }}
+                              className={`
               flex
               w-full
               items-center
@@ -1230,20 +1297,22 @@ const Header = () => {
               hover:bg-neutral-100
               dark:hover:bg-neutral-800
               ${
-                selectedCampus === campus
+                activeCampus.slug === c.slug
                   ? "bg-blue-50 text-[#2E40DC] dark:bg-blue-950/30"
                   : "text-neutral-700 dark:text-neutral-200"
               }
             `}
-                        >
-                          <GrLocation className="size-4" />
+                            >
+                              <GrLocation className="size-4 shrink-0" />
 
-                          {campus}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                              {c.name}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                )}
               </div>
             ) : (
               ""
@@ -1324,9 +1393,19 @@ const Header = () => {
                     return;
                   }
 
-                  setTimeout(() => setShowDropdown(false), 150);
+                  if (blurTimerRef.current) {
+                    window.clearTimeout(blurTimerRef.current);
+                  }
+                  blurTimerRef.current = window.setTimeout(
+                    () => setShowDropdown(false),
+                    150,
+                  );
                 }}
                 onFocus={() => {
+                  if (blurTimerRef.current) {
+                    window.clearTimeout(blurTimerRef.current);
+                    blurTimerRef.current = null;
+                  }
                   ensureTrending();
                   setShowDropdown(true);
                 }}
@@ -1420,7 +1499,7 @@ dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-9
                     )}
                   </button>
 
-                  <button className="relative">
+                  <button className="relative" aria-label="Notifications">
                     <IoNotificationsOutline className="size-6 text-[#323232] dark:text-[#848484]" />
 
                     {notification > 0 && (

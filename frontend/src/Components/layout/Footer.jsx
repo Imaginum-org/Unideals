@@ -93,7 +93,7 @@ gap-6"
                   <div className="flex items-center justify-center">
                     <img
                       src="/logo.svg"
-                      alt="image"
+                      alt="Unideals logo"
                       className="h-12 w-12 object-cover"
                     />
                     <div className="flex flex-col leading-6">

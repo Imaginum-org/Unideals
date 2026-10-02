@@ -30,8 +30,7 @@ const ImagesStep = () => {
   }, []);
 
   // PROCESS FILES
-  const processFiles = async (files) => {
-    const fileArray = Array.from(files);
+  const processFiles = async (files) => {    const fileArray = Array.from(files);
 
     const remainingSlots = MAX_IMAGES - formData.images.length;
 
@@ -101,6 +100,9 @@ const ImagesStep = () => {
   // must always see the LATEST formData, never a stale closure.
   const processFilesRef = useRef(null);
   processFilesRef.current = (files) => processFiles(files);
+  // Live mirror of attached-preview count for the same reason.
+  const previewsCountRef = useRef(0);
+  previewsCountRef.current = formData.imagePreviews?.length || 0;
 
   const handlePhonePhotos = useCallback(async (images) => {
     const fresh = (images || []).filter((img) => {
@@ -109,6 +111,18 @@ const ImagesStep = () => {
       return true;
     });
     if (fresh.length === 0) return;
+
+    // Enforce hybrid slots at attach time too: laptop picks made after the
+    // QR was generated can otherwise overflow the 3-photo cap silently.
+    const room = MAX_IMAGES - previewsCountRef.current;
+    if (room <= 0) {
+      toast.error("All 3 photo slots are full. Remove one first.");
+      return;
+    }
+    if (fresh.length > room) {
+      toast(`Only ${room} more fit — attaching the first ${room}.`);
+      fresh.splice(room);
+    }
 
     try {
       const files = await Promise.all(
@@ -267,9 +281,13 @@ const ImagesStep = () => {
         )}
       </div>
 
-      {/* Phone handoff: QR -> gallery/camera -> auto-attach. The laptop
-          upload above is untouched. */}
-      <PhoneHandoffCard onPhotos={handlePhonePhotos} />
+      {/* Phone handoff: QR -> gallery/camera -> auto-attach. Slots stay in
+          sync with laptop picks (max 3 combined). */}
+      <PhoneHandoffCard
+        onPhotos={handlePhonePhotos}
+        attachedCount={formData.imagePreviews?.length || 0}
+        remainingSlots={MAX_IMAGES - (formData.imagePreviews?.length || 0)}
+      />
 
       {/* Uploaded Images */}
       {formData.imagePreviews?.length > 0 && (
@@ -320,7 +338,8 @@ const ImagesStep = () => {
                   loading="lazy"
                   draggable={false}
                   onError={(e) => {
-                    e.currentTarget.src = "/images/placeholder-image.png";
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/logo.svg";
                   }}
                   className="w-full aspect-square object-cover select-none"
                 />

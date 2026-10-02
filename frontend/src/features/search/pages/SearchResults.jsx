@@ -1,6 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import { useCallback, useEffect, useState } from "react";
-import ReactSlider from "react-slider";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 
 import ProductCard from "../../product/components/ProductCard";
 import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
@@ -8,6 +7,13 @@ import { searchProducts, getTrendingProducts } from "../api/searchApi";
 import { CATEGORY_ITEMS } from "../../product/constants/categories.js";
 
 import { FaFilter, FaTimes } from "react-icons/fa";
+import { useCampus } from "../../../context/CampusContext.jsx";
+
+// react-slider loads with the filter UI, never with Home.
+const LazySlider = lazy(() => import("react-slider"));
+const SliderFallback = (
+  <div className="h-1 w-full animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-700" />
+);
 
 const PRICE_MIN = 0;
 const PRICE_MAX = 100000;
@@ -31,6 +37,7 @@ const SORTS = [
 
 const SearchResults = () => {
   const [params, setParams] = useSearchParams();
+  const { campusSlug } = useCampus();
 
   const query = params.get("q") || "";
   const page = Math.max(1, Number.parseInt(params.get("page") || "1", 10) || 1);
@@ -47,6 +54,7 @@ const SearchResults = () => {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [trending, setTrending] = useState([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
 
@@ -84,6 +92,7 @@ const SearchResults = () => {
   useEffect(() => {
     let cancelled = false;
     const fetchSearchResults = async () => {
+      if (!campusSlug) return;
       const isPaging = page > 1;
       try {
         if (isPaging) setLoadingMore(true);
@@ -101,6 +110,7 @@ const SearchResults = () => {
           ...(condition ? { condition } : {}),
           ...(minPrice !== "" ? { min_price: minPrice } : {}),
           ...(maxPrice !== "" ? { max_price: maxPrice } : {}),
+          campus_slug: campusSlug,
         });
 
         if (cancelled) return;
@@ -127,15 +137,15 @@ const SearchResults = () => {
     return () => {
       cancelled = true;
     };
-  }, [query, page, sort, category, condition, minPrice, maxPrice]);
+  }, [query, page, sort, category, condition, minPrice, maxPrice, campusSlug, retryKey]);
 
   // Trending fallback for empty query / zero results (server-cached).
   useEffect(() => {
     let cancelled = false;
     const needsTrending = !query || (!loading && products.length === 0 && !error);
-    if (!needsTrending || trending.length > 0) return;
+    if (!needsTrending || trending.length > 0 || !campusSlug) return;
     setTrendingLoading(true);
-    getTrendingProducts()
+    getTrendingProducts({ campus_slug: campusSlug })
       .then((res) => {
         if (!cancelled) setTrending(res.data?.data || []);
       })
@@ -146,7 +156,7 @@ const SearchResults = () => {
     return () => {
       cancelled = true;
     };
-  }, [query, loading, products.length, error, trending.length]);
+  }, [query, loading, products.length, error, trending.length, campusSlug]);
 
   const handleClear = () => {
     setParams({ q: query }, { replace: false });
@@ -181,9 +191,10 @@ const SearchResults = () => {
   const SidebarContent = () => (
     <div className="flex flex-col gap-5 font-robotoFlex">
       <div>
-        <h4 className="font-bold mb-6 dark:text-white text-sm">Price Range</h4>
+        <h4 className="font-bold mb-6 text-zinc-900 dark:text-white text-sm">Price Range</h4>
         <div className="px-2">
-          <ReactSlider
+          <Suspense fallback={SliderFallback}>
+          <LazySlider
             className="w-full h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full flex items-center"
             thumbClassName="size-4 bg-[#394FF1] border-2 border-white rounded-full cursor-grab active:cursor-grabbing outline-none"
             trackClassName="h-1 rounded-full"
@@ -195,6 +206,7 @@ const SearchResults = () => {
             onAfterChange={commitPriceRange}
             minDistance={1000}
           />
+          </Suspense>
         </div>
 
         <div className="flex justify-between mt-4 text-[10px] text-zinc-400 font-bold uppercase">
@@ -216,7 +228,7 @@ const SearchResults = () => {
       </div>
 
       <div>
-        <h4 className="font-bold mb-3 dark:text-white text-sm">Condition</h4>
+        <h4 className="font-bold mb-3 text-zinc-900 dark:text-white text-sm">Condition</h4>
         <div className="flex flex-wrap gap-2">
           {CONDITIONS.map((c) => (
             <button
@@ -235,12 +247,12 @@ const SearchResults = () => {
       </div>
 
       <div>
-        <h4 className="font-bold mb-3 dark:text-white text-sm">Sort By</h4>
+        <h4 className="font-bold mb-3 text-zinc-900 dark:text-white text-sm">Sort By</h4>
         <div className="flex flex-col gap-3">
           {SORTS.map((opt) => (
             <label
               key={opt.value}
-              className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer dark:border-zinc-800"
+              className="flex items-center gap-3 p-3 border border-zinc-200 rounded-xl cursor-pointer dark:border-zinc-800"
             >
               <input
                 type="radio"
@@ -251,7 +263,9 @@ const SearchResults = () => {
               />
               <span
                 className={`text-xs ${
-                  sort === opt.value ? "font-bold dark:text-white" : "text-zinc-500"
+                  sort === opt.value
+                    ? "font-bold text-zinc-900 dark:text-white"
+                    : "text-zinc-500"
                 }`}
               >
                 {opt.label}
@@ -271,18 +285,18 @@ const SearchResults = () => {
   );
 
   return (
-    <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#121212] overflow-hidden">
-      <div className="flex flex-1 overflow-hidden px-4 lg:px-11">
+    <div className="min-h-[100dvh] flex flex-col bg-[#F8F9FA] dark:bg-[#121212]">
+      <div className="flex flex-1 px-4 lg:px-11">
         {/* SIDEBAR */}
-        <aside className="hidden lg:block w-[340px] flex-shrink-0 my-6 rounded-3xl bg-white dark:bg-[#131313] px-8 py-9 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-zinc-100 dark:border-zinc-800/50 h-[calc(100vh-140px)] sticky top-6 self-start overflow-y-auto no-scrollbar">
-          <h2 className="text-2xl font-bold mb-8 dark:text-white font-robotoFlex">
+        <aside className="hidden lg:block w-[340px] flex-shrink-0 my-6 rounded-3xl bg-white dark:bg-[#131313] px-8 py-9 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-zinc-100 dark:border-zinc-800/50 h-fit sticky top-6 self-start">
+          <h2 className="text-2xl font-bold mb-8 text-zinc-900 dark:text-white font-robotoFlex">
             Filters
           </h2>
           <SidebarContent />
         </aside>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 overflow-y-auto no-scrollbar bg-transparent p-4 md:p-8 lg:pl-12">
+        <main className="flex-1 bg-transparent p-4 md:p-8 lg:pl-12 min-w-0">
           <div className="max-w-[1100px] mx-auto">
             <div className="mb-6">
               <h1 className="text-lg lg:text-xl xl:text-3xl font-bold text-[#121417] dark:text-white font-manrope">
@@ -318,7 +332,7 @@ const SearchResults = () => {
                 <div className="mt-4 flex flex-col items-start gap-3">
                   <p className="text-red-500">{error}</p>
                   <button
-                    onClick={() => window.location.reload()}
+                    onClick={() => setRetryKey((k) => k + 1)}
                     className="rounded-xl bg-[#394FF1] px-5 py-2.5 text-sm font-bold text-white"
                   >
                     Retry
@@ -448,7 +462,7 @@ const SearchResults = () => {
       {/* MOBILE FILTER BUTTON */}
       <button
         onClick={() => setOpen(true)}
-        className="lg:hidden fixed bottom-6 right-6 z-40 bg-[#394FF1] text-white p-4 rounded-full shadow-2xl scale-110 active:scale-95 transition-transform"
+        className="lg:hidden fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-6 z-40 bg-[#394FF1] text-white p-4 rounded-full shadow-2xl scale-110 active:scale-95 transition-transform"
         aria-label="Open filters"
       >
         <FaFilter />
@@ -462,7 +476,7 @@ const SearchResults = () => {
             onClick={() => setOpen(false)}
           ></div>
 
-          <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-[#131313] rounded-t-[32px] p-8 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl">
+          <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-[#131313] rounded-t-[32px] p-8 pb-[max(2rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto no-scrollbar shadow-2xl">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-2xl font-bold dark:text-white">Filters</h2>
 

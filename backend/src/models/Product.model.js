@@ -19,6 +19,16 @@ const productSchema = new Schema(
       index: true,
     },
 
+    // Campus marketplace: denormalized from the seller at creation so
+    // every feed/search stays a single-collection indexed query.
+    // Never client-controlled — the service stamps it from req.user.
+    campus_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Campus",
+      default: null,
+      index: true,
+    },
+
     title: {
       type: String,
       required: function () {
@@ -266,6 +276,20 @@ productSchema.index({
 productSchema.index({
   is_deleted: 1,
   status: 1,
+});
+
+// Campus-first compounds: every feed/search match starts with campus_id,
+// keeping queries selective as the directory grows to 100s of campuses.
+productSchema.index({
+  campus_id: 1,
+  status: 1,
+  is_deleted: 1,
+  createdAt: -1,
+});
+productSchema.index({
+  campus_id: 1,
+  category: 1,
+  selling_price: 1,
 });
 
 productSchema.index({ is_boosted: 1, boost_expires_at: -1, boost_tier: 1 });

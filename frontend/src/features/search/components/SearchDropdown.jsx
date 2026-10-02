@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef } from "react";
+import { ikFirstThumb } from "../../../utils/imageTransform.js";
 
 const INR = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -94,8 +95,8 @@ ${mobile ? "px-4 py-3" : "px-3 py-2.5"}
 `}
     >
       <img
-        src={item.images?.[0]?.url || "/placeholder.png"}
-        alt=""
+        src={ikFirstThumb(item.images?.[0])}
+        alt={item.title || "Product"}
         loading="lazy"
         className={
           mobile

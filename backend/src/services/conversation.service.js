@@ -53,11 +53,24 @@ export const createConversation = async ({ buyerId, sellerId, productId }) => {
 /**
  * Get conversation by ID
  */
-export const getConversationById = async (conversationId) => {
-  return Conversation.findById(conversationId)
+const assertParticipant = (conversation, userId) => {
+  const id = String(userId);
+  const isParticipant =
+    conversation.buyer_id.toString() === id ||
+    conversation.seller_id.toString() === id;
+  if (!isParticipant) {
+    throw new AppError("You do not have access to this conversation.", 403);
+  }
+};
+
+export const getConversationById = async (conversationId, userId = null) => {
+  const conversation = await Conversation.findById(conversationId)
     .populate("buyer_id", "name avatar subscription")
     .populate("seller_id", "name avatar subscription")
     .populate("product_id", "title selling_price images status");
+  // Participant check so this stays safe if ever mounted on a route.
+  if (conversation && userId) assertParticipant(conversation, userId);
+  return conversation;
 };
 
 /**
@@ -117,6 +130,8 @@ export const markConversationRead = async ({ conversationId, userId }) => {
   if (!conversation) {
     throw new AppError("Conversation not found.", 404);
   }
+
+  assertParticipant(conversation, userId);
 
   if (conversation.buyer_id.toString() === userId.toString()) {
     conversation.unread_count.buyer = 0;
@@ -182,6 +197,8 @@ export const deleteConversation = async ({ conversationId, userId }) => {
   if (!conversation) {
     throw new AppError("Conversation not found.", 404);
   }
+
+  assertParticipant(conversation, userId);
 
   if (conversation.buyer_id.toString() === userId.toString()) {
     conversation.deleted_for.buyer = true;

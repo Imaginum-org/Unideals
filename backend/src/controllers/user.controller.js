@@ -1,6 +1,8 @@
+import bcrypt from "bcrypt";
 import userModel from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
 import { deleteImage } from "../utils/imagekit.js";
+import { safeErrorMessage } from "../utils/response.js";
 
 // GET USER PROFILE
 export const getUserProfile = async (req, res) => {
@@ -10,6 +12,7 @@ export const getUserProfile = async (req, res) => {
     const user = await userModel
       .findById(userId)
       .select("-password -refresh_token -verifyTokenEmail")
+      .populate("campus_id", "slug name short_name city state is_active")
       .lean();
 
     if (!user) {
@@ -30,7 +33,7 @@ export const getUserProfile = async (req, res) => {
     console.error("Error fetching in getUserProfile", err);
 
     return res.status(500).json({
-      message: err.message || err,
+      message: safeErrorMessage(err),
       success: false,
       error: true,
     });
@@ -41,7 +44,7 @@ export const getUserProfile = async (req, res) => {
 export const updateUserProfile = async (req, res) => {
   try {
     const userId = req.userId;
-    const { mobile, gender } = req.body;
+    const { mobile, gender, campus_slug } = req.body;
 
     const updateData = {};
 
@@ -70,12 +73,46 @@ export const updateUserProfile = async (req, res) => {
       updateData.gender = gender;
     }
 
+    // Campus selection (onboarding gate + Settings change).
+    // Slug validated against active directory; live listings migrate
+    // to the new campus in the same request.
+    let movedListings = 0;
+    if (campus_slug !== undefined) {
+      const { getActiveCampusBySlug } = await import(
+        "../services/campus.service.js"
+      );
+      let campus;
+      try {
+        campus = await getActiveCampusBySlug(campus_slug);
+      } catch (e) {
+        return res.status(e.statusCode || 400).json({
+          message: e.message,
+          success: false,
+          error: true,
+          ...(e.code ? { code: e.code } : {}),
+        });
+      }
+      updateData.campus_id = campus._id;
+
+      try {
+        const Product = (await import("../models/Product.model.js")).default;
+        const result = await Product.updateMany(
+          { seller_id: userId, is_deleted: false, status: "listed" },
+          { $set: { campus_id: campus._id } },
+        );
+        movedListings = result?.modifiedCount || 0;
+      } catch {
+        // best-effort only — profile update still succeeds
+      }
+    }
+
     const updatedUser = await userModel
       .findByIdAndUpdate(userId, updateData, {
         new: true,
         runValidators: true,
       })
       .select("-password -refresh_token")
+      .populate("campus_id", "slug name short_name city state is_active")
       .lean();
 
     if (!updatedUser) {
@@ -91,12 +128,13 @@ export const updateUserProfile = async (req, res) => {
       success: true,
       error: false,
       user: updatedUser, // keep same key
+      movedListings,
     });
   } catch (err) {
     console.error("Error updating profile:", err);
 
     return res.status(500).json({
-      message: err.message || err,
+      message: safeErrorMessage(err),
       success: false,
       error: true,
     });
@@ -130,9 +168,17 @@ export const updateUserAvatar = async (req, res) => {
 
     // Pin avatars to ImageKit endpoint when configured, allow Google avatars
     const endpoint = process.env.IMAGEKIT_URL_ENDPOINT;
-    const isImageKit = endpoint && avatar.url.startsWith(endpoint);
+    // Fail closed: without a configured endpoint we cannot verify host.
+    if (!endpoint) {
+      return res.status(500).json({
+        success: false,
+        error: true,
+        message: "Avatar service unavailable",
+      });
+    }
+    const isImageKit = avatar.url.startsWith(endpoint);
     const isGoogle = /^https:\/\/lh\d*\.googleusercontent\.com\//.test(avatar.url);
-    if (endpoint && !isImageKit && !isGoogle) {
+    if (!isImageKit && !isGoogle) {
       return res.status(400).json({
         success: false,
         error: true,
@@ -194,7 +240,7 @@ export const updateUserAvatar = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: true,
-      message: err.message || "Internal server error",
+      message: safeErrorMessage(err, "Internal server error"),
     });
   }
 };
@@ -249,6 +295,39 @@ export const removeUserAvatar = async (req, res) => {
 export const deleteAccount = async (req, res) => {
   try {
     const userId = req.userId;
+    const { password } = req.body || {};
+
+    // Password re-auth: a stolen session alone must not delete the account.
+    // Google-only accounts have no known password — they set one via
+    // Forgot Password first (surfaced in the UI error below).
+    if (!password || typeof password !== "string") {
+      return res.status(400).json({
+        message: "Please enter your password to confirm deletion.",
+        success: false,
+        error: true,
+        code: "PASSWORD_REQUIRED",
+      });
+    }
+
+    const account = await userModel.findById(userId).select("+password");
+    if (!account) {
+      return res.status(404).json({
+        message: "User not found or already deleted",
+        success: false,
+        error: true,
+      });
+    }
+
+    const bcryptOk = await bcrypt.compare(password, account.password);
+    if (!bcryptOk) {
+      return res.status(403).json({
+        message:
+          "Incorrect password. Google sign-in users can set one via Forgot Password first.",
+        success: false,
+        error: true,
+        code: "INVALID_PASSWORD",
+      });
+    }
 
     const deletedUser = await userModel.findByIdAndUpdate(
       userId,
@@ -300,7 +379,7 @@ export const deleteAccount = async (req, res) => {
     console.error("Error in deleteAccount controller:", err);
 
     return res.status(500).json({
-      message: err.message || "Server error while deleting account",
+      message: safeErrorMessage(err, "Server error while deleting account"),
       success: false,
       error: true,
     });

@@ -5,8 +5,8 @@ export const getProducts = (params = {}) => {
   return axios.get("/api/product", {params});
 };
 
-export const getBoostedProducts = () => {
-  return axios.get("/api/product/boosted");
+export const getBoostedProducts = (params = {}) => {
+  return axios.get("/api/product/boosted", { params });
 };
 
 export const getBoostSummary = () => {
@@ -14,8 +14,8 @@ export const getBoostSummary = () => {
 };
 
 // GET PRODUCT BY ID
-export const getProductById = (id) => {
-  return axios.get(`/api/product/${id}`);
+export const getProductById = (id, params = {}, config = {}) => {
+  return axios.get(`/api/product/${id}`, { params, ...config });
 };
 
 // GET USER PRODUCTS

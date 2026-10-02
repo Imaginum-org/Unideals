@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
@@ -101,26 +101,36 @@ function Subscription() {
   const [loadError, setLoadError] = useState(false);
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
 
-  const fetchBilling = async () => {
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
+
+  const fetchBilling = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
       const res = await getBilling();
+      if (cancelledRef.current) return;
       if (res.data?.success) {
         setBilling(res.data.data);
       } else {
         setLoadError(true);
       }
     } catch {
-      setLoadError(true);
+      if (!cancelledRef.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchBilling();
-  }, []);
+  }, [fetchBilling]);
 
   const selectedPlanId = TIER_TO_ID[billing?.tier] || "free";
 

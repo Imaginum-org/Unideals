@@ -14,9 +14,11 @@ import LimitModal from "../../../Components/ui/LimitModal.jsx";
 import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { RiGraduationCapLine } from "react-icons/ri";
 import { MdOutlineLocationOn } from "react-icons/md";
+import { useCampus } from "../../../context/CampusContext.jsx";
 
 const PreviewStep = () => {
   const navigate = useNavigate();
+  const { campus } = useCampus();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [publishStage, setPublishStage] = useState("");
   const [limitInfo, setLimitInfo] = useState(null);
@@ -380,7 +382,7 @@ const PreviewStep = () => {
                 <p className="text-[15px] text-[#454655]">
                   Campus:{" "}
                   <span className="font-semibold text-[#111827]">
-                    VIT Vellore
+                    {campus?.name || "Your campus"}
                   </span>
                 </p>
               </div>

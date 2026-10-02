@@ -1,4 +1,5 @@
 import * as adminUserService from "../services/admin.user.service.js";
+import { safeErrorMessage } from "../utils/response.js";
 
 const sendSuccess = (res, message, payload, statusCode = 200) =>
   res.status(statusCode).json({
@@ -12,7 +13,7 @@ const sendFailure = (res, error, statusCode = 400) =>
   res.status(statusCode).json({
     success: false,
     error: true,
-    message: error.message || "Request failed",
+    message: safeErrorMessage(error, "Request failed"),
   });
 
 export const getUsers = async (req, res) => {
