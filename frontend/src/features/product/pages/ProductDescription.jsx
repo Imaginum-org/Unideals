@@ -24,7 +24,7 @@ import { IoColorPaletteOutline } from "react-icons/io5";
 import { useWishlist } from "../../../context/WishlistContext";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
-import { ikThumb } from "../../../utils/imageTransform.js";
+import { ikThumb } from "../../../Utils/imageTransform.js";
 import LimitModal from "../../../Components/ui/LimitModal.jsx";
 // date of purchase
 import { IoCalendarOutline } from "react-icons/io5";

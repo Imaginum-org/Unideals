@@ -9,7 +9,7 @@ import {
   ZoomOut,
   RotateCcw,
 } from "lucide-react";
-import { ikFull, ikThumb } from "../../../utils/imageTransform.js";
+import { ikFull, ikThumb } from "../../../Utils/imageTransform.js";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 3;

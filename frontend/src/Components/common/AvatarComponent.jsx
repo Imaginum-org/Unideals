@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ik } from "../../utils/imageTransform.js";
+import { ik } from "../../Utils/imageTransform.js";
 
 const AvatarComponent = ({
   name,

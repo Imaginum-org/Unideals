@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Share2 } from "lucide-react";
-import { ikFull, ikThumb } from "../../../utils/imageTransform.js";
+import { ikFull, ikThumb } from "../../../Utils/imageTransform.js";
 
 const SWIPE_THRESHOLD = 60;
 

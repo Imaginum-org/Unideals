@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { FaStar, FaHeart, FaRegHeart, FaCrown } from "react-icons/fa";
 import { useWishlist } from "../../../context/WishlistContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
-import { ikCard } from "../../../utils/imageTransform.js";
+import { ikCard } from "../../../Utils/imageTransform.js";
 import LimitModal from "../../../Components/ui/LimitModal.jsx";
 import toast from "react-hot-toast";
 import { IoLocationOutline } from "react-icons/io5";

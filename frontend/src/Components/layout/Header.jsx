@@ -27,7 +27,7 @@ import { IoChevronBackOutline } from "react-icons/io5";
 import AvatarComponent from "../common/AvatarComponent.jsx";
 import { useUser } from "../../context/useUserContext.jsx";
 import { useCampus } from "../../context/CampusContext.jsx";
-import { ikFirstThumb } from "../../utils/imageTransform.js";
+import { ikFirstThumb } from "../../Utils/imageTransform.js";
 import { logoutUser } from "../../features/auth/api/authApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import useDebounce from "../../features/search/hooks/useDebounce";

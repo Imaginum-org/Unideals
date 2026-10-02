@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef } from "react";
-import { ikFirstThumb } from "../../../utils/imageTransform.js";
+import { ikFirstThumb } from "../../../Utils/imageTransform.js";
 
 const INR = new Intl.NumberFormat("en-IN", {
   style: "currency",
