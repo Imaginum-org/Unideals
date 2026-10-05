@@ -6,17 +6,22 @@ import {
   Zap,
   CheckCircle2,
   Lock,
-  ChevronRight,
   Info,
-  Shield,
   Crown,
   ArrowRight,
+  Gift,
 } from "lucide-react";
-import { RANK_TIERS_GUIDE, XP_ACTIVITIES_GUIDE } from "../../../Utils/badgeConfig.js";
+import {
+  RANK_TIERS_GUIDE,
+  XP_ACTIVITIES_GUIDE,
+  LEVEL_REWARDS_GUIDE,
+} from "../../../Utils/badgeConfig.js";
 
 /**
  * RankGuideModal — comprehensive, gamified guide explaining all 6 ranks,
- * level criteria, XP requirements, perks, and how users can earn XP on Unideals.
+ * level criteria, XP requirements, perks, rewards and how to earn XP.
+ *
+ * Tabs: Rank Roadmap | How to Earn XP | Rewards & Gifts
  */
 export default function RankGuideModal({
   isOpen,
@@ -25,7 +30,7 @@ export default function RankGuideModal({
   currentLevel = 1,
   currentXp = 0,
 }) {
-  const [activeTab, setActiveTab] = useState("roadmap"); // "roadmap" | "earn"
+  const [activeTab, setActiveTab] = useState("roadmap"); // "roadmap" | "earn" | "rewards"
 
   if (!isOpen) return null;
 
@@ -55,7 +60,7 @@ export default function RankGuideModal({
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  Climb tiers from Seedling to Campus Royale to unlock perks & badges.
+                  Climb tiers from Seedling to Campus Royale to unlock perks & real rewards.
                 </p>
               </div>
             </div>
@@ -82,7 +87,7 @@ export default function RankGuideModal({
             </div>
           </div>
 
-          {/* Tab Navigation */}
+          {/* Tab Navigation — 3 tabs */}
           <div className="flex gap-2 mt-4">
             <button
               onClick={() => setActiveTab("roadmap")}
@@ -93,7 +98,18 @@ export default function RankGuideModal({
               }`}
             >
               <Crown size={14} />
-              Rank Roadmap (6 Tiers)
+              Rank Roadmap
+            </button>
+            <button
+              onClick={() => setActiveTab("rewards")}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === "rewards"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                  : "bg-white/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800"
+              }`}
+            >
+              <Gift size={14} />
+              Gifts & Rewards
             </button>
             <button
               onClick={() => setActiveTab("earn")}
@@ -104,21 +120,22 @@ export default function RankGuideModal({
               }`}
             >
               <Zap size={14} />
-              Ways to Earn XP
+              Earn XP
             </button>
           </div>
         </div>
 
         {/* Modal Body */}
         <div className="p-6 sm:p-8 overflow-y-auto no-scrollbar space-y-4">
-          {activeTab === "roadmap" ? (
+
+          {/* ── RANK ROADMAP TAB ───────────────────────────────────────────── */}
+          {activeTab === "roadmap" && (
             <div className="space-y-4">
               <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                 <Info size={14} className="text-indigo-500 shrink-0" />
-                <span>Your level is calculated using XP: <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-semibold">Level = √(XP / 50)</code></span>
+                <span>Level = √(XP / 50). Rank perks unlock once when you first enter that tier.</span>
               </div>
 
-              {/* Ranks list */}
               <div className="space-y-3">
                 {RANK_TIERS_GUIDE.map((tier) => {
                   const isCurrent =
@@ -195,7 +212,7 @@ export default function RankGuideModal({
                       {/* Perks */}
                       <div className="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                          Tier Perks & Rewards
+                          Tier Perks
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                           {tier.perks.map((perk, i) => (
@@ -213,12 +230,192 @@ export default function RankGuideModal({
                           ))}
                         </div>
                       </div>
+
+                      {/* Rank unlock rewards — shown inline */}
+                      {tier.rewards && tier.rewards.length > 0 && (
+                        <div className="mt-3 pt-2.5 border-t border-dashed border-gray-200 dark:border-gray-700">
+                          <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
+                             style={{ color: tier.color }}>
+                            Rank Unlock Gift 🎁
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tier.rewards.map((r, i) => (
+                              <span
+                                key={i}
+                                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
+                                style={{
+                                  background: tier.bg,
+                                  color: tier.color,
+                                  borderColor: tier.color + "40",
+                                }}
+                              >
+                                {r}
+                              </span>
+                            ))}
+                          </div>
+                          {tier.subReward && (
+                            <p className="text-[10px] text-gray-400 mt-1.5">
+                              Subscription is granted once per rank. If you already have a higher plan, extra time is stacked.
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
-          ) : (
+          )}
+
+          {/* ── GIFTS & REWARDS TAB ───────────────────────────────────────── */}
+          {activeTab === "rewards" && (
+            <div className="space-y-5">
+              {/* Hero banner */}
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 border border-purple-200/60 dark:border-purple-900/30 rounded-2xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shrink-0 text-lg shadow-md shadow-purple-500/30">
+                  🎁
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                    Level up = Real rewards, automatically!
+                  </h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    Every milestone level and rank unlock drops free Boost Credits, subscription upgrades, and exclusive cosmetics — no action needed.
+                  </p>
+                </div>
+              </div>
+
+              {/* Rank unlock rewards */}
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+                  <Crown size={13} className="text-yellow-500" />
+                  Rank Unlock Rewards (one-time per rank)
+                </p>
+                <div className="space-y-2">
+                  {RANK_TIERS_GUIDE.map((tier) => {
+                    const isUnlocked = currentLevel >= tier.minLevel;
+                    return (
+                      <div
+                        key={tier.title}
+                        className={`rounded-xl p-3.5 border flex items-start gap-3 transition-all ${
+                          isUnlocked
+                            ? "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#202020]"
+                            : "border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1a1a1a] opacity-60"
+                        }`}
+                      >
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+                          style={{ background: tier.bg }}
+                        >
+                          {tier.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span
+                              className="text-xs font-extrabold"
+                              style={{ color: tier.color }}
+                            >
+                              {tier.title}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-medium">
+                              (Lv. {tier.minLevel}+)
+                            </span>
+                            {!isUnlocked && (
+                              <span className="flex items-center gap-1 text-[10px] text-gray-400">
+                                <Lock size={9} /> Locked
+                              </span>
+                            )}
+                            {isUnlocked && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                Unlocked
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {tier.rewards.map((r, i) => (
+                              <span
+                                key={i}
+                                className="px-2 py-0.5 rounded-md text-[11px] font-semibold"
+                                style={{ background: tier.bg, color: tier.color }}
+                              >
+                                {r}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Level milestone rewards */}
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-indigo-500" />
+                  Level Milestone Gifts (every 5 levels)
+                </p>
+                <div className="space-y-2">
+                  {LEVEL_REWARDS_GUIDE.map((r) => {
+                    const isReached = currentLevel >= r.level;
+                    return (
+                      <div
+                        key={r.level}
+                        className={`rounded-xl p-3 border flex items-center gap-3 transition-all ${
+                          isReached
+                            ? "border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/10"
+                            : "border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-[#1a1a1a] opacity-60"
+                        }`}
+                      >
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black shrink-0 ${
+                            isReached
+                              ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30"
+                              : "bg-gray-100 dark:bg-gray-800 text-gray-400"
+                          }`}
+                        >
+                          {r.level}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs font-bold mb-1 ${isReached ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-500"}`}>
+                            {r.label}
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {r.grants.map((g, i) => (
+                              <span
+                                key={i}
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                                  isReached
+                                    ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300"
+                                    : "bg-gray-100 dark:bg-gray-800 text-gray-400"
+                                }`}
+                              >
+                                {g}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        {isReached && (
+                          <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Info footer */}
+              <div className="rounded-xl p-3 border border-amber-200/60 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-950/10 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
+                <Info size={14} className="shrink-0 mt-0.5" />
+                <span>
+                  All rewards are granted automatically when you hit the milestone — just keep trading! Subscription rewards stack on top of your existing plan (time is extended, not replaced).
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ── HOW TO EARN XP TAB ───────────────────────────────────────── */}
+          {activeTab === "earn" && (
             <div className="space-y-4">
               <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border border-amber-200/60 dark:border-amber-900/30 rounded-2xl p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
@@ -269,7 +466,7 @@ export default function RankGuideModal({
             onClick={onClose}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
           >
-            <span>??</span>
+            <span>🏅</span>
             View All Badges & Milestones
             <ArrowRight size={13} />
           </Link>

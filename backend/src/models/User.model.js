@@ -209,6 +209,27 @@ const userSchema = new Schema(
           xp_granted: { type: Number, default: 0 },
         },
       ],
+
+      // ── Reward system fields ──────────────────────────────────────────
+      // Running balance of boost credits the user currently holds.
+      boost_credits: { type: Number, default: 0 },
+
+      // Audit log: every reward event ever granted to this user.
+      rewards_claimed: [
+        {
+          _id: false,
+          reward_id:   { type: String, required: true }, // e.g. "level_10_gift"
+          reward_type: { type: String, required: true }, // "boost_credit" | "subscription" | "badge" | "frame" | "tag"
+          value:       { type: Schema.Types.Mixed },     // credits count or sub tier string
+          claimed_at:  { type: Date, default: Date.now },
+        },
+      ],
+
+      // Active decorative frame key shown on profile. null = default.
+      profile_frame: { type: String, default: null },
+
+      // Special text tags on the profile (e.g. "hall_of_fame", "og_member").
+      special_tags: [{ type: String }],
     },
   },
   {

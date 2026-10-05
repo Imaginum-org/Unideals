@@ -3,6 +3,7 @@ import userModel from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
 import { deleteImage } from "../utils/imagekit.js";
 import { safeErrorMessage } from "../utils/response.js";
+import { computeLevel, xpToNextLevel, levelProgress } from "../services/badgeService.js";
 
 // GET USER PROFILE
 export const getUserProfile = async (req, res) => {
@@ -21,6 +22,15 @@ export const getUserProfile = async (req, res) => {
         success: false,
         error: true,
       });
+    }
+
+    if (user.gamification) {
+      const xp = user.gamification.total_xp || 0;
+      const level = computeLevel(xp);
+      user.gamification.level = level;
+      user.gamification.xp_to_next_level = xpToNextLevel(xp);
+      user.gamification.progress_percent = levelProgress(xp);
+      user.gamification.next_level = level + 1;
     }
 
     return res.status(200).json({

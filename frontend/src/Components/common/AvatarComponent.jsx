@@ -137,14 +137,14 @@ const AvatarComponent = ({
 
       {/* PRO Badge */}
       {showBadge && plan === "pro" && (
-        <span className="absolute -bottom-1 -right-1 translate-x-1/4 translate-y-1/4 bg-gradient-to-r from-[#3838EC] to-[#5C6DFF] text-white shadow-[#3838EC]/40 shadow-lg text-[9px] leading-none font-extrabold px-1.5 py-0.5 rounded border border-white dark:border-[#131313] z-20">
+        <span className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-r from-[#3838EC] to-[#5C6DFF] text-white shadow-[#3838EC]/40 shadow-md text-[8px] leading-none font-extrabold px-1.5 py-0.5 rounded-full border border-white dark:border-[#131313] z-20 pointer-events-none select-none">
           PRO
         </span>
       )}
 
       {/* PRO+ Badge */}
       {showBadge && plan === "pro_plus" && (
-        <span className="absolute -bottom-1 -right-1 translate-x-1/4 translate-y-1/4 bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black shadow-[#FFD700]/40 shadow-lg text-[9px] leading-none font-extrabold px-1.5 py-0.5 rounded border border-white dark:border-[#131313] z-20">
+        <span className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black shadow-[#FFD700]/40 shadow-md text-[8px] leading-none font-extrabold px-1.5 py-0.5 rounded-full border border-white dark:border-[#131313] z-20 pointer-events-none select-none">
           PRO+
         </span>
       )}

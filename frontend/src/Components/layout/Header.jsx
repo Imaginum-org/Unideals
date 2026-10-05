@@ -34,6 +34,7 @@ import useDebounce from "../../features/search/hooks/useDebounce";
 import { searchProducts, getTrendingProducts } from "../../features/search/api/searchApi";
 import SearchDropdown from "../../features/search/components/SearchDropdown";
 import { toast } from "react-hot-toast";
+import { levelProgress, xpToNextLevel } from "../../Utils/badgeConfig.js";
 
 const ProfileDropdown = ({
   userDetails,
@@ -168,8 +169,8 @@ const ProfileDropdown = ({
         const rank = g.rank_title || "Seedling";
         const level = g.level || 1;
         const totalXp = g.total_xp || 0;
-        const progress = Math.min(g.progress_percent || 0, 100);
-        const xpToNext = g.xp_to_next_level || 0;
+        const progress = Math.min(g.progress_percent ?? levelProgress(totalXp), 100);
+        const xpToNext = g.xp_to_next_level ?? xpToNextLevel(totalXp);
         const badgeCount = (g.badges || []).length;
         const rankColor = rankColors[rank] || "#6366F1";
         const rankIcon = rankIcons[rank] || "⚡";

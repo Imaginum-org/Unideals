@@ -294,6 +294,8 @@ export const RANK_TIERS_GUIDE = [
       "Basic buyer & seller in-app messaging",
       "Eligible for Verified Student status",
     ],
+    rewards: ["+1 Boost Credit 🚀"],
+    subReward: null,
   },
   {
     title: "Explorer",
@@ -311,6 +313,8 @@ export const RANK_TIERS_GUIDE = [
       "Higher discovery in campus browse feeds",
       "Unlocks multi-category badge milestones",
     ],
+    rewards: ["+2 Boost Credits 🚀"],
+    subReward: null,
   },
   {
     title: "Dealer",
@@ -328,6 +332,8 @@ export const RANK_TIERS_GUIDE = [
       "Highlighted listings with 'Active Trader' chip",
       "Faster response badge eligibility",
     ],
+    rewards: ["+3 Boost Credits 🚀", "🆓 Pro Subscription — 1 Month FREE"],
+    subReward: { label: "Pro", duration: "1 Month" },
   },
   {
     title: "Hustler",
@@ -345,6 +351,8 @@ export const RANK_TIERS_GUIDE = [
       "Boosted visibility in search results",
       "Special streak & volume badge recognition",
     ],
+    rewards: ["+5 Boost Credits 🚀", "🆓 Pro Subscription — 1 Semester FREE", "Hustler Profile Frame 🖼️"],
+    subReward: { label: "Pro", duration: "1 Semester" },
   },
   {
     title: "Legend",
@@ -362,6 +370,8 @@ export const RANK_TIERS_GUIDE = [
       "Top-tier recommendation placement",
       "Special recognition in campus leaderboard",
     ],
+    rewards: ["+7 Boost Credits 🚀", "🆓 Pro+ Subscription — 1 Semester FREE", "Gold Profile Frame 🖼️"],
+    subReward: { label: "Pro+", duration: "1 Semester" },
   },
   {
     title: "Campus Royale",
@@ -380,6 +390,8 @@ export const RANK_TIERS_GUIDE = [
       "Permanent top spotlight across university pages",
       "Lifetime VIP perks & community leader badge",
     ],
+    rewards: ["+10 Boost Credits 🚀", "🆓 Pro+ Subscription — LIFETIME FREE 👑", "Crown Avatar Frame 👑", "'Campus Royale' Profile Tag"],
+    subReward: { label: "Pro+", duration: "Lifetime" },
   },
 ];
 
@@ -394,4 +406,40 @@ export const XP_ACTIVITIES_GUIDE = [
   { action: "Chat conversations & deals", xp: "+20 to +200 XP", icon: "💬", note: "Active chats leading to closed trades" },
   { action: "Milestones & streaks", xp: "+80 to +200 XP", icon: "🔥", note: "5 sales in 7 days, ₹5,000+ sales, 100 deals" },
 ];
+
+// Level milestone rewards guide
+// Mirrors exactly what rewardService.js grants on the backend.
+export const LEVEL_REWARDS_GUIDE = [
+  { level: 5,  label: "Explorer reached",   grants: ["+1 Boost Credit"] },
+  { level: 10, label: "Dealer reached",      grants: ["+2 Boost Credits"] },
+  { level: 15, label: "Level 15 milestone",  grants: ["+2 Boost Credits", "Bronze Profile Frame"] },
+  { level: 20, label: "Hustler reached",     grants: ["+3 Boost Credits"] },
+  { level: 25, label: "Level 25 milestone",  grants: ["+3 Boost Credits", "Rising Star Tag"] },
+  { level: 30, label: "Legend reached",      grants: ["+4 Boost Credits", "Gold Profile Frame"] },
+  { level: 35, label: "Level 35 milestone",  grants: ["+4 Boost Credits"] },
+  { level: 40, label: "Campus Royale!",      grants: ["+5 Boost Credits", "Crown Avatar Frame"] },
+  { level: 45, label: "Level 45 milestone",  grants: ["+5 Boost Credits", "Campus Legend Tag"] },
+  { level: 50, label: "MAX LEVEL!",          grants: ["+10 Boost Credits", "Hall of Fame Profile Tag"] },
+];
+
+// Level & XP helpers
+export function computeLevel(xp = 0) {
+  return Math.max(1, Math.floor(Math.sqrt((xp || 0) / 50)));
+}
+
+export function xpForLevel(level = 1) {
+  return level * level * 50;
+}
+
+export function xpToNextLevel(xp = 0) {
+  const level = computeLevel(xp);
+  return xpForLevel(level + 1) - (xp || 0);
+}
+
+export function levelProgress(xp = 0) {
+  const level = computeLevel(xp);
+  const current = xpForLevel(level);
+  const next = xpForLevel(level + 1);
+  return Math.min(100, Math.round((((xp || 0) - current) / (next - current)) * 100));
+}
 

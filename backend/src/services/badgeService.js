@@ -1,6 +1,7 @@
 import User from "../models/User.model.js";
 import Product from "../models/Product.model.js";
 import BadgeEvent from "../models/Badge.model.js";
+import { checkAndGrantRewards } from "./rewardService.js";
 
 // ─── XP / Level helpers ───────────────────────────────────────────────────
 
@@ -280,6 +281,9 @@ export async function computeAndAwardBadges(userId) {
     await BadgeEvent.insertMany(newEvents);
   }
 
+  // ── Check & grant level / rank rewards ────────────────────────────────────
+  const newly_earned_rewards = await checkAndGrantRewards(userId, level, rank_title);
+
   return {
     total_xp: totalXp,
     level,
@@ -289,6 +293,7 @@ export async function computeAndAwardBadges(userId) {
     next_level: level + 1,
     progress_percent: levelProgress(totalXp),
     newly_earned: newEvents,
+    newly_earned_rewards,
   };
 }
 

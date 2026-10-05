@@ -9,10 +9,9 @@ if (!process.env.MONGO_URL) {
 export const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URL, {
-      serverSelectionTimeoutMS: 5000, // Connection within 5sec or fail
+      serverSelectionTimeoutMS: 15000, // 15s timeout for Atlas cluster discovery & DNS lookup
       socketTimeoutMS: 45000,
       maxPoolSize: 10,
-      family: 4, // IPv4
     });
 
     console.log(`MongoDB connected: ${mongoose.connection.host}`);

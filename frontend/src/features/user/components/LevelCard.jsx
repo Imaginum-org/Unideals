@@ -1,10 +1,12 @@
-import React, { useState } from "react";
-import { Info, HelpCircle } from "lucide-react";
-import { RANK_CONFIG } from "../../../Utils/badgeConfig.js";
+import React, { useState, useEffect } from "react";
+import { Info } from "lucide-react";
+import { RANK_CONFIG, LEVEL_REWARDS_GUIDE } from "../../../Utils/badgeConfig.js";
 import RankGuideModal from "./RankGuideModal.jsx";
+import { fetchMyRewards } from "../api/badgeApi.js";
 
 /**
- * LevelCard — displays user's XP, level, rank, and progress bar.
+ * LevelCard — displays user's XP, level, rank, progress bar,
+ * boost credit balance, and next milestone reward preview.
  *
  * Props:
  *   total_xp         {number}
@@ -25,7 +27,24 @@ export default function LevelCard({
   badge_count = 0,
 }) {
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [boostCredits, setBoostCredits] = useState(null);
   const rank = RANK_CONFIG[rank_title] || RANK_CONFIG["Seedling"];
+
+  // Fetch boost credits balance
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyRewards()
+      .then((res) => {
+        if (!cancelled && res.data.success) {
+          setBoostCredits(res.data.data.boost_credits ?? 0);
+        }
+      })
+      .catch(() => {}); // non-critical, just display enhancement
+    return () => { cancelled = true; };
+  }, []);
+
+  // Find the next level reward the user hasn't reached yet
+  const nextReward = LEVEL_REWARDS_GUIDE.find((r) => r.level > level);
 
   return (
     <>
@@ -134,6 +153,41 @@ export default function LevelCard({
             </div>
           </div>
 
+          {/* Boost credits + next reward row */}
+          <div className="flex items-center gap-3 py-2.5 px-3 mb-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+            <div className="flex items-center gap-1.5">
+              <span className="text-base">🚀</span>
+              <div>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide leading-none">
+                  Boost Credits
+                </p>
+                <p className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 leading-tight">
+                  {boostCredits === null ? "—" : boostCredits}
+                </p>
+              </div>
+            </div>
+            {nextReward && (
+              <>
+                <div className="w-px h-8 bg-indigo-200 dark:bg-indigo-800 mx-1" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide leading-none">
+                    Next Reward at Lv.{nextReward.level}
+                  </p>
+                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 leading-tight truncate">
+                    {nextReward.grants.join(" · ")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGuideModal(true)}
+                  className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 shrink-0 hover:underline"
+                >
+                  All →
+                </button>
+              </>
+            )}
+          </div>
+
           {/* Footer stats */}
           <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
             <span className="text-base">🏅</span>
@@ -161,4 +215,3 @@ export default function LevelCard({
     </>
   );
 }
-

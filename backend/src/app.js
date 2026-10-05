@@ -19,6 +19,7 @@ import adminRouter from "./routes/admin.routes.js";
 import boostRouter from "./routes/boost.routes.js";
 import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js";
 import badgeRouter from "./routes/badgeRoutes.js";
+import rewardRouter from "./routes/rewardRoutes.js";
 import handoffRouter from "./routes/handoff.routes.js";
 import { verifyOrigin } from "./middlewares/csrf.middleware.js";
 
@@ -196,6 +197,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/boost", boostRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/badges", badgeRouter);
+app.use("/api/rewards", rewardRouter);
 app.use("/api/handoff", handoffRouter);
 
 // If no route matches
