@@ -208,6 +208,16 @@ Shows: rank title, level, XP progress bar, badge count, top 4 badge icons, link 
 
 ---
 
+### Surface C - Header Profile Dropdown & Avatar Badge
+
+- **Location**: Top navigation bar (`Header.jsx`) & Avatar Component (`AvatarComponent.jsx`)
+- **Features**:
+  - **Gamification XP Strip**: Embedded directly inside the top of `ProfileDropdown`. Displays rank icon (`🌱`, `⚡`, `👑`), rank title, `Lv. {level}`, total XP, earned badge count (`3 🏅`), animated progress bar (`progress_percent`), and `XP to next level →`.
+  - **Avatar Subscription Badge**: Renders `PRO` or `PRO+` pill positioned at `-bottom-0.5 -right-0.5` on `AvatarComponent`, avoiding layout shift and overflow over location details (`📍`).
+  - **Header User Header**: Displays inline `PRO` / `PRO+` badge pill adjacent to user name in dropdown.
+
+---
+
 ## 6. Data Models
 
 ### 6.1 - Changes to User.model.js
@@ -230,6 +240,9 @@ gamification: {
       xp_granted: { type: Number, default: 0 },
     },
   ],
+  boost_credits:    { type: Number, default: 0 },
+  profile_frame:    { type: String, default: null },
+  special_tags:     [{ type: String }],
 },
 ```
 
@@ -262,6 +275,7 @@ const badgeEventSchema = new Schema({
 | POST   | /api/badges/compute     | Yes  | Recomputes all badges from scratch for user       |
 | GET    | /api/badges/leaderboard | Yes  | Top users by XP scoped to same campus             |
 | GET    | /api/badges/config      | No   | Full badge catalogue used by frontend config      |
+| GET    | /api/user/userProfile   | Yes  | User profile (Enriched with `progress_percent`, `xp_to_next_level`, `next_level`) |
 
 ### GET /api/badges/me - Sample Response
 
@@ -306,8 +320,9 @@ const badgeEventSchema = new Schema({
 | frontend/src/features/user/components/LevelCard.jsx | Reusable XP + level + rank display card |
 | frontend/src/features/user/components/BadgeCard.jsx | Single badge card with earned / locked states and modal |
 | frontend/src/features/user/components/BadgeMiniStrip.jsx | Compact widget for Overview page |
+| frontend/src/features/user/components/RankGuideModal.jsx | Roadmap & Levels Guide modal explaining XP and rank rewards |
 | frontend/src/features/user/api/badgeApi.js | API calls: fetchMyBadges, computeBadges, fetchLeaderboard |
-| frontend/src/Utils/badgeConfig.js | Badge definitions: id, name, desc, icon, color, category, tiers |
+| frontend/src/Utils/badgeConfig.js | Badge definitions, rank guides, and level calculation helpers (`levelProgress`, `xpToNextLevel`) |
 
 ### Frontend - Modified Files
 
@@ -315,6 +330,8 @@ const badgeEventSchema = new Schema({
 |------|-------------|
 | frontend/src/features/user/components/Profile_left_part.jsx | Add Achievements nav item with Trophy icon |
 | frontend/src/features/user/pages/ProfileOverview.jsx | Add BadgeMiniStrip widget to activity grid |
+| frontend/src/Components/layout/Header.jsx | Add Gamification XP strip to dropdown, fallbacks for `levelProgress` & `xpToNextLevel`, and inline subscription badge |
+| frontend/src/Components/common/AvatarComponent.jsx | Fix badge position to `-bottom-0.5 -right-0.5` without translate offset collision |
 | Router file under frontend/src/app/ | Add /achievements route |
 
 ### Backend - New Files
@@ -323,6 +340,7 @@ const badgeEventSchema = new Schema({
 |------|---------|
 | backend/src/models/Badge.model.js | Badge event audit log schema |
 | backend/src/services/badgeService.js | Core: compute badges, award XP, update level |
+| backend/src/services/rewardService.js | Automated Level & Rank milestone reward distribution (Boost Credits, Subscriptions, Frames, Tags) |
 | backend/src/controllers/badgeController.js | HTTP handlers |
 | backend/src/routes/badgeRoutes.js | Route definitions |
 
@@ -330,7 +348,8 @@ const badgeEventSchema = new Schema({
 
 | File | What Changes |
 |------|-------------|
-| backend/src/models/User.model.js | Add gamification sub-document |
+| backend/src/models/User.model.js | Add gamification sub-document schema |
+| backend/src/controllers/user.controller.js | Enrich `getUserProfile` with computed virtual fields (`progress_percent`, `xp_to_next_level`, `next_level`) |
 | backend/src/app.js | Register /api/badges router |
 
 ---
