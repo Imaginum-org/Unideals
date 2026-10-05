@@ -236,7 +236,6 @@ export async function computeAndAwardBadges(userId) {
 
   const newBadges = [...existing];
   const newEvents = [];
-  let totalXp = (user.gamification && user.gamification.total_xp) || 0;
 
   for (const [badgeId, evaluate] of Object.entries(BADGE_DEFINITIONS)) {
     const result = evaluate(ctx);
@@ -254,17 +253,25 @@ export async function computeAndAwardBadges(userId) {
         earned_at: new Date(),
         xp_granted: xp,
       });
-      totalXp += xp;
       newEvents.push({ user_id: userId, badge_id: badgeId, tier, xp_granted: xp });
     } else if ((TIER_RANK[tier] || 0) > (TIER_RANK[current.tier] || 0)) {
       // Tier upgrade
       const delta = xp - (current.xp_granted || 0);
       const idx = newBadges.findIndex((b) => b.badge_id === badgeId);
       if (idx !== -1) newBadges[idx] = { ...newBadges[idx], tier, xp_granted: xp, earned_at: new Date() };
-      totalXp += delta;
       newEvents.push({ user_id: userId, badge_id: badgeId, tier, xp_granted: delta });
     }
   }
+
+  // Compute total XP:
+  // 1. Sum of all earned badges' XP
+  const badgeXp = newBadges.reduce((sum, b) => sum + (b.xp_granted || 0), 0);
+  // 2. +30 XP for each active product listing beyond the first (first listing is awarded by first_listing badge)
+  const additionalListingXp = Math.max(0, (ctx.totalListings || 0) - 1) * 30;
+  // 3. +30 XP for each completed buy beyond the first (first buy is awarded by first_buy badge)
+  const additionalBuyXp = Math.max(0, (ctx.totalBuys || 0) - 1) * 30;
+
+  const totalXp = badgeXp + additionalListingXp + additionalBuyXp;
 
   const level = computeLevel(totalXp);
   const rank_title = rankFromLevel(level, user.gender);

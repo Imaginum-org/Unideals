@@ -133,6 +133,20 @@ export const updateUserProfile = async (req, res) => {
       });
     }
 
+    // Recompute badges/gamification in background if profile fields change
+    computeAndAwardBadges(userId).catch((err) =>
+      console.error("Error updating gamification on updateUserProfile:", err),
+    );
+
+    if (updatedUser.gamification) {
+      const xp = updatedUser.gamification.total_xp || 0;
+      const level = computeLevel(xp);
+      updatedUser.gamification.level = level;
+      updatedUser.gamification.xp_to_next_level = xpToNextLevel(xp);
+      updatedUser.gamification.progress_percent = levelProgress(xp);
+      updatedUser.gamification.next_level = level + 1;
+    }
+
     return res.status(200).json({
       message: "Profile updated successfully",
       success: true,
@@ -237,6 +251,19 @@ export const updateUserAvatar = async (req, res) => {
       .findById(userId)
       .select("-password -refresh_token")
       .lean();
+
+    computeAndAwardBadges(userId).catch((err) =>
+      console.error("Error updating gamification on updateUserAvatar:", err),
+    );
+
+    if (updatedUser?.gamification) {
+      const xp = updatedUser.gamification.total_xp || 0;
+      const level = computeLevel(xp);
+      updatedUser.gamification.level = level;
+      updatedUser.gamification.xp_to_next_level = xpToNextLevel(xp);
+      updatedUser.gamification.progress_percent = levelProgress(xp);
+      updatedUser.gamification.next_level = level + 1;
+    }
 
     return res.status(200).json({
       success: true,

@@ -4,6 +4,8 @@ import { deleteImage } from "../utils/imagekit.js";
 import { forwardServiceError } from "../utils/response.js";
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
+import { computeAndAwardBadges } from "../services/badgeService.js";
+
 // CREATE PRODUCT
 export const createProduct = async (req, res) => {
   // Only collect well-formed fileIds for cleanup to prevent arbitrary deletion.
@@ -26,6 +28,13 @@ export const createProduct = async (req, res) => {
 
     const product = await productService.createProduct(data, user);
 
+    let gamification = null;
+    try {
+      gamification = await computeAndAwardBadges(user._id);
+    } catch (gamifyErr) {
+      console.error("Error updating gamification on createProduct:", gamifyErr);
+    }
+
     const productCount = await Product.countDocuments({
       seller_id: user._id,
       status: PRODUCT_STATUS.LISTED,
@@ -39,6 +48,7 @@ export const createProduct = async (req, res) => {
       message: "Product created successfully",
       data: product,
       isFirstListing,
+      gamification,
     });
   } catch (error) {
     // Cleanup uploaded images if product fails (best-effort, never fails request)
@@ -235,6 +245,10 @@ export const deleteProduct = async (req, res, next) => {
 
     const product = await productService.deleteProduct(productId, userId);
 
+    computeAndAwardBadges(userId).catch((err) =>
+      console.error("Error updating gamification on deleteProduct:", err),
+    );
+
     return res.status(200).json({
       success: true,
       message: "Product deleted successfully",
@@ -252,6 +266,10 @@ export const unlistProduct = async (req, res, next) => {
 
     const product = await productService.unlistProduct(productId, userId);
 
+    computeAndAwardBadges(userId).catch((err) =>
+      console.error("Error updating gamification on unlistProduct:", err),
+    );
+
     return res.status(200).json({
       success: true,
       message: "Product unlisted successfully",
@@ -268,6 +286,10 @@ export const relistProduct = async (req, res, next) => {
     const userId = req.userId;
 
     const product = await productService.relistProduct(productId, userId);
+
+    computeAndAwardBadges(userId).catch((err) =>
+      console.error("Error updating gamification on relistProduct:", err),
+    );
 
     return res.status(200).json({
       success: true,

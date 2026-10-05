@@ -52,7 +52,12 @@ This builds trust, rewards consistent engagement, and makes profiles feel alive.
 ## 3. XP Formula
 
 ```
-level       = Math.floor(Math.sqrt(total_xp / 50))
+total_xp    = badge_xp + additional_listing_xp + additional_buy_xp
+badge_xp    = sum of all earned badge xp_granted
+listing_xp  = max(0, total_active_listings - 1) * 30  (1st listing covered by First Drop badge)
+buy_xp      = max(0, total_buys - 1) * 30             (1st buy covered by First Purchase badge)
+
+level       = Math.max(1, Math.floor(Math.sqrt(total_xp / 50)))
 xp_for_next = (currentLevel + 1)^2 * 50
 xp_to_next  = xp_for_next - total_xp
 progress_%  = ((total_xp - currentLevel^2*50) / (xp_for_next - currentLevel^2*50)) * 100

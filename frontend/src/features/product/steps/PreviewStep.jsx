@@ -15,10 +15,12 @@ import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
 import { RiGraduationCapLine } from "react-icons/ri";
 import { MdOutlineLocationOn } from "react-icons/md";
 import { useCampus } from "../../../context/CampusContext.jsx";
+import { useUser } from "../../../context/useUserContext.jsx";
 
 const PreviewStep = () => {
   const navigate = useNavigate();
   const { campus } = useCampus();
+  const { updateUserDetails } = useUser();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [publishStage, setPublishStage] = useState("");
   const [limitInfo, setLimitInfo] = useState(null);
@@ -232,6 +234,9 @@ const PreviewStep = () => {
       });
 
       const isFirstListing = Boolean(response?.data?.isFirstListing);
+      if (response?.data?.gamification) {
+        updateUserDetails({ gamification: response.data.gamification });
+      }
 
       setPublishStage("");
       resetForm();
