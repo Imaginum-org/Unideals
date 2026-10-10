@@ -618,12 +618,12 @@ const Home = () => {
         </div>
 
         {boostedProducts.length > 0 && (
-          <div className="w-full max-w-[1380px] mx-auto mt-6 lg:mt-12 overflow-hidden rounded-2xl bg-[#2E4BFF]">
+          <div className="w-full max-w-[1380px] mx-auto mt-6 lg:mt-12 overflow-hidden rounded-2xl bg-[#2E4BFF] px-1 pb-1">
             <h2 className="px-4 md:px-6 pt-2.5 md:pt-3 text-white font-bold text-lg md:text-xl font-figtree">
               Limited Time Deals
             </h2>
 
-            <div className="mt-2.5 md:mt-3 rounded-t-2xl bg-white p-3 md:p-4 dark:bg-[#18181B]">
+            <div className="mt-2.5 md:mt-3 rounded-2xl bg-white p-3 md:p-4 dark:bg-[#18181B]">
             <div
               className="
     grid

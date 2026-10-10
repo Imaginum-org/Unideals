@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Home, Compass } from "lucide-react";
+import { Search, Home } from "lucide-react";
 import Seo from "./Seo.jsx";
 
 export default function NotFound() {
@@ -16,40 +16,22 @@ export default function NotFound() {
   return (
     <>
       <Seo title="Page not found — Unideals" robots="noindex,nofollow" />
-      <div className="relative flex min-h-[78vh] flex-col items-center justify-center overflow-hidden bg-[#F7F8FA] px-6 py-16 text-center font-figtree dark:bg-[#131313]">
-        {/* Backdrop: faint grid fading out + ambient color orbs */}
-        <div
+      <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-[#F7F8FA] px-6 py-16 text-center font-figtree dark:bg-[#131313]">
+        {/* Campus-marketplace dressing: two bags on a diagonal balance */}
+        <img
+          src="/bag_banner.webp"
+          alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(57,78,242,0.07)_1px,transparent_1px),linear-gradient(to_bottom,rgba(57,78,242,0.07)_1px,transparent_1px)] bg-[size:44px_44px] [mask-image:radial-gradient(ellipse_60%_55%_at_50%_42%,black,transparent)] dark:opacity-60"
+          className="pointer-events-none absolute right-[4%] top-[7%] z-0 w-32 rotate-[10deg] object-contain sm:w-52 lg:w-64 xl:w-72"
         />
-        <div
+        <img
+          src="/bag_banner.webp"
+          alt=""
           aria-hidden="true"
-          className="animate-float-slow pointer-events-none absolute -top-24 left-[6%] h-72 w-72 rounded-full bg-[#4A3CFF]/20 blur-3xl dark:bg-[#4A3CFF]/25"
-        />
-        <div
-          aria-hidden="true"
-          className="animate-float-slower pointer-events-none absolute -bottom-28 right-[4%] h-80 w-80 rounded-full bg-[#FFB020]/15 blur-3xl dark:bg-[#FFB020]/10"
-        />
-        {/* Playful floating shapes */}
-        <div
-          aria-hidden="true"
-          className="animate-float-slow pointer-events-none absolute left-[12%] top-[22%] hidden size-10 rotate-12 rounded-2xl border-2 border-[#4A3CFF]/25 sm:block dark:border-[#8FA2FF]/30"
-        />
-        <div
-          aria-hidden="true"
-          className="animate-float-slower pointer-events-none absolute right-[11%] top-[30%] hidden size-6 rounded-full bg-[#FFB020]/40 sm:block dark:bg-[#FFB020]/30"
-        />
-        <div
-          aria-hidden="true"
-          className="animate-float-slow pointer-events-none absolute bottom-[18%] right-[20%] hidden size-8 -rotate-12 rounded-xl bg-[#4A3CFF]/15 sm:block dark:bg-[#8FA2FF]/20"
+          className="pointer-events-none absolute bottom-[9%] left-[5%] z-0 w-28 -rotate-[8deg] object-contain sm:w-44 lg:w-56"
         />
 
-        <div className="relative w-full max-w-lg">
-          <p className="inline-flex items-center gap-1.5 rounded-full border border-[#4A3CFF]/25 bg-white px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.22em] text-[#394FF1] shadow-sm dark:border-[#8FA2FF]/30 dark:bg-white/5 dark:text-[#A5B0FF]">
-            <Compass className="size-3.5" />
-            404
-          </p>
-
+        <div className="relative z-[1] w-full max-w-lg">
           <p
             aria-hidden="true"
             className="mt-2 bg-gradient-to-b from-[#2E4BFF] via-[#5C6DFF] to-[#B9C0FF] bg-clip-text text-[7rem] font-extrabold leading-none tracking-tight text-transparent drop-shadow-[0_18px_36px_rgba(46,75,255,0.25)] sm:text-[9rem] dark:from-[#8FA2FF] dark:via-[#5C6DFF] dark:to-[#2E4BFF]"

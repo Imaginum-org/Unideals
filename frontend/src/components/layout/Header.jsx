@@ -1077,7 +1077,7 @@ const Header = () => {
               className="flex h-10 shrink-0 items-center"
             >
               <Wordmark
-                fontSize={16}
+                fontSize={17}
                 fontWeight={500}
                 letterSpacing={0}
                 className="text-[#000000] dark:text-white"
@@ -1578,6 +1578,8 @@ const Header = () => {
               Nothing wraps or drops at any width: fixed items are shrink-0
               with truncation, only the search field flexes. */}
           <div className="hidden w-full min-w-0 flex-nowrap items-center gap-2 sm:flex md:gap-3 lg:gap-4">
+            {/* Brand cluster: logo | divider | campus — tight equal gaps */}
+            <div className="flex min-w-0 shrink-0 items-center gap-3">
             {/* Logo — SVG wordmark; hovering morphs the U into the logo mark */}
             <Link
               to="/"
@@ -1585,7 +1587,7 @@ const Header = () => {
               className="flex h-11 shrink-0 items-center"
             >
               <Wordmark
-                fontSize={19}
+                fontSize={21}
                 fontWeight={700}
                 letterSpacing={-0.5}
                 className="text-[#000000] dark:text-white"
@@ -1594,7 +1596,7 @@ const Header = () => {
 
             <span
               aria-hidden="true"
-              className="h-6 w-px mx-1 shrink-0 bg-[#ECEEF3] dark:bg-neutral-800"
+              className="h-6 w-px shrink-0 bg-[#dbdde0] dark:bg-neutral-800"
             />
 
             {/* Campus — pill; locked for members (opens Settings), switchable for guests */}
@@ -1695,6 +1697,7 @@ const Header = () => {
             ) : (
               ""
             )}
+            </div>
 
             {/* Search */}
             <div
@@ -1898,7 +1901,7 @@ lg:pr-24"
                   <div className="flex min-w-0 flex-1 items-center justify-end gap-1 pr-1 sm:gap-2 lg:gap-3 xl:gap-4">
                     <span
                       aria-hidden="true"
-                      className="mr-1 hidden h-6 w-px bg-[#ECEEF3] md:block dark:bg-neutral-800"
+                      className="mr-1 hidden h-6 w-px bg-[#dbdde0] md:block dark:bg-neutral-800"
                     />
 
                     <ThemeToggle />
