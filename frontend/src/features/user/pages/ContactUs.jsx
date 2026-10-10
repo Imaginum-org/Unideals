@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "../../../context/useUserContext.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import {
   Search,
   MessageSquare,

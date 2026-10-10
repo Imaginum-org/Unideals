@@ -19,7 +19,7 @@ import {
   unlistProduct,
   relistProduct,
 } from "../../product/api/productApi.js";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 
 const steps = [
   { id: 1, label: "Order Placed" },

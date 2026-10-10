@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { useNavigate } from "react-router-dom";
 import {
   BadgeCheck,

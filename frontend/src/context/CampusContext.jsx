@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import toast from "react-hot-toast";
+import { toast } from "../components/ui/toast.js";
 import { useUser } from "./useUserContext.jsx";
 import { getCampuses, setMyCampus } from "../features/campus/api/campusApi.js";
 

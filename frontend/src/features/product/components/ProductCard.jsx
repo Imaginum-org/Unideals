@@ -5,7 +5,7 @@ import { useWishlist } from "../../../context/WishlistContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { ikCard } from "../../../utils/imageTransform.js";
 import LimitModal from "../../../components/ui/LimitModal.jsx";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { IoLocationOutline } from "react-icons/io5";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import { MdOutlineChatBubbleOutline } from "react-icons/md";

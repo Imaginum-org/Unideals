@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import ChatCard from "../components/ChatCard.jsx";
 import userdp from "/userdp.webp";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import axios from "../../../services/axiosInstance";
 
 import {

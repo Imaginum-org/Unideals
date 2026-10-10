@@ -7,7 +7,7 @@ import {
   getBoostSummary,
   getUserProducts,
 } from "../api/productApi.js";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { FiPlus } from "react-icons/fi";
 import {

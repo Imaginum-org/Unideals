@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { MdPhotoLibrary, MdPhotoCamera, MdCheckCircle } from "react-icons/md";
 import { uploadHandoffPhotos } from "../api/handoffApi.js";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";

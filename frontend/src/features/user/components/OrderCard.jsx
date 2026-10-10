@@ -26,7 +26,7 @@ import {
 } from "../../payment/api/paymentApi.js";
 import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
 import LimitModal from "../../../components/ui/LimitModal.jsx";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 
 const BOOST_ADDONS = [
   { id: "boost_3day", label: "3-day", price: 29 },

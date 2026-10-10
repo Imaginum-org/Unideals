@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { exchangeGoogleOAuthCode, loginUser } from "../api/authApi.js";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";

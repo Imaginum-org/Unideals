@@ -32,7 +32,7 @@ import { logoutUser } from "../../features/auth/api/authApi.js";
 import useDebounce from "../../features/search/hooks/useDebounce";
 import { searchProducts, getTrendingProducts } from "../../features/search/api/searchApi";
 import SearchDropdown from "../../features/search/components/SearchDropdown";
-import { toast } from "react-hot-toast";
+import { toast } from "../ui/toast.js";
 import { levelProgress, xpToNextLevel } from "../../utils/badgeConfig.js";
 import {
   latestFirst,

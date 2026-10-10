@@ -7,7 +7,7 @@ import { FaPlus } from "react-icons/fa6";
 import { IoIosArrowForward } from "react-icons/io";
 import { motion, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 // Celebration (and its canvas-confetti dep) loads only when shown.
 const LazyCelebration = lazy(
   () => import("../../../components/FirstListingCelebration.jsx"),
@@ -548,9 +548,9 @@ const Home = () => {
               className="
               select-none
         flex
-        gap-3
-        md:gap-5
-        lg:gap-6
+        gap-2
+        md:gap-3
+        lg:gap-4
         overflow-x-auto
         scroll-smooth
         snap-x

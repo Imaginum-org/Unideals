@@ -5,7 +5,7 @@ import ListingLayout from "../components/listing/ListingLayout";
 import { getProductById } from "../api/productApi";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useProductListingContext } from "../context/ProductListingContext";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 
 // Inner wrapper that has access to context (so it can call initEditMode).
 const EditModeInitializer = ({ productId, onReady }) => {

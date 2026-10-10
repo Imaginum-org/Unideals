@@ -1,4 +1,4 @@
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle } from "lucide-react";

@@ -1,7 +1,7 @@
-import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "react-hot-toast";
+import { Toaster } from "../components/ui/Toast.jsx";
+import { toast } from "../components/ui/toast.js";
 import AppRoutes from "./routes.jsx";
 import { useUser } from "../context/useUserContext.jsx";
 
@@ -31,7 +31,7 @@ function App() {
   return (
     <div className="App">
       <AppRoutes />
-      <Toaster position="top-center" />
+      <Toaster />
     </div>
   );
 }

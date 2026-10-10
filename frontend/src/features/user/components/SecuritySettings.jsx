@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { toast } from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { Eye, Lock, Shield, X } from "lucide-react";
 
 import { forgotPassword } from "../../../features/auth/api/authApi.js";

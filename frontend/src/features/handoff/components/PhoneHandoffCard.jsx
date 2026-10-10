@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { MdOutlinePhonelinkSetup, MdRefresh } from "react-icons/md";
 import {
   createHandoffSession,

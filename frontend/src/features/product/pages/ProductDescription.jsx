@@ -6,7 +6,7 @@ import { FaHeart, FaRegHeart } from "react-icons/fa";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
 import ProductGallery from "../../../features/product/components/ProductGallery.jsx";
 import ImageLightbox from "../../../features/product/components/ImageLightbox.jsx";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { LuMessageSquareText } from "react-icons/lu";
 import { useParams, Link } from "react-router-dom";
 import { IoIosArrowForward } from "react-icons/io";

@@ -4,7 +4,7 @@ import TabSwitcher from "../components/manageorderanime.jsx";
 import MyOrdersCard from "../components/MyOrdersCard.jsx";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { getUserProducts } from "../../product/api/productApi.js";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 
 function Myorders() {
   const [activeTab, setActiveTab] = useState("All");

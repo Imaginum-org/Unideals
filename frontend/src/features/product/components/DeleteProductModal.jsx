@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import "../../../styles/deletestyle.css";
-import { toast } from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 
 function DeleteProductModal({
   isOpen,

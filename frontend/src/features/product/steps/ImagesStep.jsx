@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { HiOutlineTrash } from "react-icons/hi";
 import useProductListing from "../hooks/useProductListing";
 import PhoneHandoffCard from "../../handoff/components/PhoneHandoffCard.jsx";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { HiOutlinePencil } from "react-icons/hi";
 import { GoRocket } from "react-icons/go";
 import { FaRupeeSign } from "react-icons/fa";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
 import { HiOutlineLocationMarker, HiOutlineCash } from "react-icons/hi";
 import { FaRupeeSign } from "react-icons/fa";
 import axios from "../../../services/axiosInstance";
