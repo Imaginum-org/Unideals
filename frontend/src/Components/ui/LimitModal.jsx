@@ -42,7 +42,7 @@ const LimitModal = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[440px] rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-[#1c1c1c] font-figtree"
+        className="w-full max-w-[440px] rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-2xl dark:border-gray-800 dark:bg-[#1c1c1c] font-figtree"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start gap-3">

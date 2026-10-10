@@ -60,20 +60,34 @@ export const createProduct = async (req, res) => {
       "Images are required",
       "already listed a similar product",
       "Selling price cannot be greater",
+      "Discount cannot exceed",
+      "Image host not allowed",
+      "Use public campus spot only",
+      "Quantity must be between",
+      "Selling price must be at least",
       "Invalid purchase date",
       "Purchase date cannot be",
       "Listing limit reached",
+      "Draft limit reached",
       "Invalid listing status",
       "Campus is required",
       "campus is unavailable",
     ];
     const isClientError =
-      error.code === "LISTING_LIMIT" ||
+      Boolean(error.code) ||
+      error.statusCode === 400 ||
       clientErrors.some((m) => String(error.message || "").includes(m));
+    const status =
+      error.statusCode ||
+      (error.code === "LISTING_LIMIT" || error.code === "DRAFT_LIMIT"
+        ? 403
+        : isClientError
+          ? 400
+          : 500);
 
     return res.status(error.code === "LISTING_LIMIT" ? 403 : isClientError ? 400 : 500).json({
       success: false,
-      message: isClientError ? error.message : "Product creation failed",
+      message: isClientError || status < 500 ? error.message : "Product creation failed",
       ...(error.code ? { code: error.code } : {}),
     });
   }
@@ -99,10 +113,16 @@ export const getAllProducts = async (req, res, next) => {
 export const getSingleProduct = async (req, res, next) => {
   try {
     const campus = await resolveRequestCampus(req);
+    const clientIp =
+      req.ip ||
+      (typeof req.headers?.["x-forwarded-for"] === "string"
+        ? req.headers["x-forwarded-for"].split(",")[0].trim()
+        : null);
     const product = await productService.getSingleProduct(
       req.params.id,
       campus._id,
       req.userId || null,
+      clientIp || null,
     );
 
     // Owner sees extra snapshot fields — never share across users.
@@ -301,8 +321,7 @@ export const relistProduct = async (req, res, next) => {
   }
 };
 
-export const getMyDraftProducts = async (req, res, next) => {
-  try {
+export const getMyDraftProducts = async (req, res, next) => {  try {
     const userId = req.userId;
 
     const drafts = await productService.getMyDraftProducts(userId);
@@ -316,5 +335,49 @@ export const getMyDraftProducts = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+// PATCH /:id — owner-only edit. No image cleanup on failure: req.body may
+// reference already-live fileIds, and deleting them would destroy good
+// images. Orphaned fresh uploads from failed edits expire via normal flows.
+export const updateProduct = async (req, res, next) => {
+  try {
+    const product = await productService.updateProduct(
+      req.params.id,
+      req.userId,
+      req.body,
+    );
+
+    computeAndAwardBadges(req.userId).catch((err) =>
+      console.error("Error updating gamification on updateProduct:", err),
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      data: product,
+    });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// PATCH /:id/sold — owner-only listed → sold, boost exposure cleared.
+export const markProductSold = async (req, res, next) => {
+  try {
+    const product = await productService.markProductSold(req.params.id, req.userId);
+
+    computeAndAwardBadges(req.userId).catch((err) =>
+      console.error("Error updating gamification on markProductSold:", err),
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Product marked as sold",
+      data: product,
+    });
+  } catch (error) {
+    forwardServiceError(error, next);
   }
 };

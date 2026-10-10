@@ -23,7 +23,9 @@ const SIZE_PX = {
 };
 
 // Logo artwork from public/logo.svg (shared viewBox "285 245 430 520").
-const LOGO_PATHS = [
+// Exported for reuse (e.g. the navbar wordmark hover morph).
+export const LOGO_VIEWBOX = "285 245 430 520";
+export const LOGO_PATHS = [
   {
     transform: "translate(408.142578125,259.132080078125)",
     fill: "#4A4DFE",
@@ -98,7 +100,7 @@ const BrandLoader = ({
         style={{ width: isFull ? 112 : px, height: isFull ? 112 : px }}
       >
         <svg
-          viewBox="285 245 430 520"
+          viewBox={LOGO_VIEWBOX}
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className="h-full w-full overflow-visible"
@@ -165,7 +167,7 @@ const BrandLoader = ({
 
   if (isFull) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-white dark:bg-[#131313]">
+      <div className="flex min-h-screen w-full items-center justify-center bg-[#F7F8FA] dark:bg-[#131313]">
         {mark}
       </div>
     );

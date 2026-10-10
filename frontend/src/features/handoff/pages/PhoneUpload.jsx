@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { MdPhotoLibrary, MdPhotoCamera, MdCheckCircle } from "react-icons/md";
 import { uploadHandoffPhotos } from "../api/handoffApi.js";
-import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 
 const DEFAULT_MAX_FILES = 3;
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -46,6 +46,26 @@ const PhoneUpload = () => {
   const [done, setDone] = useState(false);
   const [failed, setFailed] = useState("");
 
+  // Strip the ?k= secret from the URL right after load so it never lingers
+  // in history, logs, or Referer headers. The secret stays in memory only
+  // (sent via x-handoff-secret header on upload).
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("k")) {
+        url.searchParams.delete("k");
+        window.history.replaceState(
+          null,
+          "",
+          url.pathname + (url.search ? `?${url.searchParams.toString()}` : "") + url.hash,
+        );
+      }
+    } catch {
+      // ignore — upload still works from memory
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (!code || !secret) {
     return (
       <MobileShell title="Invalid link">
@@ -70,6 +90,12 @@ const PhoneUpload = () => {
     const picked = Array.from(list || []).slice(0, remaining);
     const valid = [];
     for (const file of picked) {
+      const lowerName = String(file?.name || "").toLowerCase();
+      // iPhone HEIC/HEIF shots can't be processed in-browser — ask for JPEG.
+      if (lowerName.endsWith(".heic") || lowerName.endsWith(".heif")) {
+        toast.error(`${file.name}: iPhone HEIC not supported, please use JPEG`);
+        continue;
+      }
       if (!ALLOWED_TYPES.includes(file.type)) {
         toast.error(`${file.name} is not a supported image`);
         continue;
@@ -131,12 +157,15 @@ const PhoneUpload = () => {
     } catch (err) {
       const status = err?.response?.status;
       const code = err?.response?.data?.code;
-      if (status === 404) {
-        setFailed("This session was not found. Please scan a fresh QR code.");
-      } else if (status === 410 || code === "HANDOFF_EXPIRED") {
-        setFailed("This QR code has expired. Please generate a new one on your laptop.");
-      } else if (status === 401) {
-        setFailed("This link is invalid. Please scan the QR code again.");
+      // Generic message for all link/session failures (no enumeration
+      // between 404/410/401 — all mean "get a fresh QR").
+      if (
+        status === 404 ||
+        status === 410 ||
+        status === 401 ||
+        code === "HANDOFF_EXPIRED"
+      ) {
+        setFailed("Link invalid or expired. Please scan a fresh QR code from your laptop.");
       } else {
         setFailed(err?.response?.data?.message || "Upload failed. Please try again.");
       }
@@ -271,7 +300,7 @@ const PhoneUpload = () => {
 };
 
 const MobileShell = ({ title, children }) => (
-  <main className="min-h-[100dvh] bg-white px-5 py-8 font-figtree text-[#111827] dark:bg-[#131313] dark:text-white">
+  <main className="min-h-[100dvh] bg-[#F7F8FA] px-5 py-8 font-figtree text-[#111827] dark:bg-[#131313] dark:text-white">
     <div className="mx-auto w-full max-w-md">
       <div className="flex items-center gap-2.5">
         <img src="/logo.svg" alt="Unideals" className="h-9 w-9 object-contain" />

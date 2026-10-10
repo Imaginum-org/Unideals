@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useUser } from "../context/useUserContext.jsx";
-import BrandLoader from "../Components/ui/BrandLoader.jsx";
+import BrandLoader from "../components/ui/BrandLoader.jsx";
 
 // Redirect authenticated users away from auth pages (login/signup/etc.)
 const PublicOnlyRoute = () => {

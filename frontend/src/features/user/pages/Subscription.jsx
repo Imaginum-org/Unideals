@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import Profile_left_part from "../components/Profile_left_part.jsx";
-import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { getBilling } from "../../payment/api/paymentApi.js";
 
 const TIER_TO_ID = {
@@ -132,7 +132,15 @@ function Subscription() {
     fetchBilling();
   }, [fetchBilling]);
 
-  const selectedPlanId = TIER_TO_ID[billing?.tier] || "free";
+  const selectedPlanId = useMemo(() => {
+    const tier = billing?.tier;
+    if (!tier) return "free";
+    if (!TIER_TO_ID[tier]) {
+      console.warn(`[subscription] unknown tier "${tier}", falling back to Free`);
+      return "free";
+    }
+    return TIER_TO_ID[tier];
+  }, [billing?.tier]);
 
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId) ?? plans[0],
@@ -161,13 +169,15 @@ function Subscription() {
       },
     ];
     if (billing.usage?.boost) {
-      const monthlyTotal =
-        (billing.usage.boost.monthlyUsed || 0) +
-        (billing.usage.boost.monthlyRemaining || 0);
+      const used = billing.usage.boost.monthlyUsed || 0;
+      const remaining = billing.usage.boost.monthlyRemaining;
+      // Total quota = used + remaining when both are reported; otherwise
+      // fall back to what we know (used).
+      const monthlyTotal = remaining == null ? used : used + remaining;
       rows.push({
         label: "Monthly Boosts",
         icon: Zap,
-        used: billing.usage.boost.monthlyUsed || 0,
+        used,
         total: monthlyTotal,
       });
     }
@@ -189,11 +199,43 @@ function Subscription() {
     navigate("/price");
   };
 
+  // Client-side receipt (same-theme button): order/payment IDs + amount + date.
+  const handleDownloadInvoice = () => {
+    try {
+      const last =
+        billing?.lastPayment || billing?.payments?.[0] || null;
+      const lines = [
+        "Unideals — Payment Receipt",
+        "---------------------------",
+        `Plan: ${selectedPlan.name}`,
+        `Amount: Rs.${selectedPlan.price} (one-time)`,
+        `Order ID: ${last?.razorpay_order_id || orderRef || "N/A"}`,
+        `Payment ID: ${last?.razorpay_payment_id || "N/A"}`,
+        `Status: ${last?.status || billing?.status || "active"}`,
+        `Purchased: ${purchasedLabel}`,
+        `Validity: ${renewalLabel}`,
+        `Date: ${new Date().toLocaleString("en-IN")}`,
+      ];
+      const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${orderRef || "unideals"}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast.success("Invoice downloaded");
+    } catch {
+      toast.error("Could not generate invoice");
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
         <div className="flex h-[calc(100vh-70px)]">
-          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
           <main className="flex h-full flex-1 items-center justify-center">
@@ -208,7 +250,7 @@ function Subscription() {
     return (
       <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
         <div className="flex h-[calc(100vh-70px)]">
-          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
           <main className="flex h-full flex-1 flex-col items-center justify-center gap-4 px-5">
@@ -230,7 +272,7 @@ function Subscription() {
   return (
     <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
       <div className="flex h-[calc(100vh-70px)]">
-         <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+         <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
 
@@ -245,7 +287,7 @@ function Subscription() {
               </p>
             </header>
 
-            <section className="rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
+            <section className="rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F0EEFF] text-[#4A3CFF]">
@@ -337,7 +379,7 @@ function Subscription() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
+            <section className="rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-[14px] font-extrabold text-[#09111F] dark:text-white">
                   Current Usage
@@ -383,7 +425,7 @@ function Subscription() {
               </button>
             </section>
 
-            <section className="rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
+            <section className="rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
               <h2 className="mb-4 text-[14px] font-extrabold text-[#09111F] dark:text-white">
                 What&apos;s included in {selectedPlan.name}
               </h2>
@@ -402,7 +444,7 @@ function Subscription() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
+            <section className="rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
               <h2 className="mb-4 text-[14px] font-extrabold text-[#09111F] dark:text-white">
                 Other Plans
               </h2>
@@ -411,7 +453,7 @@ function Subscription() {
                   <button
                     key={plan.name}
                     onClick={goToPricing}
-                    className="flex w-full flex-col gap-3 rounded-xl border border-[#E6EAF2] bg-white px-4 py-3 text-left transition hover:border-[#4A3CFF] hover:bg-[#FAFAFF] dark:border-gray-800 dark:bg-[#1c1c1c] sm:flex-row sm:items-center sm:justify-between"
+                    className="flex w-full flex-col gap-3 rounded-xl border border-[#E6EAF2] bg-[#F7F8FA] px-4 py-3 text-left transition hover:border-[#4A3CFF] hover:bg-[#FAFAFF] dark:border-gray-800 dark:bg-[#1c1c1c] sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F2F4F9] text-[#09111F]">
@@ -443,7 +485,7 @@ function Subscription() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
+            <section className="rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
               <h2 className="mb-5 text-[14px] font-extrabold text-[#09111F] dark:text-white">
                 Billing Details
               </h2>
@@ -487,16 +529,20 @@ function Subscription() {
 
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <button
-                  onClick={() =>
-                    toast("Receipts are emailed by Razorpay after each payment", {
-                      id: "subscription-receipt",
-                    })
-                  }
+                  onClick={handleDownloadInvoice}
                   className="inline-flex items-center justify-center gap-2 rounded-lg px-2 py-2 text-[11px] font-extrabold text-[#4A3CFF] transition hover:bg-[#F0EEFF]"
                 >
                   <FileText size={13} />
                   Download Invoice
                 </button>
+                {selectedPlan.id !== "free" && (
+                  <a
+                    href="mailto:hi@unideals.in?subject=Downgrade%20request"
+                    className="text-[11px] font-semibold text-gray-500 hover:text-[#4A3CFF] hover:underline"
+                  >
+                    Contact support to downgrade
+                  </a>
+                )}
               </div>
 
               {billing.payments && billing.payments.length > 0 && (
@@ -529,7 +575,7 @@ function Subscription() {
 
         {isUpgradeOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-            <div className="w-full max-w-[520px] rounded-2xl border border-[#E3E8F1] bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-[#1c1c1c]">
+            <div className="w-full max-w-[520px] rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-2xl dark:border-gray-800 dark:bg-[#1c1c1c]">
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-extrabold text-[#09111F] dark:text-white">
@@ -568,7 +614,7 @@ function Subscription() {
                           ? "border-[#4A3CFF] bg-[#F7F6FF]"
                           : isIncluded
                             ? "cursor-default border-[#E6EAF2] bg-[#F8F9FC] opacity-80 dark:border-gray-800 dark:bg-[#151515]"
-                            : "border-[#E6EAF2] bg-white hover:border-[#4A3CFF] hover:bg-[#FAFAFF] dark:border-gray-800 dark:bg-[#1c1c1c]"
+                            : "border-[#E6EAF2] bg-[#F7F8FA] hover:border-[#4A3CFF] hover:bg-[#FAFAFF] dark:border-gray-800 dark:bg-[#1c1c1c]"
                       }`}
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

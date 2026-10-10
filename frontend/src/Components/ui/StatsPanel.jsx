@@ -4,11 +4,11 @@ import { MdInventory, MdShoppingCart, MdStar } from "react-icons/md";
 function StatCard({ icon, value, label, delta }) {
   return (
     <article
-      className="flex items-center gap-4 p-5 rounded-2xl bg-white dark:bg-[#2D3339] border border-transparent dark:border-[#161718] shadow-md hover:shadow-lg transition-shadow duration-500 transform cursor-default"
+      className="flex items-center gap-4 p-5 rounded-2xl bg-[#F7F8FA] dark:bg-[#2D3339] border border-transparent dark:border-[#161718] shadow-md hover:shadow-lg transition-shadow duration-500 transform cursor-default"
       role="region"
       aria-label={`${label} statistic`}
     >
-      <div className="flex-none p-3 rounded-xl bg-gradient-to-br from-white to-gray-50 dark:from-[#131416] dark:to-[#0f1112] border border-gray-100 dark:border-[#212426] shadow-inner">
+      <div className="flex-none p-3 rounded-xl bg-gradient-to-br from-[#F7F8FA] to-[#F7F8FA] dark:from-[#131416] dark:to-[#0f1112] border border-gray-100 dark:border-[#212426] shadow-inner">
         <div className="w-10 h-10 flex items-center justify-center text-[#394ff1] dark:text-[#93b4ff]">
           {icon}
         </div>
@@ -68,7 +68,7 @@ export default function StatsPanel({ stats }) {
   ];
 
   return (
-    <section className="bg-white dark:bg-[#1A1D20] rounded-b-2xl shadow mx-[3vw] p-6">
+    <section className="bg-[#F7F8FA] dark:bg-[#1A1D20] rounded-b-2xl shadow mx-[3vw] p-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((s) => (
           <StatCard

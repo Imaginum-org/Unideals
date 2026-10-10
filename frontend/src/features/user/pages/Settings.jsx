@@ -16,12 +16,13 @@ import {
   User,
   Zap,
 } from "lucide-react";
-import { uploadImage } from "../../../Utils/imageUpload.js";
-import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
-import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import { uploadImage } from "../../../utils/imageUpload.js";
+import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
-import { logoutUser } from "../../auth/api/authApi";
+import { logoutUser, resendVerification } from "../../auth/api/authApi";
+import { getUserProducts } from "../../product/api/productApi.js";
 import PickupSpotModal from "../components/PickupSpotModal.jsx";
 import AlertDialogDemo from "../components/Deletebutton.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
@@ -56,7 +57,7 @@ const formatPhone = (phone) => {
 
 function Settings() {
   const navigate = useNavigate();
-  const { userDetails: contextUserDetails, updateUserDetails } = useUser();
+  const { userDetails: contextUserDetails, updateUserDetails, clearUserData } = useUser();
   const { campuses, campus: activeCampus } = useCampus();
 
   const [activeTab, setActiveTab] = useState("Profile");
@@ -69,8 +70,13 @@ function Settings() {
   const [profileChanged, setProfileChanged] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [pickupSpots, setPickupSpots] = useState([]);
+  const [pickupLoading, setPickupLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState(null);
+  const [pendingPrimaryId, setPendingPrimaryId] = useState(null);
+  const [showCampusConfirm, setShowCampusConfirm] = useState(false);
+  const [listingsToMove, setListingsToMove] = useState(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
 
@@ -126,10 +132,13 @@ function Settings() {
 
   const fetchPickupSpots = useCallback(async () => {
     try {
+      setPickupLoading(true);
       const res = await getUserPickupSpots();
       if (res.data.success) setPickupSpots(res.data.pickupSpots);
     } catch {
       toast.error("Failed to load pickup spots");
+    } finally {
+      setPickupLoading(false);
     }
   }, []);
 
@@ -137,10 +146,33 @@ function Settings() {
     fetchPickupSpots();
   }, [fetchPickupSpots]);
 
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = async (confirmed = false) => {
     if (!profileChanged) {
       setIsProfileEditing(false);
       return true;
+    }
+
+    const currentSlug =
+      typeof userDetails?.campus_id === "object"
+        ? userDetails.campus_id?.slug
+        : activeCampus?.slug;
+    const changingCampus = Boolean(campusSlug) && campusSlug !== currentSlug;
+
+    // Campus moves relocate live listings — confirm first (same theme modal).
+    if (changingCampus && !confirmed) {
+      try {
+        const res = await getUserProducts();
+        const items = res.data?.data || [];
+        setListingsToMove(
+          items.filter((p) =>
+            ["listed", "active"].includes((p.status || "").toLowerCase()),
+          ).length,
+        );
+      } catch {
+        setListingsToMove(null);
+      }
+      setShowCampusConfirm(true);
+      return false;
     }
 
     try {
@@ -158,11 +190,7 @@ function Settings() {
         updateData.mobile = digits;
       }
       if (gender) updateData.gender = gender;
-      const currentSlug =
-        typeof userDetails?.campus_id === "object"
-          ? userDetails.campus_id?.slug
-          : activeCampus?.slug;
-      if (campusSlug && campusSlug !== currentSlug) {
+      if (changingCampus) {
         updateData.campus_slug = campusSlug;
       }
 
@@ -186,6 +214,7 @@ function Settings() {
         setCampusSlug(slug || "");
         setProfileChanged(false);
         setIsProfileEditing(false);
+        setShowCampusConfirm(false);
         return true;
       }
       return false;
@@ -283,6 +312,11 @@ function Settings() {
 
   const handleSavePickupSpot = async (data) => {
     try {
+      // Enforce the 3-spot cap on save too (create path).
+      if (editingIndex === null && pickupSpots.length >= 3) {
+        toast.error("Maximum 3 pickup spots allowed");
+        return;
+      }
       let res;
       if (editingIndex !== null) {
         res = await updatePickupSpot(pickupSpots[editingIndex]?._id, data);
@@ -308,6 +342,8 @@ function Settings() {
       fetchPickupSpots();
     } catch {
       toast.error("Failed to delete pickup spot");
+    } finally {
+      setPendingDeleteIndex(null);
     }
   };
 
@@ -318,6 +354,21 @@ function Settings() {
       fetchPickupSpots();
     } catch {
       toast.error("Failed to set primary pickup spot");
+    } finally {
+      setPendingPrimaryId(null);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!userDetails?.email) {
+      toast.error("No email on your account");
+      return;
+    }
+    try {
+      await resendVerification({ email: userDetails.email });
+      toast.success("Verification email sent");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to resend email");
     }
   };
 
@@ -326,14 +377,23 @@ function Settings() {
       const res = await logoutUser();
 
       if (res.data.success) {
-        localStorage.removeItem("isAuthenticated");
-        localStorage.removeItem("cachedUserDetails");
-        localStorage.removeItem("accessToken");
         toast.success("Logged out successfully");
         navigate("/login");
+      } else {
+        toast.error("Logout failed");
       }
     } catch {
       toast.error("Logout failed");
+    } finally {
+      // Always clear local session regardless of server result.
+      try {
+        clearUserData();
+      } catch {
+        localStorage.removeItem("isAuthenticated");
+        localStorage.removeItem("cachedUserDetails");
+        localStorage.removeItem("accessToken");
+      }
+      navigate("/login");
     }
   };
 
@@ -386,7 +446,7 @@ function Settings() {
   return (
     <div className="h-full w-full overflow-hidden bg-[#F7F9FD] font-figtree text-[#111827] dark:bg-[#131313] dark:text-white">
       <div className="flex h-[calc(100vh-70px)]">
-        <aside className="hidden bg-white dark:bg-[#131313] md:block md:w-auto md:shrink-0 xl:pt-2 xl:pb-0">
+        <aside className="hidden bg-[#F7F8FA] dark:bg-[#131313] md:block md:w-auto md:shrink-0 xl:pt-2 xl:pb-0">
           <Profile_left_part />
         </aside>
 
@@ -408,7 +468,7 @@ function Settings() {
                   onClick={() => setActiveTab(tab)}
                   className={`min-w-max rounded-lg px-3.5 py-2 text-sm font-medium transition ${
                     activeTab === tab
-                      ? "bg-white text-[#111827] shadow-sm ring-1 ring-black/5 dark:bg-[#252A35] dark:text-white dark:ring-white/10"
+                      ? "bg-[#F7F8FA] text-[#111827] shadow-sm ring-1 ring-black/5 dark:bg-[#252A35] dark:text-white dark:ring-white/10"
                       : "text-[#98A1B2] hover:text-[#4B5563] dark:text-[#8F9BAA] dark:hover:text-white"
                   }`}
                 >
@@ -419,7 +479,7 @@ function Settings() {
 
             {activeTab === "Profile" && (
               <section className="space-y-6">
-                <div className="rounded-2xl border border-gray-100 bg-white px-5 py-5 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] px-5 py-5 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-5">
                       <div className="relative">
@@ -472,7 +532,7 @@ function Settings() {
   disabled:cursor-not-allowed
   disabled:opacity-60
   ${
-    userDetails?.avatar?.fileId
+    userDetails?.avatar?.url
       ? "bg-red-500 hover:bg-red-600 shadow-red-500/25"
       : "bg-[#4F46FF] hover:bg-[#4338CA] shadow-[#4F46FF]/25"
   }
@@ -480,7 +540,7 @@ function Settings() {
                         >
                           {isUploadingAvatar || isRemovingAvatar ? (
                             <BrandLoader size="xs" tone="white" />
-                          ) : userDetails?.avatar?.fileId ? (
+                          ) : userDetails?.avatar?.url ? (
                             <Trash2 className="h-4 w-4" />
                           ) : (
                             <Camera className="h-4 w-4" />
@@ -526,7 +586,7 @@ function Settings() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
                   <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-base font-bold">
                       Personal Information
@@ -575,7 +635,7 @@ function Settings() {
                                     setProfileChanged(true);
                                   }}
                                   placeholder="10 digit mobile number"
-                                  className="mt-1.5 w-full rounded-xl border border-[#D8DDEA] bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
+                                  className="mt-1.5 w-full rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                                 />
                               ) : isProfileEditing && row.field === "campus" ? (
                                 <>
@@ -585,7 +645,7 @@ function Settings() {
                                       setCampusSlug(event.target.value);
                                       setProfileChanged(true);
                                     }}
-                                    className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
+                                    className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                                   >
                                     <option value="">Select campus</option>
                                     {campuses.map((c) => (
@@ -641,7 +701,7 @@ function Settings() {
                                 setGender(event.target.value);
                                 setProfileChanged(true);
                               }}
-                              className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
+                              className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                             >
                               <option value="">Select gender</option>
                               <option value="male">Male</option>
@@ -684,11 +744,22 @@ function Settings() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-[#2A2E35] dark:bg-[#181A1F]">
+                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-[#2A2E35] dark:bg-[#181A1F]">
                   <h2 className="mb-5 text-base font-bold">
                     Your pickup spots
                   </h2>
                   <div className="space-y-4">
+                    {pickupLoading ? (
+                      <div className="space-y-3">
+                        {[0, 1].map((i) => (
+                          <div
+                            key={i}
+                            className="h-[76px] animate-pulse rounded-2xl border border-[#E4E7EF] bg-[#F4F6FB] dark:border-[#303641] dark:bg-[#20242B]"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                    <>
                     {pickupSpots.length === 0 && (
                       <div className="rounded-2xl border border-dashed border-[#D8DDEA] bg-[#FAFBFE] p-6 text-center text-sm font-medium text-[#98A1B2] dark:border-[#303641] dark:bg-[#20242B] dark:text-[#AAB9C5]">
                         No pickup spots yet. Add a familiar campus location to
@@ -732,9 +803,7 @@ function Settings() {
                           {!spot.isPrimary && (
                             <button
                               type="button"
-                              onClick={() =>
-                                handleSetPrimaryPickupSpot(spot._id)
-                              }
+                              onClick={() => setPendingPrimaryId(spot._id)}
                               className="text-xs font-semibold text-[#4F46FF]"
                             >
                               Set primary
@@ -749,7 +818,7 @@ function Settings() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeletePickupSpot(index)}
+                            onClick={() => setPendingDeleteIndex(index)}
                             className="text-[#98A1B2] transition hover:text-[#EF4444] dark:text-[#8F9BAA] dark:hover:text-[#F87171]"
                           >
                             <Trash2 size={16} />
@@ -757,6 +826,8 @@ function Settings() {
                         </div>
                       </div>
                     ))}
+                    </>
+                    )}
                   </div>
                 </div>
 
@@ -778,21 +849,38 @@ function Settings() {
             )}
 
             {activeTab === "Verification" && (
-              <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DCFCE7] text-[#16A34A]">
-                    <Shield size={18} />
+              <section className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                        userDetails?.is_email_verified
+                          ? "bg-[#DCFCE7] text-[#16A34A]"
+                          : "bg-amber-100 text-amber-600"
+                      }`}
+                    >
+                      <Shield size={18} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold">
+                        {userDetails?.is_email_verified
+                          ? "Email verified"
+                          : "Verification pending"}
+                      </h2>
+                      <p className="text-xs text-[#98A1B2]">
+                        {userDetails?.email || "No email on file"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-base font-bold">
-                      {userDetails?.is_email_verified
-                        ? "Email verified"
-                        : "Verification pending"}
-                    </h2>
-                    <p className=" text-xs text-[#98A1B2]">
-                      Student verification workflow is not available here yet.
-                    </p>
-                  </div>
+                  {!userDetails?.is_email_verified && (
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      className="rounded-xl bg-[#4F46FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#4338CA]"
+                    >
+                      Resend verification email
+                    </button>
+                  )}
                 </div>
               </section>
             )}
@@ -811,11 +899,106 @@ function Settings() {
                 editingIndex !== null ? pickupSpots[editingIndex]?._id : null
               }
             />
+
+            {/* Campus-move confirm (same theme) */}
+            {showCampusConfirm && (
+              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+                <div className="w-full max-w-[420px] rounded-[20px] border border-white/80 bg-[#F7F8FA] p-6 shadow-2xl dark:border-[#2A2E35] dark:bg-[#181A1F]">
+                  <h2 className="text-lg font-bold text-[#111827] dark:text-white">
+                    Change campus?
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#64748B] dark:text-[#AAB9C5]">
+                    {listingsToMove !== null
+                      ? `Move ${listingsToMove} active listing${listingsToMove === 1 ? "" : "s"} to the new campus?`
+                      : "Move your live listings to the new campus?"}{" "}
+                    Buyers on your old campus will no longer see them.
+                  </p>
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowCampusConfirm(false)}
+                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                    >
+                      Keep campus
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSavingProfile}
+                      onClick={() => handleSaveProfile(true)}
+                      className="flex-1 rounded-xl bg-[#4F46FF] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {isSavingProfile ? "Moving…" : "Move listings"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Pickup spot delete confirm */}
+            {pendingDeleteIndex !== null && (
+              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+                <div className="w-full max-w-[400px] rounded-[20px] bg-[#F7F8FA] p-6 shadow-2xl dark:bg-[#181A1F]">
+                  <h2 className="text-base font-bold text-[#111827] dark:text-white">
+                    Delete pickup spot?
+                  </h2>
+                  <p className="mt-2 text-sm text-[#64748B] dark:text-[#AAB9C5]">
+                    “{pickupSpots[pendingDeleteIndex]?.name}” will be removed.
+                    Listings using it keep their saved snapshot.
+                  </p>
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteIndex(null)}
+                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePickupSpot(pendingDeleteIndex)}
+                      className="flex-1 rounded-xl bg-[#EF4444] py-2.5 text-sm font-semibold text-white"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Set-primary confirm */}
+            {pendingPrimaryId !== null && (
+              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+                <div className="w-full max-w-[400px] rounded-[20px] bg-[#F7F8FA] p-6 shadow-2xl dark:bg-[#181A1F]">
+                  <h2 className="text-base font-bold text-[#111827] dark:text-white">
+                    Set as primary?
+                  </h2>
+                  <p className="mt-2 text-sm text-[#64748B] dark:text-[#AAB9C5]">
+                    New listings will use this spot by default.
+                  </p>
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPendingPrimaryId(null)}
+                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetPrimaryPickupSpot(pendingPrimaryId)}
+                      className="flex-1 rounded-xl bg-[#4F46FF] py-2.5 text-sm font-semibold text-white"
+                    >
+                      Set primary
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/jpg"
+            accept="image/png,image/jpeg,image/webp"
             className="hidden"
             onChange={handleAvatarChange}
           />
@@ -827,7 +1010,7 @@ function Settings() {
 
 function AccountCard({ onLogout }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+    <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
       <h2 className="mb-5 text-base font-bold">Account</h2>
 
       <div className="flex items-center justify-between border-b border-[#E1E5EE] pb-5">

@@ -32,6 +32,15 @@ export const createPickupSpot = async (req, res) => {
       });
     }
 
+    // Public-spot hygiene: single-char/gibberish names pollute the picker.
+    if (name.length < 2 || detail.length < 2) {
+      return res.status(400).json({
+        message: "Pickup spot name and detail must be at least 2 characters",
+        success: false,
+        error: true,
+      });
+    }
+
     const count = await PickupSpot.countDocuments({ user: userId });
     if (count >= 3) {
       return res.status(400).json({
@@ -70,6 +79,18 @@ export const createPickupSpot = async (req, res) => {
       detail,
       isPrimary: isPrimary || count === 0,
     });
+
+    // Post-create race guard (no unique partial index without a migration):
+    // roll back the 4th+ spot instead of overserving the 3-spot cap.
+    const postCount = await PickupSpot.countDocuments({ user: userId });
+    if (postCount > 3) {
+      await PickupSpot.deleteOne({ _id: pickupSpot._id });
+      return res.status(403).json({
+        message: "Maximum 3 pickup spots allowed",
+        success: false,
+        error: true,
+      });
+    }
 
     return res.status(201).json({
       message: "Pickup spot created successfully",
@@ -199,6 +220,24 @@ export const deletePickupSpot = async (req, res) => {
         success: false,
         error: true,
       });
+    }
+
+    // Audit invariant: exactly one primary. When the primary is deleted,
+    // auto-promote the oldest remaining spot so checkout always has one.
+    if (pickupSpot.isPrimary) {
+      try {
+        const oldest = await PickupSpot.findOne({ user: req.userId }).sort({
+          createdAt: 1,
+        });
+        if (oldest) {
+          await PickupSpot.updateOne(
+            { _id: oldest._id },
+            { $set: { isPrimary: true } },
+          );
+        }
+      } catch {
+        // best-effort: delete already succeeded
+      }
     }
 
     return res.status(200).json({

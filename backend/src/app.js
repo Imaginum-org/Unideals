@@ -6,6 +6,7 @@ import morgan from "morgan";
 import helmet from "helmet";
 
 import xss from "xss";
+import rateLimit from "express-rate-limit";
 
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
@@ -143,6 +144,27 @@ app.use(
   }),
 );
 
+// Additive route guards (no behavior change to existing handlers):
+// - Razorpay retries legitimately burst, so the webhook gets a high 100/min
+//   ceiling that only blocks floods.
+// - Admin reads across all /api/admin GETs get a shared 60/min ceiling
+//   (writes/mutations untouched).
+const paymentWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many webhook deliveries, try later" },
+});
+
+const adminReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests, try later" },
+});
+
 // Razorpay webhook needs the RAW body for HMAC verification. It MUST be
 // registered BEFORE express.json(): json() would otherwise consume the
 // request stream, leaving express.raw with an empty body and every
@@ -151,6 +173,7 @@ app.use(
 // (POST /api/payments/webhook, no auth — the HMAC signature is the auth.)
 app.post(
   "/api/payments/webhook",
+  paymentWebhookLimiter,
   express.raw({ type: "application/json", limit: "1mb" }),
   paymentWebhookHandler,
 );
@@ -193,7 +216,12 @@ app.use("/api/pickup-spots", pickupSpotRouter);
 app.use("/api/imagekit", imagekitRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/campuses", campusRouter);
-app.use("/api/admin", adminRouter);
+app.use(
+  "/api/admin",
+  (req, res, next) =>
+    req.method === "GET" ? adminReadLimiter(req, res, next) : next(),
+  adminRouter,
+);
 app.use("/api/boost", boostRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/badges", badgeRouter);

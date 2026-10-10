@@ -1,87 +1,76 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import TabSwitcher from "../components/manageorderanime.jsx";
-import { MdShoppingBag } from "react-icons/md";
 import MyOrdersCard from "../components/MyOrdersCard.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
+import { getUserProducts } from "../../product/api/productApi.js";
+import toast from "react-hot-toast";
 
 function Myorders() {
   const [activeTab, setActiveTab] = useState("All");
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  // Mock data matching the new design & your card props
-  const [orders, setOrders] = useState([
-    {
-      id: "130525-01",
-      placedOn: "13-05-2025",
-      imageUrl:
-        "https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=150&q=80",
-      name: "Sony WH-1000XM4 Headphones",
-      color: "Black",
-      attr: "Wireless",
-      status: "In progress",
-      price: "750",
-    },
-    {
-      id: "ORD-23",
-      placedOn: "10-03-2024",
-      imageUrl:
-        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=150&q=80",
-      name: "MacBook Pro M1",
-      color: "Space Grey",
-      attr: "256GB SSD",
-      status: "Delivered",
-      price: "72,000",
-    },
-    {
-      id: "ORD-18",
-      placedOn: "22-01-2024",
-      imageUrl:
-        "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=150&q=80",
-      name: "iPad Pro 11-inch",
-      color: "Silver",
-      attr: "Wi-Fi Only",
-      status: "Unlisted",
-      price: "28,000",
-    },
-  ]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setLoading(true);
+        setLoadError("");
+        const res = await getUserProducts();
+        if (!cancelled) setProducts(res.data?.data || []);
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err?.response?.data?.message || "Failed to load your sales");
+          toast.error("Failed to load your sales");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // Compute counts for the tabs
+  const statusOf = (p) => (p.status || "listed").toLowerCase().trim();
+  const isActive = (p) => ["listed", "active", "in progress"].includes(statusOf(p));
+  const isSold = (p) => ["sold", "delivered"].includes(statusOf(p));
+  const isUnlisted = (p) => statusOf(p) === "unlisted";
+
+  // Compute counts for the tabs (real statuses)
   const tabCounts = useMemo(() => {
     return {
-      All: orders.length,
-      "In progress": orders.filter(
-        (o) => o.status.toLowerCase() === "in progress",
-      ).length,
-      Delivered: orders.filter((o) => o.status.toLowerCase() === "delivered")
-        .length,
-      Unlisted: orders.filter((o) => o.status.toLowerCase() === "unlisted")
-        .length,
+      All: products.length,
+      Active: products.filter(isActive).length,
+      Sold: products.filter(isSold).length,
+      Unlisted: products.filter(isUnlisted).length,
     };
-  }, [orders]);
+  }, [products]);
 
   const filteredOrders = useMemo(() => {
     const tab = (activeTab || "All").toLowerCase().trim();
-    if (tab === "all") return orders;
-    return orders.filter((o) => (o.status || "").toLowerCase().trim() === tab);
-  }, [activeTab, orders]);
+    if (tab === "all") return products;
+    if (tab === "active" || tab === "in progress") return products.filter(isActive);
+    if (tab === "sold" || tab === "delivered") return products.filter(isSold);
+    return products.filter((p) => statusOf(p) === tab);
+  }, [activeTab, products]);
 
-  // Mock Handlers (These will trigger when actions are clicked in your card)
   const handleProductDeleted = (orderId) => {
-    setOrders((prev) => prev.filter((order) => order.id !== orderId));
+    setProducts((prev) => prev.filter((p) => p._id !== orderId));
   };
 
   const handleProductUnlisted = (orderId) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId ? { ...order, status: "Unlisted" } : order,
-      ),
+    setProducts((prev) =>
+      prev.map((p) => (p._id === orderId ? { ...p, status: "unlisted" } : p)),
     );
   };
 
   const handleProductRelisted = (orderId) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId ? { ...order, status: "In progress" } : order,
-      ),
+    setProducts((prev) =>
+      prev.map((p) => (p._id === orderId ? { ...p, status: "listed" } : p)),
     );
   };
 
@@ -89,7 +78,7 @@ function Myorders() {
     <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
       <div className="flex h-[calc(100vh-70px)] ">
         {/* LEFT PANEL */}
-        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
+        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
           <Profile_left_part />
         </div>
 
@@ -98,11 +87,15 @@ function Myorders() {
           <div className="max-w-4xl mx-auto">
             {/* Header Section */}
             <div className="flex items-center gap-2 text-[1.2rem] lg:text-xl xl:text-xl font-bold text-gray-900 dark:text-white mb-1">
-              <h1>My Orders</h1>
+              <h1>My Sales</h1>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Manage your listings and orders
+              Your listed, sold, and unlisted products
             </p>
+
+            <div className="mb-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-[13px] font-medium leading-6 text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
+              Buyer orders coming soon — for now this is your sales history.
+            </div>
 
             {/* Tabs */}
             <div className="mb-5">
@@ -115,22 +108,47 @@ function Myorders() {
 
             {/* Orders List */}
             <div className="flex flex-col gap-6 pb-10">
-              {filteredOrders.length === 0 ? (
-                <div className="py-12 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                  No orders found for "{activeTab}"
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <BrandLoader size="md" />
+                </div>
+              ) : loadError ? (
+                <div className="flex flex-col items-center gap-4 py-12 text-center bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
+                  <p className="text-sm font-medium text-red-500">{loadError}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="rounded-xl bg-[#3838EC] px-5 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : filteredOrders.length === 0 ? (
+                <div className="py-12 text-center text-gray-500 dark:text-gray-400 bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                  No listings found for &quot;{activeTab}&quot;
                 </div>
               ) : (
-                filteredOrders.map((o) => (
+                filteredOrders.map((p) => (
                   <MyOrdersCard
-                    key={o.id}
-                    orderId={o.id}
-                    placedOn={o.placedOn}
-                    imageUrl={o.imageUrl}
-                    name={o.name}
-                    color={o.color}
-                    attr={o.attr}
-                    status={o.status}
-                    price={o.price}
+                    key={p._id}
+                    orderId={p._id}
+                    placedOn={
+                      p.createdAt
+                        ? new Date(p.createdAt)
+                            .toLocaleDateString("en-GB")
+                            .replace(/\//g, "-")
+                        : ""
+                    }
+                    imageUrl={
+                      typeof p.images?.[0] === "string"
+                        ? p.images[0]
+                        : p.images?.[0]?.url || "/logo.svg"
+                    }
+                    name={p.title || "Untitled listing"}
+                    color={p.attributes?.color || ""}
+                    attr={p.attributes?.usage_duration?.replaceAll?.("_", " ") || ""}
+                    status={p.status || "listed"}
+                    price={p.selling_price}
+                    isOwnListing
                     onProductDeleted={handleProductDeleted}
                     onProductUnlisted={handleProductUnlisted}
                     onProductRelisted={handleProductRelisted}

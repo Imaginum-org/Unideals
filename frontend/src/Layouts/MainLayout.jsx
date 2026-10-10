@@ -1,7 +1,7 @@
 import React from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import Header from "../Components/layout/Header.jsx";
-import Footer from "../Components/layout/Footer";
+import Header from "../components/layout/Header.jsx";
+import Footer from "../components/layout/Footer";
 import CampusGate from "../features/campus/components/CampusGate.jsx";
 import { useCampus } from "../context/CampusContext.jsx";
 import { useUser } from "../context/useUserContext.jsx";

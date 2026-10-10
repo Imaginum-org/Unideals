@@ -109,11 +109,15 @@ export const updateUserStatus = async (userId, status) => {
     throw new Error("Invalid user status");
   }
 
+  const isDeactivation = status !== USER_STATUS.ACTIVE;
+
   const user = await User.findOneAndUpdate(
     { _id: userId, role: USER_ROLES.USER },
     {
       status,
-      ...(status !== USER_STATUS.ACTIVE ? { refresh_token: null } : {}),
+      ...(isDeactivation
+        ? { refresh_token: null, $inc: { tokenVersion: 1 } }
+        : {}),
     },
     { new: true, runValidators: true },
   )
@@ -122,6 +126,28 @@ export const updateUserStatus = async (userId, status) => {
 
   if (!user) {
     throw new Error("User not found");
+  }
+
+  // On suspend/deactivate: kill sessions (tokenVersion above), unlist live
+  // listings, and revoke active boosts (best-effort, never fail the request).
+  if (isDeactivation) {
+    try {
+      await Product.updateMany(
+        { seller_id: user._id, is_deleted: false, status: "listed" },
+        { $set: { status: "unlisted", is_boosted: false } },
+      );
+    } catch {
+      // best-effort only
+    }
+    try {
+      const Boost = (await import("../models/Boost.model.js")).default;
+      await Boost.updateMany(
+        { user_id: user._id, status: "active" },
+        { $set: { status: "expired" } },
+      );
+    } catch {
+      // best-effort only
+    }
   }
 
   const listings = await Product.countDocuments({

@@ -34,10 +34,12 @@ const initialFormData = {
 
   // Address
   address: null,
-  meetupLocation: "Foodys",
+  meetupLocation: "",
 
-  // Terms
+  // Terms (versioned consent, additive to payload)
   termsAccepted: false,
+  termsVersion: "v1",
+  termsAcceptedAt: null,
 };
 
 export const ProductListingProvider = ({ children }) => {
@@ -112,8 +114,10 @@ export const ProductListingProvider = ({ children }) => {
             city: product.pickup_address_snapshot.city,
           }
         : null,
-      meetupLocation: product.meetup_location || "Foodys",
+      meetupLocation: product.meetup_location || "",
       termsAccepted: true, // already accepted when originally listed
+      termsVersion: product.terms_version || "v1",
+      termsAcceptedAt: product.terms_accepted_at || null,
     });
 
     setStep(1);
@@ -196,11 +200,11 @@ export const ProductListingProvider = ({ children }) => {
   useEffect(() => {
     if (isEditMode) return;
     const timer = setTimeout(() => {
-      saveDraftToLocal(formData);
+      saveDraftToLocal({ ...formData, editProductId });
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [formData, isEditMode]);
+  }, [formData, isEditMode, editProductId]);
 
   // CONTEXT VALUE
   const value = useMemo(

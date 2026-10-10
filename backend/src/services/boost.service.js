@@ -2,6 +2,27 @@ import Boost from "../models/Boost.model.js";
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
 import { getBoostPlanRules } from "../config/boostPlans.js";
+
+// Quota filter: purchased add-ons (isAddon:true) never consume monthly or
+// active quota slots — the payment is the entitlement. $ne:true keeps
+// legacy docs without the field counted as quota.
+const QUOTA_FILTER = { isAddon: { $ne: true } };
+
+const campusMismatchError = () => {
+  const error = new Error("Boosts are limited to your own campus listings.");
+  error.statusCode = 400;
+  error.code = "CAMPUS_MISMATCH";
+  return error;
+};
+
+// Boosts apply to same-campus listings only (marketplace is campus-scoped).
+const assertSameCampus = (product, user) => {
+  const productCampus = product?.campus_id?._id || product?.campus_id;
+  const userCampus = user?.campus_id?._id || user?.campus_id;
+  if (productCampus && userCampus && String(productCampus) !== String(userCampus)) {
+    throw campusMismatchError();
+  }
+};
 const getMonthWindow = (date = new Date()) => {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
@@ -19,10 +40,12 @@ export const getBoostSummary = async (user) => {
   const [monthlyUsed, activeBoosts] = await Promise.all([
     Boost.countDocuments({
       user_id: user._id,
+      ...QUOTA_FILTER,
       createdAt: { $gte: start, $lt: end },
     }),
     Boost.countDocuments({
       user_id: user._id,
+      ...QUOTA_FILTER,
       status: "active",
       expires_at: { $gt: now },
     }),
@@ -77,6 +100,9 @@ export const createBoost = async ({ productId, user }) => {
     throw new Error("Product not found or you do not have permission to boost it");
   }
 
+  // Campus marketplace: quota boosts never cross campuses.
+  assertSameCampus(product, user);
+
   if (product.status !== PRODUCT_STATUS.LISTED) {
     throw new Error("Only active listed products can be boosted");
   }
@@ -92,10 +118,12 @@ export const createBoost = async ({ productId, user }) => {
   const [monthlyUsage, activeBoosts] = await Promise.all([
     Boost.countDocuments({
       user_id: user._id,
+      ...QUOTA_FILTER,
       createdAt: { $gte: start, $lt: end },
     }),
     Boost.countDocuments({
       user_id: user._id,
+      ...QUOTA_FILTER,
       status: "active",
       expires_at: { $gt: new Date() },
     }),
@@ -123,6 +151,7 @@ export const createBoost = async ({ productId, user }) => {
       starts_at: startsAt,
       expires_at: expiresAt,
       duration_hours: rules.durationHours,
+      isAddon: false,
     });
   } catch (err) {
     // Handle duplicate/race gracefully
@@ -139,13 +168,18 @@ export const createBoost = async ({ productId, user }) => {
 
   // Post-create re-check to bound parallel-race over-grant.
   // If limits are now exceeded, roll back this boost.
+  // Quota window is the calendar month (spec): simpler to reason about and
+  // matches the summary display. A rolling-30d window would change
+  // monthEndsAt semantics, so it is intentionally not used.
   const [monthlyAfter, activeAfter] = await Promise.all([
     Boost.countDocuments({
       user_id: user._id,
+      ...QUOTA_FILTER,
       createdAt: { $gte: start, $lt: end },
     }),
     Boost.countDocuments({
       user_id: user._id,
+      ...QUOTA_FILTER,
       status: "active",
       expires_at: { $gt: new Date() },
     }),
@@ -198,6 +232,10 @@ export const applyPurchasedBoost = async ({ productId, user, durationHours }) =>
     throw new Error("Product not found or you do not have permission to boost it");
   }
 
+  // Same-campus rule applies to purchased add-ons too — fail before money
+  // is captured (callers surface BOOST_APPLY_FAILED for support follow-up).
+  assertSameCampus(product, user);
+
   if (product.status !== PRODUCT_STATUS.LISTED) {
     throw new Error("Only active listed products can be boosted");
   }
@@ -216,6 +254,10 @@ export const applyPurchasedBoost = async ({ productId, user, durationHours }) =>
     starts_at: startsAt,
     expires_at: expiresAt,
     duration_hours: durationHours,
+    // Purchased add-on: excluded from quota counts, no refund on failure
+    // (payment stays VERIFIED with code BOOST_APPLY_FAILED for support
+    // reconciliation — see payment.service verifyPayment).
+    isAddon: true,
   });
 
   product.is_boosted = true;

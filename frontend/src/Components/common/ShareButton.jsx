@@ -93,6 +93,7 @@ export default function ShareButton({
         className="share-btn"
         onClick={handleClick}
         aria-label={label}
+        rel="noreferrer"
       >
         <span className="share-btn-icon">
           <ShareIcon />

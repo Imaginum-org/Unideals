@@ -46,6 +46,46 @@ export const sanitizeAuthUser = (user) => ({
   avatar: user.avatar,
 });
 
+// Per-account failed-login throttle (in-memory, no new deps).
+// Complements the IP-based express-rate-limiters: slows password guessing
+// against a single account even when spread across IPs.
+const loginFailures = new Map(); // key: normalized email -> { count, expiresAt }
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+const pruneLoginFailures = () => {
+  const now = Date.now();
+  for (const [key, entry] of loginFailures) {
+    if (!entry || entry.expiresAt <= now) loginFailures.delete(key);
+  }
+};
+
+const checkLoginThrottle = (normalizedEmail) => {
+  const entry = loginFailures.get(normalizedEmail);
+  if (entry && entry.expiresAt > Date.now() && entry.count >= LOGIN_MAX_FAILS) {
+    const error = new Error("Too many login attempts. Please try again later.");
+    error.statusCode = 429;
+    throw error;
+  }
+  if (entry && entry.expiresAt <= Date.now()) loginFailures.delete(normalizedEmail);
+};
+
+const recordLoginFailure = (normalizedEmail) => {
+  pruneLoginFailures();
+  const now = Date.now();
+  const entry = loginFailures.get(normalizedEmail);
+  if (!entry || entry.expiresAt <= now) {
+    loginFailures.set(normalizedEmail, { count: 1, expiresAt: now + LOGIN_WINDOW_MS });
+  } else {
+    entry.count += 1;
+    loginFailures.set(normalizedEmail, entry);
+  }
+};
+
+const clearLoginFailures = (normalizedEmail) => {
+  loginFailures.delete(normalizedEmail);
+};
+
 export const loginWithPassword = async ({
   email,
   password,
@@ -63,13 +103,14 @@ export const loginWithPassword = async ({
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  checkLoginThrottle(normalizedEmail);
   const user = await userModel
     .findOne({ email: normalizedEmail })
     .select("+password");
 
   // Generic message prevents account enumeration (no distinction
   // between missing account vs wrong password). Verification status
-  // is still surfaced via requiresVerification for UX.
+  // is only surfaced AFTER a correct password (no oracle).
   if (!user) {
     // Dummy compare so missing accounts take ~as long as real ones
     // (blocks timing-based enumeration).
@@ -77,17 +118,10 @@ export const loginWithPassword = async ({
       "invalid-credential-dummy",
       "$2b$10$invalidinvalidinvalidinvalidinvalidinvali",
     );
+    recordLoginFailure(normalizedEmail);
+    checkLoginThrottle(normalizedEmail);
     const error = new Error("Invalid email or password");
     error.statusCode = 400;
-    throw error;
-  }
-
-  if (!user.is_email_verified) {
-    const error = new Error(
-      "Please verify your email address before logging in.",
-    );
-    error.statusCode = 403;
-    error.requiresVerification = true;
     throw error;
   }
 
@@ -104,17 +138,39 @@ export const loginWithPassword = async ({
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    const error = new Error("This account does not have admin access");
-    error.statusCode = 403;
+    // Generic message: distinct "no admin access" would confirm valid
+    // credentials for a non-admin account (role leak).
+    recordLoginFailure(normalizedEmail);
+    const error = new Error("Invalid credentials");
+    error.statusCode = 401;
     throw error;
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
+    recordLoginFailure(normalizedEmail);
+    try {
+      checkLoginThrottle(normalizedEmail);
+    } catch (throttleErr) {
+      throw throttleErr;
+    }
     const error = new Error("Invalid email or password");
     error.statusCode = 400;
     throw error;
   }
+
+  // Verification gate AFTER correct password only — wrong-password probes
+  // can no longer learn verified/unverified status.
+  if (!user.is_email_verified) {
+    const error = new Error(
+      "Please verify your email address before logging in.",
+    );
+    error.statusCode = 403;
+    error.requiresVerification = true;
+    throw error;
+  }
+
+  clearLoginFailures(normalizedEmail);
 
   const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
   const refreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
@@ -146,10 +202,14 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
 
   if (!user || !user.refresh_token || user.refresh_token !== refreshToken) {
     // Possible reuse/theft: if token decodes but doesn't match stored token,
-    // revoke stored session to force re-login on all devices.
+    // revoke stored session + bump tokenVersion to kill the stolen 15m
+    // access token as well (force re-login on all devices).
     if (user && user.refresh_token && user.refresh_token !== refreshToken) {
       try {
-        await userModel.findByIdAndUpdate(user._id, { refresh_token: null });
+        await userModel.findByIdAndUpdate(user._id, {
+          refresh_token: null,
+          $inc: { tokenVersion: 1 },
+        });
       } catch {
         // ignore revocation errors
       }
@@ -159,9 +219,15 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
     throw error;
   }
 
+  // Reject legacy pre-v tokens (force one re-login to mint v-bearing tokens).
+  if (typeof decoded.v !== "number") {
+    const error = new Error("Session revoked. Please log in again.");
+    error.statusCode = 401;
+    throw error;
+  }
+
   // Token version check - invalidates all sessions on password reset / suspend
   if (
-    typeof decoded.v === "number" &&
     typeof user.tokenVersion === "number" &&
     decoded.v !== user.tokenVersion
   ) {
@@ -183,8 +249,8 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    const error = new Error("This account does not have admin access");
-    error.statusCode = 403;
+    const error = new Error("Invalid credentials");
+    error.statusCode = 401;
     throw error;
   }
 

@@ -12,9 +12,9 @@ import {
 } from "@animateicons/react/lucide";
 import { Settings01Icon } from "@animateicons/react/huge";
 import { ChevronLeft, Crown, Menu, Trophy } from "lucide-react";
-import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
-import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
+import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 
 // ─── NavItem defined OUTSIDE the parent so hooks are stable across renders ───
 // Having it inside caused React to reset state (including isCollapsed) on every
@@ -63,7 +63,7 @@ const NavItem = ({ path, label, icon: Icon, badge, isCollapsed, pathname }) => {
                 ? "h-[1.05rem] w-[1.05rem] right-[0.2rem] top-[0.2rem]"
                 : "h-5 w-5 right-4"
             } ${
-              isActive ? "bg-white text-[#364EF2]" : "bg-red-500 text-white"
+              isActive ? "bg-[#F7F8FA] text-[#364EF2]" : "bg-red-500 text-white"
             }`}
           >
             {badge}
@@ -114,7 +114,7 @@ function Profile_left_part() {
 
   return (
     <div
-      className={`h-full flex flex-col font-figtree relative border-r border-gray-100 bg-white transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-gray-800/50 dark:bg-[#131313] ${
+      className={`h-full flex flex-col font-figtree relative border-r border-gray-100 bg-[#F7F8FA] transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-gray-800/50 dark:bg-[#131313] ${
         isCollapsed
           ? "w-[4.9rem]"
           : "w-[12.6rem] lg:w-[14.7rem] xl:w-[17.15rem] xl:max-w-[17.15rem]"
@@ -163,7 +163,7 @@ function Profile_left_part() {
             onClick={() => setIsCollapsed((current) => !current)}
             className={`ml-auto flex shrink-0 items-center justify-center text-[#8292A6] transition-all duration-200 hover:text-[#3838EC] dark:text-[#AAB9C5] dark:hover:text-white ${
               isCollapsed
-                ? "absolute left-1/2 top-[4.35rem] h-10 w-10 -translate-x-1/2 rounded-xl border border-gray-100 bg-white shadow-sm hover:border-[#DDD8FF] hover:bg-[#F5F2FF] dark:border-gray-800 dark:bg-[#171717] dark:hover:bg-[#1c1c1c]"
+                ? "absolute left-1/2 top-[4.35rem] h-10 w-10 -translate-x-1/2 rounded-xl border border-gray-100 bg-[#F7F8FA] shadow-sm hover:border-[#DDD8FF] hover:bg-[#F5F2FF] dark:border-gray-800 dark:bg-[#171717] dark:hover:bg-[#1c1c1c]"
                 : "h-8 w-8 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1c1c1c]"
             }`}
             aria-label={
@@ -220,7 +220,7 @@ function Profile_left_part() {
       </div>
 
       {/* Bottom Branding (Sticky at bottom of sidebar) */}
-      <div className="bg-[#FFFFFF] dark:bg-[#131313] border-t pt-4 border-gray-100 dark:border-gray-800/50 pb-4">
+      <div className="bg-[#F7F8FA] dark:bg-[#131313] border-t pt-4 border-gray-100 dark:border-gray-800/50 pb-4">
         <div className="flex items-center justify-center">
           {/* Bag Icon */}
           <div className="flex items-center justify-center">

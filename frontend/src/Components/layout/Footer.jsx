@@ -61,7 +61,7 @@ const SOCIAL_LINKS = [
 
 const Footer = () => {
   return (
-    <div className="bg-white p-2 md:p-4 dark:bg-[#131313]">
+    <div className="bg-[#F7F8FA] p-2 md:p-4 dark:bg-[#131313]">
       <div className="mx-auto w-full max-w-[1600px]">
         <footer
           style={{
@@ -73,7 +73,7 @@ const Footer = () => {
           className="w-full overflow-hidden rounded-[30px] px-4 pt-4 font-figtree"
         >
           <div
-            className="rounded-[30px] bg-white dark:bg-[#131313] dark:text-white px-6
+            className="rounded-[30px] bg-[#F7F8FA] dark:bg-[#131313] dark:text-white px-6
               py-4
 sm:px-8
 md:px-12

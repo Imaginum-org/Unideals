@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { getBadgeMeta, TIER_STYLES } from "../../../Utils/badgeConfig.js";
+import { getBadgeMeta, TIER_STYLES } from "../../../utils/badgeConfig.js";
 
 /**
  * BadgeCard — displays a single badge in earned or locked state.
@@ -39,8 +39,8 @@ export default function BadgeCard({
         className={`
           relative group text-left w-full rounded-2xl p-4 border transition-all duration-200
           ${locked
-            ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] opacity-60 grayscale cursor-pointer hover:opacity-80"
-            : "border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1c1c1c] hover:scale-[1.02] hover:-translate-y-0.5 cursor-pointer"
+            ? "border-gray-200 dark:border-gray-700 bg-[#F7F8FA] dark:bg-[#1a1a1a] opacity-60 grayscale cursor-pointer hover:opacity-80"
+            : "border-gray-100 dark:border-gray-800 bg-[#F7F8FA] dark:bg-[#1c1c1c] hover:scale-[1.02] hover:-translate-y-0.5 cursor-pointer"
           }
           ${isNew ? "animate-pulse-border" : ""}
         `}
@@ -112,7 +112,7 @@ export default function BadgeCard({
           onClick={() => setShowModal(false)}
         >
           <div
-            className="bg-white dark:bg-[#1c1c1c] rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-gray-800"
+            className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Big icon */}
@@ -149,7 +149,7 @@ export default function BadgeCard({
               {meta.tiers.map((t) => (
                 <div
                   key={t.tier}
-                  className="flex items-center justify-between text-xs rounded-xl px-3 py-2 bg-gray-50 dark:bg-[#252525]"
+                  className="flex items-center justify-between text-xs rounded-xl px-3 py-2 bg-[#F7F8FA] dark:bg-[#252525]"
                 >
                   <span className="text-gray-600 dark:text-gray-300">{t.label}</span>
                   <span className="font-bold text-indigo-600 dark:text-indigo-400">+{t.xp} XP</span>

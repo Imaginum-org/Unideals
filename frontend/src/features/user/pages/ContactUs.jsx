@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "../../../context/useUserContext.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
@@ -24,7 +24,7 @@ const faqData = [
     questions: [
       {
         q: "How do I track the status of a deal?",
-        a: 'Go to Orders in your profile — each deal shows a live progress tracker from "Enquired" through "Meetup Confirmed" and "Completed". You and the seller both get notifications at each stage.',
+        a: "Go to Orders in your profile to see your deals and their current status. You and the seller both get notifications when something changes.",
       },
       {
         q: "Can I return an item after buying it?",
@@ -32,7 +32,7 @@ const faqData = [
       },
       {
         q: "What if I got scammed or the item is not as described?",
-        a: "Report the listing immediately using the flag icon on the product page or seller profile. Our safety team reviews every report within 24 hours and will contact you via email.",
+        a: "Report the issue using the Report option on this page with details of what happened. Our safety team reviews every report and will contact you via email.",
       },
     ],
   },
@@ -56,7 +56,7 @@ const faqData = [
     questions: [
       {
         q: "How does Campus Verification Works ?",
-        a: "Go to Settings → Verification and enter your official university email (e.g. name@vitstudent.ac.in). We send a one-click confirmation link. Once verified, your profile shows a blue badge which increases buyer trust",
+        a: "Go to Settings and complete the verification steps shown there. Once verified, your profile shows a badge which increases buyer trust.",
       },
       {
         q: "How do I delete my account ?",
@@ -78,7 +78,7 @@ const faqData = [
       },
       {
         q: "How does Boost work",
-        a: "Boosting a listing promotes it to the top of search results and category feeds for 48 hours. You can boost any active listing from My Listings → Boost.",
+        a: "Boosting a listing promotes it to the top of search results and category feeds for 3 or 7 days depending on the plan you pick. You can boost any active listing from My Listings → Boost.",
       },
     ],
   },
@@ -89,6 +89,13 @@ function ContactUs() {
   const [activeForm, setActiveForm] = useState(null); // 'contact', 'report', 'suggest'
   const [openCategory, setOpenCategory] = useState(null);
   const [openQuestion, setOpenQuestion] = useState(null);
+  const [helpQuery, setHelpQuery] = useState("");
+
+  // Guest email: prefilled when logged in, editable input when guest.
+  const [guestEmail, setGuestEmail] = useState(userDetails?.email || "");
+  useEffect(() => {
+    if (userDetails?.email) setGuestEmail(userDetails.email);
+  }, [userDetails?.email]);
 
   // Unified Form States
   const [contactForm, setContactForm] = useState({ topic: "", message: "" });
@@ -125,11 +132,21 @@ function ContactUs() {
       return;
     }
     const clamp = (s, max) => String(s || "").trim().slice(0, max);
+    const cleanReplyEmail = clamp(guestEmail, 254).toLowerCase();
+
+    if (!cleanReplyEmail || !cleanReplyEmail.includes("@")) {
+      toast.error("Please enter a valid email address.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Server-agnostic ticket ID shown to the user for follow-ups.
+    const ticketId = Date.now().toString(36).toUpperCase();
 
     // Base template parameters mapped to your HTML template
     let templateParams = {
       sender_name: clamp(userDetails?.name || "Unregistered User", 100),
-      sender_email: clamp(userDetails?.email || "No email provided", 100),
+      sender_email: cleanReplyEmail,
       preferred_reply: "Email",
       reference: "N/A",
     };
@@ -206,7 +223,9 @@ function ContactUs() {
       );
 
       sessionStorage.setItem("contactLastSent", String(Date.now()));
-      toast.success("Message sent successfully! We'll be in touch soon.");
+      toast.success(
+        `Message sent successfully! Ticket ID: ${ticketId}. We'll be in touch soon.`,
+      );
 
       // Clear forms and reset view
       setContactForm({ topic: "", message: "" });
@@ -236,7 +255,7 @@ function ContactUs() {
       <div className="flex h-[calc(100vh-70px)]">
         {/* LEFT PANEL */}
         {userDetails?._id ? (
-          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
         ) : null}
@@ -268,8 +287,11 @@ function ContactUs() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
+                value={helpQuery}
+                onChange={(e) => setHelpQuery(e.target.value)}
                 placeholder="Search help articles..."
-                className="w-full pl-9 pr-4 py-2 text-sm border bg-white border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white transition-all"
+                aria-label="Search help articles"
+                className="w-full pl-9 pr-4 py-2 text-sm border bg-[#F7F8FA] border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white transition-all"
               />
             </motion.div>
 
@@ -284,7 +306,7 @@ function ContactUs() {
                   activeForm === "contact"
                     ? "border-indigo-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#4F46E5] group-hover:scale-105 group-hover:shadow-md">
                   <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400 transition-colors duration-300 group-hover:text-white" />
@@ -301,7 +323,7 @@ function ContactUs() {
                   activeForm === "report"
                     ? "border-red-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
                 <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#EF4444] group-hover:scale-105 group-hover:shadow-md">
                   <ShieldAlert className="w-4 h-4 text-red-500 transition-colors duration-300 group-hover:text-white" />
@@ -320,7 +342,7 @@ function ContactUs() {
                   activeForm === "suggest"
                     ? "border-green-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
                 <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#22C55E] group-hover:scale-105 group-hover:shadow-md">
                   <Lightbulb className="w-4 h-4 text-green-600 dark:text-green-400 transition-colors duration-300 group-hover:text-white" />
@@ -341,7 +363,7 @@ function ContactUs() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.98 }}
                   transition={{ duration: 0.25, ease: "easeOut" }}
-                  className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-[#1f1f1f] p-5 relative mb-6"
+                  className="border border-gray-200 dark:border-gray-700 rounded-xl bg-[#F7F8FA] dark:bg-[#1f1f1f] p-5 relative mb-6"
                 >
                   <button
                     onClick={() => setActiveForm(null)}
@@ -366,6 +388,19 @@ function ContactUs() {
                       </p>
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Your email
+                      </label>
+                      <input
+                        type="email"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        placeholder="you@college.edu"
+                        required
+                        maxLength={254}
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                      />
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Topic
                       </label>
                       <select
@@ -376,7 +411,7 @@ function ContactUs() {
                             topic: e.target.value,
                           })
                         }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
                         required
                       >
                         <option value="">Select a topic</option>
@@ -399,7 +434,7 @@ function ContactUs() {
                             message: e.target.value,
                           })
                         }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
                         placeholder="Describe your issue in as much detail as possible..."
                         required
                       ></textarea>
@@ -408,7 +443,7 @@ function ContactUs() {
                         <button
                           type="button"
                           onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
@@ -421,6 +456,17 @@ function ContactUs() {
                           {isSubmitting ? "Sending..." : "Send message"}
                         </button>
                       </div>
+                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                        Need to share a screenshot? Submit first, then email it
+                        to{" "}
+                        <a
+                          href="mailto:hi@unideals.in"
+                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          hi@unideals.in
+                        </a>{" "}
+                        with your ticket ID.
+                      </p>
                     </motion.form>
                   )}
 
@@ -438,6 +484,19 @@ function ContactUs() {
                       <p className="text-xs text-gray-500 mb-4">
                         Let us know what's wrong so we can fix it.
                       </p>
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Your email
+                      </label>
+                      <input
+                        type="email"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        placeholder="you@college.edu"
+                        required
+                        maxLength={254}
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                      />
 
                       <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-3 mb-4 flex gap-2">
                         <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -460,7 +519,7 @@ function ContactUs() {
                           })
                         }
                         required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                       >
                         <option value="">Select category...</option>
                         <option value="Fraud or Scam Seller">
@@ -490,7 +549,7 @@ function ContactUs() {
                         onChange={(e) =>
                           setReportForm({ ...reportForm, link: e.target.value })
                         }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                         placeholder="e.g. Paste a link, user ID, or type 'My Listings'"
                       />
 
@@ -507,7 +566,7 @@ function ContactUs() {
                           })
                         }
                         required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                         placeholder="Be as specific as possible. Include dates, messages, or steps to trigger the bug..."
                       ></textarea>
 
@@ -515,7 +574,7 @@ function ContactUs() {
                         <button
                           type="button"
                           onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
@@ -528,6 +587,17 @@ function ContactUs() {
                           {isSubmitting ? "Submitting..." : "Submit report"}
                         </button>
                       </div>
+                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                        Need to share a screenshot? Submit first, then email it
+                        to{" "}
+                        <a
+                          href="mailto:hi@unideals.in"
+                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          hi@unideals.in
+                        </a>{" "}
+                        with your ticket ID.
+                      </p>
                     </motion.form>
                   )}
 
@@ -547,6 +617,19 @@ function ContactUs() {
                       </p>
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Your email
+                      </label>
+                      <input
+                        type="email"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        placeholder="you@college.edu"
+                        required
+                        maxLength={254}
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                      />
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Feature title
                       </label>
                       <input
@@ -559,7 +642,7 @@ function ContactUs() {
                           })
                         }
                         required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="e.g. Filter by hostel block"
                       />
 
@@ -576,7 +659,7 @@ function ContactUs() {
                           })
                         }
                         required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="What should it do? How would it work?"
                       ></textarea>
 
@@ -592,7 +675,7 @@ function ContactUs() {
                             whyUseful: e.target.value,
                           })
                         }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="Who benefits and how?"
                       ></textarea>
 
@@ -600,7 +683,7 @@ function ContactUs() {
                         <button
                           type="button"
                           onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
@@ -613,6 +696,16 @@ function ContactUs() {
                           {isSubmitting ? "Submitting..." : "Submit idea"}
                         </button>
                       </div>
+                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                        Need to share a mockup? Submit first, then email it to{" "}
+                        <a
+                          href="mailto:hi@unideals.in"
+                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          hi@unideals.in
+                        </a>{" "}
+                        with your ticket ID.
+                      </p>
                     </motion.form>
                   )}
                 </motion.div>
@@ -625,7 +718,7 @@ function ContactUs() {
                   transition={{ duration: 0.3 }}
                 >
                   {/* Response Time Banner */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 mb-6 bg-white shadow-sm border border-gray-100 rounded-xl dark:bg-[#1a1a1a] dark:border-gray-800">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 mb-6 bg-[#F7F8FA] shadow-sm border border-gray-100 rounded-xl dark:bg-[#1a1a1a] dark:border-gray-800">
                     <div className="flex items-center text-xs text-gray-600 dark:text-gray-300">
                       <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg mr-3">
                         <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
@@ -640,14 +733,14 @@ function ContactUs() {
                     </div>
                     <a
                       href="mailto:hi@unideals.in"
-                      className="flex items-center mt-3 sm:mt-0 px-3 py-1.5 bg-gray-50 dark:bg-[#252525] rounded-lg text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors font-medium"
+                      className="flex items-center mt-3 sm:mt-0 px-3 py-1.5 bg-[#F7F8FA] dark:bg-[#252525] rounded-lg text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors font-medium"
                     >
                       <Mail className="w-3.5 h-3.5 mr-1.5" /> hi@unideals.in
                     </a>
                   </div>
 
                   {/* FAQ Section */}
-                  <div className="bg-white border border-gray-200 rounded-2xl dark:bg-[#1f1f1f] dark:border-gray-700 p-4 lg:p-6 shadow-sm">
+                  <div className="bg-[#F7F8FA] border border-gray-200 rounded-2xl dark:bg-[#1f1f1f] dark:border-gray-700 p-4 lg:p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
                       <h3 className="text-xs font-bold text-gray-400 tracking-wider">
                         FREQUENTLY ASKED
@@ -656,7 +749,24 @@ function ContactUs() {
                     </div>
 
                     <div className="">
-                      {faqData.map((category) => (
+                      {faqData
+                        .map((category) => {
+                          const q = helpQuery.trim().toLowerCase();
+                          if (!q) return category;
+                          const matched = category.questions.filter(
+                            (item) =>
+                              item.q.toLowerCase().includes(q) ||
+                              item.a.toLowerCase().includes(q),
+                          );
+                          if (
+                            category.title.toLowerCase().includes(q) &&
+                            matched.length === 0
+                          )
+                            return category;
+                          return { ...category, questions: matched };
+                        })
+                        .filter((category) => category.questions.length > 0)
+                        .map((category) => (
                         <div
                           key={category.id}
                           className="border-b border-gray-50 last:border-0 dark:border-gray-800/50 pb-1"
@@ -696,7 +806,7 @@ function ContactUs() {
                                     category.questions.map((item, idx) => (
                                       <div
                                         key={idx}
-                                        className="bg-gray-50/80 dark:bg-[#171717] rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 transition-all"
+                                        className="bg-[#F7F8FA]/80 dark:bg-[#171717] rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 transition-all"
                                       >
                                         <button
                                           onClick={() => toggleQuestion(item.q)}
@@ -758,6 +868,21 @@ function ContactUs() {
                           </AnimatePresence>
                         </div>
                       ))}
+                      {helpQuery.trim() &&
+                      faqData.every((category) => {
+                        const q = helpQuery.trim().toLowerCase();
+                        return !(
+                          category.questions.some(
+                            (item) =>
+                              item.q.toLowerCase().includes(q) ||
+                              item.a.toLowerCase().includes(q),
+                          ) || category.title.toLowerCase().includes(q)
+                        );
+                      }) ? (
+                        <p className="text-xs text-gray-400 p-2 italic">
+                          No help articles match “{helpQuery.trim()}”.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </motion.div>

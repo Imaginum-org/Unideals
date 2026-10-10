@@ -18,6 +18,10 @@ import { applyPurchasedBoost } from "./boost.service.js";
 // Razorpay order on every button click / retry.
 const ORDER_REUSE_WINDOW_MS = 15 * 60 * 1000;
 
+// Global unpaid-order cap: at most 10 CREATED orders per user (abandoned
+// checkout guard — prevents order-table flooding via repeated retries).
+const MAX_UNPAID_ORDERS = 10;
+
 const toPaidPlanOrThrow = (plan) => {
   if (isBoostAddon(plan)) {
     return { kind: "addon", def: getBoostAddon(plan) };
@@ -65,6 +69,15 @@ const validateAddonTarget = async ({ productId, user }) => {
     error.statusCode = 400;
     throw error;
   }
+  // Campus marketplace: add-ons never boost another campus's listing.
+  const productCampus = product.campus_id?._id || product.campus_id;
+  const buyerCampus = user.campus_id?._id || user.campus_id;
+  if (productCampus && buyerCampus && String(productCampus) !== String(buyerCampus)) {
+    const error = new Error("Boosts are limited to your own campus listings.");
+    error.statusCode = 400;
+    error.code = "CAMPUS_MISMATCH";
+    throw error;
+  }
   return product;
 };
 
@@ -83,6 +96,21 @@ export const createOrder = async ({ plan, productId, user }) => {
     }
   } else {
     await validateAddonTarget({ productId, user });
+  }
+
+  // Global unpaid cap (checked before reuse so abandoned orders accumulate
+  // toward the limit instead of being silently bypassed).
+  const unpaidCount = await Payment.countDocuments({
+    user_id: user._id,
+    status: PAYMENT_STATUS.CREATED,
+  });
+  if (unpaidCount >= MAX_UNPAID_ORDERS) {
+    const error = new Error(
+      "Too many pending orders. Please complete or wait before creating a new one.",
+    );
+    error.statusCode = 400;
+    error.code = "TOO_MANY_ORDERS";
+    throw error;
   }
 
   // Idempotent reuse: return the fresh unpaid order instead of minting another.
@@ -242,6 +270,36 @@ export const verifyPayment = async ({ orderId, paymentId, signature, user }) => 
     throw error;
   }
 
+  // 2b. Payment-entity cross-check: fetch the payment itself and assert it
+  // belongs to this order and is captured. Best-effort — a fetch failure
+  // falls back to the order check above and never breaks verification.
+  try {
+    const rzpPayment = await razorpay.payments.fetch(paymentId);
+    if (String(rzpPayment.order_id) !== String(orderId)) {
+      await Payment.updateOne(
+        { _id: payment._id, status: PAYMENT_STATUS.CREATED },
+        { $set: { status: PAYMENT_STATUS.FAILED } },
+      );
+      const error = new Error("Payment verification failed.");
+      error.statusCode = 400;
+      throw error;
+    }
+    if (rzpPayment.status && !["captured", "authorized"].includes(rzpPayment.status)) {
+      console.error("Razorpay payment not captured:", {
+        paymentId,
+        status: rzpPayment.status,
+      });
+    }
+  } catch (fetchErr) {
+    if (fetchErr?.statusCode === 400) throw fetchErr;
+    // Provider fetch failed (network/permissions): log and continue with
+    // the order-level proof already established above.
+    console.error("Razorpay payments.fetch failed (best-effort):", {
+      statusCode: fetchErr?.statusCode,
+      error: fetchErr?.error,
+    });
+  }
+
   // 3. Atomic claim: only one concurrent verify can flip created -> verified.
   // Losers fall into the alreadyVerified path below via re-read.
   const claimed = await Payment.findOneAndUpdate(
@@ -273,7 +331,11 @@ export const verifyPayment = async ({ orderId, paymentId, signature, user }) => 
     try {
       const { product } = await applyPurchasedBoost({
         productId: payment.product_id,
-        user: { _id: payment.user_id, subscription: user.subscription },
+        user: {
+          _id: payment.user_id,
+          subscription: user.subscription,
+          campus_id: user.campus_id,
+        },
         durationHours: addon.durationHours,
       });
       return { alreadyVerified: false, plan: payment.plan, product };
@@ -317,7 +379,10 @@ export const verifyWebhookSignature = (rawBody, signature) => {
 // and verify-claim is the only writer of VERIFIED).
 export const handleWebhookEvent = async (event) => {
   const type = event?.event;
-  const entity = event?.payload?.payment?.entity;
+  // payment.* events carry payload.payment.entity; refund.* events carry
+  // payload.refund.entity instead.
+  const entity =
+    event?.payload?.payment?.entity || event?.payload?.refund?.entity;
   if (!type || !entity) return { handled: false };
 
   if (type === "payment.captured") {
@@ -357,11 +422,15 @@ export const handleWebhookEvent = async (event) => {
         try {
           const { default: UserModel } = await import("../models/User.model.js");
           const buyer = await UserModel.findById(payment.user_id)
-            .select("subscription")
+            .select("subscription campus_id")
             .lean();
           await applyPurchasedBoost({
             productId: payment.product_id,
-            user: { _id: payment.user_id, subscription: buyer?.subscription },
+            user: {
+              _id: payment.user_id,
+              subscription: buyer?.subscription,
+              campus_id: buyer?.campus_id,
+            },
             durationHours: addon.durationHours,
           });
         } catch {
@@ -385,6 +454,48 @@ export const handleWebhookEvent = async (event) => {
       { razorpay_order_id: orderId, status: PAYMENT_STATUS.CREATED },
       { $set: { status: PAYMENT_STATUS.FAILED } },
     );
+    return { handled: true };
+  }
+
+  // Refund + dispute events: money left the merchant account, so the
+  // entitlement is revoked — payment marked REFUNDED, buyer downgraded to
+  // Free, and live boosts revoked (best-effort, idempotent).
+  // Covered: refund.created, refund.processed (entity may be a refund with
+  // payment_id, or a payment entity), payment.dispute.* (entity carries
+  // payment_id).
+  if (
+    type === "refund.created" ||
+    type === "refund.processed" ||
+    type.startsWith("refund.") ||
+    type.startsWith("payment.dispute.")
+  ) {
+    try {
+      const paymentRef = entity.payment_id || entity.id;
+      const orderRef = entity.order_id;
+      const query = paymentRef
+        ? { razorpay_payment_id: paymentRef }
+        : orderRef
+          ? { razorpay_order_id: orderRef }
+          : null;
+      if (!query) return { handled: true };
+      const payment = await Payment.findOne(query);
+      if (!payment) return { handled: true };
+      if (payment.status === PAYMENT_STATUS.REFUNDED) {
+        return { handled: true, deduped: true };
+      }
+      await Payment.updateOne(
+        { _id: payment._id },
+        { $set: { status: PAYMENT_STATUS.REFUNDED, refunded_at: new Date() } },
+      );
+      try {
+        const { downgradeToFree } = await import("./subscription.service.js");
+        await downgradeToFree(payment.user_id, `refund:${type}`);
+      } catch (downgradeErr) {
+        console.error("Refund downgrade failed (best-effort):", downgradeErr?.message);
+      }
+    } catch (refundErr) {
+      console.error("Refund webhook handling failed:", refundErr?.message);
+    }
     return { handled: true };
   }
 

@@ -19,7 +19,7 @@ const userSchema = new Schema(
       trim: true,
       index: true,
       match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.[A-Za-z]{2,})+$/,
         "Please provide a valid email address",
       ],
     },

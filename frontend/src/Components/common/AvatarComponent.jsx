@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ik } from "../../Utils/imageTransform.js";
+import { ik } from "../../utils/imageTransform.js";
 
 const AvatarComponent = ({
   name,
@@ -112,7 +112,7 @@ const AvatarComponent = ({
       <div
         // inset-[2px] exposes exactly 2px of the animated gradient behind it.
         // border-[2px] creates the clean white/dark gap between the image and the gradient.
-        className={`absolute ${isPremium ? "inset-[2px] border-[2px] border-white dark:border-[#131313]" : "inset-0"} z-10 ${borderRadiusClass} bg-white dark:bg-[#131313] overflow-hidden`}
+        className={`absolute ${isPremium ? "inset-[2px] border-[2px] border-white dark:border-[#131313]" : "inset-0"} z-10 ${borderRadiusClass} bg-[#F7F8FA] dark:bg-[#131313] overflow-hidden`}
       >
         {shouldShowImage ? (
           <img

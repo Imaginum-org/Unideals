@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Info } from "lucide-react";
-import { RANK_CONFIG, LEVEL_REWARDS_GUIDE } from "../../../Utils/badgeConfig.js";
+import { RANK_CONFIG, LEVEL_REWARDS_GUIDE } from "../../../utils/badgeConfig.js";
 import RankGuideModal from "./RankGuideModal.jsx";
 import { fetchMyRewards } from "../api/badgeApi.js";
 

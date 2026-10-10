@@ -1,8 +1,9 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
+import CategoryIcon from "./CategoryIcon.jsx";
 
-const Category = ({ title, imageSrc }) => {
-  const slug = title.toLowerCase().replace(/\s+/g, "_");
+const Category = ({ title, value }) => {
+  const slug = (value || title).toLowerCase().replace(/\s+/g, "_");
   return (
     <Link
       to={`/category/${slug}`}
@@ -21,7 +22,7 @@ gap-3
 rounded-xl
 border
 border-[#E1E5EA]
-bg-[#F2F1FD]
+bg-white
 dark:bg-neutral-900
 dark:border-neutral-700
 dark:hover:bg-neutral-800
@@ -38,23 +39,11 @@ focus-visible:ring-offset-2
 dark:focus-visible:ring-offset-neutral-900
 font-figtree"
     >
-      {imageSrc ? (
-        <img
-          src={imageSrc}
-          width={40}
-          height={40}
-          alt={`${title} icon`}
-          className="w-8 h-8 lg:w-9 lg:h-9 object-contain transition-transform duration-300 group-hover:scale-110"
-          loading="lazy"
-          decoding="async"
-          draggable={false}
-        />
-      ) : (
-        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gray-100 dark:bg-neutral-800">
-          <span className="text-xs text-gray-400">N/A</span>
-        </div>
-      )}
-      <h3 className="text-xs sm:text-sm md:text-base xl:text-sm font-semibold text-center line-clamp-2 text-[#4A5565] dark:text-white">
+      <CategoryIcon
+        value={slug}
+        className="h-10 w-10 lg:h-12 lg:w-12 transition-transform duration-300 group-hover:scale-110"
+      />
+      <h3 className="px-1 text-xs sm:text-sm md:text-base xl:text-sm font-semibold text-center line-clamp-2 text-[#4A5565] dark:text-white">
         {title}
       </h3>
     </Link>

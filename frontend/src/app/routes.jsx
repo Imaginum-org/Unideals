@@ -1,9 +1,9 @@
 import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import MainLayout from "../Layouts/MainLayout.jsx";
-import ProtectedLayout from "../Layouts/ProtectedLayout.jsx";
-import PublicOnlyRoute from "../Layouts/PublicOnlyRoute.jsx";
-import BrandLoader from "../Components/ui/BrandLoader.jsx";
+import MainLayout from "../layouts/MainLayout.jsx";
+import ProtectedLayout from "../layouts/ProtectedLayout.jsx";
+import PublicOnlyRoute from "../layouts/PublicOnlyRoute.jsx";
+import BrandLoader from "../components/ui/BrandLoader.jsx";
 
 // Route-level code splitting: each page loads on demand instead of bloating
 // the initial Home bundle. BrandLoader matches existing loading UX.
@@ -35,6 +35,9 @@ const ProductListed = lazy(
 );
 const ProductCategory = lazy(
   () => import("../features/product/pages/ProductCategory.jsx"),
+);
+const Explore = lazy(
+  () => import("../features/product/pages/Explore.jsx"),
 );
 const PricingModel = lazy(
   () => import("../features/product/pages/PricingModel.jsx"),
@@ -69,6 +72,7 @@ const SearchResults = lazy(
 const PhoneUpload = lazy(
   () => import("../features/handoff/pages/PhoneUpload.jsx"),
 );
+const NotFound = lazy(() => import("../components/NotFound.jsx"));
 
 function RouteFallback() {
   return (
@@ -98,9 +102,11 @@ export default function AppRoutes() {
           <Route path="/search" element={<SearchResults />} />
           <Route path="/product/:id" element={<ProductDescription />} />
           <Route path="/category/:categoryName" element={<ProductCategory />} />
+          <Route path="/explore" element={<Explore />} />
           <Route path="/price" element={<PricingModel />} />
           <Route path="/termscondition" element={<Termscondition />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/contact" element={<ContactUs />} />
         </Route>
 
         {/* PROTECTED WITH HEADER */}
@@ -126,7 +132,6 @@ export default function AppRoutes() {
             <Route path="/upload" element={<ProductListing />} />
             <Route path="/upload/:productId" element={<ProductListing />} />
             <Route path="/productlisted" element={<ProductListed />} />
-            <Route path="/contact" element={<ContactUs />} />
           </Route>
         </Route>
 
@@ -135,7 +140,7 @@ export default function AppRoutes() {
         <Route path="/p/:code" element={<PhoneUpload />} />
 
         {/* 404 - must be last */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

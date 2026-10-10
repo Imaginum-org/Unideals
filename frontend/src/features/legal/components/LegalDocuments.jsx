@@ -359,7 +359,7 @@ function LegalDocument({ initialType = "privacy" }) {
           onClick={() => setActiveTab("privacy")}
           className={`flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition-all duration-200 ${
             isPrivacy
-              ? "bg-white font-medium text-gray-900 shadow-sm dark:bg-[#25282c] dark:text-white"
+              ? "bg-[#F7F8FA] font-medium text-gray-900 shadow-sm dark:bg-[#25282c] dark:text-white"
               : "bg-transparent font-medium text-[#9AA4B2] hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           }`}
         >
@@ -377,7 +377,7 @@ function LegalDocument({ initialType = "privacy" }) {
           onClick={() => setActiveTab("terms")}
           className={`flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition-all duration-200 ${
             !isPrivacy
-              ? "bg-white font-medium text-gray-900 shadow-sm dark:bg-[#25282c] dark:text-white"
+              ? "bg-[#F7F8FA] font-medium text-gray-900 shadow-sm dark:bg-[#25282c] dark:text-white"
               : "bg-transparent font-medium text-[#9AA4B2] hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           }`}
         >
@@ -393,9 +393,9 @@ function LegalDocument({ initialType = "privacy" }) {
       </div>
 
       {/* Main Content Card */}
-      <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-[0px_4px_20px_-10px_rgba(0,0,0,0.05)] dark:border-gray-800 dark:bg-[#1c1c1c] lg:p-10">
+      <div className="rounded-3xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-[0px_4px_20px_-10px_rgba(0,0,0,0.05)] dark:border-gray-800 dark:bg-[#1c1c1c] lg:p-10">
         {/* Info Banner */}
-        <div className="mb-8 flex items-center rounded-r-xl border-l-[3px] border-[#364EF2] bg-[#F8F9FA] px-5 py-3.5 dark:bg-[#252525]">
+        <div className="mb-8 flex items-center rounded-r-xl border-l-[3px] border-[#364EF2] bg-[#F7F8FA] px-5 py-3.5 dark:bg-[#252525]">
           <p className="text-[13px] text-gray-600 dark:text-gray-300 lg:text-sm">
             <span className="font-bold text-gray-900 dark:text-white">
               Last updated:

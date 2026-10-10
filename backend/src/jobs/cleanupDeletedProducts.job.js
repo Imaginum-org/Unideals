@@ -61,6 +61,51 @@ export const scheduleCleanupDeletedProducts = () => {
       }
 
       console.log("[Job] Cleanup job completed successfully");
+
+      // Orphan sweep (unverified TTL deletes): products whose seller no
+      // longer exists (TTL auto-delete has no pre-hook) + wishlist pull.
+      try {
+        const User = (await import("../models/User.model.js")).default;
+        const existingUserIds = await User.distinct("_id");
+        const orphanProducts = await Product.find(
+          { seller_id: { $nin: existingUserIds } },
+          { _id: 1, images: 1 },
+        ).lean();
+        if (orphanProducts.length > 0) {
+          const orphanIds = orphanProducts.map((p) => p._id);
+          console.log(
+            `[Job] Found ${orphanIds.length} orphan products (seller gone) to clean up`,
+          );
+          try {
+            const { deleteImage } = await import("../utils/imagekit.js");
+            const fileIds = orphanProducts.flatMap((p) =>
+              Array.isArray(p.images)
+                ? p.images.map((i) => i?.fileId).filter(Boolean)
+                : [],
+            );
+            await Promise.allSettled(fileIds.map((id) => deleteImage(id)));
+          } catch {
+            // ignore image cleanup failures
+          }
+          const Report = (await import("../models/Report.model.js")).default;
+          await Promise.all([
+            Product.deleteMany({ _id: { $in: orphanIds } }),
+            User.updateMany(
+              { wishlist: { $in: orphanIds } },
+              { $pull: { wishlist: { $in: orphanIds } } },
+            ),
+            Report.deleteMany({
+              target_id: { $in: orphanIds },
+              target_model: "Product",
+            }),
+          ]);
+          console.log(
+            `[Job] Successfully deleted ${orphanIds.length} orphan products`,
+          );
+        }
+      } catch (orphanErr) {
+        console.error("[Job] Error in orphan sweep:", orphanErr.message);
+      }
     } catch (error) {
       console.error("[Job] Error in cleanup job:", error.message);
     }
@@ -69,6 +114,26 @@ export const scheduleCleanupDeletedProducts = () => {
   console.log(
     "[Job] Product cleanup scheduler initialized (runs daily at 2 AM UTC)",
   );
+
+  // Draft TTL: unpublished drafts older than 30d are deleted (abandoned
+  // composer state — never user-visible). Runs daily at 2:30 AM UTC.
+  cron.schedule("30 2 * * *", async () => {
+    try {
+      console.log("[Job] Purging stale drafts older than 30 days...");
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const result = await Product.deleteMany({
+        status: "draft",
+        is_deleted: false,
+        updatedAt: { $lt: thirtyDaysAgo },
+      });
+      console.log(
+        `[Job] Draft purge done (deleted ${result.deletedCount || 0} stale drafts)`,
+      );
+    } catch (error) {
+      console.error("[Job] Error in draft purge:", error.message);
+    }
+  });
 };
 
 /**

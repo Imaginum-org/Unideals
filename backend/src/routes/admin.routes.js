@@ -37,6 +37,10 @@ import { adminListCampuses } from "../controllers/campus.controller.js";
 
 // Validations
 import {
+  getAdminReports,
+  reviewAdminReport,
+} from "../controllers/report.controller.js";
+import {
   createCampusSchema,
   updateCampusSchema,
 } from "../validations/campus.validation.js";
@@ -44,7 +48,7 @@ import { validate } from "../middlewares/validation.middleware.js";
 
 const router = express.Router();
 
-// ─── Auth ──────────────────────────────────────────────────────────────────
+// Auth 
 // Privileged login: strict brute-force protection.
 const adminAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -59,7 +63,7 @@ router.post("/auth/refresh-token", adminAuthLimiter, adminRefreshToken);
 router.get("/auth/me", auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT), adminMe);
 router.post("/auth/logout", auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT), adminLogout);
 
-// ─── Dashboard (real metrics) ──────────────────────────────────────────────
+// Dashboard (real metrics)
 // Both roles can view dashboard
 router.get(
   "/dashboard",
@@ -68,7 +72,7 @@ router.get(
   getDashboard,
 );
 
-// ─── Moderation Queue ──────────────────────────────────────────────────────
+// Moderation Queue
 // Both roles can view and dismiss reports from the queue
 router.get(
   "/moderation/queue",
@@ -83,7 +87,7 @@ router.post(
   dismissReports,
 );
 
-// ─── Users ─────────────────────────────────────────────────────────────────
+// Users
 // List (paginated, searchable) — both roles
 router.get(
   "/users",
@@ -108,7 +112,7 @@ router.patch(
   updateUserStatusWithAudit,
 );
 
-// ─── Products ──────────────────────────────────────────────────────────────
+// Products
 // List — both roles
 router.get(
   "/products",
@@ -149,9 +153,23 @@ router.delete(
   hardDeleteProductWithAudit,
 );
 
-// ─── Campus Directory ──────────────────────────────────────────────────────
+// Campus Directory
 // Read for both roles; writes for admin only.
 // Slugs are immutable — pausing a campus hides its feeds via is_active.
+// Reports moderation queue - read + review for support, writes already role-gated.
+router.get(
+  "/reports",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  getAdminReports,
+);
+router.patch(
+  "/reports/:id",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  reviewAdminReport,
+);
+
 router.get(
   "/campuses",
   auth,
@@ -175,7 +193,7 @@ router.patch(
   updateCampusWithAudit,
 );
 
-// ─── Audit Log ─────────────────────────────────────────────────────────────
+// Audit Log
 // Admins see full audit log; support can read-only for transparency.
 router.get(
   "/audit-log",

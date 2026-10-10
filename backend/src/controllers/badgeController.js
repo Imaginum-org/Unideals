@@ -63,8 +63,9 @@ export const getLeaderboard = async (req, res) => {
       rank: i + 1,
       name: u.name,
       avatar: u.avatar,
-      total_xp: u.gamification?.total_xp || 0,
-      level: u.gamification?.level || 1,
+      total_xp: u.gamification?.total_xp ?? 0,
+      // ?? (not ||): Lv0 is a real level and must display as 0.
+      level: u.gamification?.level ?? 1,
       rank_title: u.gamification?.rank_title || "Seedling",
       badge_count: (u.gamification?.badges || []).length,
     }));

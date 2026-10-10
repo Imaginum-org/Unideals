@@ -72,7 +72,7 @@ const FirstListingCelebration = ({ onClose }) => {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 12 }}
           transition={{ type: "spring", stiffness: 220, damping: 22 }}
-          className="relative w-full max-w-[420px] overflow-hidden rounded-2xl bg-white shadow-[0_30px_80px_-16px_rgba(56,56,236,0.28)] border border-slate-900/[0.06]"
+          className="relative w-full max-w-[420px] overflow-hidden rounded-2xl bg-[#F7F8FA] shadow-[0_30px_80px_-16px_rgba(56,56,236,0.28)] border border-slate-900/[0.06]"
         >
           {/* Top accent bar */}
           <div className="h-[3px] w-full bg-[#3838EC]" />
@@ -129,7 +129,7 @@ const FirstListingCelebration = ({ onClose }) => {
           </div>
 
           {/* Receipt stub */}
-          <div className="space-y-2.5 bg-slate-50/70 px-8 py-5 font-mono text-[13px] tabular-nums">
+          <div className="space-y-2.5 bg-[#F7F8FA]/70 px-8 py-5 font-mono text-[13px] tabular-nums">
             <div className="flex items-baseline justify-between">
               <span className="text-[11px] uppercase tracking-wide text-slate-400">
                 Status
@@ -159,7 +159,7 @@ const FirstListingCelebration = ({ onClose }) => {
               onClick={onClose}
               className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-lg bg-[#3838EC] py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_20px_-6px_rgba(56,56,236,0.55)] transition-colors hover:bg-[#2F2FCB]"
             >
-              <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/25" />
+              <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[#F7F8FA]/25" />
               Continue exploring
               <HiArrowRight size={16} />
             </motion.button>

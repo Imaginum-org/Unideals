@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { checkEmailVerification, resendVerification } from "../api/authApi";
 import checkemailicon from "/checkemailicon.webp";
-import { ArrowLeft, OctagonAlert } from "lucide-react";
+import { ArrowLeft, OctagonAlert, Pencil } from "lucide-react";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
@@ -14,13 +14,17 @@ function CheckEmail() {
   const navigate = useNavigate();
   const safeTimeout = useSafeTimeout();
 
-  // Grab the email passed from the signup page.
-  // If someone visits this page directly without signing up, it falls back to empty.
-  const email = location.state?.email || "";
+  // Prefill from signup/login state, but keep editable so refresh still works.
+  const [emailInput, setEmailInput] = useState(location.state?.email || "");
+  const returnTo = location.state?.from;
+  const emailInputRef = useRef(emailInput);
+  emailInputRef.current = emailInput;
 
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [pollCount, setPollCount] = useState(0);
   const [formMessage, setFormMessage] = useState(null);
 
   const clearFormMessage = () => setFormMessage(null);
@@ -41,9 +45,22 @@ function CheckEmail() {
     return () => window.clearInterval(timer);
   }, [resendCooldown]);
 
+  const getTarget = () => {
+    if (returnTo) {
+      if (typeof returnTo === "string") return returnTo;
+      return `${returnTo.pathname || "/"}${returnTo.search || ""}${returnTo.hash || ""}`;
+    }
+    return "/login";
+  };
+
   const handleResend = async () => {
-    if (!email) {
-      navigate("/signup");
+    const cleanEmail = emailInputRef.current.trim().toLowerCase();
+    if (!cleanEmail) {
+      setFormMessage({
+        variant: "error",
+        text: "Please enter your email address first.",
+      });
+      setIsEditingEmail(true);
       return;
     }
 
@@ -51,7 +68,7 @@ function CheckEmail() {
     setIsResending(true);
     try {
       const response = await resendVerification({
-        email,
+        email: cleanEmail,
       });
 
       if (response.data.success) {
@@ -75,25 +92,36 @@ function CheckEmail() {
     }
   };
 
-  const handleVerifyStatus = async () => {
-    if (!email) {
-      navigate("/signup");
-      return;
+  const handleVerifyStatus = async (fromPoll = false) => {
+    const cleanEmail = emailInputRef.current.trim().toLowerCase();
+    if (!cleanEmail) {
+      if (!fromPoll) {
+        setFormMessage({
+          variant: "error",
+          text: "Please enter your email address first.",
+        });
+        setIsEditingEmail(true);
+      }
+      return false;
     }
 
-    clearFormMessage();
-    setIsChecking(true);
+    if (!fromPoll) {
+      clearFormMessage();
+      setIsChecking(true);
+    }
     try {
-      const response = await checkEmailVerification(email);
+      const response = await checkEmailVerification(cleanEmail);
 
       if (response.data.success) {
         if (response.data.verified) {
           setFormMessage({
             variant: "success",
-            text: "Email verified! Redirecting to sign in…",
+            text: "Email verified! Redirecting…",
           });
-          safeTimeout(() => navigate("/login"), 900);
-        } else {
+          safeTimeout(() => navigate(getTarget(), { replace: true }), 900);
+          return true;
+        }
+        if (!fromPoll) {
           setFormMessage({
             variant: "info",
             text: "Your email isn’t verified yet. Open the link we sent, then try again.",
@@ -101,22 +129,36 @@ function CheckEmail() {
         }
       }
     } catch (error) {
-      setFormMessage({
-        variant: "error",
-        text:
-          error.response?.data?.message ||
-          "Unable to check verification status right now.",
-      });
+      if (!fromPoll) {
+        setFormMessage({
+          variant: "error",
+          text:
+            error.response?.data?.message ||
+            "Unable to check verification status right now.",
+        });
+      }
     } finally {
-      setIsChecking(false);
+      if (!fromPoll) setIsChecking(false);
     }
+    return false;
   };
 
+  // Gentle auto-poll: check up to 3 times, 5s apart, then stop (manual kept).
+  useEffect(() => {
+    if (pollCount >= 3) return;
+    const id = window.setTimeout(async () => {
+      const done = await handleVerifyStatus(true);
+      if (!done) setPollCount((c) => c + 1);
+    }, 5000);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pollCount]);
+
   return (
-    <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-white dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden">
+    <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-[#F7F8FA] dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden">
       {/* ── LEFT PANEL ── */}
-      <div className="relative flex min-h-[100dvh] w-full flex-col bg-white font-figtree dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
-        <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-white dark:md:bg-[#131313] md:text-[#111827]">
+      <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#F7F8FA] font-figtree dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
+        <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-[#F7F8FA] dark:md:bg-[#131313] md:text-[#111827]">
           <div className="flex shrink-0 items-center justify-center mt-[3.5vh] sm:mt-[4vh] md:justify-start md:mt-2 md:pl-4 xl:mt-4 xl:pl-7">
             <AuthBrandLogo />
           </div>
@@ -124,7 +166,7 @@ function CheckEmail() {
           <AuthMobileBanner />
 
           <div className="flex min-h-0 flex-1 items-end justify-center md:items-center">
-            <div className="w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-hidden md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none">
+            <div className="w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-hidden md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none">
               <div className="flex flex-col items-center text-center">
                 <div className="mb-[1.5vh] flex h-14 w-14 items-center justify-center rounded-full bg-blue-700/10 transition-colors duration-300 dark:bg-blue-500/20 sm:h-16 sm:w-16 md:mb-3 md:h-12 md:w-12 lg:mb-4 xl:mb-[1.9vh] xl:h-14 xl:w-14 2xl:h-16 2xl:w-16">
                   <img
@@ -141,11 +183,45 @@ function CheckEmail() {
                   <br className="hidden sm:block" />
                   Please click the link to confirm your account.
                 </p>
-                <div className="mt-[2.2vh] max-w-full rounded-xl border border-slate-300/30 bg-slate-100 px-4 py-2 transition-colors duration-300 dark:border-zinc-800 dark:bg-[#1e1e1e] md:mt-[1.8vh]">
-                  <span className="block truncate text-sm font-semibold text-zinc-900 transition-colors duration-300 dark:text-zinc-100 md:text-xs lg:text-[0.8rem] 2xl:text-[0.85rem]">
-                    {email || "Unknown Email"}
-                  </span>
-                </div>
+                {isEditingEmail ? (
+                  <div className="mt-[2.2vh] w-full md:mt-[1.8vh]">
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => {
+                        setEmailInput(e.target.value);
+                        clearFormMessage();
+                      }}
+                      placeholder="you@college.edu"
+                      maxLength={254}
+                      autoFocus
+                      className="h-10 w-full rounded-xl border border-transparent bg-[#F7F8FA] px-3 text-center text-sm font-semibold text-zinc-900 outline-none transition placeholder:font-normal placeholder:text-gray-400 focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1e1e1e] dark:text-zinc-100 dark:focus:bg-[#1e1e1e] md:text-xs lg:text-[0.8rem]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingEmail(false)}
+                      disabled={!emailInput.trim()}
+                      className="mt-2 text-[0.75rem] font-semibold text-[#393AF2] transition hover:text-[#2426C7] disabled:opacity-50"
+                    >
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-[2.2vh] flex max-w-full items-center gap-2 rounded-xl border border-slate-300/30 bg-slate-100 px-4 py-2 transition-colors duration-300 dark:border-zinc-800 dark:bg-[#1e1e1e] md:mt-[1.8vh]">
+                    <span className="block truncate text-sm font-semibold text-zinc-900 transition-colors duration-300 dark:text-zinc-100 md:text-xs lg:text-[0.8rem] 2xl:text-[0.85rem]">
+                      {emailInput.trim() || "Unknown Email"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingEmail(true)}
+                      aria-label="Change email"
+                      className="flex shrink-0 items-center gap-1 text-[0.7rem] font-semibold text-[#393AF2] transition hover:text-[#2426C7]"
+                    >
+                      <Pencil className="size-3" />
+                      Change
+                    </button>
+                  </div>
+                )}
               </div>
 
               {formMessage ? (
@@ -158,7 +234,7 @@ function CheckEmail() {
 
               <div className="mt-[2.2vh] space-y-[2vh] md:mt-[1.8vh] md:space-y-3 lg:mt-3 lg:space-y-3 xl:mt-[2.9vh] xl:space-y-[2.2vh]">
                 <button
-                  onClick={handleVerifyStatus}
+                  onClick={() => handleVerifyStatus(false)}
                   disabled={isChecking}
                   className="h-[6.3vh] w-full rounded-xl bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-0 md:h-10 md:rounded-xl md:text-xs lg:h-10 lg:text-sm xl:h-[6.4vh] xl:text-[0.8rem] 2xl:h-[6.4vh] 2xl:text-[0.85rem]"
                 >

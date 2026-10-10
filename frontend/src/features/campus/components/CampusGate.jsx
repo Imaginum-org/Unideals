@@ -20,6 +20,7 @@ const CampusGate = memo(function CampusGate() {
     directoryLoading,
     selectCampus,
     saving,
+    refreshDirectory,
   } = useCampus();
   const { userDetails, clearUserData } = useUser();
   const navigate = useNavigate();
@@ -100,7 +101,7 @@ const CampusGate = memo(function CampusGate() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search campuses..."
             aria-label="Search campuses"
-            className="h-12 w-full rounded-xl border border-[#E2E8F0] bg-white pl-11 pr-4 text-sm text-[#0F172A] outline-none transition placeholder:text-[#94A3B8] focus:border-[#3838EC] focus:ring-4 focus:ring-[#3838EC]/10 dark:border-0 dark:bg-[#1A1D20] dark:text-white"
+            className="h-12 w-full rounded-xl border border-[#E2E8F0] bg-[#F7F8FA] pl-11 pr-4 text-sm text-[#0F172A] outline-none transition placeholder:text-[#94A3B8] focus:border-[#3838EC] focus:ring-4 focus:ring-[#3838EC]/10 dark:border-0 dark:bg-[#1A1D20] dark:text-white"
           />
         </div>
 
@@ -116,11 +117,22 @@ const CampusGate = memo(function CampusGate() {
               ))}
             </>
           ) : filtered.length === 0 ? (
-            <p className="col-span-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-6 text-center text-sm text-[#64748B] dark:border-0 dark:bg-[#1A1D20] dark:text-slate-300">
-              {campuses.length === 0
-                ? "Campuses are loading. Please check your connection and retry."
-                : `No campus matches "${query}".`}
-            </p>
+            <div className="col-span-full rounded-2xl border border-[#E2E8F0] bg-[#F7F8FA] px-4 py-6 text-center dark:border-0 dark:bg-[#1A1D20]">
+              <p className="text-sm text-[#64748B] dark:text-slate-300">
+                {campuses.length === 0
+                  ? "Campuses are loading. Please check your connection and retry."
+                  : `No campus matches "${query}".`}
+              </p>
+              {campuses.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => refreshDirectory?.()}
+                  className="mt-3 rounded-xl bg-[#3938EC] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
+                >
+                  Retry
+                </button>
+              ) : null}
+            </div>
           ) : (
             filtered.map((c) => {
               const active = selectedSlug === c.slug;
@@ -133,7 +145,7 @@ const CampusGate = memo(function CampusGate() {
                   className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] focus-visible:ring-offset-2 active:scale-[0.98] ${
                     active
                       ? "border-[#4F46E5] bg-[#EEF0FF] shadow-[0_0_0_3px_rgba(79,70,229,0.15)] dark:bg-[#1A1D20]"
-                      : "border-[#E2E8F0] bg-white hover:border-[#C7D2FE] dark:border-0 dark:bg-[#1A1D20]"
+                      : "border-[#E2E8F0] bg-[#F7F8FA] hover:border-[#C7D2FE] dark:border-0 dark:bg-[#1A1D20]"
                   }`}
                 >
                   <span

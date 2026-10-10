@@ -5,7 +5,7 @@ import LevelCard from "../components/LevelCard.jsx";
 import BadgeCard from "../components/BadgeCard.jsx";
 import RankGuideModal from "../components/RankGuideModal.jsx";
 import { fetchMyBadges, recomputeBadges } from "../api/badgeApi.js";
-import { BADGE_CATALOGUE, BADGE_MAP, getBadgeMeta } from "../../../Utils/badgeConfig.js";
+import { BADGE_CATALOGUE, BADGE_MAP, getBadgeMeta } from "../../../utils/badgeConfig.js";
 
 const CATEGORIES = [
   { id: "all",           label: "All" },
@@ -89,7 +89,7 @@ export default function Achievements() {
     <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
       <div className="flex h-[calc(100vh-70px)]">
         {/* Left panel */}
-        <div className="hidden md:block md:w-auto md:shrink-0 bg-white dark:bg-[#131313] xl:pt-2">
+        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2">
           <Profile_left_part />
         </div>
 
@@ -116,7 +116,7 @@ export default function Achievements() {
                 <button
                   onClick={handleRecompute}
                   disabled={recomputing || loading}
-                  className="text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-[#202020] transition-colors disabled:opacity-50"
+                  className="text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800 px-3 py-1.5 rounded-lg hover:bg-[#F7F8FA] dark:hover:bg-[#202020] transition-colors disabled:opacity-50"
                 >
                   {recomputing ? "Syncing..." : "Sync Badges"}
                 </button>
@@ -125,7 +125,7 @@ export default function Achievements() {
 
             {/* Level card */}
             {loading ? (
-              <div className="h-40 rounded-2xl bg-white dark:bg-[#1c1c1c] animate-pulse border border-gray-100 dark:border-gray-800" />
+              <div className="h-40 rounded-2xl bg-[#F7F8FA] dark:bg-[#1c1c1c] animate-pulse border border-gray-100 dark:border-gray-800" />
             ) : error ? (
               <div className="flex flex-col items-start gap-3 p-4">
                 <div className="text-sm text-red-500">{error}</div>
@@ -169,7 +169,7 @@ export default function Achievements() {
                   className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
                     activeCategory === cat.id
                       ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                      : "bg-white dark:bg-[#1c1c1c] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-600"
+                      : "bg-[#F7F8FA] dark:bg-[#1c1c1c] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-600"
                   }`}
                 >
                   {cat.label}
@@ -183,7 +183,7 @@ export default function Achievements() {
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-36 rounded-2xl bg-white dark:bg-[#1c1c1c] animate-pulse border border-gray-100 dark:border-gray-800"
+                    className="h-36 rounded-2xl bg-[#F7F8FA] dark:bg-[#1c1c1c] animate-pulse border border-gray-100 dark:border-gray-800"
                   />
                 ))}
               </div>

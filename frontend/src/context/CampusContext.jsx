@@ -61,10 +61,23 @@ export const CampusProvider = ({ children }) => {
     fetchCampuses();
   }, [fetchCampuses]);
 
-  const profileCampus =
-    userDetails?.campus_id && typeof userDetails.campus_id === "object"
-      ? userDetails.campus_id
-      : null;
+  const profileCampusId = userDetails?.campus_id;
+
+  const profileCampus = useMemo(() => {
+    if (!profileCampusId) return null;
+    // Populated object from backend — ideal path.
+    if (typeof profileCampusId === "object") return profileCampusId;
+    // Legacy/string id: treat as has-campus (never gate), resolve display
+    // name from the directory when available.
+    if (typeof profileCampusId === "string") {
+      const match = campuses.find(
+        (c) => c.slug === profileCampusId || c._id === profileCampusId,
+      );
+      if (match) return match;
+      return { _id: profileCampusId, slug: profileCampusId, name: "Your campus" };
+    }
+    return null;
+  }, [profileCampusId, campuses]);
 
   // One-time notice when login switches the marketplace away from what the
   // guest was browsing (stored pick or implicit flagship default).
@@ -86,6 +99,29 @@ export const CampusProvider = ({ children }) => {
     if (campuses.length === 0) return null;
     return campuses.find((c) => c.slug === slug) || null;
   }, [guestSlug, campuses]);
+
+  // Guest pick points at a deleted/unknown slug: fall back to the flagship
+  // default, clear the stale pick, and toast once per session.
+  const guestFallbackAnnouncedRef = useRef(false);
+  useEffect(() => {
+    if (isLoggedIn || directoryLoading || campuses.length === 0) return;
+    if (!guestSlug) return;
+    const exists = campuses.some((c) => c.slug === guestSlug);
+    if (!exists) {
+      try {
+        localStorage.removeItem(GUEST_CAMPUS_KEY);
+      } catch {
+        // ignore
+      }
+      setGuestSlug(null);
+      if (!guestFallbackAnnouncedRef.current) {
+        guestFallbackAnnouncedRef.current = true;
+        toast("Campus no longer available — showing VIT Vellore.", {
+          id: "campus-deleted-fallback",
+        });
+      }
+    }
+  }, [isLoggedIn, directoryLoading, campuses, guestSlug]);
 
   // Logged-in users always win over any stale guest pick.
   const campus = isLoggedIn ? profileCampus : guestCampus;

@@ -37,9 +37,17 @@ const auth = async (req, res, next) => {
       });
     }
 
+    // Reject legacy pre-v tokens (no numeric v → force one re-login).
+    if (typeof decoded.v !== "number") {
+      return res.status(401).json({
+        message: "Session revoked. Please log in again.",
+        success: false,
+        error: true,
+      });
+    }
+
     // Token version check - sessions revoked on logout/password reset/suspend
     if (
-      typeof decoded.v === "number" &&
       typeof user.tokenVersion === "number" &&
       decoded.v !== user.tokenVersion
     ) {
@@ -61,6 +69,16 @@ const auth = async (req, res, next) => {
         error: true,
         accountBlocked: true,
         accountStatus: user.status,
+      });
+    }
+
+    // Defense-in-depth verified gate for mutations (public GETs use
+    // optionalAuth so unaffected; login/verify routes don't use auth()).
+    if (!user.is_email_verified) {
+      return res.status(403).json({
+        message: "Email verification required.",
+        success: false,
+        error: true,
       });
     }
 
@@ -103,8 +121,10 @@ export const optionalAuth = async (req, res, next) => {
 
     if (!user) return next();
 
+    // Legacy pre-v tokens carry no session version — treat as guest.
+    if (typeof decoded.v !== "number") return next();
+
     if (
-      typeof decoded.v === "number" &&
       typeof user.tokenVersion === "number" &&
       decoded.v !== user.tokenVersion
     ) {

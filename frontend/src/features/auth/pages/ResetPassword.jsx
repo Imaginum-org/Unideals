@@ -12,7 +12,7 @@ import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
-import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import {
   getPasswordStrength,
   isPasswordStrongEnough,
@@ -21,7 +21,7 @@ import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 
 const cardShell =
-  "w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none";
+  "w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none";
 
 const primaryBtn =
   "mt-[2.2vh] h-[6.3vh] w-full rounded-xl bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-3 md:h-10 md:rounded-xl md:text-xs lg:mt-3 lg:h-10 lg:text-sm xl:mt-[2.9vh] xl:h-[6.4vh] xl:text-[0.8rem] 2xl:mt-[2.6vh] 2xl:h-[6.4vh] 2xl:text-[0.85rem]";
@@ -136,9 +136,9 @@ function ResetPassword() {
     isError && (errorText.includes("match") || errorText.includes("password"));
 
   return (
-    <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-white dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden">
-      <div className="relative flex min-h-[100dvh] w-full flex-col bg-white font-figtree dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
-        <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-white dark:md:bg-[#131313] md:text-[#111827]">
+    <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-[#F7F8FA] dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden">
+      <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#F7F8FA] font-figtree dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
+        <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-[#F7F8FA] dark:md:bg-[#131313] md:text-[#111827]">
           <div className="flex shrink-0 items-center justify-center mt-[3.5vh] sm:mt-[4vh] md:justify-start md:mt-2 md:pl-4 xl:mt-4 xl:pl-7">
             <AuthBrandLogo />
           </div>
@@ -212,9 +212,9 @@ function ResetPassword() {
                         <span
                           className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                             password
-                              ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                              ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
                               : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                          } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
+                          } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
                         >
                           New password
                         </span>
@@ -222,10 +222,11 @@ function ResetPassword() {
                           className={`h-[6.3vh] w-full rounded-xl border pl-10 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] pr-20 ${
                             hasPasswordError
                               ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                              : "border-transparent bg-slate-50 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                              : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
                           }`}
                           type={showPassword ? "text" : "password"}
                           value={password}
+                          maxLength={72}
                           onChange={(e) => {
                             setPassword(e.target.value);
                             clearFormMessage();
@@ -270,9 +271,9 @@ function ResetPassword() {
                         <span
                           className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                             confirmPassword
-                              ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                              ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
                               : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                          } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
+                          } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
                         >
                           Confirm new password
                         </span>
@@ -280,10 +281,11 @@ function ResetPassword() {
                           className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 md:pr-3 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
                             hasConfirmError
                               ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                              : "border-transparent bg-slate-50 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                              : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
                           }`}
                           type={showPassword ? "text" : "password"}
                           value={confirmPassword}
+                          maxLength={72}
                           onChange={(e) => {
                             setConfirmPassword(e.target.value);
                             clearFormMessage();

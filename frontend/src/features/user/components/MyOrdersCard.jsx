@@ -37,8 +37,9 @@ const MyOrdersCard = ({
   attr,
   status,
   price,
-  sellerName = "Rahul Kumar",
-  location = "Main Canteen, VIT Vellore",
+  sellerName = "",
+  location = "",
+  isOwnListing = false,
   onProductDeleted,
   onProductUnlisted,
   onProductRelisted,
@@ -129,7 +130,7 @@ const MyOrdersCard = ({
   }
 
   return (
-    <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden font-figtree mb-1">
+    <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden font-figtree mb-1">
       {/* 1. HEADER ROW */}
       <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800/50 bg-gray-100 dark:bg-[#242424] flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-gray-400 font-medium">
@@ -164,14 +165,28 @@ const MyOrdersCard = ({
               {name}
             </h3>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-[1vh] text-xs text-gray-500 dark:text-gray-400">
-              <span className="font-medium text-gray-800">
-                Seller:{" "}
-                <span className="text-gray-400 font-normal">{sellerName}</span>
-              </span>
-              <div className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 hidden sm:block"></div>
-              <span className="flex items-center gap-1">
-                <FiMapPin size={12} className="text-gray-400" /> {location}
-              </span>
+              {isOwnListing ? (
+                <span className="rounded-md bg-indigo-50 px-2 py-1 font-semibold text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
+                  Your listing
+                </span>
+              ) : (
+                <>
+                  {sellerName ? (
+                    <span className="font-medium text-gray-800">
+                      Seller:{" "}
+                      <span className="text-gray-400 font-normal">{sellerName}</span>
+                    </span>
+                  ) : null}
+                  {location ? (
+                    <>
+                      <div className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 hidden sm:block"></div>
+                      <span className="flex items-center gap-1">
+                        <FiMapPin size={12} className="text-gray-400" /> {location}
+                      </span>
+                    </>
+                  ) : null}
+                </>
+              )}
             </div>
             <div className="text-lg font-bold text-gray-900 dark:text-white mt-3">
               ₹{price}
@@ -198,7 +213,7 @@ const MyOrdersCard = ({
                         className={`w-6 h-6 mx-3 md:mx-5 rounded-full flex items-center justify-center text-[12px] font-bold transition-all duration-300 ${
                           isCompleted || isCurrent
                             ? "bg-[#364EF2] text-white"
-                            : "bg-white dark:bg-[#1c1c1c] border-2 border-gray-200 dark:border-gray-700 text-gray-400"
+                            : "bg-[#F7F8FA] dark:bg-[#1c1c1c] border-2 border-gray-200 dark:border-gray-700 text-gray-400"
                         } ${
                           isCurrent
                             ? "ring-4 ring-blue-50 dark:ring-blue-900/20"
@@ -235,19 +250,55 @@ const MyOrdersCard = ({
       </div>
 
       {/* 4. FOOTER ACTIONS ROW */}
-      <div className="px-5 py-3 bg-gray-100 dark:bg-[#1A1D20]/50 border-t border-gray-50 dark:border-gray-800/50 flex items-center justify-between">
-        <button className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
-          <FiMessageSquare size={16} />
-          Contact Seller
-        </button>
+      <div className="px-5 py-3 bg-gray-100 dark:bg-[#1A1D20]/50 border-t border-gray-50 dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-2">
+        {isOwnListing ? (
+          <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+            Your listing
+          </span>
+        ) : (
+          <button
+            onClick={() => navigate(`/chat?seller=${orderId}`)}
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors"
+          >
+            <FiMessageSquare size={16} />
+            Contact Seller
+          </button>
+        )}
 
-        <button
-          onClick={handleArrowClick}
-          className="flex items-center gap-1 text-xs font-bold text-[#364EF2] hover:text-blue-700 transition-colors"
-        >
-          View Details
-          <FiChevronRight size={16} />
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {normalized !== "delivered" && normalized !== "sold" && (
+            <>
+              {normalized === "unlisted" ? (
+                <button
+                  onClick={() => setRelistModalOpen(true)}
+                  className="rounded-lg border border-gray-200 bg-[#F7F8FA] px-3 py-1.5 text-xs font-semibold text-[#364EF2] transition-colors hover:bg-blue-50 dark:border-gray-700 dark:bg-[#1c1c1c] dark:hover:bg-blue-900/10"
+                >
+                  Relist
+                </button>
+              ) : (
+                <button
+                  onClick={() => setUnlistModalOpen(true)}
+                  className="rounded-lg border border-gray-200 bg-[#F7F8FA] px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-[#F7F8FA] dark:border-gray-700 dark:bg-[#1c1c1c] dark:text-gray-300"
+                >
+                  Unlist
+                </button>
+              )}
+              <button
+                onClick={() => setDeleteModalOpen(true)}
+                className="rounded-lg border border-gray-200 bg-[#F7F8FA] px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 dark:border-gray-700 dark:bg-[#1c1c1c]"
+              >
+                Delete
+              </button>
+            </>
+          )}
+          <button
+            onClick={handleArrowClick}
+            className="flex items-center gap-1 text-xs font-bold text-[#364EF2] hover:text-blue-700 transition-colors"
+          >
+            View Details
+            <FiChevronRight size={16} />
+          </button>
+        </div>
       </div>
 
       {/* MODALS */}

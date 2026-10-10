@@ -19,7 +19,7 @@
 }
 
 .AlertDialogContent {
-	background-color: white;
+	background-color: #F7F8FA;
 	border-radius: 6px;
 	box-shadow: var(--shadow-6);
 	position: fixed;

@@ -385,12 +385,42 @@ export const deleteAccount = async (req, res) => {
     }
 
     // Unlist live listings so ghost storefronts don't remain
+    let deletedProductIds = [];
     try {
       const Product = (await import("../models/Product.model.js")).default;
+      const owned = await Product.find(
+        { seller_id: userId, is_deleted: false },
+        { _id: 1 },
+      ).lean();
+      deletedProductIds = (owned || []).map((p) => p._id);
       await Product.updateMany(
         { seller_id: userId, is_deleted: false, status: "listed" },
-        { $set: { status: "unlisted" } },
+        { $set: { status: "unlisted", is_boosted: false } },
       );
+      // Clear boost flags on all owned listings (sold/unlisted included)
+      await Product.updateMany(
+        { seller_id: userId, is_boosted: true },
+        { $set: { is_boosted: false } },
+      );
+    } catch {
+      // best-effort only
+    }
+
+    // Best-effort orphan cleanup: pull owned products from others'
+    // wishlists, delete Boost docs (credits stay spent), clear wishlists.
+    try {
+      if (deletedProductIds.length > 0) {
+        await userModel.updateMany(
+          { wishlist: { $in: deletedProductIds } },
+          { $pull: { wishlist: { $in: deletedProductIds } } },
+        );
+      }
+    } catch {
+      // best-effort only
+    }
+    try {
+      const Boost = (await import("../models/Boost.model.js")).default;
+      await Boost.deleteMany({ user_id: userId });
     } catch {
       // best-effort only
     }

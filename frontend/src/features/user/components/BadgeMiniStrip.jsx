@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Info, HelpCircle, ChevronRight, Sparkles } from "lucide-react";
-import { getBadgeMeta, RANK_CONFIG, TIER_STYLES } from "../../../Utils/badgeConfig.js";
+import { getBadgeMeta, RANK_CONFIG, TIER_STYLES } from "../../../utils/badgeConfig.js";
 import RankGuideModal from "./RankGuideModal.jsx";
 
 /**
@@ -16,7 +16,7 @@ export default function BadgeMiniStrip({ gamification, loading = false }) {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 animate-pulse">
+      <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 animate-pulse">
         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-3" />
         <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-full mb-2" />
         <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-2/3" />
@@ -39,7 +39,7 @@ export default function BadgeMiniStrip({ gamification, loading = false }) {
 
   return (
     <>
-      <div className="bg-white dark:bg-[#1c1c1c] rounded-2xl px-5 py-4 shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden group hover:border-indigo-100 dark:hover:border-indigo-950/50 transition-all">
+      <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl px-5 py-4 shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden group hover:border-indigo-100 dark:hover:border-indigo-950/50 transition-all">
         {/* Background glow */}
         <div
           className="absolute top-0 right-0 w-36 h-36 rounded-full blur-3xl opacity-15 pointer-events-none transition-opacity duration-300 group-hover:opacity-25"
@@ -50,7 +50,7 @@ export default function BadgeMiniStrip({ gamification, loading = false }) {
           {/* Row 1: Rank + Info Icon + Level */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <span className="text-2xl w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-[#252525] shadow-sm shrink-0">
+              <span className="text-2xl w-9 h-9 flex items-center justify-center rounded-xl bg-[#F7F8FA] dark:bg-[#252525] shadow-sm shrink-0">
                 {rank.icon}
               </span>
               <div>

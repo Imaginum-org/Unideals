@@ -44,7 +44,7 @@ export default function SecuritySettings({ email }) {
   };
 
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+    <section className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-5 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
       <h2 className="mb-6 text-base font-bold">Security Settings</h2>
 
       <div className="divide-y divide-[#EDF0F5]">
@@ -74,7 +74,7 @@ export default function SecuritySettings({ email }) {
 
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-[2px]" />
-              <Dialog.Content className="fixed left-1/2 top-1/2 z-[1000] w-[90vw] max-w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-white p-6 shadow-2xl focus:outline-none dark:bg-[#1A1D20]">
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-[1000] w-[90vw] max-w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-[#F7F8FA] p-6 shadow-2xl focus:outline-none dark:bg-[#1A1D20]">
                 <div className="mb-6 flex items-center justify-between">
                   <Dialog.Title className="text-xl font-semibold text-[#111827] dark:text-white">
                     Reset Password
@@ -94,7 +94,7 @@ export default function SecuritySettings({ email }) {
                   <input
                     type="email"
                     placeholder="Your email address"
-                    className="w-full rounded-xl border border-[#D8DDEA] bg-white p-3 text-sm outline-none focus:border-[#4F46FF] dark:bg-[#2D3339] dark:text-white"
+                    className="w-full rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] p-3 text-sm outline-none focus:border-[#4F46FF] dark:bg-[#2D3339] dark:text-white"
                     value={resetEmail}
                     onChange={(event) => setResetEmail(event.target.value)}
                   />

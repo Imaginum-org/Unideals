@@ -149,6 +149,15 @@ const productSchema = new Schema(
       index: true,
     },
 
+    // Stock count for single-seller chat sales. Exposed to buyers;
+    // decrement is intentionally manual (chat-negotiated, one seller).
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 99,
+    },
+
     is_negotiable: {
       type: Boolean,
       default: true,
@@ -246,6 +255,18 @@ const productSchema = new Schema(
       type: Boolean,
       default: false,
       index: true,
+    },
+
+    // Legal consent tracking (optional; old listings simply lack it).
+    terms_version: {
+      type: String,
+      trim: true,
+      maxlength: 20,
+      default: undefined,
+    },
+    terms_accepted_at: {
+      type: Date,
+      default: undefined,
     },
   },
   {

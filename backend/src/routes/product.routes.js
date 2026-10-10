@@ -17,6 +17,8 @@ import {
   deleteProduct,
   unlistProduct,
   relistProduct,
+  updateProduct,
+  markProductSold,
 } from "../controllers/product.controller.js";
 
 const router = express.Router();
@@ -26,6 +28,24 @@ const createProductLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
   message: "Too many product listings, please try later",
+});
+
+// Feed/detail guards: generous for browsing, bounded against view farming
+// and aggregation scraping.
+const feedLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests, please slow down" },
+});
+
+const detailLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests, please slow down" },
 });
 
 // Public aggregation endpoints: generous but bounded (per-keystroke traffic).
@@ -49,7 +69,7 @@ router.get("/user/my-products", auth, getMyProducts);
 // Draft
 router.get("/user/drafts", auth, getMyDraftProducts);
 
-router.get("/", optionalAuth, getAllProducts);
+router.get("/", feedLimiter, optionalAuth, getAllProducts);
 
 router.post(
   "/",
@@ -63,7 +83,11 @@ router.post(
 router.delete("/:id", auth, deleteProduct);
 router.patch("/:id/unlist", auth, unlistProduct);
 router.patch("/:id/relist", auth, relistProduct);
+router.patch("/:id/sold", auth, markProductSold);
+// Owner edit — the create schema is fully optional so it doubles as the
+// partial-update validator (privileged keys are stripped server-side).
+router.patch("/:id", auth, validate(createProductSchema), updateProduct);
 
-router.get("/:id", optionalAuth, getSingleProduct);
+router.get("/:id", detailLimiter, optionalAuth, getSingleProduct);
 
 export default router;

@@ -137,7 +137,7 @@ const PickupSpotModal = ({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="relative w-[90vw] rounded-[20px] border border-white/80 bg-white p-6 font-figtree text-[#111827] shadow-2xl shadow-slate-900/20 dark:border-[#2A2E35] dark:bg-[#181A1F] dark:text-white md:w-[450px]"
+          className="relative w-[90vw] rounded-[20px] border border-white/80 bg-[#F7F8FA] p-6 font-figtree text-[#111827] shadow-2xl shadow-slate-900/20 dark:border-[#2A2E35] dark:bg-[#181A1F] dark:text-white md:w-[450px]"
         >
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-bold tracking-normal text-[#111827] dark:text-white lg:text-lg">
@@ -158,7 +158,7 @@ const PickupSpotModal = ({
               type="button"
               onClick={handleCurrentLocation}
               disabled={loadingLocation}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#D8DDEA] bg-white py-3 text-sm font-semibold text-[#334155] transition-colors hover:border-[#B8B6FF] hover:bg-[#F7F7FF] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#303641] dark:bg-[#20242B] dark:text-[#D7DEE8] dark:hover:border-[#4F46FF]/60 dark:hover:bg-[#252A35] lg:text-[15px]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] py-3 text-sm font-semibold text-[#334155] transition-colors hover:border-[#B8B6FF] hover:bg-[#F7F7FF] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#303641] dark:bg-[#20242B] dark:text-[#D7DEE8] dark:hover:border-[#4F46FF]/60 dark:hover:bg-[#252A35] lg:text-[15px]"
             >
               <MapPin size={18} />
               {loadingLocation ? "Locating..." : "Select Current Location"}
@@ -170,7 +170,7 @@ const PickupSpotModal = ({
               value={formData.name}
               onChange={handleChange}
               placeholder="Pickup spot name"
-              className="w-full rounded-xl border border-[#D8DDEA] bg-[#F8FAFC] p-3 text-[12px] font-medium text-[#111827] outline-none transition placeholder:text-[#98A1B2] focus:border-[#4F46FF] focus:bg-white focus:ring-4 focus:ring-[#4F46FF]/10 dark:border-[#303641] dark:bg-[#20242B] dark:text-white dark:placeholder:text-[#7F8A9B] dark:focus:border-[#6D66FF] dark:focus:bg-[#222732] dark:focus:ring-[#6D66FF]/15 lg:text-[13px]"
+              className="w-full rounded-xl border border-[#D8DDEA] bg-[#F8FAFC] p-3 text-[12px] font-medium text-[#111827] outline-none transition placeholder:text-[#98A1B2] focus:border-[#4F46FF] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#4F46FF]/10 dark:border-[#303641] dark:bg-[#20242B] dark:text-white dark:placeholder:text-[#7F8A9B] dark:focus:border-[#6D66FF] dark:focus:bg-[#222732] dark:focus:ring-[#6D66FF]/15 lg:text-[13px]"
             />
 
             <input
@@ -179,7 +179,7 @@ const PickupSpotModal = ({
               value={formData.detail}
               onChange={handleChange}
               placeholder="Short detail, e.g. Ground floor near entrance"
-              className="w-full rounded-xl border border-[#D8DDEA] bg-[#F8FAFC] p-3 text-[12px] font-medium text-[#111827] outline-none transition placeholder:text-[#98A1B2] focus:border-[#4F46FF] focus:bg-white focus:ring-4 focus:ring-[#4F46FF]/10 dark:border-[#303641] dark:bg-[#20242B] dark:text-white dark:placeholder:text-[#7F8A9B] dark:focus:border-[#6D66FF] dark:focus:bg-[#222732] dark:focus:ring-[#6D66FF]/15 lg:text-[13px]"
+              className="w-full rounded-xl border border-[#D8DDEA] bg-[#F8FAFC] p-3 text-[12px] font-medium text-[#111827] outline-none transition placeholder:text-[#98A1B2] focus:border-[#4F46FF] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#4F46FF]/10 dark:border-[#303641] dark:bg-[#20242B] dark:text-white dark:placeholder:text-[#7F8A9B] dark:focus:border-[#6D66FF] dark:focus:bg-[#222732] dark:focus:ring-[#6D66FF]/15 lg:text-[13px]"
             />
 
             <div className="flex items-center gap-3 rounded-xl bg-[#F0F2FF] p-3 ring-1 ring-[#E4E6FF] dark:bg-[#22263A] dark:ring-[#343A5A]">

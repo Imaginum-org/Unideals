@@ -9,7 +9,7 @@ import {
   ZoomOut,
   RotateCcw,
 } from "lucide-react";
-import { ikFull, ikThumb } from "../../../Utils/imageTransform.js";
+import { ikFull, ikThumb } from "../../../utils/imageTransform.js";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 3;
@@ -20,7 +20,7 @@ const SWIPE_THRESHOLD = 60;
 const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 
 const iconButtonClass =
-  "flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-lg backdrop-blur-md transition-all duration-200 hover:scale-105 hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-95 disabled:pointer-events-none disabled:opacity-30";
+  "flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-[#F7F8FA]/10 text-white shadow-lg backdrop-blur-md transition-all duration-200 hover:scale-105 hover:bg-[#F7F8FA] hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-95 disabled:pointer-events-none disabled:opacity-30";
 
 /**
  * ImageLightbox — fullscreen viewer with zoom + infinite-loop nav.
@@ -241,7 +241,7 @@ const ImageLightbox = memo(function ImageLightbox({
             className="flex items-center justify-between gap-3 px-4 pt-4 sm:px-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold tabular-nums text-white backdrop-blur-md">
+            <div className="rounded-full bg-[#F7F8FA]/10 px-3 py-1.5 text-sm font-semibold tabular-nums text-white backdrop-blur-md">
               {safeIndex + 1} / {total}
             </div>
 
@@ -251,7 +251,7 @@ const ImageLightbox = memo(function ImageLightbox({
                 onClick={() => zoomBy(-ZOOM_STEP)}
                 disabled={scale <= MIN_ZOOM}
                 aria-label="Zoom out"
-                className="h-10 w-10 rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition-all hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:pointer-events-none disabled:opacity-30"
+                className="h-10 w-10 rounded-full border border-white/20 bg-[#F7F8FA]/10 text-white backdrop-blur-md transition-all hover:bg-[#F7F8FA] hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:pointer-events-none disabled:opacity-30"
               >
                 <ZoomOut size={18} className="mx-auto" />
               </button>
@@ -263,7 +263,7 @@ const ImageLightbox = memo(function ImageLightbox({
                 onClick={() => zoomBy(ZOOM_STEP)}
                 disabled={scale >= MAX_ZOOM}
                 aria-label="Zoom in"
-                className="h-10 w-10 rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition-all hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:pointer-events-none disabled:opacity-30"
+                className="h-10 w-10 rounded-full border border-white/20 bg-[#F7F8FA]/10 text-white backdrop-blur-md transition-all hover:bg-[#F7F8FA] hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:pointer-events-none disabled:opacity-30"
               >
                 <ZoomIn size={18} className="mx-auto" />
               </button>
@@ -275,7 +275,7 @@ const ImageLightbox = memo(function ImageLightbox({
                 }}
                 disabled={scale <= MIN_ZOOM}
                 aria-label="Reset zoom"
-                className="h-10 w-10 rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition-all hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:pointer-events-none disabled:opacity-30"
+                className="h-10 w-10 rounded-full border border-white/20 bg-[#F7F8FA]/10 text-white backdrop-blur-md transition-all hover:bg-[#F7F8FA] hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:pointer-events-none disabled:opacity-30"
               >
                 <RotateCcw size={16} className="mx-auto" />
               </button>
@@ -286,7 +286,7 @@ const ImageLightbox = memo(function ImageLightbox({
               type="button"
               onClick={onClose}
               aria-label="Close viewer"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-xl transition-all duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-95"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F7F8FA] text-black shadow-xl transition-all duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-95"
             >
               <X size={22} strokeWidth={2.5} />
             </button>

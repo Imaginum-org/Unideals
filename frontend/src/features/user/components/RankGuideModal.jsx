@@ -15,7 +15,7 @@ import {
   RANK_TIERS_GUIDE,
   XP_ACTIVITIES_GUIDE,
   LEVEL_REWARDS_GUIDE,
-} from "../../../Utils/badgeConfig.js";
+} from "../../../utils/badgeConfig.js";
 
 /**
  * RankGuideModal — comprehensive, gamified guide explaining all 6 ranks,
@@ -40,7 +40,7 @@ export default function RankGuideModal({
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#181818] rounded-3xl max-w-2xl w-full shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col max-h-[88vh]"
+        className="bg-[#F7F8FA] dark:bg-[#181818] rounded-3xl max-w-2xl w-full shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col max-h-[88vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -67,7 +67,7 @@ export default function RankGuideModal({
 
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-white/80 dark:bg-gray-800/80 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center justify-center hover:bg-white dark:hover:bg-gray-800 transition-colors shadow-sm"
+              className="w-9 h-9 rounded-full bg-[#F7F8FA]/80 dark:bg-gray-800/80 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center justify-center hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors shadow-sm"
               aria-label="Close modal"
             >
               <X size={18} />
@@ -75,7 +75,7 @@ export default function RankGuideModal({
           </div>
 
           {/* Current Status Pill Bar */}
-          <div className="mt-4 bg-white/90 dark:bg-[#202020] rounded-xl p-3 border border-indigo-100/80 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap text-xs shadow-sm">
+          <div className="mt-4 bg-[#F7F8FA]/90 dark:bg-[#202020] rounded-xl p-3 border border-indigo-100/80 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap text-xs shadow-sm">
             <div className="flex items-center gap-2">
               <span className="text-gray-500 dark:text-gray-400 font-medium">Your Status:</span>
               <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
@@ -94,7 +94,7 @@ export default function RankGuideModal({
               className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "roadmap"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                  : "bg-white/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800"
+                  : "bg-[#F7F8FA]/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-[#F7F8FA] dark:hover:bg-gray-800"
               }`}
             >
               <Crown size={14} />
@@ -105,7 +105,7 @@ export default function RankGuideModal({
               className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "rewards"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                  : "bg-white/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800"
+                  : "bg-[#F7F8FA]/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-[#F7F8FA] dark:hover:bg-gray-800"
               }`}
             >
               <Gift size={14} />
@@ -116,7 +116,7 @@ export default function RankGuideModal({
               className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "earn"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                  : "bg-white/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800"
+                  : "bg-[#F7F8FA]/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-[#F7F8FA] dark:hover:bg-gray-800"
               }`}
             >
               <Zap size={14} />
@@ -153,8 +153,8 @@ export default function RankGuideModal({
                         isCurrent
                           ? "border-2 border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20 shadow-md ring-2 ring-indigo-500/20"
                           : isUnlocked
-                          ? "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#202020]"
-                          : "border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-[#1a1a1a]/60 opacity-80"
+                          ? "border-gray-200 dark:border-gray-700 bg-[#F7F8FA] dark:bg-[#202020]"
+                          : "border-gray-100 dark:border-gray-800 bg-[#F7F8FA]/70 dark:bg-[#1a1a1a]/60 opacity-80"
                       }`}
                     >
                       {/* Top banner */}
@@ -299,8 +299,8 @@ export default function RankGuideModal({
                         key={tier.title}
                         className={`rounded-xl p-3.5 border flex items-start gap-3 transition-all ${
                           isUnlocked
-                            ? "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#202020]"
-                            : "border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1a1a1a] opacity-60"
+                            ? "border-gray-200 dark:border-gray-700 bg-[#F7F8FA] dark:bg-[#202020]"
+                            : "border-gray-100 dark:border-gray-800 bg-[#F7F8FA] dark:bg-[#1a1a1a] opacity-60"
                         }`}
                       >
                         <div
@@ -364,7 +364,7 @@ export default function RankGuideModal({
                         className={`rounded-xl p-3 border flex items-center gap-3 transition-all ${
                           isReached
                             ? "border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/10"
-                            : "border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-[#1a1a1a] opacity-60"
+                            : "border-gray-100 dark:border-gray-800 bg-[#F7F8FA]/50 dark:bg-[#1a1a1a] opacity-60"
                         }`}
                       >
                         <div
@@ -436,7 +436,7 @@ export default function RankGuideModal({
                 {XP_ACTIVITIES_GUIDE.map((act, i) => (
                   <div
                     key={i}
-                    className="p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-[#202020] flex items-start gap-3 hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors"
+                    className="p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-[#F7F8FA]/50 dark:bg-[#202020] flex items-start gap-3 hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors"
                   >
                     <span className="text-2xl shrink-0">{act.icon}</span>
                     <div className="flex-1 min-w-0">
@@ -460,7 +460,7 @@ export default function RankGuideModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 sm:px-8 sm:py-5 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#141414] flex items-center justify-between gap-4">
+        <div className="px-6 py-4 sm:px-8 sm:py-5 border-t border-gray-100 dark:border-gray-800 bg-[#F7F8FA] dark:bg-[#141414] flex items-center justify-between gap-4">
           <Link
             to="/achievements"
             onClick={onClose}

@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Share2 } from "lucide-react";
-import { ikFull, ikThumb } from "../../../Utils/imageTransform.js";
+import { ikFull, ikThumb } from "../../../utils/imageTransform.js";
 
 const SWIPE_THRESHOLD = 60;
 
@@ -9,7 +9,7 @@ const arrowButtonClass =
   "absolute top-1/2 -translate-y-1/2 z-20 flex h-12 w-12 items-center justify-center rounded-full border shadow-xl backdrop-blur-md transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-95";
 
 const arrowButtonTheme =
-  "border-white/25 bg-black/45 text-white hover:scale-105 hover:border-white hover:bg-white hover:text-black";
+  "border-white/25 bg-black/45 text-white hover:scale-105 hover:border-white hover:bg-[#F7F8FA] hover:text-black";
 
 /**
  * ProductGallery — inline PDP gallery.
@@ -140,7 +140,7 @@ const ProductGallery = memo(function ProductGallery({
                 onShare();
               }}
               aria-label="Share product"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#181C1F] shadow-md transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4F46E5] md:h-11 md:w-11"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F7F8FA] text-[#181C1F] shadow-md transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4F46E5] md:h-11 md:w-11"
             >
               <Share2 size={18} />
             </button>

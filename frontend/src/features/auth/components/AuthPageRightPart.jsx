@@ -1,18 +1,15 @@
-import { IoIosSunny, IoMdMoon } from "react-icons/io";
 import { motion } from "framer-motion";
-import { useTheme } from "../../../context/ThemeContext.jsx";
+import ThemeToggle from "../../../components/ui/ThemeToggle.jsx";
 import AuthPanelShape from "/auth_page_left_side.webp";
 import HomepagePreview from "/auth_left_card_image.webp";
 
 function AuthPageRightPart() {
-  const { darkMode, toggleDarkMode } = useTheme();
-
   return (
     <aside
       className="
         hidden md:flex
         h-full min-h-0 shrink-0 overflow-hidden
-        bg-white dark:bg-[#131313]
+        bg-[#F7F8FA] dark:bg-[#131313]
         p-2 md:p-2 lg:p-4 xl:p-3 2xl:p-3
         md:w-[56%] lg:w-[59%] xl:w-[59%] 2xl:w-[59%]
       "
@@ -45,22 +42,9 @@ function AuthPageRightPart() {
         />
 
         {/* ── Dark mode toggle ── */}
-        <button
-          onClick={toggleDarkMode}
-          aria-label="Toggle dark mode"
-          className="
-            absolute right-4 top-4 z-20
-            rounded-full bg-white/10 p-2
-            text-white transition hover:bg-white/20
-            md:right-5 md:top-5
-          "
-        >
-          {darkMode ? (
-            <IoIosSunny className="size-4 text-[#FFD119] xl:size-5" />
-          ) : (
-            <IoMdMoon className="size-4 text-white      xl:size-5" />
-          )}
-        </button>
+        <div className="absolute right-4 top-4 z-20 md:right-5 md:top-5">
+          <ThemeToggle size="responsive" variant="glass" />
+        </div>
 
         {/* ── Main content — centred vertically & horizontally ── */}
         <div
@@ -95,7 +79,7 @@ function AuthPageRightPart() {
               {" "}
               {/* Added shrink-0 to prevent text squishing */}
               <div
-                className="relative mb-4 h-[0.2rem] w-16 overflow-hidden rounded-full bg-white md:w-20 xl:w-24 2xl:w-28"
+                className="relative mb-4 h-[0.2rem] w-16 overflow-hidden rounded-full bg-[#F7F8FA] md:w-20 xl:w-24 2xl:w-28"
                 aria-hidden="true"
               >
                 {/* The moving 'gap' bouncing back and forth */}
@@ -123,7 +107,7 @@ function AuthPageRightPart() {
             <section
               className="
                 w-full shrink-0 
-                rounded-2xl bg-white
+                rounded-2xl bg-[#F7F8FA]
                 p-[0.6rem]
                 md:p-[0.75rem]
                 shadow-[0_1.25rem_3.75rem_rgba(18,18,120,0.22)]

@@ -21,7 +21,7 @@ function DeleteProductModal({
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="AlertDialogOverlay fixed inset-0 z-[999] bg-black/60 backdrop-blur-[2px] data-[state=open]:animate-overlayShow" />
 
-        <AlertDialog.Content className="AlertDialogContent fixed left-[50%] top-[50%] z-[1000] w-[90vw] md:w-[450px] translate-x-[-50%] translate-y-[-50%] bg-white dark:bg-[#1A1D20] rounded-lg">
+        <AlertDialog.Content className="AlertDialogContent fixed left-[50%] top-[50%] z-[1000] w-[90vw] md:w-[450px] translate-x-[-50%] translate-y-[-50%] bg-[#F7F8FA] dark:bg-[#1A1D20] rounded-lg">
           <AlertDialog.Title className="AlertDialogTitle text-black dark:text-white">
             Are you sure you want to delete this product?
           </AlertDialog.Title>

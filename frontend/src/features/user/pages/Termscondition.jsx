@@ -10,7 +10,7 @@ function Termscondition() {
       <div className="flex h-[calc(100vh-70px)]">
         {/* LEFT PANEL - Only render if user exists */}
         {userDetails?._id ? (
-          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0">
             <Profile_left_part />
           </div>
         ) : null}

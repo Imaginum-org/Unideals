@@ -82,10 +82,10 @@ function ForgotPassword() {
   const hasEmailError = isError && errorText.includes("email");
 
   return (
-    <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-white dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden font-figtree">
-      <div className="relative flex min-h-[100dvh] w-full flex-col bg-white  dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
+    <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-[#F7F8FA] dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden font-figtree">
+      <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#F7F8FA]  dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
         {/* Gradient wrapper */}
-        <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-white dark:md:bg-[#131313] md:text-[#111827]">
+        <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-[#F7F8FA] dark:md:bg-[#131313] md:text-[#111827]">
           {/* Logo */}
           <div className="flex shrink-0 items-center justify-center mt-[3.5vh] sm:mt-[4vh] md:justify-start md:mt-2 md:pl-4 xl:mt-4 xl:pl-7">
             <AuthBrandLogo />
@@ -98,7 +98,7 @@ function ForgotPassword() {
               <form
                 onSubmit={handleSubmit}
                 className="
-                 w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-hidden md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none
+                 w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-hidden md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none
                 "
               >
                 {/* Heading */}
@@ -127,9 +127,9 @@ function ForgotPassword() {
                     <span
                       className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                         email
-                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                          ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
                           : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
+                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
                     >
                       Email Address
                     </span>
@@ -137,6 +137,7 @@ function ForgotPassword() {
                       type="email"
                       value={email}
                       placeholder=" "
+                      maxLength={254}
                       onChange={(e) => {
                         setEmail(e.target.value);
                         clearFormMessage();
@@ -145,7 +146,7 @@ function ForgotPassword() {
                       className={`h-[6.3vh] sm:h-11 md:h-10 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] w-full border pl-10 pr-4 text-[#111827] text-[0.6875rem] md:text-xs outline-none transition placeholder:text-gray-400/70 dark:text-white md:rounded-xl md:pl-11 ${
                         hasEmailError
                           ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                          : "border-transparent bg-slate-50 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                          : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
                       }`}
                     />
                   </span>
@@ -182,7 +183,7 @@ function ForgotPassword() {
               </form>
             ) : (
               <div
-                className="w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none
+                className="w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none
   "
               >
                 {/* Success icon */}
@@ -222,6 +223,17 @@ function ForgotPassword() {
                     className="font-semibold text-[#393AF2] transition hover:text-[#2426C7] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Try again
+                  </button>
+                  <span className="mx-2 text-gray-300 dark:text-gray-600">·</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormMessage(null);
+                      setIsSubmitted(false);
+                    }}
+                    className="font-semibold text-[#393AF2] transition hover:text-[#2426C7]"
+                  >
+                    Edit email
                   </button>
                 </p>
                 {resendCooldown > 0 ? (

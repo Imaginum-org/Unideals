@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ProductListingProvider } from "../context/ProductListingContext";
 import ListingLayout from "../components/listing/ListingLayout";
 import { getProductById } from "../api/productApi";
-import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useProductListingContext } from "../context/ProductListingContext";
 import toast from "react-hot-toast";
 
 // Inner wrapper that has access to context (so it can call initEditMode).
 const EditModeInitializer = ({ productId, onReady }) => {
   const { initEditMode } = useProductListingContext();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(Boolean(productId));
 
   useEffect(() => {
@@ -20,16 +21,38 @@ const EditModeInitializer = ({ productId, onReady }) => {
 
     let cancelled = false;
 
+    const currentUserId = () => {
+      try {
+        const cached = localStorage.getItem("cachedUserDetails");
+        return cached ? JSON.parse(cached)?._id : null;
+      } catch {
+        return null;
+      }
+    };
+
     (async () => {
       try {
         const res = await getProductById(productId);
         const product =
           res.data?.data || res.data?.product || res.data;
-        if (!cancelled && product?._id) {
-          initEditMode(product);
-        } else if (!cancelled) {
+        if (cancelled) return;
+        if (!product?._id) {
           toast.error("Could not load product for editing.");
+          navigate(`/product/${productId}`, { replace: true });
+          return;
         }
+        // Ownership guard: never leak another seller's listing into the form.
+        const sellerId =
+          typeof product.seller_id === "object"
+            ? product.seller_id?._id
+            : product.seller_id;
+        const me = currentUserId();
+        if (me && sellerId && String(sellerId) !== String(me)) {
+          toast.error("You can only edit your own listing.");
+          navigate(`/product/${productId}`, { replace: true });
+          return;
+        }
+        initEditMode(product);
       } catch {
         if (!cancelled) toast.error("Failed to load product.");
       } finally {
@@ -43,7 +66,7 @@ const EditModeInitializer = ({ productId, onReady }) => {
     return () => {
       cancelled = true;
     };
-  }, [productId, initEditMode, onReady]);
+  }, [productId, initEditMode, onReady, navigate]);
 
   if (loading) {
     return (

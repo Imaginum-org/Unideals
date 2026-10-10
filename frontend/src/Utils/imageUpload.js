@@ -52,7 +52,9 @@ export const uploadImage = async (file, folder = "Products") => {
     const result = await upload({
       file: compressedFile,
       fileName: `${Date.now()}_${safeName}`,
-      folder, // <-- Use the parameter instead of hardcoding
+      // Backend binds signatures to `unideals/{userId}` — honor it when
+      // provided, falling back to the legacy folder for old backends.
+      folder: data.folder || folder,
       signature: data.signature,
       expire: data.expire,
       token: data.token,
@@ -69,5 +71,22 @@ export const uploadImage = async (file, folder = "Products") => {
     };
   } finally {
     clearTimeout(timeout);
+  }
+};
+
+// Best-effort cleanup for partially-uploaded images (publish/edit flows).
+// Never throws: orphan deletion must not break the listing flow.
+export const deleteImage = async (fileId) => {
+  if (!fileId) return false;
+  try {
+    await instance.delete(`/api/imagekit/${encodeURIComponent(fileId)}`);
+    return true;
+  } catch {
+    try {
+      await instance.delete("/api/imagekit/file", { data: { fileId } });
+      return true;
+    } catch {
+      return false;
+    }
   }
 };

@@ -45,6 +45,11 @@ export const forwardServiceError = (error, next) => {
     const msg = String(error.message || "");
     if (/not found/i.test(msg)) {
       error.statusCode = 404;
+    } else if (/too many/i.test(msg)) {
+      // Report/order throttles and rate guards surface as 429.
+      error.statusCode = 429;
+    } else if (/invalid (product|user) id/i.test(msg)) {
+      error.statusCode = 400;
     } else if (
       /permission|limit reached|already boosted|already reported|already deleted|only active listed|cannot report/i.test(
         msg,

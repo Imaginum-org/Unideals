@@ -111,3 +111,30 @@
     margin-bottom: 2.4vh;
   }
 }
+/* ── Theme toggle: circular reveal originating from the button ──
+   ThemeContext sets --theme-tx/--theme-ty to the button center before
+   calling document.startViewTransition(). The incoming theme snapshot
+   expands as a circle from that point; the outgoing one stays put. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2147483646;
+  clip-path: circle(0px at var(--theme-tx, 50vw) var(--theme-ty, 50vh));
+  animation: theme-reveal 1.4s cubic-bezier(0.33, 0.8, 0.3, 1) forwards;
+}
+@keyframes theme-reveal {
+  to {
+    clip-path: circle(150vmax at var(--theme-tx, 50vw) var(--theme-ty, 50vh));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(root) {
+    animation-duration: 0.01s;
+  }
+}

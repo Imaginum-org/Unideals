@@ -46,7 +46,7 @@ function AuthMobileBanner({ taglines = defaultTaglines }) {
           <span
             key={tagline}
             className={`h-0.5 rounded-full transition-all duration-300 ${
-              currentIndex === index ? "w-7 bg-white" : "w-3 bg-white/50"
+              currentIndex === index ? "w-7 bg-[#F7F8FA]" : "w-3 bg-[#F7F8FA]/50"
             }`}
           />
         ))}

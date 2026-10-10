@@ -183,9 +183,9 @@ const PhoneHandoffCard = ({
 
   // Active session: QR + code + countdown.
   return (
-    <div className="mt-4 rounded-[24px] border border-[#E5E7EB] bg-white p-6">
+    <div className="mt-4 rounded-[24px] border border-[#E5E7EB] bg-[#F7F8FA] p-6">
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-        <div className="rounded-2xl border border-[#ECECEC] bg-white p-3">
+        <div className="rounded-2xl border border-[#ECECEC] bg-[#F7F8FA] p-3">
           <Suspense fallback={<div className="size-[160px] animate-pulse rounded-xl bg-zinc-100" />}>
             <LazyQRCode value={session.url} size={160} />
           </Suspense>

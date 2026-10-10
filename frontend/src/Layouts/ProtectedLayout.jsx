@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useUser } from "../context/useUserContext.jsx";
-import BrandLoader from "../Components/ui/BrandLoader.jsx";
+import BrandLoader from "../components/ui/BrandLoader.jsx";
 
 const ProtectedLayout = () => {
   const { userDetails, isLoggedIn, loading } = useUser();

@@ -15,7 +15,7 @@ import { motion } from "framer-motion";
 const LazySelect = lazy(() => import("react-select"));
 
 const SelectFallback = (
-  <div className="h-[38px] animate-pulse rounded-lg border border-zinc-200 bg-zinc-50" />
+  <div className="h-[38px] animate-pulse rounded-lg border border-zinc-200 bg-[#F7F8FA]" />
 );
 
 const CategoryOption = (props) => {
@@ -31,7 +31,7 @@ const CategoryOption = (props) => {
       className={`
         px-4 py-4 cursor-pointer transition-all duration-200
         border-b border-[#F1F5F9]
-        ${isSelected ? "bg-[#EEF2FF]" : isFocused ? "bg-[#F8FAFF]" : "bg-white"}
+        ${isSelected ? "bg-[#EEF2FF]" : isFocused ? "bg-[#F8FAFF]" : "bg-[#F7F8FA]"}
       `}
     >
       <div className="flex flex-col">
@@ -190,7 +190,7 @@ const BasicInfoStep = () => {
         duration: 0.35,
         ease: "easeOut",
       }}
-      className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-white shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 dark:bg-[#1A1D20] dark:text-white dark:border-0"
+      className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 dark:bg-[#1A1D20] dark:text-white dark:border-0"
     >
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
@@ -300,11 +300,13 @@ const BasicInfoStep = () => {
 
             <input
               type="text"
+              maxLength={100}
               value={formData.brand}
-              onChange={(e) => updateField("brand", e.target.value)}
+              onChange={(e) => updateField("brand", e.target.value.slice(0, 100))}
               placeholder="e.g. Apple"
               className="mt-2 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800"
             />
+            {errors.brand && <FormError error={errors.brand} />}
           </div>
 
           {/* Color */}
@@ -315,11 +317,13 @@ const BasicInfoStep = () => {
 
             <input
               type="text"
+              maxLength={50}
               value={formData.color}
-              onChange={(e) => updateField("color", e.target.value)}
+              onChange={(e) => updateField("color", e.target.value.slice(0, 50))}
               placeholder="e.g. Space Grey"
               className="mt-2 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800"
             />
+            {errors.color && <FormError error={errors.color} />}
           </div>
 
           {/* Condition */}
@@ -390,6 +394,7 @@ const BasicInfoStep = () => {
 
             <input
               type="date"
+              min="2000-01-01"
               max={new Date().toISOString().split("T")[0]}
               value={formData.purchaseDate}
               onChange={(e) => updateField("purchaseDate", e.target.value)}

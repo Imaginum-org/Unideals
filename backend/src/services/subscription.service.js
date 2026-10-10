@@ -63,18 +63,20 @@ export const getMySubscription = async (user) => {
   const planDef = getSubscriptionPlan(tier, ACTIVE_SUBSCRIPTION_TYPE);
 
   const subscription = await Subscription.findOne({ user_id: user._id })
-    .populate("last_payment_id", "plan amount currency status verified_at createdAt")
+    .populate("last_payment_id", "plan amount currency receipt status verified_at createdAt")
     .lean();
 
   const payments = await Payment.find({ user_id: user._id })
-    .select("plan amount currency status razorpay_order_id createdAt verified_at")
+    .select("plan amount currency receipt status razorpay_order_id razorpay_payment_id createdAt verified_at")
     .sort({ createdAt: -1 })
     .limit(10)
     .lean();
 
   // Live usage (never marketing copy): listing + wishlist counts vs plan caps.
-  // Wishlist counts only products that still exist, exactly matching what
-  // GET /api/wishlist renders (dead refs from deleted listings are excluded).
+  // Wishlist counts only live products that still exist, exactly matching
+  // what GET /api/wishlist renders (dead refs from deleted listings are
+  // excluded). Amounts stay in paise with currency + receipt so the client
+  // can render real invoice rows.
   const wishlistIds =
     (await User.findById(user._id).select("wishlist").lean())?.wishlist || [];
   const [activeListings, wishlistCount, boost] = await Promise.all([
@@ -84,7 +86,7 @@ export const getMySubscription = async (user) => {
       is_deleted: false,
     }),
     wishlistIds.length > 0
-      ? Product.countDocuments({ _id: { $in: wishlistIds } })
+      ? Product.countDocuments({ _id: { $in: wishlistIds }, is_deleted: false })
       : 0,
     getBoostSummary(user).catch(() => null),
   ]);
@@ -156,3 +158,43 @@ export const expireDueSubscriptions = async () => {
 export const isSubscriptionActive = (subscription) =>
   subscription?.status === SUBSCRIPTION_STATUS.ACTIVE &&
   (subscription.is_lifetime || !subscription.expires_at || subscription.expires_at > new Date());
+
+// Downgrade helper for refunds/disputes/chargebacks: buyer back to Free,
+// subscription row cancelled, and every live boost revoked so refunded money
+// buys no further exposure. Best-effort per step, idempotent.
+export const downgradeToFree = async (userId, reason = "downgrade") => {
+  try {
+    await Subscription.updateOne(
+      { user_id: userId },
+      {
+        $set: {
+          tier: USER_TIER.BASE_USER,
+          status: SUBSCRIPTION_STATUS.CANCELLED,
+          cancelled_at: new Date(),
+        },
+      },
+    );
+  } catch {
+    // best-effort
+  }
+  try {
+    await User.updateOne(
+      { _id: userId },
+      { $set: { subscription: USER_TIER.BASE_USER } },
+    );
+  } catch {
+    // best-effort
+  }
+  try {
+    const { default: Boost } = await import("../models/Boost.model.js");
+    await Boost.deleteMany({ user_id: userId, status: "active" });
+    await Product.updateMany(
+      { seller_id: userId, is_boosted: true },
+      { $set: { is_boosted: false }, $unset: { boost_expires_at: "", boost_tier: "" } },
+    );
+  } catch {
+    // best-effort
+  }
+  console.warn(`[Billing] downgraded user ${userId} to Free (${reason})`);
+  return { downgraded: true };
+};

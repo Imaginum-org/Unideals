@@ -5,9 +5,9 @@ import { checkAndGrantRewards } from "./rewardService.js";
 
 // ─── XP / Level helpers ───────────────────────────────────────────────────
 
-/** level = floor(sqrt(xp / 50)) */
+/** level = floor(sqrt(xp / 50)); 0 XP maps to Lv0 (spec table: 0 -> 0) */
 export function computeLevel(xp) {
-  return Math.max(1, Math.floor(Math.sqrt((xp || 0) / 50)));
+  return Math.max(0, Math.floor(Math.sqrt((xp || 0) / 50)));
 }
 
 /** XP required to reach a given level */
@@ -129,6 +129,19 @@ const BADGE_DEFINITIONS = {
 
 // ─── Context builder ──────────────────────────────────────────────────────
 
+// Live (non-deleted) wishlist size helper.
+async function getLiveWishlistCount(wishlist) {
+  if (!Array.isArray(wishlist) || wishlist.length === 0) return 0;
+  try {
+    return await Product.countDocuments({
+      _id: { $in: wishlist },
+      is_deleted: false,
+    });
+  } catch {
+    return wishlist.length;
+  }
+}
+
 async function buildContext(userId) {
   const user = await User.findById(userId).select(
     "is_email_verified avatar mobile createdAt wishlist gamification gender"
@@ -166,17 +179,24 @@ async function buildContext(userId) {
     if (soldMs[i + 4] - soldMs[i] <= 7 * 86400000) { hasStreak = true; break; }
   }
 
-  // Night owl
+  // Night owl: late-night listings in IST (Asia/Kolkata, UTC+5:30) —
+  // server TZ must not decide who is a night owl.
   const nightListings = allListings.filter((p) => {
-    const h = new Date(p.createdAt).getHours();
+    const istMs = new Date(p.createdAt).getTime() + 5.5 * 60 * 60 * 1000;
+    const h = new Date(istMs).getUTCHours();
     return h >= 22 || h < 2;
   }).length;
 
-  // Report count (soft import)
+  // Reports filed against this user (moderation signal for trusted_trader).
+  // NOTE: field is target_id (+ target_model), not reported_user.
   let reportCount = 0;
   try {
     const { default: Report } = await import("../models/Report.model.js");
-    reportCount = await Report.countDocuments({ reported_user: userId, status: "resolved" });
+    reportCount = await Report.countDocuments({
+      target_id: userId,
+      target_model: "User",
+      status: { $ne: "dismissed" },
+    });
   } catch (_) { /* Report model may not exist yet */ }
 
   // OG rank
@@ -199,7 +219,9 @@ async function buildContext(userId) {
     isEmailVerified: !!user.is_email_verified,
     isProfileComplete: !!(user.avatar && user.avatar.url && user.mobile),
     accountCreatedAt: user.createdAt,
-    wishlistCount: (user.wishlist || []).length,
+    // Live wishlist size: only products that still exist count (matches
+    // GET /api/wishlist, which filters is_deleted:false).
+    wishlistCount: await getLiveWishlistCount(user.wishlist),
     totalListings: allListings.length,
     productsSold: sold.length,
     avgRating: null, // TODO: compute from Review model when available
@@ -234,7 +256,11 @@ export async function computeAndAwardBadges(userId) {
   const existing = (user.gamification && user.gamification.badges) || [];
   const existingMap = Object.fromEntries(existing.map((b) => [b.badge_id, b]));
 
-  const newBadges = [...existing];
+  // Subtractive recompute: the badge list is rebuilt from CURRENTLY-earned
+  // badges only. Stale badges (criteria no longer met, e.g. listings
+  // deleted) are dropped, and total_xp is recalculated from scratch — XP
+  // can go down, never just accumulate.
+  const newBadges = [];
   const newEvents = [];
 
   for (const [badgeId, evaluate] of Object.entries(BADGE_DEFINITIONS)) {
@@ -244,27 +270,27 @@ export async function computeAndAwardBadges(userId) {
     const { tier, xp } = result;
     const current = existingMap[badgeId];
 
+    // Current truth always reflects the earned tier (downgrades included).
+    newBadges.push({
+      badge_id: badgeId,
+      category: CATEGORY_MAP[badgeId] || "milestone",
+      tier,
+      earned_at: current?.earned_at || new Date(),
+      xp_granted: xp,
+    });
+
     if (!current) {
       // New badge
-      newBadges.push({
-        badge_id: badgeId,
-        category: CATEGORY_MAP[badgeId] || "milestone",
-        tier,
-        earned_at: new Date(),
-        xp_granted: xp,
-      });
       newEvents.push({ user_id: userId, badge_id: badgeId, tier, xp_granted: xp });
     } else if ((TIER_RANK[tier] || 0) > (TIER_RANK[current.tier] || 0)) {
-      // Tier upgrade
+      // Tier upgrade: only the delta is a "new" event.
       const delta = xp - (current.xp_granted || 0);
-      const idx = newBadges.findIndex((b) => b.badge_id === badgeId);
-      if (idx !== -1) newBadges[idx] = { ...newBadges[idx], tier, xp_granted: xp, earned_at: new Date() };
       newEvents.push({ user_id: userId, badge_id: badgeId, tier, xp_granted: delta });
     }
   }
 
-  // Compute total XP:
-  // 1. Sum of all earned badges' XP
+  // Total XP is recalculated from scratch every run (subtractive):
+  // 1. Sum of all CURRENTLY-earned badges' XP (stale badges already dropped)
   const badgeXp = newBadges.reduce((sum, b) => sum + (b.xp_granted || 0), 0);
   // 2. +30 XP for each active product listing beyond the first (first listing is awarded by first_listing badge)
   const additionalListingXp = Math.max(0, (ctx.totalListings || 0) - 1) * 30;

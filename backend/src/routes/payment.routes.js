@@ -23,11 +23,20 @@ const orderLimiter = rateLimit({
   message: { success: false, message: "Too many payment attempts, try later" },
 });
 
+// Billing-tab reads (dashboard polling) — 60/min.
+const meLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests, try later" },
+});
+
 // Webhook is mounted separately in app.js with a raw-body parser and NO
 // auth/validation (Razorpay signs the raw payload, not parsed JSON).
 router.post("/orders", auth, orderLimiter, validate(createOrderSchema), createPaymentOrder);
 router.post("/verify", auth, orderLimiter, validate(verifyPaymentSchema), verifyPaymentOrder);
-router.get("/me", auth, getMyBilling);
+router.get("/me", auth, meLimiter, getMyBilling);
 
 export const paymentWebhookHandler = paymentWebhook;
 

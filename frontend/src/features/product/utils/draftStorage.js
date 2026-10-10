@@ -20,6 +20,21 @@ export const saveDraftToLocal = (data) => {
       paymentMethod: data.paymentMethod,
       meetupLocation: data.meetupLocation,
       termsAccepted: data.termsAccepted,
+      termsVersion: data.termsVersion || "v1",
+      termsAcceptedAt: data.termsAcceptedAt || null,
+      // Persist pickup spot + edit identity so refresh resumes correctly.
+      // Images are never persisted (File blobs can't survive reload).
+      address: data.address
+        ? {
+            _id: data.address._id,
+            name: String(data.address.name || data.address.address_line || "").slice(0, 200),
+            detail: String(data.address.detail || data.address.city || "").slice(0, 500),
+            address_line: String(data.address.address_line || data.address.name || "").slice(0, 200),
+            city: String(data.address.city || data.address.detail || "").slice(0, 200),
+            isPrimary: Boolean(data.address.isPrimary),
+          }
+        : null,
+      editProductId: data.editProductId || null,
       images: [],
       imagePreviews: [],
     };

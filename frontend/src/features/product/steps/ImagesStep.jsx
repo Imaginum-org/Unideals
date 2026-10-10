@@ -8,6 +8,8 @@ import { IoArrowForward } from "react-icons/io5";
 import { validateImages } from "../validations";
 
 const MAX_IMAGES = 3;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_TOTAL_SIZE = 30 * 1024 * 1024;
 
 const ImagesStep = () => {
   const fileInputRef = useRef(null);
@@ -16,26 +18,53 @@ const ImagesStep = () => {
     useProductListing();
 
   const [isDragging, setIsDragging] = useState(false);
+  const [fileErrors, setFileErrors] = useState([]);
   // Tracks phone-delivered fileIds so repeat polls never re-add them.
   const phoneFileIds = useRef(new Set());
+  // Live mirror of blob URLs for reliable revoke-on-unmount (avoids stale closure).
+  const blobUrlsRef = useRef(new Set());
+  const previewsRef = useRef([]);
+  previewsRef.current = formData.imagePreviews || [];
+  const trackBlob = (url) => {
+    if (url?.startsWith("blob:")) blobUrlsRef.current.add(url);
+  };
+  const untrackBlob = (url) => {
+    if (url?.startsWith("blob:")) {
+      blobUrlsRef.current.delete(url);
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   useEffect(() => {
     return () => {
-      formData.imagePreviews?.forEach((item) => {
-        if (item?.preview?.startsWith("blob:")) {
-          URL.revokeObjectURL(item.preview);
+      blobUrlsRef.current.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore
         }
       });
+      blobUrlsRef.current.clear();
     };
   }, []);
 
   // PROCESS FILES
+  // Builds a combined [existing..., new...] array, validates, then splits back
+  // into images[] (File blobs) + imagePreviews[] (UI). Duplicate detection via
+  // size+name Set; total payload capped at 30MB across all new files.
   const processFiles = async (files) => {    const fileArray = Array.from(files);
+    setFileErrors([]);
 
-    const remainingSlots = MAX_IMAGES - formData.images.length;
+    const remainingSlots = MAX_IMAGES - (formData.imagePreviews?.length || 0);
 
     if (remainingSlots <= 0) {
-      toast.error(`Maximum ${MAX_IMAGES} images allowed`);
+      const msg = `Maximum ${MAX_IMAGES} images allowed`;
+      setFileErrors([msg]);
+      toast.error(msg);
 
       return;
     }
@@ -45,10 +74,28 @@ const ImagesStep = () => {
     const validFiles = [];
 
     const previewItems = [];
+    const issues = [];
+
+    // Dedup keys for already-attached blobs (name+size is enough for UX dupes).
+    const seen = new Set(
+      (formData.images || []).map((f) => `${f?.name || ""}__${f?.size || 0}`),
+    );
+    const currentTotal = (formData.images || []).reduce(
+      (sum, f) => sum + (Number(f?.size) || 0),
+      0,
+    );
+    let pendingTotal = currentTotal;
 
     for (const file of selectedFiles) {
       // File Validation
       if (!(file instanceof File)) {
+        continue;
+      }
+
+      // Duplicate-byte heuristic: same name + same byte size as an attached file.
+      const dupeKey = `${file.name || ""}__${file.size || 0}`;
+      if (seen.has(dupeKey)) {
+        issues.push(`${file.name}: duplicate image already added`);
         continue;
       }
 
@@ -58,27 +105,37 @@ const ImagesStep = () => {
       const allowedExts = ["png", "jpg", "jpeg", "webp"];
       const ext = String(file.name || "").split(".").pop()?.toLowerCase() || "";
       if (!allowedTypes.includes(file.type) || !allowedExts.includes(ext)) {
+        issues.push(`${file.name}: not a supported image format`);
         toast.error(`${file.name} is not a supported image format`);
         continue;
       }
 
-      // File Size Validation
-      const MAX_SIZE = 10 * 1024 * 1024;
-
-      if (file.size > MAX_SIZE) {
+      // File Size Validation (per-file 10MB, total 30MB across new files)
+      if (file.size > MAX_FILE_SIZE) {
+        issues.push(`${file.name}: exceeds 10MB limit`);
         toast.error(`${file.name} exceeds 10MB limit`);
         continue;
       }
+      if (pendingTotal + file.size > MAX_TOTAL_SIZE) {
+        issues.push(`${file.name}: total images exceed 30MB cap`);
+        toast.error(`${file.name} would exceed the 30MB total cap`);
+        continue;
+      }
 
+      seen.add(dupeKey);
+      pendingTotal += file.size;
       validFiles.push(file);
 
+      const previewUrl = URL.createObjectURL(file);
+      trackBlob(previewUrl);
       previewItems.push({
         id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
 
-        preview: URL.createObjectURL(file),
+        preview: previewUrl,
       });
     }
 
+    if (issues.length > 0) setFileErrors(issues);
     if (validFiles.length === 0) return;
 
     updateField("images", [...formData.images, ...validFiles]);
@@ -142,55 +199,46 @@ const ImagesStep = () => {
     }
   }, []);
 
-  // REMOVE IMAGE
-  // In edit mode imagePreviews can contain existing (already-uploaded) images
-  // that have no corresponding entry in formData.images (File blobs).
-  // We must remove by preview index, then figure out whether to also drop a
-  // blob from formData.images.
+  // REMOVE IMAGE — operate on the combined [preview+file] array (existing
+  // and new interleaved by cover order), then split back into images[] +
+  // imagePreviews[]. This keeps blob indexes correct after cover reorders.
+  const splitCombined = (combined) => ({
+    previews: combined.map((c) => c.preview),
+    files: combined.filter((c) => !c.preview?.isExisting).map((c) => c.file),
+  });
+
+  const buildCombined = () => {
+    let cursor = 0;
+    return (formData.imagePreviews || []).map((p) => {
+      if (p?.isExisting) return { preview: p, file: null };
+      const file = formData.images?.[cursor] || null;
+      cursor += 1;
+      return { preview: p, file };
+    });
+  };
+
   const handleRemoveImage = (index) => {
-    const updatedPreviews = [...formData.imagePreviews];
-    const removedPreview = updatedPreviews[index];
-
-    // Revoke blob URL only for locally-picked files.
-    if (!removedPreview?.isExisting && removedPreview?.preview?.startsWith("blob:")) {
-      URL.revokeObjectURL(removedPreview.preview);
+    const combined = buildCombined();
+    const [removed] = combined.splice(index, 1);
+    if (!removed) return;
+    // Revoke blob URL for locally-picked files.
+    if (!removed.preview?.isExisting && removed.preview?.preview) {
+      untrackBlob(removed.preview.preview);
     }
-    updatedPreviews.splice(index, 1);
-    updateField("imagePreviews", updatedPreviews);
-
-    // If the removed preview was a new file blob, also remove it from images[].
-    if (!removedPreview?.isExisting) {
-      // Count how many previews before this index are existing (no blob)
-      const existingBefore = formData.imagePreviews
-        .slice(0, index)
-        .filter((p) => p.isExisting).length;
-      const blobIndex = index - existingBefore;
-      const updatedImages = [...formData.images];
-      updatedImages.splice(blobIndex, 1);
-      updateField("images", updatedImages);
-    }
+    const { previews, files } = splitCombined(combined);
+    updateField("imagePreviews", previews);
+    updateField("images", files);
   };
 
   const handleSetCover = (index) => {
     if (index === 0) return;
-
-    const updatedPreviews = [...formData.imagePreviews];
-    const selectedPreview = updatedPreviews.splice(index, 1)[0];
-    updatedPreviews.unshift(selectedPreview);
-    updateField("imagePreviews", updatedPreviews);
-
-    // Only reorder images[] (File blobs) if both the selected and the first
-    // preview are new files (not existing).
-    if (!selectedPreview?.isExisting && !formData.imagePreviews[0]?.isExisting) {
-      const existingBefore = formData.imagePreviews
-        .slice(0, index)
-        .filter((p) => p.isExisting).length;
-      const blobIndex = index - existingBefore;
-      const updatedImages = [...formData.images];
-      const [moved] = updatedImages.splice(blobIndex, 1);
-      updatedImages.unshift(moved);
-      updateField("images", updatedImages);
-    }
+    const combined = buildCombined();
+    const [selected] = combined.splice(index, 1);
+    if (!selected) return;
+    combined.unshift(selected);
+    const { previews, files } = splitCombined(combined);
+    updateField("imagePreviews", previews);
+    updateField("images", files);
   };
 
   // DRAG EVENTS
@@ -213,7 +261,7 @@ const ImagesStep = () => {
   };
 
   return (
-    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
+    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8">
       {/* Header */}
       <div>
         <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
@@ -264,7 +312,7 @@ const ImagesStep = () => {
 
             {/* Description */}
             <p className="mt-1 max-w-md text-sm md:text-base text-[#6B7280] leading-7">
-              Supports JPG, PNG and WEBP up to 10MB
+              Supports JPG, PNG and WEBP up to 10MB each · 30MB total
             </p>
 
             {/* Info */}
@@ -278,6 +326,15 @@ const ImagesStep = () => {
 
         {errors.images && (
           <p className="mt-3 text-sm text-red-500">{errors.images}</p>
+        )}
+        {fileErrors.length > 0 && (
+          <ul className="mt-3 space-y-1.5 rounded-xl border border-red-200 bg-red-50 p-3">
+            {fileErrors.map((msg, i) => (
+              <li key={i} className="text-xs font-medium leading-5 text-red-600">
+                • {msg}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
@@ -352,7 +409,7 @@ const ImagesStep = () => {
 
                       handleRemoveImage(index);
                     }}
-                    className="w-12 h-12 rounded-full bg-white text-red-500 flex items-center justify-center shadow-lg"
+                    className="w-12 h-12 rounded-full bg-[#F7F8FA] text-red-500 flex items-center justify-center shadow-lg"
                   >
                     <HiOutlineTrash size={22} />
                   </button>

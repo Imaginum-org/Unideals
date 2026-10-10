@@ -26,7 +26,14 @@ const PricingModel = () => {
   const payingRef = useRef(false);
   const [payingPlan, setPayingPlan] = useState(null);
 
-  const currentTier = userDetails?.subscription || "base_user";
+  const rawTier = userDetails?.subscription || "base_user";
+  const currentTier = TIER_RANK[rawTier] === undefined ? "base_user" : rawTier;
+  if (TIER_RANK[rawTier] === undefined && userDetails?.subscription) {
+    console.warn(
+      `[pricing] unknown subscription tier "${rawTier}", falling back to Free`,
+    );
+  }
+  const razorpayMissing = !import.meta.env.VITE_RAZORPAY_KEY_ID;
 
   // Upgrade flow: server order -> Razorpay Checkout -> server verify.
   // payingRef blocks double orders from double clicks.
@@ -86,7 +93,8 @@ const PricingModel = () => {
   };
 
   // Button state per tier: current/higher tiers show disabled status,
-  // lower tiers offer upgrade.
+  // lower tiers offer upgrade. Free navigates (manage/downgrade) when it is
+  // not the current plan; paid buttons disable without a Razorpay key.
   const getButtonState = (planId) => {
     const tier = PLAN_TIER[planId];
     if ((TIER_RANK[currentTier] || 0) > (TIER_RANK[tier] || 0)) {
@@ -96,7 +104,14 @@ const PricingModel = () => {
       return { text: "Current Plan", disabled: true };
     }
     if (planId === "free") {
-      return { text: "Current", disabled: true };
+      return { text: "Manage plan", disabled: false, action: "manage" };
+    }
+    if (razorpayMissing) {
+      return {
+        text: "Payments unavailable",
+        disabled: true,
+        tooltip: "Payments are unavailable right now. Please try later.",
+      };
     }
     return { text: "Upgrade Now", disabled: false };
   };
@@ -242,7 +257,7 @@ const PricingModel = () => {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-white py-8 text-slate-900 dark:bg-[#131313]">
+    <main className="min-h-screen overflow-hidden bg-[#F7F8FA] py-8 text-slate-900 dark:bg-[#131313]">
       {/* Toasts render via the global Toaster in app/App.jsx. */}
 
       {/* Pricing hero and plan cards */}
@@ -268,7 +283,7 @@ const PricingModel = () => {
           {plans.map((plan) => (
             <article
               key={plan.name}
-              className={`relative flex h-full min-h-[390px] w-full max-w-[330px] flex-col overflow-hidden rounded-[25px] bg-white transition-all duration-300 ease-out dark:bg-[#1A1D20] ${
+              className={`relative flex h-full min-h-[390px] w-full max-w-[330px] flex-col overflow-hidden rounded-[25px] bg-[#F7F8FA] transition-all duration-300 ease-out dark:bg-[#1A1D20] ${
                 plan.highlighted
                   ? "shadow-xl lg:h-[calc(100%+0.75rem)] lg:-translate-y-3"
                   : "shadow-xl dark:shadow-none"
@@ -286,14 +301,14 @@ const PricingModel = () => {
                     </span>
                   </div>
 
-                  <div className="absolute bottom-[-1px] left-0 right-0 h-5 rounded-t-[24px] bg-white dark:bg-[#1A1D20]" />
+                  <div className="absolute bottom-[-1px] left-0 right-0 h-5 rounded-t-[24px] bg-[#F7F8FA] dark:bg-[#1A1D20]" />
                 </div>
               ) : (
                 <div
                   className="relative h-6 overflow-hidden rounded-t-[24px]"
                   style={{ backgroundColor: PRIMARY_BLUE }}
                 >
-                  <div className="absolute bottom-[-1px] left-0 right-0 h-4 rounded-t-[24px] bg-white dark:bg-[#1A1D20]" />
+                  <div className="absolute bottom-[-1px] left-0 right-0 h-4 rounded-t-[24px] bg-[#F7F8FA] dark:bg-[#1A1D20]" />
                 </div>
               )}
 
@@ -321,12 +336,21 @@ const PricingModel = () => {
                   const state = getButtonState(plan.id);
                   const isPaying = payingPlan === plan.id;
                   const disabled = state.disabled || payingPlan !== null;
+                  const handleClick = () => {
+                    if (state.disabled) return;
+                    if (state.action === "manage") {
+                      navigate("/subscription");
+                      return;
+                    }
+                    handleUpgrade(plan.id);
+                  };
                   return (
                     <button
                       type="button"
-                      onClick={state.disabled ? undefined : () => handleUpgrade(plan.id)}
+                      onClick={state.disabled ? undefined : handleClick}
                       disabled={disabled}
                       aria-disabled={disabled}
+                      title={state.tooltip || undefined}
                       style={
                         state.disabled
                           ? undefined
@@ -378,7 +402,7 @@ const PricingModel = () => {
       </section>
 
       {/* Detailed comparison section */}
-      <section className="mt-16 w-full bg-slate-50 pb-24 pt-16 dark:bg-[#181818]">
+      <section className="mt-16 w-full bg-[#F7F8FA] pb-24 pt-16 dark:bg-[#181818]">
         <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
           {/* Section heading */}
           <div className="text-center">
@@ -403,7 +427,7 @@ const PricingModel = () => {
               </div>
 
               {/* Comparison table */}
-              <table className="relative z-20 w-full table-fixed overflow-hidden rounded-xl bg-white text-left shadow-xl shadow-slate-200 dark:bg-[#1A1D20] dark:shadow-none">
+              <table className="relative z-20 w-full table-fixed overflow-hidden rounded-xl bg-[#F7F8FA] text-left shadow-xl shadow-slate-200 dark:bg-[#1A1D20] dark:shadow-none">
                 <colgroup>
                   <col className="w-[32%]" />
                   <col className="w-[22%]" />
@@ -465,6 +489,12 @@ const PricingModel = () => {
           {/* Payment note */}
           <p className="mt-6 text-center text-sm font-medium text-slate-500 dark:text-[#848484] font-figtree">
             * Prices are in INR. Payments are secured by Razorpay.
+          </p>
+          <p className="mt-2 text-center text-xs font-medium text-slate-400 dark:text-[#848484] font-figtree">
+            One-time Founder lifetime · Refunds per{" "}
+            <a href="/termscondition" className="underline hover:text-[#3300ff]">
+              Terms
+            </a>
           </p>
         </div>
       </section>

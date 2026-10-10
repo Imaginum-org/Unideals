@@ -1,19 +1,15 @@
 import { useSearchParams } from "react-router-dom";
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import PriceRangeSlider from "../../../components/ui/PriceRangeSlider.jsx";
 
 import ProductCard from "../../product/components/ProductCard";
-import BrandLoader from "../../../Components/ui/BrandLoader.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { searchProducts, getTrendingProducts } from "../api/searchApi";
 import { CATEGORY_ITEMS } from "../../product/constants/categories.js";
 
 import { FaFilter, FaTimes } from "react-icons/fa";
 import { useCampus } from "../../../context/CampusContext.jsx";
-
-// react-slider loads with the filter UI, never with Home.
-const LazySlider = lazy(() => import("react-slider"));
-const SliderFallback = (
-  <div className="h-1 w-full animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-700" />
-);
 
 const PRICE_MIN = 0;
 const PRICE_MAX = 100000;
@@ -37,15 +33,35 @@ const SORTS = [
 
 const SearchResults = () => {
   const [params, setParams] = useSearchParams();
-  const { campusSlug } = useCampus();
+  const { campusSlug, refreshDirectory } = useCampus();
 
   const query = params.get("q") || "";
   const page = Math.max(1, Number.parseInt(params.get("page") || "1", 10) || 1);
-  const minPrice = params.get("min") || "";
-  const maxPrice = params.get("max") || "";
-  const condition = params.get("condition") || "";
-  const category = params.get("category") || "";
-  const sort = params.get("sort") || "relevant";
+  const rawMin = params.get("min") || "";
+  const rawMax = params.get("max") || "";
+  const rawCondition = params.get("condition") || "";
+  const rawCategory = params.get("category") || "";
+  const rawSort = params.get("sort") || "relevant";
+
+  // Whitelist invalid filter values → default (never send junk to backend).
+  const validConditions = new Set(CONDITIONS.map((c) => c.value));
+  const validSorts = new Set(SORTS.map((s) => s.value));
+  const validCategories = new Set(CATEGORY_ITEMS.map((c) => c.value));
+  const condition = validConditions.has(rawCondition) ? rawCondition : "";
+  const category = validCategories.has(rawCategory) ? rawCategory : "";
+  const sort = validSorts.has(rawSort) ? rawSort : "relevant";
+
+  // Numeric price validation: >= 0, min <= max. Invalid → inline error, no fetch.
+  const parsedMin = rawMin === "" ? null : Number(rawMin);
+  const parsedMax = rawMax === "" ? null : Number(rawMax);
+  const priceInvalid =
+    (rawMin !== "" && (!Number.isFinite(parsedMin) || parsedMin < 0)) ||
+    (rawMax !== "" && (!Number.isFinite(parsedMax) || parsedMax < 0)) ||
+    (parsedMin != null &&
+      parsedMax != null &&
+      parsedMin > parsedMax);
+  const minPrice = priceInvalid ? "" : rawMin;
+  const maxPrice = priceInvalid ? "" : rawMax;
 
   const [open, setOpen] = useState(false);
 
@@ -92,7 +108,7 @@ const SearchResults = () => {
   useEffect(() => {
     let cancelled = false;
     const fetchSearchResults = async () => {
-      if (!campusSlug) return;
+      if (!campusSlug || priceInvalid) return;
       const isPaging = page > 1;
       try {
         if (isPaging) setLoadingMore(true);
@@ -116,7 +132,13 @@ const SearchResults = () => {
         if (cancelled) return;
         const items = res.data?.products || [];
         const paging = res.data?.pagination || null;
-        setProducts((prev) => (isPaging ? [...prev, ...items] : items));
+        // Dedup Load-more by _id: paging overlap must never duplicate cards.
+        setProducts((prev) => {
+          if (!isPaging) return items;
+          const seen = new Set(prev.map((p) => p._id));
+          const fresh = items.filter((p) => !seen.has(p._id));
+          return [...prev, ...fresh];
+        });
         setPagination(paging);
       } catch {
         if (!cancelled) setError("Failed to load search results");
@@ -137,12 +159,13 @@ const SearchResults = () => {
     return () => {
       cancelled = true;
     };
-  }, [query, page, sort, category, condition, minPrice, maxPrice, campusSlug, retryKey]);
+  }, [query, page, sort, category, condition, minPrice, maxPrice, campusSlug, retryKey, priceInvalid]);
 
-  // Trending fallback for empty query / zero results (server-cached).
+  // Trending fallback for empty query only (server-cached). Filtered zero
+  // results show "No matches, clear filters" instead — never trending.
   useEffect(() => {
     let cancelled = false;
-    const needsTrending = !query || (!loading && products.length === 0 && !error);
+    const needsTrending = !query;
     if (!needsTrending || trending.length > 0 || !campusSlug) return;
     setTrendingLoading(true);
     getTrendingProducts({ campus_slug: campusSlug })
@@ -156,7 +179,7 @@ const SearchResults = () => {
     return () => {
       cancelled = true;
     };
-  }, [query, loading, products.length, error, trending.length, campusSlug]);
+  }, [query, trending.length, campusSlug]);
 
   const handleClear = () => {
     setParams({ q: query }, { replace: false });
@@ -193,11 +216,7 @@ const SearchResults = () => {
       <div>
         <h4 className="font-bold mb-6 text-zinc-900 dark:text-white text-sm">Price Range</h4>
         <div className="px-2">
-          <Suspense fallback={SliderFallback}>
-          <LazySlider
-            className="w-full h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full flex items-center"
-            thumbClassName="size-4 bg-[#394FF1] border-2 border-white rounded-full cursor-grab active:cursor-grabbing outline-none"
-            trackClassName="h-1 rounded-full"
+          <PriceRangeSlider
             min={PRICE_MIN}
             max={PRICE_MAX}
             step={1000}
@@ -206,7 +225,6 @@ const SearchResults = () => {
             onAfterChange={commitPriceRange}
             minDistance={1000}
           />
-          </Suspense>
         </div>
 
         <div className="flex justify-between mt-4 text-[10px] text-zinc-400 font-bold uppercase">
@@ -285,10 +303,10 @@ const SearchResults = () => {
   );
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-[#F8F9FA] dark:bg-[#121212]">
+    <div className="min-h-[100dvh] flex flex-col bg-[#F7F8FA] dark:bg-[#121212]">
       <div className="flex flex-1 px-4 lg:px-11">
         {/* SIDEBAR */}
-        <aside className="hidden lg:block w-[340px] flex-shrink-0 my-6 rounded-3xl bg-white dark:bg-[#131313] px-8 py-9 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-zinc-100 dark:border-zinc-800/50 h-fit sticky top-6 self-start">
+        <aside className="hidden lg:block w-[340px] flex-shrink-0 my-6 rounded-3xl bg-[#F7F8FA] dark:bg-[#131313] px-8 py-9 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-zinc-100 dark:border-zinc-800/50 h-fit sticky top-6 self-start">
           <h2 className="text-2xl font-bold mb-8 text-zinc-900 dark:text-white font-robotoFlex">
             Filters
           </h2>
@@ -323,6 +341,26 @@ const SearchResults = () => {
                 </p>
               )}
 
+              {!campusSlug ? (
+                <div className="flex flex-col items-center gap-3 py-8">
+                  <BrandLoader size="md" label="Loading campus…" />
+                  <button
+                    onClick={() => {
+                      refreshDirectory?.();
+                      setRetryKey((k) => k + 1);
+                    }}
+                    className="rounded-xl bg-[#394FF1] px-5 py-2.5 text-sm font-bold text-white"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : null}
+              {priceInvalid ? (
+                <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600 ring-1 ring-red-100 dark:bg-red-950/20 dark:text-red-300 dark:ring-red-900/40">
+                  Invalid price range — min and max must be numbers ≥ 0 and min
+                  ≤ max. Clear the price filter to search.
+                </p>
+              ) : null}
               {loading && (
                 <div className="flex justify-center py-8">
                   <BrandLoader size="md" label="Searching…" />
@@ -339,11 +377,35 @@ const SearchResults = () => {
                   </button>
                 </div>
               )}
-              {!loading && !error && query && products.length === 0 && (
-                <p className="text-gray-500 mt-2">
-                  No results found. Try different keywords.
-                </p>
-              )}
+              {!loading &&
+                !error &&
+                !priceInvalid &&
+                query &&
+                products.length === 0 && (
+                  <div className="mt-2">
+                    <p className="text-gray-500">
+                      {condition ||
+                      category ||
+                      minPrice !== "" ||
+                      maxPrice !== "" ||
+                      sort !== "relevant"
+                        ? "No matches for these filters."
+                        : "No results found. Try different keywords."}
+                    </p>
+                    {condition ||
+                    category ||
+                    minPrice !== "" ||
+                    maxPrice !== "" ||
+                    sort !== "relevant" ? (
+                      <button
+                        onClick={handleClear}
+                        className="mt-3 rounded-xl bg-[#394FF1] px-5 py-2.5 text-sm font-bold text-white"
+                      >
+                        Clear filters
+                      </button>
+                    ) : null}
+                  </div>
+                )}
             </div>
 
               {/* CATEGORY PILLS + ACTIVE FILTER CHIPS */}
@@ -353,7 +415,7 @@ const SearchResults = () => {
                   className={`rounded-full px-4 py-2 text-xs font-bold transition ${
                     !category
                       ? "bg-[#394FF1] text-white shadow-md shadow-blue-500/30"
-                      : "border border-zinc-200 bg-white text-zinc-500 dark:border-zinc-800 dark:bg-[#1A1D20] dark:text-zinc-400"
+                      : "border border-zinc-200 bg-[#F7F8FA] text-zinc-500 dark:border-zinc-800 dark:bg-[#1A1D20] dark:text-zinc-400"
                   }`}
                 >
                   All
@@ -365,7 +427,7 @@ const SearchResults = () => {
                     className={`rounded-full px-4 py-2 text-xs font-bold transition ${
                       category === cat.value
                         ? "bg-[#394FF1] text-white shadow-md shadow-blue-500/30"
-                        : "border border-zinc-200 bg-white text-zinc-500 dark:border-zinc-800 dark:bg-[#1A1D20] dark:text-zinc-400"
+                        : "border border-zinc-200 bg-[#F7F8FA] text-zinc-500 dark:border-zinc-800 dark:bg-[#1A1D20] dark:text-zinc-400"
                     }`}
                   >
                     {cat.label}
@@ -432,10 +494,10 @@ const SearchResults = () => {
               </div>
             )}
 
-            {/* TRENDING FALLBACK */}
+            {/* TRENDING FALLBACK — only when there is no query */}
             {!loading &&
               !error &&
-              (products.length === 0 || !query) &&
+              !query &&
               (trendingLoading || trending.length > 0) && (
                 <div className="pb-20">
                   <h2 className="text-lg font-bold text-[#121417] dark:text-white mb-4">
@@ -476,7 +538,7 @@ const SearchResults = () => {
             onClick={() => setOpen(false)}
           ></div>
 
-          <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-[#131313] rounded-t-[32px] p-8 pb-[max(2rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto no-scrollbar shadow-2xl">
+          <div className="absolute bottom-0 left-0 right-0 bg-[#F7F8FA] dark:bg-[#131313] rounded-t-[32px] p-8 pb-[max(2rem,env(safe-area-inset-bottom))] max-h-[90dvh] overflow-y-auto no-scrollbar shadow-2xl">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-2xl font-bold dark:text-white">Filters</h2>
 

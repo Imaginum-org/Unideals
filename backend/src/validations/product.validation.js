@@ -37,6 +37,7 @@ export const createProductSchema = z
         invalid_type_error: "Selling price must be a number",
       })
       .positive("Selling price must be greater than 0")
+      .min(10, "Selling price must be at least ₹10")
       .max(10000000, "Selling price is too large")
       .optional(),
 
@@ -50,10 +51,22 @@ export const createProductSchema = z
 
     is_negotiable: z.boolean().optional(),
 
+    // Stock count for single-seller chat sales (default 1, range 1–99).
+    quantity: z.coerce
+      .number({ invalid_type_error: "Quantity must be a number" })
+      .int("Quantity must be a whole number")
+      .min(1, "Quantity must be at least 1")
+      .max(99, "Quantity cannot exceed 99")
+      .optional(),
+
     payment_preference: z.enum(Object.values(PRODUCT_PAYMENT)).optional(),
 
     // Legacy frontend field - accepted but ignored server-side
     meetup_location: z.string().trim().max(200).optional(),
+
+    // Legal consent tracking (optional, persisted; old clients omit it).
+    terms_version: z.string().trim().min(1).max(20).optional(),
+    terms_accepted_at: z.string().max(40).nullish(),
 
     images: z
       .array(
@@ -137,4 +150,21 @@ export const createProductSchema = z
 
       path: ["selling_price"],
     },
+  )
+  // Discount guard: max 90% off (selling >= 10% of original).
+  .refine(
+    (data) => {
+      if (data.original_price && data.selling_price) {
+        return data.selling_price >= data.original_price * 0.1;
+      }
+      return true;
+    },
+    {
+      message: "Discount cannot exceed 90% of the original price",
+      path: ["selling_price"],
+    },
   );
+
+// PATCH /:id reuses the create schema as-is (every field is optional, so it
+// already behaves as a partial). Alias kept for route readability.
+export const updateProductSchema = createProductSchema;

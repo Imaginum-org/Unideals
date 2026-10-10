@@ -25,7 +25,7 @@ import {
   verifyPayment,
 } from "../../payment/api/paymentApi.js";
 import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
-import LimitModal from "../../../Components/ui/LimitModal.jsx";
+import LimitModal from "../../../components/ui/LimitModal.jsx";
 import toast from "react-hot-toast";
 
 const BOOST_ADDONS = [
@@ -115,7 +115,7 @@ const OrderCard = ({
           "border-amber-300 ring-2 ring-amber-400/30 shadow-[0_12px_30px_rgba(245,158,11,0.16)] dark:border-amber-400/70 dark:ring-amber-300/20",
         strip: "bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-600",
         header:
-          "bg-gradient-to-r from-amber-50 via-yellow-50 to-white border-amber-100 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-[#1c1c1c]",
+          "bg-gradient-to-r from-amber-50 via-yellow-50 to-[#F7F8FA] border-amber-100 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-[#1c1c1c]",
         badge:
           "bg-amber-400 text-amber-950 shadow-sm shadow-amber-500/25 ring-1 ring-amber-200",
         button:
@@ -128,7 +128,7 @@ const OrderCard = ({
             "border-blue-300 ring-2 ring-blue-500/20 shadow-[0_12px_30px_rgba(37,99,235,0.12)] dark:border-blue-500/70 dark:ring-blue-400/20",
           strip: "bg-gradient-to-r from-blue-700 via-[#3838EC] to-cyan-400",
           header:
-            "bg-gradient-to-r from-blue-50 via-indigo-50 to-white border-blue-100 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-[#1c1c1c]",
+            "bg-gradient-to-r from-blue-50 via-indigo-50 to-[#F7F8FA] border-blue-100 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-[#1c1c1c]",
           badge:
             "bg-blue-600 text-white shadow-sm shadow-blue-500/25 ring-1 ring-blue-300",
           button: "bg-blue-600 text-white shadow-blue-500/20 disabled:opacity-95",
@@ -289,7 +289,7 @@ const OrderCard = ({
   return (
     <div
       onClick={handleCardClick}
-      className={`relative bg-white dark:bg-[#1c1c1c] rounded-2xl border shadow-sm overflow-hidden font-figtree cursor-pointer transition-all hover:shadow-md ${
+      className={`relative bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border shadow-sm overflow-hidden font-figtree cursor-pointer transition-all hover:shadow-md ${
         boostActive ? boostTone.card : "border-gray-100 dark:border-gray-800"
       }`}
     >
@@ -356,9 +356,6 @@ const OrderCard = ({
                 <span className="flex items-center gap-1 sm:gap-1.5">
                   <FiHeart size={14} /> {wishlistedCount || 0}
                 </span>
-                <span className="flex items-center gap-1 sm:gap-1.5">
-                  <FiMessageSquare size={14} /> 3
-                </span>
               </div>
             ) : (
               <div className="mt-2 sm:mt-3">
@@ -407,7 +404,7 @@ const OrderCard = ({
 
       {/* 3. FOOTER ACTIONS */}
       <div
-        className={`px-4 sm:px-6 py-4 bg-gray-50/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row items-center gap-3 ${
+        className={`px-4 sm:px-6 py-4 bg-[#F7F8FA]/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row items-center gap-3 ${
           isActive || isDelivered ? "sm:justify-between" : "sm:justify-end"
         }`}
       >
@@ -465,7 +462,7 @@ const OrderCard = ({
                   e.stopPropagation();
                   navigate(`/upload/${orderId}`);
                 }}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2"
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2"
               >
                 <FiEdit2 size={14} />
                 <span className="sm:hidden text-xs">Edit</span>
@@ -478,7 +475,7 @@ const OrderCard = ({
                   setUnlistModalOpen(true);
                 }}
                 disabled={isUnlisting}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
               >
                 <FiEyeOff size={14} />
                 <span className="text-xs sm:text-[13px]">
@@ -492,7 +489,7 @@ const OrderCard = ({
                   setDeleteModalOpen(true);
                 }}
                 disabled={isDeleting}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
               >
                 <FiTrash2 size={14} />
                 <span className="text-xs sm:text-[13px]">Delete</span>
@@ -508,7 +505,7 @@ const OrderCard = ({
                 e.stopPropagation();
                 navigate(`/upload/${orderId}`);
               }}
-              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-2"
+              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-2"
             >
               <FiEdit2 size={14} />
               Edit Details
@@ -520,7 +517,7 @@ const OrderCard = ({
                 setRelistModalOpen(true);
               }}
               disabled={isRelisting}
-              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <FiRefreshCw size={14} />
               {isRelisting ? "..." : "Relist Product"}
@@ -532,7 +529,7 @@ const OrderCard = ({
                 setDeleteModalOpen(true);
               }}
               disabled={isDeleting}
-              className="w-full sm:w-auto justify-center py-2.5 sm:p-2.5 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full sm:w-auto justify-center py-2.5 sm:p-2.5 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <FiTrash2 size={16} />
               <span className="sm:hidden text-[13px]">Delete</span>
@@ -545,7 +542,7 @@ const OrderCard = ({
             <div className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 italic text-center sm:text-left w-full sm:w-auto">
               This order is completed. Actions are limited.
             </div>
-            <button className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2">
+            <button className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2">
               View Delivery Details
             </button>
           </div>

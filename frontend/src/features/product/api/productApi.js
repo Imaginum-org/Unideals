@@ -61,6 +61,11 @@ export const relistProduct = (productId) => {
   return axios.patch(`/api/product/${productId}/relist`);
 };
 
+// MARK SOLD — PATCH /api/product/:id/sold (owner only, listed → sold)
+export const markProductSold = (productId) => {
+  return axios.patch(`/api/product/${productId}/sold`);
+};
+
 export const boostProduct = (productId) => {
   return axios.post(`/api/boost/products/${productId}`);
 };

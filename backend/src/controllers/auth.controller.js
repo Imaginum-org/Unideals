@@ -20,6 +20,43 @@ import {
 } from "../services/auth.service.js";
 import { safeErrorMessage } from "../utils/response.js";
 
+const sha256 = (value) =>
+  crypto.createHash("sha256").update(String(value)).digest("hex");
+
+// Per-target-email send throttle (in-memory, no new deps): max 3/hr per
+// email across forgot/resend/register-resend. Throttled callers still get
+// generic success (no oracle, no email-bombing signal).
+const emailSendThrottle = new Map(); // key -> { count, expiresAt }
+const EMAIL_SEND_LIMIT = 3;
+const EMAIL_SEND_WINDOW_MS = 60 * 60 * 1000;
+
+const isEmailSendThrottled = (normalizedEmail) => {
+  const entry = emailSendThrottle.get(normalizedEmail);
+  if (!entry) return false;
+  if (entry.expiresAt <= Date.now()) {
+    emailSendThrottle.delete(normalizedEmail);
+    return false;
+  }
+  return entry.count >= EMAIL_SEND_LIMIT;
+};
+
+const recordEmailSend = (normalizedEmail) => {
+  const now = Date.now();
+  const entry = emailSendThrottle.get(normalizedEmail);
+  if (!entry || entry.expiresAt <= now) {
+    emailSendThrottle.set(normalizedEmail, { count: 1, expiresAt: now + EMAIL_SEND_WINDOW_MS });
+  } else {
+    entry.count += 1;
+    emailSendThrottle.set(normalizedEmail, entry);
+  }
+};
+
+const isPasswordValidLength = (password) =>
+  typeof password === "string" && password.length >= 8 && password.length <= 72;
+
+const REGISTER_GENERIC_MESSAGE =
+  "If this email is registered, please log in or check your inbox for verification.";
+
 const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -96,72 +133,110 @@ export const registerUserController = async (req, res) => {
     }
 
     // Server-side backstop (frontend already enforces a stronger policy).
-    if (typeof password !== "string" || password.length < 8) {
+    // bcrypt caps at 72 bytes — reject longer to avoid silent truncation.
+    if (!isPasswordValidLength(password)) {
       return res.status(400).json({
-        message: "Password must be at least 8 characters.",
+        message:
+          typeof password === "string" && password.length > 72
+            ? "Password must be at most 72 characters."
+            : "Password must be at least 8 characters.",
         error: true,
         success: false,
       });
     }
 
     email = email.trim().toLowerCase();
-    const existingUser = await userModel.findOne({ email });
-
-    if (existingUser && existingUser.is_email_verified) {
-      // Uniform success: distinct statuses/messages would let anyone
-      // probe which emails hold verified accounts.
+    const normalizedEmail = email;
+    if (isEmailSendThrottled(normalizedEmail)) {
       return res.status(200).json({
-        message:
-          "If this email is registered, please log in or check your inbox for verification.",
+        message: REGISTER_GENERIC_MESSAGE,
         error: false,
         success: true,
       });
     }
+    const existingUser = await userModel.findOne({ email });
+
+    if (existingUser) {
+      // Deleted/suspended accounts reactivate via forgot-password only —
+      // never resurrect or leak via re-register. Same generic 200.
+      if (existingUser.status !== USER_STATUS.ACTIVE) {
+        return res.status(200).json({
+          message: REGISTER_GENERIC_MESSAGE,
+          error: false,
+          success: true,
+        });
+      }
+      if (existingUser.is_email_verified) {
+        // Uniform success: distinct statuses/messages would let anyone
+        // probe which emails hold verified accounts.
+        return res.status(200).json({
+          message: REGISTER_GENERIC_MESSAGE,
+          error: false,
+          success: true,
+        });
+      }
+    }
 
     const verifyToken = crypto.randomBytes(32).toString("hex");
+    const hashedVerifyToken = sha256(verifyToken);
     const verifyExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
 
-    let responseMessage = "";
-    let statusCode = 201;
-
     if (existingUser) {
       await userModel.findByIdAndUpdate(existingUser._id, {
-        verifyTokenEmail: verifyToken,
+        verifyTokenEmail: hashedVerifyToken,
         verifyTokenEmailExpiry: verifyExpiry,
       });
 
-      responseMessage =
-        "Account exists but is unverified. We just resent your verification email!";
-      statusCode = 200;
-    } else {
-      const hashedPassword = await bcrypt.hash(password, 10);
+      recordEmailSend(normalizedEmail);
+      try {
+        await sendEmail({
+          sendTo: email,
+          subject: "Verify your email for Unideals",
+          html: verifyEmailTempplate({
+            name: existingUser.name,
+            url: verifyEmailUrl,
+          }),
+        });
+      } catch {
+        // best-effort: uniform success even if mailer fails
+      }
 
-      await userModel.create({
-        name,
-        email,
-        password: hashedPassword,
-        verifyTokenEmail: verifyToken,
-        verifyTokenEmailExpiry: verifyExpiry,
-        is_email_verified: false,
+      // Uniform generic 200 (no verified/unverified/missing distinction).
+      return res.status(200).json({
+        message: REGISTER_GENERIC_MESSAGE,
+        error: false,
+        success: true,
       });
-
-      responseMessage =
-        "Account created successfully. Please check your email to verify.";
-      statusCode = 201;
     }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    await sendEmail({
-      sendTo: email,
-      subject: "Verify your email for Unideals",
-      html: verifyEmailTempplate({
-        name: existingUser ? existingUser.name : name,
-        url: verifyEmailUrl,
-      }),
+    await userModel.create({
+      name,
+      email,
+      password: hashedPassword,
+      verifyTokenEmail: hashedVerifyToken,
+      verifyTokenEmailExpiry: verifyExpiry,
+      is_email_verified: false,
     });
 
-    return res.status(statusCode).json({
-      message: responseMessage,
+    recordEmailSend(normalizedEmail);
+    try {
+      await sendEmail({
+        sendTo: email,
+        subject: "Verify your email for Unideals",
+        html: verifyEmailTempplate({
+          name,
+          url: verifyEmailUrl,
+        }),
+      });
+    } catch {
+      // best-effort: uniform success even if mailer fails
+    }
+
+    // Uniform generic 200 (creation no longer signalled via 201/message).
+    return res.status(200).json({
+      message: REGISTER_GENERIC_MESSAGE,
       error: false,
       success: true,
     });
@@ -457,16 +532,25 @@ export const verifyEmailController = async (req, res) => {
         error: true,
       });
     }
-    const user = await userModel.findOne({
-      verifyTokenEmail: code,
+    // Hashed-first lookup; fallback to legacy raw tokens then upgrade to hash.
+    const hashedCode = sha256(code);
+    let user = await userModel.findOne({
+      verifyTokenEmail: hashedCode,
       verifyTokenEmailExpiry: { $gt: new Date() },
     });
     if (!user) {
-      return res.status(400).json({
-        message: " Invalid or expired verification link",
-        success: false,
-        error: true,
+      const legacyUser = await userModel.findOne({
+        verifyTokenEmail: code,
+        verifyTokenEmailExpiry: { $gt: new Date() },
       });
+      if (!legacyUser) {
+        return res.status(400).json({
+          message: " Invalid or expired verification link",
+          success: false,
+          error: true,
+        });
+      }
+      user = legacyUser;
     }
 
     user.is_email_verified = true;
@@ -509,11 +593,13 @@ export const checkEmailVerificationController = async (req, res) => {
       });
     }
 
+    const GENERIC_CHECK_MESSAGE =
+      "If this email is registered, its verification status has been sent where applicable.";
     const user = await userModel.findOne({ email: normalized });
     if (!user) {
       // Generic response to avoid enumeration; frontend treats as unverified
       return res.status(200).json({
-        message: "Email is not verified yet",
+        message: GENERIC_CHECK_MESSAGE,
         success: true,
         error: false,
         verified: false,
@@ -521,9 +607,7 @@ export const checkEmailVerificationController = async (req, res) => {
     }
 
     return res.status(200).json({
-      message: user.is_email_verified
-        ? "Email is verified"
-        : "Email is not verified yet",
+      message: GENERIC_CHECK_MESSAGE,
       success: true,
       error: false,
       verified: user.is_email_verified,
@@ -602,6 +686,14 @@ export const forgotPasswordController = async (req, res) => {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    // Per-target-email throttle: generic success even when throttled.
+    if (isEmailSendThrottled(normalizedEmail)) {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
     const user = await userModel.findOne({ email: normalizedEmail });
 
     if (!user) {
@@ -639,6 +731,7 @@ export const forgotPasswordController = async (req, res) => {
           resetUrl,
         }),
       });
+      recordEmailSend(normalizedEmail);
     } catch (emailErr) {
       // Roll back token if email fails so stale tokens don't linger
       await userModel.findByIdAndUpdate(user._id, {
@@ -670,9 +763,12 @@ export const resetPasswordController = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
-    if (!password || typeof password !== "string" || password.length < 8) {
+    if (!isPasswordValidLength(password)) {
       return res.status(400).json({
-        message: "Please provide a new password of at least 8 characters",
+        message:
+          typeof password === "string" && password.length > 72
+            ? "Password must be at most 72 characters."
+            : "Please provide a new password of at least 8 characters",
         success: false,
         error: true,
       });
@@ -702,6 +798,17 @@ export const resetPasswordController = async (req, res) => {
       refresh_token: null,
       $inc: { tokenVersion: 1 },
     });
+
+    // Post-reset notify (best-effort, never fail the request).
+    try {
+      await sendEmail({
+        sendTo: user.email,
+        subject: "Your Unideals password was changed",
+        html: `<p>Hi ${user.name || "there"},</p><p>Your Unideals password was just changed. If this wasn't you, please reset your password immediately or contact support.</p>`,
+      });
+    } catch {
+      // ignore notify failures
+    }
 
     return res.status(200).json({
       message: "Password updated successfully!",
@@ -768,6 +875,14 @@ export const resendVerificationController = async (req, res) => {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    // Per-target-email throttle: generic success even when throttled.
+    if (isEmailSendThrottled(normalizedEmail)) {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
     const user = await userModel.findOne({ email: normalizedEmail });
 
     if (!user) {
@@ -787,23 +902,28 @@ export const resendVerificationController = async (req, res) => {
       });
     }
 
-    // Generate a new token and update the user
+    // Generate a new token (SHA256-hashed at rest, 24h expiry) and update the user
     const verifyToken = crypto.randomBytes(32).toString("hex");
     await userModel.findByIdAndUpdate(user._id, {
-      verifyTokenEmail: verifyToken,
+      verifyTokenEmail: sha256(verifyToken),
       verifyTokenEmailExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
-    // Send the email
+    // Send the email (best-effort, uniform success)
     const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
-    await sendEmail({
-      sendTo: normalizedEmail,
-      subject: "Verify your email for Unideals",
-      html: verifyEmailTempplate({ name: user.name, url: verifyEmailUrl }),
-    });
+    try {
+      await sendEmail({
+        sendTo: normalizedEmail,
+        subject: "Verify your email for Unideals",
+        html: verifyEmailTempplate({ name: user.name, url: verifyEmailUrl }),
+      });
+      recordEmailSend(normalizedEmail);
+    } catch {
+      // best-effort: still return generic success
+    }
 
     return res.status(200).json({
-      message: "Verification email resent!",
+      message: genericMessage,
       success: true,
       error: false,
     });

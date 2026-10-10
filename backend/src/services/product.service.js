@@ -16,6 +16,83 @@ const campusError = (statusCode, message, code) => {
   return error;
 };
 
+// ---- Marketplace hardening helpers (production-safe, no new deps) ----
+
+// Price guards (defense-in-depth alongside zod): floor ₹10, original cap
+// kept at 10M by validation, discount max 90% off.
+const assertPriceGuards = (sellingPrice, originalPrice) => {
+  if (sellingPrice != null && sellingPrice !== "" && Number(sellingPrice) < 10) {
+    throw campusError(400, "Selling price must be at least ₹10.", "INVALID_PRICE");
+  }
+  if (
+    originalPrice != null &&
+    originalPrice !== "" &&
+    sellingPrice != null &&
+    sellingPrice !== "" &&
+    Number(sellingPrice) < Number(originalPrice) * 0.1
+  ) {
+    throw campusError(
+      400,
+      "Discount cannot exceed 90% of the original price.",
+      "INVALID_DISCOUNT",
+    );
+  }
+};
+
+// Image host pin: only our ImageKit endpoint is servable. Read at call time
+// so env rotation needs no restart logic beyond the process env.
+const assertImageHost = (images) => {
+  if (!Array.isArray(images) || images.length === 0) return;
+  const endpoint = process.env.IMAGEKIT_URL_ENDPOINT;
+  if (!endpoint) return; // unconfigured env: zod https+length checks still apply
+  for (const image of images) {
+    if (image?.url && !String(image.url).startsWith(endpoint)) {
+      throw campusError(400, "Image host not allowed.", "INVALID_IMAGE_HOST");
+    }
+  }
+};
+
+// Phone/room-level detail leak guard for the pickup snapshot.
+const UNSAFE_ADDRESS_RE = /\d{10}|\broom\b|\bflat\b|house\s*no|door\s*no/i;
+
+// Snapshot must reference one of the seller's saved public spots
+// (name -> address_line, detail -> city). Non-matching snapshots are still
+// allowed (legacy/manual flows) unless they carry phone-like or
+// room/flat-level private detail.
+const assertPickupSnapshot = async (snapshot, userId) => {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const addressLine = String(snapshot.address_line || "").trim();
+  const city = String(snapshot.city || "").trim();
+  if (!addressLine && !city) return;
+  try {
+    const { default: PickupSpot } = await import("../models/PickupSpot.model.js");
+    const spots = await PickupSpot.find({ user: userId }).select("name detail").lean();
+    const norm = (s) => String(s || "").trim().toLowerCase();
+    const matched = spots.some(
+      (spot) => norm(spot.name) === norm(addressLine) && norm(spot.detail) === norm(city),
+    );
+    if (matched) return;
+  } catch {
+    // Lookup failure falls through to the unsafe-pattern screen below.
+  }
+  const haystack = [addressLine, city, snapshot.additional_info, snapshot.state]
+    .filter((v) => typeof v === "string" && v)
+    .join(" ");
+  if (UNSAFE_ADDRESS_RE.test(haystack)) {
+    throw campusError(400, "Use public campus spot only.", "UNSAFE_ADDRESS");
+  }
+};
+
+// Best-effort boost revocation shared by unlist/delete/sold paths.
+const revokeBoostsForProduct = async (productId) => {
+  try {
+    const { default: Boost } = await import("../models/Boost.model.js");
+    await Boost.deleteMany({ product_id: productId, status: "active" });
+  } catch {
+    // best-effort: product state transition must never fail on boost cleanup
+  }
+};
+
 // Every public query must be campus-scoped. The campus ObjectId is required
 // so a missing campus fails loudly instead of leaking cross-campus data.
 const requireCampusId = (campusId) => {
@@ -60,6 +137,11 @@ export const createProduct = async (data, user) => {
     }
   }
 
+  // Service-level price + host guards (mirror zod, fail with codes).
+  assertPriceGuards(data.selling_price, data.original_price);
+  assertImageHost(data.images);
+  await assertPickupSnapshot(data.pickup_address_snapshot, user._id);
+
   if (
     data.status !== PRODUCT_STATUS.DRAFT &&
     (!data.images || data.images.length === 0)
@@ -72,7 +154,9 @@ export const createProduct = async (data, user) => {
 
   const safeTitle = escapeRegex(normalizedTitle);
 
-  const FIVE_MINUTES_AGO = new Date(Date.now() - 5 * 60 * 1000);
+  // Repost cooldown: same seller + title + category within 24h at a similar
+  // price (±10%) is a recency-farm duplicate.
+  const TWENTY_FOUR_HOURS_AGO = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   // Only run duplicate guard when we have a complete non-draft payload
   if (
@@ -95,13 +179,17 @@ export const createProduct = async (data, user) => {
         $lte: priceNum * 1.1,
       },
       createdAt: {
-        $gte: FIVE_MINUTES_AGO,
+        $gte: TWENTY_FOUR_HOURS_AGO,
       },
       is_deleted: false,
     });
 
     if (existingProduct) {
-      throw new Error("You already listed a similar product recently.");
+      throw campusError(
+        400,
+        "You already listed a similar product recently.",
+        "DUPLICATE_LISTING",
+      );
     }
   }
 
@@ -113,6 +201,22 @@ export const createProduct = async (data, user) => {
   }
   data.status = data.status || PRODUCT_STATUS.LISTED;
   data.is_deleted = false;
+
+  // Draft cap: at most 50 open drafts per seller (storage/UX bound).
+  if (data.status === PRODUCT_STATUS.DRAFT) {
+    const draftCount = await Product.countDocuments({
+      seller_id: user._id,
+      status: PRODUCT_STATUS.DRAFT,
+      is_deleted: false,
+    });
+    if (draftCount >= 50) {
+      throw campusError(
+        403,
+        "Draft limit reached (50 drafts). Publish or delete old drafts first.",
+        "DRAFT_LIMIT",
+      );
+    }
+  }
 
   // Listings belong to the seller's campus. Campus-less accounts pass the
   // onboarding gate first, so this is a guardrail, not a flow.
@@ -180,7 +284,51 @@ export const createProduct = async (data, user) => {
     throw new Error("Selling price cannot be greater than original price");
   }
 
-  return await Product.create(data);
+  if (data.quantity !== undefined) {
+    const qty = Number(data.quantity);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+      throw campusError(400, "Quantity must be between 1 and 99.", "INVALID_QUANTITY");
+    }
+    data.quantity = qty;
+  }
+
+  // Normalize legal consent timestamp (ISO string -> Date; invalid dropped).
+  if (data.terms_accepted_at !== undefined && data.terms_accepted_at !== null) {
+    const parsed = new Date(data.terms_accepted_at);
+    if (!Number.isNaN(parsed.getTime())) {
+      data.terms_accepted_at = parsed;
+    } else {
+      delete data.terms_accepted_at;
+    }
+  } else if (data.terms_accepted_at === null) {
+    delete data.terms_accepted_at;
+  }
+
+  const created = await Product.create(data);
+
+  // Atomic post-check (race guard, same pattern as boost): a parallel
+  // request may have filled the last plan slot between the pre-check and
+  // this insert. Roll back the over-cap insert instead of overserving.
+  if (created.status === PRODUCT_STATUS.LISTED) {
+    const listingLimit = getListingLimit(user.subscription);
+    if (typeof listingLimit === "number") {
+      const activeCount = await Product.countDocuments({
+        seller_id: user._id,
+        status: PRODUCT_STATUS.LISTED,
+        is_deleted: false,
+      });
+      if (activeCount > listingLimit) {
+        await Product.deleteOne({ _id: created._id });
+        throw campusError(
+          403,
+          `Listing limit reached (${listingLimit} active listings on your plan). Upgrade to list more.`,
+          "LISTING_LIMIT",
+        );
+      }
+    }
+  }
+
+  return created;
 };
 
 export const getBoostedProducts = async (campusId) => {
@@ -462,7 +610,29 @@ export const getAllProducts = async (query, campusId) => {
   };
 };
 
-export const getSingleProduct = async (id, campusId, requesterId = null) => {
+// View anti-farm: at most 1 counted view per product per IP per 10 min.
+// In-memory Map (single-process best-effort; a restart only resets the
+// cooldown, never corrupts counts). Bounded to avoid memory growth.
+const viewCooldown = new Map();
+const VIEW_COOLDOWN_MS = 10 * 60 * 1000;
+
+const shouldCountView = (productId, clientIp) => {
+  if (!clientIp) return true;
+  const key = `${String(productId)}:${String(clientIp)}`;
+  const now = Date.now();
+  const last = viewCooldown.get(key);
+  if (last && now - last < VIEW_COOLDOWN_MS) return false;
+  viewCooldown.set(key, now);
+  if (viewCooldown.size > 5000) {
+    for (const [k, at] of viewCooldown) {
+      if (now - at >= VIEW_COOLDOWN_MS) viewCooldown.delete(k);
+      if (viewCooldown.size <= 4000) break;
+    }
+  }
+  return true;
+};
+
+export const getSingleProduct = async (id, campusId, requesterId = null, clientIp = null) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new Error("Product not found");
   }
@@ -490,8 +660,14 @@ export const getSingleProduct = async (id, campusId, requesterId = null) => {
     );
   }
 
-  await Product.updateOne({ _id: id }, { $inc: { views_count: 1 } });
-  product.views_count = (product.views_count || 0) + 1;
+  // Anti-farm: the seller's own views never count, and each IP counts at
+  // most once per product per 10 minutes.
+  const sellerIdStr = String(product.seller_id?._id || product.seller_id || "");
+  const isOwnerView = !!requesterId && sellerIdStr && String(requesterId) === sellerIdStr;
+  if (!isOwnerView && shouldCountView(id, clientIp)) {
+    await Product.updateOne({ _id: id }, { $inc: { views_count: 1 } });
+    product.views_count = (product.views_count || 0) + 1;
+  }
 
   // Pickup snapshot carries seller mobile/pincode — visible to the owner
   // only. Buyers keep the public meetup fields (spot name/city).
@@ -914,8 +1090,7 @@ export const getUserProducts = async (userId) => {
 };
 
 // SOFT DELETE PRODUCT
-export const deleteProduct = async (productId, userId) => {
-  const product = await Product.findOne({
+export const deleteProduct = async (productId, userId) => {  const product = await Product.findOne({
     _id: productId,
     seller_id: userId,
   });
@@ -930,17 +1105,158 @@ export const deleteProduct = async (productId, userId) => {
     throw new Error("Product is already deleted");
   }
 
-  // Delete all uploaded images from ImageKit
-  await Promise.all(
+  // Delete all uploaded images from ImageKit (best-effort, never fails request)
+  await Promise.allSettled(
     product.images
       .filter((image) => image.fileId)
       .map((image) => deleteImage(image.fileId)),
   );
 
-  // Soft delete product
+  // Soft delete product + revoke any live boost exposure.
   product.is_deleted = true;
+  product.is_boosted = false;
+  product.boost_expires_at = undefined;
+  product.boost_tier = undefined;
+  const saved = await product.save();
+  await revokeBoostsForProduct(product._id);
+  return saved;
+};
 
-  return await product.save();
+// UPDATE PRODUCT (owner only). Editable: title/desc/prices/images/
+// attributes/quantity/pickup snapshot. Listing-cap re-check is NOT needed
+// for edits (no new active slot), but price floor/gap + image host pin are
+// re-validated. Status changes go through dedicated transitions.
+export const updateProduct = async (productId, userId, data = {}) => {
+  // Strip privileged/server-controlled fields (defense-in-depth).
+  delete data.seller_id;
+  delete data.is_boosted;
+  delete data.boost_expires_at;
+  delete data.boost_tier;
+  delete data.views_count;
+  delete data.is_deleted;
+  delete data.slug;
+  delete data.location;
+  delete data.campus_id;
+  delete data.status;
+
+  const product = await Product.findOne({
+    _id: productId,
+    seller_id: userId,
+    is_deleted: false,
+  });
+
+  if (!product) {
+    throw new Error("Product not found or you don't have permission to edit it");
+  }
+
+  const ALLOWED = new Set([
+    "title",
+    "description",
+    "category",
+    "condition",
+    "selling_price",
+    "original_price",
+    "is_negotiable",
+    "payment_preference",
+    "images",
+    "attributes",
+    "pickup_address_snapshot",
+    "quantity",
+    "terms_version",
+    "terms_accepted_at",
+  ]);
+  const updates = {};
+  for (const key of Object.keys(data)) {
+    if (ALLOWED.has(key) && data[key] !== undefined) updates[key] = data[key];
+  }
+  // Normalize terms_accepted_at (ISO string -> Date; null clears).
+  if (updates.terms_accepted_at !== undefined) {
+    if (updates.terms_accepted_at === null) {
+      delete updates.terms_accepted_at;
+    } else {
+      const parsed = new Date(updates.terms_accepted_at);
+      if (!Number.isNaN(parsed.getTime())) {
+        updates.terms_accepted_at = parsed;
+      } else {
+        delete updates.terms_accepted_at;
+      }
+    }
+  }
+
+  if (updates.attributes?.purchase_date) {
+    const parsed = new Date(updates.attributes.purchase_date);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("Invalid purchase date");
+    }
+    if (parsed.getTime() > Date.now()) {
+      throw new Error("Purchase date cannot be in the future");
+    }
+    updates.attributes.purchase_date = parsed;
+  } else if (updates.attributes && updates.attributes.purchase_date === null) {
+    delete updates.attributes.purchase_date;
+  }
+
+  // Price guards on the merged (existing + incoming) values.
+  const mergedSelling = updates.selling_price ?? product.selling_price;
+  const mergedOriginal = updates.original_price ?? product.original_price;
+  assertPriceGuards(mergedSelling, mergedOriginal);
+  if (mergedOriginal && mergedSelling > mergedOriginal) {
+    throw new Error("Selling price cannot be greater than original price");
+  }
+  assertImageHost(updates.images);
+  await assertPickupSnapshot(updates.pickup_address_snapshot, userId);
+
+  if (updates.quantity !== undefined) {
+    const qty = Number(updates.quantity);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+      throw campusError(400, "Quantity must be between 1 and 99.", "INVALID_QUANTITY");
+    }
+    updates.quantity = qty;
+  }
+
+  Object.assign(product, updates);
+  try {
+    return await product.save();
+  } catch (err) {
+    // Incomplete/invalid edit payloads are client errors, not 500s.
+    if (err?.name === "ValidationError") {
+      err.statusCode = 400;
+    }
+    throw err;
+  }
+};
+
+// MARK SOLD (owner only): listed → sold, boost exposure cleared.
+export const markProductSold = async (productId, userId) => {
+  const product = await Product.findOne({
+    _id: productId,
+    seller_id: userId,
+    is_deleted: false,
+  });
+
+  if (!product) {
+    throw new Error("Product not found or you don't have permission to edit it");
+  }
+
+  if (product.status === PRODUCT_STATUS.SOLD) {
+    return product;
+  }
+
+  if (product.status !== PRODUCT_STATUS.LISTED) {
+    throw campusError(
+      400,
+      "Only active listed products can be marked as sold.",
+      "INVALID_STATUS_TRANSITION",
+    );
+  }
+
+  product.status = PRODUCT_STATUS.SOLD;
+  product.is_boosted = false;
+  product.boost_expires_at = undefined;
+  product.boost_tier = undefined;
+  const saved = await product.save();
+  await revokeBoostsForProduct(product._id);
+  return saved;
 };;
 
 // UNLIST PRODUCT
@@ -962,7 +1278,13 @@ export const unlistProduct = async (productId, userId) => {
   }
 
   product.status = PRODUCT_STATUS.UNLISTED;
-  return await product.save();
+  // Unlisted listings lose all boost exposure immediately.
+  product.is_boosted = false;
+  product.boost_expires_at = undefined;
+  product.boost_tier = undefined;
+  const saved = await product.save();
+  await revokeBoostsForProduct(product._id);
+  return saved;
 };
 
 // RELIST PRODUCT
@@ -982,6 +1304,8 @@ export const relistProduct = async (productId, userId) => {
   if (product.status === PRODUCT_STATUS.LISTED) {
     return product;
   }
+
+  const prevStatus = product.status;
 
   // Relisting reactivates against the plan cap — same rule as creation.
   const { default: UserModel } = await import("../models/User.model.js");
@@ -1006,7 +1330,39 @@ export const relistProduct = async (productId, userId) => {
   }
 
   product.status = PRODUCT_STATUS.LISTED;
-  return await product.save();
+  let saved;
+  try {
+    saved = await product.save();
+  } catch (err) {
+    // Drafts missing required listing fields fail validation on relist —
+    // that is a client error (incomplete draft), not a 500.
+    if (err?.name === "ValidationError") {
+      err.statusCode = 400;
+    }
+    throw err;
+  }
+
+  // Atomic post-check (race guard, same pattern as boost): parallel relists
+  // may have filled the last plan slot — revert instead of overserving.
+  const postLimit = getListingLimit(owner?.subscription);
+  if (typeof postLimit === "number") {
+    const activeAfter = await Product.countDocuments({
+      seller_id: product.seller_id,
+      status: PRODUCT_STATUS.LISTED,
+      is_deleted: false,
+    });
+    if (activeAfter > postLimit) {
+      product.status = prevStatus;
+      await product.save();
+      throw campusError(
+        403,
+        `Listing limit reached (${postLimit} active listings on your plan). Upgrade to list more.`,
+        "LISTING_LIMIT",
+      );
+    }
+  }
+
+  return saved;
 };
 
 export const getMyDraftProducts = async (userId) => {

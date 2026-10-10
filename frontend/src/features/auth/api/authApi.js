@@ -22,15 +22,8 @@ export const loginWithGoogleOneTap = (data) => {
 };
 
 export const logoutUser = async () => {
-  // POST is CSRF-safe and preferred; backend keeps GET for legacy compat.
-  try {
-    return await axios.post(`${AUTH_BASE_PATH}/logoutUser`);
-  } catch (err) {
-    if (err.response?.status === 404 || err.response?.status === 405) {
-      return axios.get(`${AUTH_BASE_PATH}/logoutUser`);
-    }
-    throw err;
-  }
+  // Backend contract is POST-only (GET would be a logout-CSRF vector).
+  return axios.post(`${AUTH_BASE_PATH}/logoutUser`);
 };
 
 export const forgotPassword = (data) =>

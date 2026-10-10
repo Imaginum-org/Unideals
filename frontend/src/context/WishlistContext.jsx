@@ -15,9 +15,11 @@ export const WishlistProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
 
   /**
-   * Fetch complete wishlist from backend
+   * Fetch complete wishlist from backend.
+   * Backend supports ?page=&limit= (defaults page=1, limit=20, max 50).
+   * No-arg call preserves the legacy shape (first page).
    */
-  const fetchWishlist = useCallback(async () => {
+  const fetchWishlist = useCallback(async (page = 1, limit = 50) => {
     // Skip when not logged in to avoid 401 spam on public pages
     try {
       if (localStorage.getItem("isAuthenticated") !== "true") return;
@@ -27,7 +29,9 @@ export const WishlistProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      const response = await axios.get("/api/wishlist");
+      const response = await axios.get("/api/wishlist", {
+        params: { page, limit },
+      });
 
       if (response.data.success) {
         setWishlist(response.data.data || []);

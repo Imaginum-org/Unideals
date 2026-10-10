@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { GrLocation } from "react-icons/gr";
 import { CiSearch } from "react-icons/ci";
 import { IoNotificationsOutline } from "react-icons/io5";
-import { MdSunny } from "react-icons/md";
-import { HiMiniMoon } from "react-icons/hi2";
+import ThemeToggle from "../ui/ThemeToggle.jsx";
+import Wordmark from "../ui/Wordmark.jsx";
 import { FiMessageSquare } from "react-icons/fi";
 import { FiSettings } from "react-icons/fi";
 import { FaPlus } from "react-icons/fa6";
@@ -13,11 +13,11 @@ import { FaStar } from "react-icons/fa";
 import { LuMessageSquare } from "react-icons/lu";
 import { LuUserRound } from "react-icons/lu";
 import { LuPackage } from "react-icons/lu";
-import { LuBadgeCheck } from "react-icons/lu";
 import { LuCircleHelp } from "react-icons/lu";
 import { LuShield } from "react-icons/lu";
 import { LuBell } from "react-icons/lu";
 import { LuLock } from "react-icons/lu";
+import { LuCheck } from "react-icons/lu";
 import { LuTrophy } from "react-icons/lu";
 import { BsBoxSeam } from "react-icons/bs";
 import { BsLightningChargeFill } from "react-icons/bs";
@@ -27,19 +27,24 @@ import { IoChevronBackOutline } from "react-icons/io5";
 import AvatarComponent from "../common/AvatarComponent.jsx";
 import { useUser } from "../../context/useUserContext.jsx";
 import { useCampus } from "../../context/CampusContext.jsx";
-import { ikFirstThumb } from "../../Utils/imageTransform.js";
+import { ikFirstThumb } from "../../utils/imageTransform.js";
 import { logoutUser } from "../../features/auth/api/authApi.js";
-import { useTheme } from "../../context/ThemeContext.jsx";
 import useDebounce from "../../features/search/hooks/useDebounce";
 import { searchProducts, getTrendingProducts } from "../../features/search/api/searchApi";
 import SearchDropdown from "../../features/search/components/SearchDropdown";
 import { toast } from "react-hot-toast";
-import { levelProgress, xpToNextLevel } from "../../Utils/badgeConfig.js";
+import { levelProgress, xpToNextLevel } from "../../utils/badgeConfig.js";
+import {
+  latestFirst,
+  loadNotifications,
+  markStoredAllRead,
+  markStoredRead,
+  unreadCountOf,
+} from "../../features/notification/data/notifications.js";
 
 const ProfileDropdown = ({
   userDetails,
   userLoading,
-  menuRef,
   onClose,
   onLogout,
   mobile = false,
@@ -75,7 +80,6 @@ const ProfileDropdown = ({
 
   return (
     <motion.div
-      ref={menuRef}
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -85,7 +89,7 @@ const ProfileDropdown = ({
       }}
       className={`
         absolute
-        right-0
+        -right-3
         top-full
         z-50
         mt-2.5
@@ -96,10 +100,11 @@ const ProfileDropdown = ({
         rounded-2xl
         border
         border-neutral-200
-        bg-white
+        bg-[#F7F8FA]
         shadow-[0_14px_34px_rgba(15,23,42,0.12)]
         dark:border-neutral-800
         dark:bg-[#1A1D20]
+        sm:-right-4
       `}
     >
       <div className="px-[17px] pb-[13px] pt-[17px]">
@@ -123,7 +128,7 @@ const ProfileDropdown = ({
               {userDetails?.email || ""}
             </p>
 
-            <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[13px] font-medium text-[#4B45FF]">
+            <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[13px] font-medium text-[#4B45FF] dark:text-[#A5B0FF]">
               <GrLocation className="size-3 shrink-0" />
               <span className="truncate">{campusLabel || "Set campus"}</span>
             </div>
@@ -178,7 +183,7 @@ const ProfileDropdown = ({
           <Link
             to="/achievements"
             onClick={onClose}
-            className="mx-[13px] mb-[7px] block rounded-xl border border-neutral-200 dark:border-neutral-700 bg-gradient-to-r from-neutral-50 to-white dark:from-neutral-800/60 dark:to-neutral-800 px-3 py-2.5 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-200 group"
+            className="mx-[13px] mb-[7px] block rounded-xl border border-neutral-200 dark:border-neutral-700 bg-gradient-to-r from-[#F7F8FA] to-[#F7F8FA] dark:from-neutral-800/60 dark:to-neutral-800 px-3 py-2.5 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-200 group"
           >
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
@@ -222,7 +227,7 @@ const ProfileDropdown = ({
               key={label}
               to={to}
               onClick={onClose}
-              className="flex items-center gap-[13px] px-[17px] py-[9px] text-[13px] font-medium text-[#4B5563] transition-colors duration-200 hover:bg-neutral-50 active:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:active:bg-neutral-800"
+              className="flex items-center gap-[13px] px-[17px] py-[9px] text-[13px] font-medium text-[#4B5563] transition-colors duration-200 hover:bg-[#4B45FF]/10 hover:text-[#2E40DC] active:bg-[#4B45FF]/[0.15] dark:text-neutral-200 dark:hover:bg-[#4B45FF]/20 dark:hover:text-[#C3C9FF] dark:active:bg-[#4B45FF]/25"
             >
               <span className="text-[17px] text-[#9CA3AF] dark:text-neutral-400">
                 {icon}
@@ -244,6 +249,234 @@ const ProfileDropdown = ({
   );
 };
 
+const CampusDropdown = ({ campuses, activeSlug, onPick, alignClass }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+    transition={{
+      duration: 0.18,
+      ease: [0.22, 1, 0.36, 1],
+    }}
+    role="listbox"
+    aria-label="Choose a campus to browse"
+    className={`
+          absolute
+          top-full
+          z-50
+          mt-2
+          overflow-hidden
+          rounded-2xl
+          border
+          border-[#EEF1F5]
+          bg-[#F7F8FA]
+          p-1.5
+          dark:border-neutral-800
+          dark:bg-[#1A1D20]
+          ${alignClass || "left-0 w-60"}
+        `}
+  >
+    <p className="px-3 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">
+      Browse campus
+    </p>
+    {(campuses || []).map((c) => {
+      const isActive = activeSlug === c.slug;
+      return (
+        <button
+          key={c.slug}
+          type="button"
+          role="option"
+          aria-selected={isActive}
+          onClick={() => onPick(c.slug)}
+          className={`
+              flex
+              w-full
+              items-center
+              gap-3
+              rounded-xl
+              px-3
+              py-2.5
+              text-left
+              transition-colors
+              duration-150
+              ${
+                isActive
+                  ? "bg-[#4B45FF]/10 dark:bg-[#4B45FF]/20"
+                    : "hover:bg-[#4B45FF]/10 dark:hover:bg-[#4B45FF]/20"
+              }
+            `}
+        >
+          <GrLocation
+            className={`
+                                  size-4
+                                  shrink-0
+                                  ${
+                                    isActive
+                                      ? "text-[#4B45FF] dark:text-[#A5B0FF]"
+                                      : "text-neutral-400 dark:text-neutral-500"
+                                  }
+                                `}
+          />
+
+          <span className="min-w-0 flex-1 leading-tight">
+            <span
+              className={`
+                                    block
+                                    truncate
+                                    text-[13px]
+                                    font-semibold
+                                    ${
+                                      isActive
+                                        ? "text-[#2E40DC] dark:text-[#C3C9FF]"
+                                        : "text-[#090A0B] dark:text-white"
+                                    }
+                                  `}
+            >
+              {c.name}
+            </span>
+            <span className="mt-0.5 block truncate text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+              {[c.city, c.state].filter(Boolean).join(", ") || "India"}
+            </span>
+          </span>
+
+          {isActive && (
+            <LuCheck
+              size={14}
+              strokeWidth={3}
+              className="shrink-0 text-[#4B45FF] dark:text-[#A5B0FF]"
+            />
+          )}
+        </button>
+      );
+    })}
+  </motion.div>
+);
+
+// Notification dropdown — same panel language as the profile menu:
+// bordered rounded-2xl card, icon rows, unread dots, footer action.
+const NotifDropdown = ({ items, unread, onOpen, onMarkAll, onViewAll }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+    transition={{
+      duration: 0.18,
+      ease: [0.22, 1, 0.36, 1],
+    }}
+    role="menu"
+    aria-label="Notifications"
+    className="
+        absolute
+        -right-3
+        top-full
+        z-50
+        mt-2.5
+        max-h-[calc(100vh-6rem)]
+        w-[340px]
+        max-w-[calc(100vw-2rem)]
+        overflow-hidden
+        rounded-2xl
+        border
+        border-neutral-200
+        bg-[#F7F8FA]
+        shadow-[0_14px_34px_rgba(15,23,42,0.12)]
+        dark:border-neutral-800
+        dark:bg-[#1A1D20]
+        sm:-right-4
+      "
+  >
+    <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-3.5">
+      <p className="flex items-center gap-2 text-[15px] font-bold text-[#1F2937] dark:text-white">
+        Notifications
+        {unread > 0 && (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF3B30] px-1.5 text-[11px] font-bold text-white">
+            {unread}
+          </span>
+        )}
+      </p>
+      <button
+        type="button"
+        onClick={onMarkAll}
+        disabled={unread === 0}
+        className="text-[12px] font-bold text-[#4B45FF] transition hover:text-[#2E40DC] disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#A5B0FF]"
+      >
+        Mark all read
+      </button>
+    </div>
+
+    {items.length === 0 ? (
+      <p className="px-4 pb-4 pt-1 text-center text-[13px] font-medium text-neutral-400 dark:text-neutral-500">
+        You&apos;re caught up 🎉
+      </p>
+    ) : (
+      <div className="max-h-[320px] overflow-y-auto px-2 pb-1">
+        {items.map((n) => {
+          const Icon = n.icon;
+          return (
+            <button
+              key={n.id}
+              type="button"
+              role="menuitem"
+              onClick={() => onOpen(n)}
+              className={`
+                flex
+                w-full
+                items-start
+                gap-3
+                rounded-xl
+                px-3
+                py-2.5
+                text-left
+                transition-colors
+                duration-150
+                ${
+                  n.unread
+                    ? "bg-[#4B45FF]/[0.07] hover:bg-[#4B45FF]/[0.12] dark:bg-[#4B45FF]/15 dark:hover:bg-[#4B45FF]/25"
+                  : "hover:bg-[#4B45FF]/10 dark:hover:bg-[#4B45FF]/20"
+                }
+              `}
+            >
+              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[#EEF1FF] dark:bg-white/10">
+                {Icon && (
+                  <Icon size={16} strokeWidth={2} className={n.iconColor} />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 leading-tight">
+                <span className="flex items-start justify-between gap-2">
+                  <span className="truncate text-[13px] font-semibold text-[#090A0B] dark:text-white">
+                    {n.title}
+                  </span>
+                  {n.unread && (
+                    <span
+                      className={`mt-1 size-2 shrink-0 rounded-full ${n.dotColor}`}
+                    />
+                  )}
+                </span>
+                <span className="mt-0.5 block truncate text-[12px] font-medium text-neutral-400 dark:text-neutral-500">
+                  {n.description}
+                </span>
+                <span className="mt-1 block text-[11px] font-bold text-neutral-400 dark:text-neutral-500">
+                  {n.time}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    )}
+
+    <div className="border-t border-neutral-200 p-2 dark:border-neutral-800">
+      <button
+        type="button"
+        onClick={onViewAll}
+        className="w-full rounded-xl bg-[#4B45FF]/10 px-4 py-2.5 text-[13px] font-bold text-[#2E40DC] transition-colors duration-150 hover:bg-[#4B45FF]/20 dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]"
+      >
+        View all notifications
+      </button>
+    </div>
+  </motion.div>
+);
+
 const Header = () => {
   const {
     userDetails,
@@ -252,8 +485,6 @@ const Header = () => {
     fetchUserProfile,
     clearUserData,
   } = useUser();
-
-  const { darkMode, toggleDarkMode } = useTheme();
 
   // Campus marketplace scope (locked for members — changed only via
   // Settings; guests may switch their browse campus freely).
@@ -264,6 +495,7 @@ const Header = () => {
     selectCampus,
   } = useCampus();
   const [showCampusDropdown, setShowCampusDropdown] = useState(false);
+  const [showMobileCampus, setShowMobileCampus] = useState(false);
 
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -275,10 +507,16 @@ const Header = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showmenu, setShowmenu] = useState(false);
-  const [notification] = useState(1);
+  const [unreadCount, setUnreadCount] = useState(() =>
+    unreadCountOf(loadNotifications()),
+  );
+  const [showNotif, setShowNotif] = useState(false);
+  const [notifItems, setNotifItems] = useState([]);
+  const notifRef = useRef(null);
+  const chatBadge = 1;
   const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [fade, setFade] = useState(true);
+  const [cube, setCube] = useState({ step: 0, faces: [0, 1, 2, 3] });
+  const reduceMotion = useReducedMotion();
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [recentSearches, setRecentSearches] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -305,7 +543,12 @@ const Header = () => {
       if (storedSearches) {
         const parsed = JSON.parse(storedSearches);
         if (Array.isArray(parsed)) {
-          setRecentSearches(parsed.filter((s) => typeof s === "string").slice(0, 5));
+          setRecentSearches(
+            parsed
+              .filter((s) => typeof s === "string")
+              .map((s) => s.slice(0, 100))
+              .slice(0, 5),
+          );
         }
       }
     } catch {
@@ -379,7 +622,10 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const menuRef = useRef(null);
+  const menuRefMobile = useRef(null);
+  const menuRefDesktop = useRef(null);
+  const campusRef = useRef(null);
+  const campusRefMobile = useRef(null);
   const searchInputRef = useRef(null);
 
   useEffect(() => {
@@ -398,7 +644,6 @@ const Header = () => {
       setShowDropdown(false);
     }
   }, [location.pathname]);
-
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
       setResults([]);
@@ -463,29 +708,48 @@ const Header = () => {
       .finally(() => setTrendingLoading(false));
   };
 
+  // Sync trending with the active campus: a switch drops stale picks and
+  // refetches for the new marketplace.
   useEffect(() => {
-    let timeoutId;
+    setTrending([]);
+    setTrendingLoading(true);
+    getTrendingProducts(campusSlug ? { campus_slug: campusSlug } : undefined)
+      .then((res) => setTrending(res.data?.data || []))
+      .catch(() => {})
+      .finally(() => setTrendingLoading(false));
+  }, [campusSlug]);
+
+  // True 3D cube: the 4 side faces each carry a word and the whole cube
+  // steps forward 90° every interval. The face rotating to the back is
+  // re-inked with the upcoming word while hidden, so all 11 words cycle
+  // through one continuous cube. At step s the front face is s % 4 and
+  // the back face is (s + 2) % 4, which next fronts at s + 2.
+  useEffect(() => {
+    const total = placeholderWords.length;
     const interval = setInterval(() => {
-      setFade(false);
-
-      timeoutId = setTimeout(() => {
-        setPlaceholderIndex((prev) => (prev + 1) % placeholderWords.length);
-
-        setFade(true);
-      }, 300);
-    }, 2500);
+      setCube((prev) => {
+        const ns = prev.step + 1;
+        const next = [...prev.faces];
+        next[(ns + 2) % 4] = (ns + 2) % total;
+        return { step: ns, faces: next };
+      });
+    }, 2600);
 
     return () => {
       clearInterval(interval);
-      clearTimeout(timeoutId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!showmenu) return;
 
     const handleOutsideInteraction = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      const target = event.target;
+      const insideAnyMenu =
+        (menuRefMobile.current && menuRefMobile.current.contains(target)) ||
+        (menuRefDesktop.current && menuRefDesktop.current.contains(target));
+      if (!insideAnyMenu) {
         setShowmenu(false);
       }
     };
@@ -506,6 +770,99 @@ const Header = () => {
       window.removeEventListener("scroll", handleScroll);
     };
   }, [showmenu]);
+
+  const refreshNotifs = () => {
+    const list = loadNotifications();
+    setNotifItems(latestFirst(list).slice(0, 5));
+    setUnreadCount(unreadCountOf(list));
+  };
+
+  const toggleNotif = () => {
+    if (!showNotif) refreshNotifs();
+    setShowNotif((prev) => !prev);
+  };
+
+  const openNotif = (item) => {
+    markStoredRead(item.id);
+    setNotifItems((current) =>
+      current.map((n) => (n.id === item.id ? { ...n, unread: false } : n)),
+    );
+    setUnreadCount((c) => Math.max(0, c - (item.unread ? 1 : 0)));
+    setShowNotif(false);
+    navigate(item.actionPath);
+  };
+
+  const markAllNotifRead = () => {
+    markStoredAllRead();
+    setNotifItems((current) => current.map((n) => ({ ...n, unread: false })));
+    setUnreadCount(0);
+  };
+
+  // Keep badge/count in sync when returning from the Notifications page
+  // (Header persists across route changes).
+  useEffect(() => {
+    refreshNotifs();
+  }, [location.pathname]);
+
+  // Notification dropdown: close on outside click, Escape, or scroll.
+  useEffect(() => {
+    if (!showNotif) return;
+
+    const handleOutsideNotif = (event) => {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotif(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setShowNotif(false);
+    };
+
+    const handleScroll = () => {
+      setShowNotif(false);
+    };
+
+    document.addEventListener("mousedown", handleOutsideNotif);
+    document.addEventListener("keydown", handleEscape);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideNotif);
+      document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [showNotif]);
+
+  // Location dropdowns (desktop + mobile): close on outside click or Escape.
+  useEffect(() => {
+    if (!showCampusDropdown && !showMobileCampus) return;
+
+    const handleOutsideCampus = (event) => {
+      const inDesktop =
+        campusRef.current && campusRef.current.contains(event.target);
+      const inMobile =
+        campusRefMobile.current && campusRefMobile.current.contains(event.target);
+      if (!inDesktop && !inMobile) {
+        setShowCampusDropdown(false);
+        setShowMobileCampus(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setShowCampusDropdown(false);
+        setShowMobileCampus(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideCampus);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideCampus);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showCampusDropdown, showMobileCampus]);
 
   useEffect(() => {
     if (!showMobileSearch) return;
@@ -636,14 +993,15 @@ const Header = () => {
   const goToSignup = () => navigate("/signup");
 
   const saveRecentSearch = (searchTerm) => {
-    if (!searchTerm.trim()) return;
+    const clean = String(searchTerm || "").trim().slice(0, 100);
+    if (!clean) return;
 
     // Functional update: rapid consecutive saves never clobber each other.
     setRecentSearches((prev) => {
       const updatedSearches = [
-        searchTerm,
+        clean,
         ...prev.filter(
-          (item) => item.toLowerCase() !== searchTerm.toLowerCase(),
+          (item) => item.toLowerCase() !== clean.toLowerCase(),
         ),
       ].slice(0, 5);
 
@@ -664,6 +1022,13 @@ const Header = () => {
     } catch {
       // ignore
     }
+  };
+
+  // Suggestion click also persists the typed query for recents.
+  const handleSuggestionSelect = () => {
+    const q = query.trim().slice(0, 100);
+    if (q) saveRecentSearch(q);
+    setShowDropdown(false);
   };
 
   const handleLogoutClick = async () => {
@@ -691,12 +1056,10 @@ const Header = () => {
     sticky
     top-0
     z-50
-    border-b
-    border-neutral-200
-    bg-white/95
-    backdrop-blur-xl
-    dark:border-neutral-800
-    dark:bg-[#131313]
+    px-3
+    pt-3
+    sm:px-6
+    dark:bg-transparent
     font-figtree
     transition-transform
     duration-300
@@ -704,50 +1067,104 @@ const Header = () => {
     ${showHeader ? "translate-y-0" : "-translate-y-full"}
   `}
       >
-        <div className="mx-auto flex h-14 sm:h-16 w-full max-w-[1380px] items-center justify-between px-6 sm:px-8 md:px-11 lg:px-14 2xl:px-0">
-          {/* Mobile Navbar */}
-          <div className="flex w-full items-center justify-between sm:hidden">
-            <Link to="/" className="flex items-center gap-2">
-              <img
-                src="/logo.svg"
-                alt="Unideals home"
-                className="h-11 w-11 object-cover"
+        <div className="mx-auto flex h-14 w-full max-w-[1380px] min-w-0 items-center justify-between rounded-2xl border border-[#ECEEF3] bg-[#F7F8FA] px-3 sm:h-16 sm:px-5 shadow-[0_10px_36px_-16px_rgba(23,27,80,0.22)] dark:border-neutral-800 dark:bg-[#1A1D20] dark:shadow-[0_10px_36px_-16px_rgba(0,0,0,0.7)]">
+          {/* Mobile Navbar — single row: brand + icon actions */}
+          <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:hidden">
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
+            <Link
+              to="/"
+              aria-label="Unideals home"
+              className="flex h-10 shrink-0 items-center"
+            >
+              <Wordmark
+                fontSize={16}
+                fontWeight={500}
+                letterSpacing={0}
+                className="text-[#000000] dark:text-white"
               />
-
-              <span className="text-base font-medium text-[#000000] dark:text-white">
-                Unideals
-              </span>
             </Link>
 
-            <div className="flex items-center gap-5">
-              <button
-                onClick={toggleDarkMode}
-                className="transition-transform duration-200 active:scale-95"
-                aria-label="Toggle Theme"
-              >
-                {darkMode ? (
-                  <MdSunny className="size-4 text-[#FFD119]" />
-                ) : (
-                  <HiMiniMoon className="size-4 text-[#323232] dark:text-white" />
-                )}
-              </button>
+            <div className="flex min-w-0 shrink-0 items-center gap-1">
+              <ThemeToggle size="sm" />
+
+              {isLoggedIn && (
+                <button
+                  onClick={() => navigate("/notification")}
+                  className="relative rounded-full p-2 transition-transform duration-200 active:scale-95"
+                  aria-label="Notifications"
+                >
+                  <IoNotificationsOutline
+                    size={22}
+                    className="text-[#090A0B] dark:text-neutral-300"
+                  />
+                  {unreadCount > 0 && (
+                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[10px] font-bold text-white">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+              )}
 
               <button
                 onClick={() => {
                   setShowMobileSearch(true);
                   setShowDropdown(false);
                 }}
-                className="transition-transform duration-200 active:scale-95"
+                className="rounded-full p-2 transition-transform duration-200 active:scale-95"
                 aria-label="Open Search"
               >
                 <CiSearch
                   size={22}
-                  className="text-[#090A0B] dark:text-neutral-400"
+                  className="text-[#090A0B] dark:text-neutral-300"
                 />
               </button>
 
+              {activeCampus &&
+                (isLoggedIn ? (
+                  <span
+                    title="Your campus marketplace. Change it in Settings."
+                    className="rounded-full p-2"
+                  >
+                    <GrLocation
+                      size={22}
+                      className="text-[#2E4BFF] dark:text-[#A5B0FF]"
+                    />
+                  </span>
+                ) : (
+                  <span className="relative" ref={campusRefMobile}>
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileCampus((prev) => !prev)}
+                      title="Choose a campus to browse"
+                      aria-expanded={showMobileCampus}
+                      aria-haspopup="listbox"
+                      aria-label="Choose a campus to browse"
+                      className="block rounded-full p-2 transition-transform duration-200 active:scale-95"
+                    >
+                      <GrLocation
+                        size={22}
+                        className="text-[#2E4BFF] dark:text-[#A5B0FF]"
+                      />
+                    </button>
+
+                    <AnimatePresence>
+                      {showMobileCampus && (
+                        <CampusDropdown
+                          campuses={campuses}
+                          activeSlug={activeCampus.slug}
+                          alignClass="right-0 w-64 max-w-[calc(100vw-3rem)]"
+                          onPick={(slug) => {
+                            selectCampus(slug);
+                            setShowMobileCampus(false);
+                          }}
+                        />
+                      )}
+                    </AnimatePresence>
+                  </span>
+                ))}
+
               {isLoggedIn ? (
-                <div className="relative">
+                <div className="relative" ref={menuRefMobile}>
                   <button
                     onClick={handleMenu}
                     className="transition-transform duration-200 active:scale-95"
@@ -769,7 +1186,6 @@ const Header = () => {
                       <ProfileDropdown
                         userDetails={userDetails}
                         userLoading={userLoading}
-                        menuRef={menuRef}
                         onClose={() => setShowmenu(false)}
                         onLogout={handleLogoutClick}
                         mobile
@@ -778,7 +1194,7 @@ const Header = () => {
                   </AnimatePresence>
                 </div>
               ) : (
-                <div className="relative">
+                <div className="relative" ref={menuRefMobile}>
                   <button
                     onClick={handleMenu}
                     className="
@@ -798,7 +1214,6 @@ const Header = () => {
                   <AnimatePresence>
                     {showmenu && (
                       <motion.div
-                        ref={menuRef}
                         initial={{ opacity: 0, y: 8, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -808,7 +1223,7 @@ const Header = () => {
                         }}
                         className="
           absolute
-          right-0
+          -right-3
           top-full
           z-50
           mt-3
@@ -817,10 +1232,11 @@ const Header = () => {
           rounded-2xl
           border
           border-neutral-200
-          bg-white
+          bg-[#F7F8FA]
           shadow-2xl
           dark:border-neutral-800
           dark:bg-[#1A1D20]
+          sm:-right-4
         "
                       >
                         <div className="p-3">
@@ -874,6 +1290,7 @@ const Header = () => {
                 </div>
               )}
             </div>
+            </div>
           </div>
 
           <AnimatePresence>
@@ -890,7 +1307,7 @@ const Header = () => {
         fixed
         inset-0
         z-[100]
-        bg-white
+        bg-[#F7F8FA]
         dark:bg-[#131313]
         sm:hidden
       "
@@ -983,7 +1400,7 @@ const Header = () => {
                 </div>
 
                 {/* Results */}
-                <div className="h-[calc(100vh-56px)] overflow-y-auto bg-white dark:bg-[#131313]">
+                <div className="h-[calc(100vh-56px)] overflow-y-auto bg-[#F7F8FA] dark:bg-[#131313]">
                   {showDropdown && query.trim() ? (
                     <SearchDropdown
                       results={results}
@@ -998,9 +1415,7 @@ const Header = () => {
                       hasSearched={hasSearched}
                       selectedIndex={selectedIndex}
                       setSelectedIndex={setSelectedIndex}
-                      onSelect={() => {
-                        setShowDropdown(false);
-                      }}
+                      onSelect={handleSuggestionSelect}
                     />
                   ) : (
                     <div className="px-4 py-5">
@@ -1024,7 +1439,7 @@ const Header = () => {
                 rounded-full
                 border
                 border-neutral-200
-                bg-neutral-50
+                bg-[#F7F8FA]
                 px-4
                 py-2
                 text-sm
@@ -1067,7 +1482,9 @@ const Header = () => {
                               onClick={() => {
                                 saveRecentSearch(item);
 
-                                navigate(`/search?q=${encodeURIComponent(item)}`);
+                                navigate(
+                                  `/search?q=${encodeURIComponent(item)}`,
+                                );
 
                                 setShowMobileSearch(false);
                                 setShowDropdown(false);
@@ -1139,7 +1556,10 @@ const Header = () => {
                                 </span>
                                 {item.selling_price != null && (
                                   <span className="shrink-0 text-xs font-bold text-[#394FF1]">
-                                    ₹{Number(item.selling_price).toLocaleString("en-IN")}
+                                    ₹
+                                    {Number(item.selling_price).toLocaleString(
+                                      "en-IN",
+                                    )}
                                   </span>
                                 )}
                               </button>
@@ -1154,50 +1574,57 @@ const Header = () => {
             )}
           </AnimatePresence>
 
-          {/* Desktop Navbar */}
-          <div className="hidden w-full items-center justify-between sm:flex">
-            {/* Logo */}
-            <Link to="/" className="flex shrink-0 items-center">
-              <img
-                src="/logo.svg"
-                alt="Unideals home"
-                className="h-11 w-11 object-cover"
+          {/* Desktop Navbar — single locked row: logo | campus | search | icons | sell+avatar.
+              Nothing wraps or drops at any width: fixed items are shrink-0
+              with truncation, only the search field flexes. */}
+          <div className="hidden w-full min-w-0 flex-nowrap items-center gap-2 sm:flex md:gap-3 lg:gap-4">
+            {/* Logo — SVG wordmark; hovering morphs the U into the logo mark */}
+            <Link
+              to="/"
+              aria-label="Unideals home"
+              className="flex h-11 shrink-0 items-center"
+            >
+              <Wordmark
+                fontSize={19}
+                fontWeight={700}
+                letterSpacing={-0.5}
+                className="text-[#000000] dark:text-white"
               />
-
-              <span className="text-xl md:text-lg lg:text-xl font-semibold text-[#000000] dark:text-white">
-                Unideals
-              </span>
             </Link>
 
-            {/* Campus — full name; locked for members, switchable for guests */}
+            <span
+              aria-hidden="true"
+              className="h-6 w-px mx-1 shrink-0 bg-[#ECEEF3] dark:bg-neutral-800"
+            />
+
+            {/* Campus — pill; locked for members (opens Settings), switchable for guests */}
             {activeCampus ? (
-              <div className="relative ml-3 xl:ml-5">
+              <div className="relative min-w-0 max-w-[38vw] shrink-0 sm:max-w-[210px] lg:max-w-none" ref={campusRef}>
                 {isLoggedIn ? (
                   <div title="Your campus marketplace. Change it in Settings.">
                     <div
                       className="
       flex
+      cursor-default
       items-center
+      min-w-0
       gap-2
       rounded-xl
-      border
-      border-[#F2F4F8]
-      bg-white
-      px-2 xl:px-3
-      py-2
-      dark:border-neutral-700
-      dark:bg-[#1A1D20]
+      bg-[#F3F4F6]
+      px-4
+      py-2.5
+      dark:bg-neutral-800
     "
                     >
-                      <GrLocation className="size-4 shrink-0 text-[#2E40DC]" />
+                      <GrLocation className="size-[18px] shrink-0 text-[#2E4BFF] dark:text-[#A5B0FF]" />
 
-                      <span className="hidden whitespace-nowrap text-sm font-medium text-[#090A0B] xl:block dark:text-white">
+                      <span className="hidden min-w-0 flex-1 truncate whitespace-nowrap text-sm font-semibold text-[#111111] lg:block dark:text-white">
                         {activeCampus.name}
                       </span>
 
                       <LuLock
                         size={12}
-                        className="hidden shrink-0 text-neutral-400 xl:block"
+                        className="hidden shrink-0 text-neutral-400 md:block dark:text-neutral-500"
                       />
                     </div>
                   </div>
@@ -1208,37 +1635,38 @@ const Header = () => {
                       onClick={() => setShowCampusDropdown((prev) => !prev)}
                       title="Choose a campus to browse"
                       aria-expanded={showCampusDropdown}
+                      aria-haspopup="listbox"
                       className="
+      group
       flex
+      w-full
+      min-w-0
       items-center
       gap-2
       rounded-xl
-      border
-      border-[#F2F4F8]
-      bg-white
-      px-2 xl:px-3
-      py-2
-      transition-all
+      bg-[#F3F4F6]
+      px-4
+      py-2.5
+      transition-colors
       duration-200
-      hover:bg-neutral-100
-      dark:border-neutral-700
-      dark:bg-[#1A1D20]
-      dark:hover:bg-neutral-800
+      hover:bg-[#ECEEF4]
+      dark:bg-neutral-800
+      dark:hover:bg-neutral-700
     "
                     >
-                      <GrLocation className="size-4 shrink-0 text-[#2E40DC]" />
+                      <GrLocation className="size-[18px] shrink-0 text-[#2E4BFF] dark:text-[#A5B0FF]" />
 
-                      <span className="hidden whitespace-nowrap text-sm font-medium text-[#090A0B] xl:block dark:text-white">
+                      <span className="hidden min-w-0 flex-1 truncate whitespace-nowrap text-sm font-semibold text-[#111111] lg:block dark:text-white">
                         {activeCampus.name}
                       </span>
 
                       <svg
-                        className={`hidden h-4 w-4 shrink-0 transition-transform duration-200 xl:block ${
+                        className={`h-3.5 w-3.5 shrink-0 text-neutral-500 transition-transform duration-200 group-hover:text-[#2E4BFF] dark:text-neutral-400 ${
                           showCampusDropdown ? "rotate-180" : ""
                         }`}
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2"
+                        strokeWidth={2.5}
                         viewBox="0 0 24 24"
                       >
                         <path
@@ -1251,65 +1679,14 @@ const Header = () => {
 
                     <AnimatePresence>
                       {showCampusDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                          transition={{
-                            duration: 0.18,
-                            ease: [0.22, 1, 0.36, 1],
+                        <CampusDropdown
+                          campuses={campuses}
+                          activeSlug={activeCampus.slug}
+                          onPick={(slug) => {
+                            selectCampus(slug);
+                            setShowCampusDropdown(false);
                           }}
-                          className="
-          absolute
-          left-0
-          top-full
-          z-50
-          mt-2
-          w-52
-          overflow-hidden
-          rounded-2xl
-          border
-          border-[#EEF1F5]
-          bg-white
-          shadow-2xl
-          dark:border-neutral-800
-          dark:bg-[#1A1D20]
-        "
-                        >
-                          {(campuses || []).map((c) => (
-                            <button
-                              key={c.slug}
-                              type="button"
-                              onClick={() => {
-                                selectCampus(c.slug);
-                                setShowCampusDropdown(false);
-                              }}
-                              className={`
-              flex
-              w-full
-              items-center
-              gap-3
-              px-4
-              py-3
-              text-left
-              text-sm
-              transition-colors
-              duration-200
-              hover:bg-neutral-100
-              dark:hover:bg-neutral-800
-              ${
-                activeCampus.slug === c.slug
-                  ? "bg-blue-50 text-[#2E40DC] dark:bg-blue-950/30"
-                  : "text-neutral-700 dark:text-neutral-200"
-              }
-            `}
-                            >
-                              <GrLocation className="size-4 shrink-0" />
-
-                              {c.name}
-                            </button>
-                          ))}
-                        </motion.div>
+                        />
                       )}
                     </AnimatePresence>
                   </>
@@ -1320,7 +1697,14 @@ const Header = () => {
             )}
 
             {/* Search */}
-            <div className="data-search-dropdown relative mx-3 min-w-0 flex-1 max-w-md items-center lg:max-w-none xl:mx-6 xl:mr-80 xl:max-w-md">
+            <div
+              className="data-search-dropdown relative w-full min-w-0 max-w-[220px] flex-1 sm:max-w-[180px] md:max-w-[220px] lg:max-w-[320px] xl:ml-2 xl:max-w-[420px]"
+              data-search-dropdown
+            >
+              <CiSearch
+                size={20}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#111111] dark:text-neutral-300"
+              />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -1410,59 +1794,84 @@ const Header = () => {
                   ensureTrending();
                   setShowDropdown(true);
                 }}
-                className="h-10 w-full rounded-xl border border-[#eaecec]
-bg-gradient-to-b from-[#FFFFFF] to-[#f4f4f5]
-dark:bg-none
-pl-9 pr-28 text-sm text-[#64707D]
+                className="h-11 w-full min-w-0 rounded-xl border border-transparent
+bg-[#F3F4F6]
+dark:bg-neutral-800
+pl-11 pr-4 text-sm text-[#111111]
 outline-none
-focus:border-[#3838EC] focus:ring-5 focus:ring-blue-100
-dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-950"
+transition-colors
+duration-200
+placeholder:text-[#9AA0AE]
+hover:bg-[#ECEEF2]
+focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#3838EC]/10
+dark:text-white dark:placeholder:text-neutral-500 dark:hover:bg-neutral-700 dark:focus:bg-[#1A1D20] dark:focus:ring-[#3838EC]/20
+lg:pr-24"
               />
 
               {search === "" && (
-                <span className="pointer-events-none absolute left-5 xl:left-9 top-1/2 flex -translate-y-1/2 items-center gap-1 text-sm">
-                  <span className="text-[#64707D] dark:text-neutral-400">
+                <span className="pointer-events-none absolute left-11 top-1/2 flex max-w-[calc(100%-4rem)] -translate-y-1/2 items-center gap-1 truncate text-sm lg:max-w-[calc(100%-7rem)]">
+                  <span className="shrink-0 text-[#9AA0AE] dark:text-neutral-500">
                     Search for
                   </span>
 
-                  <span
-                    className={`text-[#3838EC] transition-opacity duration-500 ${
-                      fade ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
-                    {placeholderWords[placeholderIndex]}
+                  {/* True 3D cube: all four side faces carry a word and the
+                      whole cube steps forward — front face rolls away over
+                      the top edge while the next face rolls up from below. */}
+                  <span className="relative inline-flex min-w-0 [perspective:600px]">
+                    {reduceMotion ? (
+                      <span className="truncate font-medium text-[#2E4BFF] dark:text-[#8FA2FF]">
+                        {placeholderWords[cube.faces[0]]}
+                      </span>
+                    ) : (
+                      <motion.span
+                        animate={{ rotateX: -90 * cube.step }}
+                        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                        className="relative block h-[22px] w-[128px] [transform-style:preserve-3d]"
+                      >
+                        {[0, 1, 2, 3].map((face) => (
+                          <span
+                            key={face}
+                            aria-hidden={face !== cube.step % 4}
+                            className="absolute inset-0 flex items-center overflow-hidden [backface-visibility:hidden]"
+                            style={{
+                              transform: `rotateX(${face * 90}deg) translateZ(11px)`,
+                            }}
+                          >
+                            <span className="truncate font-medium text-[#2E4BFF] dark:text-[#8FA2FF]">
+                              {placeholderWords[cube.faces[face]]}
+                            </span>
+                          </span>
+                        ))}
+                      </motion.span>
+                    )}
                   </span>
                 </span>
               )}
 
               {search === "" && (
-                <div className="absolute right-12 xl:right-16 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+                <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-md bg-[#F7F8FA] py-[3px] pl-1.5 pr-1.5 shadow-[0_1px_2px_rgba(23,27,80,0.12)] ring-1 ring-[#E3E6EC] lg:flex dark:bg-[#232323] dark:shadow-none dark:ring-neutral-700">
                   {isMac ? (
                     <>
-                      <kbd className="rounded-md border border-neutral-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-600 dark:bg-[#232323] dark:text-neutral-400">
+                      <kbd className="font-sans text-[10px] font-semibold leading-none text-neutral-400 dark:text-neutral-500">
                         ⌘
                       </kbd>
-                      <kbd className="rounded-md border border-neutral-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-600 dark:bg-[#232323] dark:text-neutral-400">
+                      <kbd className="font-sans text-[10px] font-semibold leading-none text-neutral-400 dark:text-neutral-500">
                         K
                       </kbd>
                     </>
                   ) : (
                     <>
-                      <kbd className="rounded-md border border-neutral-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-600 dark:bg-[#232323] dark:text-neutral-400">
+                      <kbd className="font-sans text-[10px] font-semibold uppercase leading-none tracking-wide text-neutral-400 dark:text-neutral-500">
                         Ctrl
                       </kbd>
-                      <kbd className="rounded-md border border-neutral-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-600 dark:bg-[#232323] dark:text-neutral-400">
+                      <span className="h-2.5 w-px bg-[#E3E6EC] dark:bg-neutral-700" />
+                      <kbd className="font-sans text-[10px] font-semibold leading-none text-neutral-400 dark:text-neutral-500">
                         K
                       </kbd>
                     </>
                   )}
                 </div>
               )}
-
-              <CiSearch
-                size={22}
-                className="absolute right-3 xl:right-7 top-1/2 -translate-y-1/2 text-[#090A0B] dark:text-neutral-400"
-              />
 
               {showDropdown && (
                 <SearchDropdown
@@ -1477,112 +1886,149 @@ dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-white dark:focus:ring-blue-9
                   hasSearched={hasSearched}
                   selectedIndex={selectedIndex}
                   setSelectedIndex={setSelectedIndex}
-                  onSelect={() => {
-                    setShowDropdown(false);
-                  }}
+                  onSelect={handleSuggestionSelect}
                 />
               )}
             </div>
 
             {/* Actions */}
-            <div className="flex shrink-0 items-center gap-3 lg:gap-4 xl:gap-7">
+            <div className="flex min-w-0 flex-1 items-center">
               {isLoggedIn ? (
                 <>
-                  <button
-                    onClick={toggleDarkMode}
-                    className="transition-transform duration-200 hover:scale-105"
-                    aria-label="Toggle Theme"
-                  >
-                    {darkMode ? (
-                      <MdSunny className="size-5 text-[#FFD119]" />
-                    ) : (
-                      <HiMiniMoon className="size-5 text-[#323232] dark:text-white" />
-                    )}
-                  </button>
+                  <div className="flex min-w-0 flex-1 items-center justify-end gap-1 pr-1 sm:gap-2 lg:gap-3 xl:gap-4">
+                    <span
+                      aria-hidden="true"
+                      className="mr-1 hidden h-6 w-px bg-[#ECEEF3] md:block dark:bg-neutral-800"
+                    />
 
-                  <button className="relative" aria-label="Notifications">
-                    <IoNotificationsOutline className="size-6 text-[#323232] dark:text-[#848484]" />
+                    <ThemeToggle />
 
-                    {notification > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
-                        {notification}
-                      </span>
-                    )}
-                  </button>
+                    <div className="relative shrink-0" ref={notifRef}>
+                      <button
+                        onClick={toggleNotif}
+                        className="relative rounded-full p-2 transition-colors duration-200 hover:bg-[#F3F4F6] dark:hover:bg-neutral-800"
+                        aria-label="Notifications"
+                        aria-expanded={showNotif}
+                      >
+                        <IoNotificationsOutline className="size-[22px] text-[#111111] dark:text-neutral-200" />
 
-                  <Link to="/chat" className="relative">
-                    <LuMessageSquare className="size-6 text-[#323232] dark:text-[#848484]" />
+                        {unreadCount > 0 && (
+                          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[10px] font-bold text-white">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </button>
 
-                    {notification > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#3838EC] px-1 text-[10px] font-medium text-white">
-                        {notification}
-                      </span>
-                    )}
-                  </Link>
+                      <AnimatePresence>
+                        {showNotif && (
+                          <NotifDropdown
+                            items={notifItems}
+                            unread={unreadCount}
+                            onOpen={openNotif}
+                            onMarkAll={markAllNotifRead}
+                            onViewAll={() => {
+                              setShowNotif(false);
+                              navigate("/notification");
+                            }}
+                          />
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <Link
+                      to="/chat"
+                      className="relative shrink-0 rounded-full p-2 transition-colors duration-200 hover:bg-[#F3F4F6] dark:hover:bg-neutral-800"
+                      aria-label="Chat"
+                    >
+                      <LuMessageSquare className="size-[22px] text-[#111111] dark:text-neutral-200" />
+
+                      {chatBadge > 0 && (
+                        <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#2E4BFF] px-1 text-[10px] font-bold text-white">
+                          {chatBadge}
+                        </span>
+                      )}
+                    </Link>
+
+                    <span
+                      aria-hidden="true"
+                      className="mr-1 hidden h-6 w-px bg-[#dbdde0] sm:mr-2 md:block lg:mr-3 xl:mr-4 dark:bg-neutral-800"
+                    />
+                  </div>
+
+                  <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
                   <Link
                     to="/upload"
-                    className="flex items-center gap-2 rounded-lg bg-[#3838EC] px-4 lg:px-5 py-2 text-base font-medium text-[#FCFCFC] transition-all duration-200 hover:scale-[1.02]"
+                    className="flex shrink-0 items-center gap-2 rounded-lg bg-[#3838EC] px-3 py-2 text-sm font-medium text-[#FCFCFC] transition-all duration-200 hover:scale-[1.02] md:px-4 md:text-base lg:px-5"
                   >
-                    <span>Sell</span>
-                    <FaPlus className="size-3" />
-                  </Link>
+                      <span>Sell</span>
+                      <FaPlus className="size-3" />
+                    </Link>
 
-                  <div className="relative">
-                    <button
-                      onClick={handleMenu}
-                      className="transition-all duration-200 hover:scale-105"
-                    >
-                      <AvatarComponent
-                        name={userDetails?.name}
-                        imageUrl={userDetails?.avatar?.url}
-                        size="medium"
-                        plan={userDetails?.subscription}
-                        isLoading={userLoading}
-                        className="rounded-full"
-                        showBadge
-                      />
-                    </button>
-
-                    <AnimatePresence>
-                      {showmenu && (
-                        <ProfileDropdown
-                          userDetails={userDetails}
-                          userLoading={userLoading}
-                          menuRef={menuRef}
-                          onClose={() => setShowmenu(false)}
-                          onLogout={handleLogoutClick}
+                    <div className="relative shrink-0" ref={menuRefDesktop}>
+                      <button
+                        onClick={handleMenu}
+                        aria-label="Open profile menu"
+                        aria-expanded={showmenu}
+                        className="flex items-center gap-0.5 rounded-full p-0.5 transition-colors duration-200 hover:bg-[#F3F4F6] dark:hover:bg-neutral-800"
+                      >
+                        <AvatarComponent
+                          name={userDetails?.name}
+                          imageUrl={userDetails?.avatar?.url}
+                          size="medium"
+                          plan={userDetails?.subscription}
+                          isLoading={userLoading}
+                          className="rounded-full"
+                          showBadge
                         />
-                      )}
-                    </AnimatePresence>
+                        <svg
+                          className={`h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-200 dark:text-neutral-400 ${
+                            showmenu ? "rotate-180" : ""
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </button>
+
+                      <AnimatePresence>
+                        {showmenu && (
+                          <ProfileDropdown
+                            userDetails={userDetails}
+                            userLoading={userLoading}
+                            onClose={() => setShowmenu(false)}
+                            onLogout={handleLogoutClick}
+                          />
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </>
               ) : (
                 <>
-                  <button
-                    onClick={toggleDarkMode}
-                    className="transition-transform duration-200 hover:scale-105"
-                    aria-label="Toggle Theme"
-                  >
-                    {darkMode ? (
-                      <MdSunny className="size-5 text-[#FFD119]" />
-                    ) : (
-                      <HiMiniMoon className="size-5 text-[#323232] dark:text-white" />
-                    )}
-                  </button>
+                  <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+                    <ThemeToggle className="mr-4 sm:mr-5" />
 
-                  <button
-                    onClick={goToSignup}
-                    className="text-base lg:text-base md:text-sm font-medium text-[#090A0B] transition-colors duration-200 hover:text-black dark:text-neutral-300 dark:hover:text-white"
-                  >
-                    Sign up
-                  </button>
+                    <button
+                      onClick={goToSignup}
+                      className="text-base lg:text-base md:text-sm font-medium text-[#090A0B] transition-colors duration-200 hover:text-black dark:text-neutral-300 dark:hover:text-white"
+                    >
+                      Sign up
+                    </button>
 
-                  <button
-                    onClick={goToLogin}
-                    className="rounded-xl bg-[#1E1E1E] px-6 xl:px-7 py-2 text-base lg:text-base md:text-sm font-medium text-white transition-all duration-200 hover:scale-[1.01] dark:bg-white dark:text-black"
-                  >
-                    Login
-                  </button>
+                    <button
+                      onClick={goToLogin}
+                      className="rounded-xl bg-[#1E1E1E] px-6 xl:px-7 py-2 text-base lg:text-base md:text-sm font-medium text-white transition-all duration-200 hover:scale-[1.01] dark:bg-white dark:text-black"
+                    >
+                      Login
+                    </button>
+                  </div>
                 </>
               )}
             </div>

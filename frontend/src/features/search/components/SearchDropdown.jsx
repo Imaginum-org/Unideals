@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef } from "react";
-import { ikFirstThumb } from "../../../Utils/imageTransform.js";
+import { ikFirstThumb } from "../../../utils/imageTransform.js";
 
 const INR = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -85,10 +85,10 @@ duration-150
 
 ${
   selectedIndex === index
-    ? "bg-blue-100 dark:bg-blue-950/30"
-    : mobile
-      ? "active:bg-neutral-100 dark:active:bg-neutral-800"
-      : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
+      ? "bg-blue-100 dark:bg-blue-950/30"
+      : mobile
+        ? "active:bg-[#4B45FF]/[0.15] dark:active:bg-[#4B45FF]/25"
+        : "hover:bg-[#4B45FF]/10 dark:hover:bg-[#4B45FF]/20"
 }
 
 ${mobile ? "px-4 py-3" : "px-3 py-2.5"}
@@ -140,7 +140,7 @@ ${mobile ? "px-4 py-3" : "px-3 py-2.5"}
         mobile
           ? `
             min-h-full
-            bg-white
+            bg-[#F7F8FA]
             dark:bg-[#131313]
             pb-24
           `
@@ -155,7 +155,7 @@ ${mobile ? "px-4 py-3" : "px-3 py-2.5"}
             rounded-2xl
             border
             border-neutral-200
-            bg-white
+            bg-[#F7F8FA]
             shadow-2xl
             dark:border-neutral-800
             dark:bg-[#1A1D20]
@@ -200,7 +200,7 @@ ${mobile ? "px-4 py-3" : "px-3 py-2.5"}
                     key={term}
                     to={`/search?q=${encodeURIComponent(term)}`}
                     onClick={() => onSelect?.()}
-                    className="block truncate rounded-lg px-2 py-2 text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    className="block truncate rounded-lg px-2 py-2 text-sm text-neutral-700 hover:bg-[#4B45FF]/10 hover:text-[#2E40DC] dark:text-neutral-300 dark:hover:bg-[#4B45FF]/20 dark:hover:text-[#C3C9FF]"
                   >
                     {term}
                   </Link>
@@ -263,7 +263,7 @@ ${mobile ? "px-4 py-3" : "px-3 py-2.5"}
               ${
                 mobile
                   ? "px-4 py-5"
-                  : "p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900"
+                  : "p-3 hover:bg-[#4B45FF]/10 dark:hover:bg-[#4B45FF]/20"
               }
             `}
           >

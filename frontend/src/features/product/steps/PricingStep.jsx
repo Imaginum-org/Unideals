@@ -89,6 +89,22 @@ const [legalTab, setLegalTab] = useState(null);
       const res = await createPickupSpot(spotData);
       const created =
         res.data?.pickupSpot || res.data?.data || { ...spotData };
+      // Never trust a fake _id-less object: refetch the list so the new
+      // spot has a real id for select + publish snapshot.
+      if (!created?._id) {
+        const refetch = await axios.get("/api/pickup-spots");
+        const spots = refetch.data?.pickupSpots || [];
+        setPickupSpots(spots);
+        const newest =
+          spots.find((s) => s.isPrimary) || spots[spots.length - 1] || spots[0];
+        if (newest) updateField("address", newest);
+        toast.success("Pickup spot added");
+        return;
+      }
+      if (pickupSpots.length + 1 > MAX_SPOTS) {
+        toast.error(`Maximum ${MAX_SPOTS} pickup spots allowed`);
+        return;
+      }
       setPickupSpots((prev) => [...prev, created]);
       updateField("address", created);
       toast.success("Pickup spot added");
@@ -101,6 +117,16 @@ const [legalTab, setLegalTab] = useState(null);
     }
   };
 
+  const handleTermsChange = (checked) => {
+    updateField("termsAccepted", checked);
+    if (checked) {
+      updateField("termsVersion", "v1");
+      updateField("termsAcceptedAt", new Date().toISOString());
+    } else {
+      updateField("termsAcceptedAt", null);
+    }
+  };
+
   return (
     <>
       {legalTab && (
@@ -110,7 +136,7 @@ const [legalTab, setLegalTab] = useState(null);
           onClose={() => setLegalTab(null)}
         />
       )}
-      <div className="w-full text-black dark:text-white rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
+      <div className="w-full text-black dark:text-white rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8">
         {/* Header */}
         <div>
           <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
@@ -152,7 +178,7 @@ const [legalTab, setLegalTab] = useState(null);
                     )
                   }
                   placeholder="999"
-                  className="flex-1 bg-white -ml-2 h-full outline-none text-lg xl:text-xl font-semibold"
+                  className="flex-1 bg-[#F7F8FA] -ml-2 h-full outline-none text-lg xl:text-xl font-semibold"
                 />
               </div>
               {errors.sellingPrice && <FormError error={errors.sellingPrice} />}
@@ -180,7 +206,7 @@ const [legalTab, setLegalTab] = useState(null);
                     )
                   }
                   placeholder="1499"
-                  className="flex-1 bg-white h-full -ml-2 outline-none text-lg xl:text-xl font-semibold"
+                  className="flex-1 bg-[#F7F8FA] h-full -ml-2 outline-none text-lg xl:text-xl font-semibold"
                 />
               </div>
               {errors.originalPrice && (
@@ -208,7 +234,7 @@ const [legalTab, setLegalTab] = useState(null);
       ${formData.negotiable ? "bg-[#2E3FDC]" : "bg-[#D1D5DB]"}`}
             >
               <div
-                className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all duration-300
+                className={`absolute top-1 w-6 h-6 rounded-full bg-[#F7F8FA] transition-all duration-300
           
           ${formData.negotiable ? "translate-x-7" : "translate-x-1"}`}
               />
@@ -290,7 +316,7 @@ const [legalTab, setLegalTab] = useState(null);
                   <RequiredAsterisk />
                 </label>
 
-                <div className="mt-2 min-h-[110px] rounded-xl border bg-white p-4 flex flex-col justify-between">
+                <div className="mt-2 min-h-[110px] rounded-xl border bg-[#F7F8FA] p-4 flex flex-col justify-between">
                   <div>
                     <p className="font-medium text-[#111827]">
                       {campus?.name || "Your campus"}
@@ -314,7 +340,7 @@ const [legalTab, setLegalTab] = useState(null);
                   <RequiredAsterisk />
                 </label>
 
-                <div className="mt-2 min-h-[110px] rounded-xl border bg-white p-4 flex flex-col justify-between">
+                <div className="mt-2 min-h-[110px] rounded-xl border bg-[#F7F8FA] p-4 flex flex-col justify-between">
                   <div>
                     {loadingPickupSpot ? (
                       <p className="text-sm text-[#6B7280]">
@@ -383,7 +409,7 @@ const [legalTab, setLegalTab] = useState(null);
             </div>
 
             {/* Bottom Warning */}
-            <div className="mt-5 inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-3 text-sm text-[#4F46E5]">
+            <div className="mt-5 inline-flex items-center gap-2 rounded-xl border bg-[#F7F8FA] px-4 py-3 text-sm text-[#4F46E5]">
               <span>🛡️</span>
 
               <span>For safety, choose a public place inside campus.</span>
@@ -399,7 +425,7 @@ const [legalTab, setLegalTab] = useState(null);
               <input
                 type="checkbox"
                 checked={formData.termsAccepted}
-                onChange={(e) => updateField("termsAccepted", e.target.checked)}
+                onChange={(e) => handleTermsChange(e.target.checked)}
                 className="mt-1 h-4 w-4 accent-[#2E3FDC] bg-wh cursor-pointer"
               />
 
@@ -430,6 +456,9 @@ const [legalTab, setLegalTab] = useState(null);
                 <RequiredAsterisk />
               </p>
             </label>
+            <p className="mt-2 text-[11px] leading-5 text-[#9CA3AF]">
+              Terms v1 · accepted at publish time is recorded with your listing.
+            </p>
             {errors.termsAccepted && <FormError error={errors.termsAccepted} />}
           </div>
         </div>
