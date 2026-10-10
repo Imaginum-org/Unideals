@@ -18,7 +18,7 @@ const sendFailure = (res, error, statusCode = 400) =>
 
 export const getDashboard = async (req, res) => {
   try {
-    const data = await adminService.getDashboardMetrics();
+    const data = await adminService.getDashboardMetrics(req.query.range);
     return sendSuccess(res, "Dashboard data fetched", { data });
   } catch (error) {
     return sendFailure(res, error);

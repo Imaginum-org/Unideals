@@ -4,18 +4,26 @@ import Product from "../models/Product.model.js";
 import Campus from "../models/Campus.model.js";
 import Report from "../models/Report.model.js";
 import AuditLog from "../models/AuditLog.model.js";
+import Deal from "../models/deal.model.js";
+import Payment from "../models/Payment.model.js";
 import {
   USER_ROLES,
   USER_STATUS,
   PRODUCT_STATUS,
   REPORT_STATUS,
+  DEAL_STATUS,
+  PAYMENT_STATUS,
 } from "../config/constants.js";
 
 const { ObjectId } = mongoose.Types;
 
 // ─── Dashboard ─────────────────────────────────────────────────────────────
 
-export const getDashboardMetrics = async () => {
+export const getDashboardMetrics = async (range = "month") => {
+  const now = new Date();
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
   const [
     totalUsers,
     activeUsers,
@@ -25,7 +33,21 @@ export const getDashboardMetrics = async () => {
     blockedProducts,
     pendingReports,
     activeCampuses,
+    totalOrders,
+    paymentsAgg,
+    dealsAgg,
+    paymentsThisMonthAgg,
+    paymentsPrevMonthAgg,
+    dealsThisMonthAgg,
+    dealsPrevMonthAgg,
+    campusDistributionRaw,
     recentAuditLogs,
+    usersThisMonth,
+    usersPrevMonth,
+    productsThisMonth,
+    productsPrevMonth,
+    ordersThisMonth,
+    ordersPrevMonth,
   ] = await Promise.all([
     User.countDocuments({ role: USER_ROLES.USER }),
     User.countDocuments({ role: USER_ROLES.USER, status: USER_STATUS.ACTIVE }),
@@ -35,22 +57,174 @@ export const getDashboardMetrics = async () => {
     Product.countDocuments({ status: PRODUCT_STATUS.BLOCKED, is_deleted: false }),
     Report.countDocuments({ status: REPORT_STATUS.PENDING }),
     Campus.countDocuments({ is_active: true }),
+    Deal.countDocuments({
+      status: {
+        $in: [
+          DEAL_STATUS.COMPLETED,
+          DEAL_STATUS.PAYMENT_CONFIRMED,
+          DEAL_STATUS.DEAL_CONFIRMED,
+        ],
+      },
+    }).catch(() => 0),
+    Payment.aggregate([
+      { $match: { status: PAYMENT_STATUS.VERIFIED } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]).catch(() => []),
+    Deal.aggregate([
+      { $match: { status: DEAL_STATUS.COMPLETED } },
+      { $group: { _id: null, total: { $sum: "$current_price" } } },
+    ]).catch(() => []),
+    Payment.aggregate([
+      {
+        $match: {
+          status: PAYMENT_STATUS.VERIFIED,
+          createdAt: { $gte: startOfCurrentMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]).catch(() => []),
+    Payment.aggregate([
+      {
+        $match: {
+          status: PAYMENT_STATUS.VERIFIED,
+          createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]).catch(() => []),
+    Deal.aggregate([
+      {
+        $match: {
+          status: DEAL_STATUS.COMPLETED,
+          createdAt: { $gte: startOfCurrentMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$current_price" } } },
+    ]).catch(() => []),
+    Deal.aggregate([
+      {
+        $match: {
+          status: DEAL_STATUS.COMPLETED,
+          createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$current_price" } } },
+    ]).catch(() => []),
+    User.aggregate([
+      { $match: { role: USER_ROLES.USER, campus_id: { $ne: null } } },
+      { $group: { _id: "$campus_id", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "campuses",
+          localField: "_id",
+          foreignField: "_id",
+          as: "campus",
+        },
+      },
+      {
+        $project: {
+          campusName: { $arrayElemAt: ["$campus.name", 0] },
+          count: 1,
+        },
+      },
+    ]).catch(() => []),
     AuditLog.find({})
       .sort({ createdAt: -1 })
       .limit(8)
       .lean(),
+    User.countDocuments({
+      role: USER_ROLES.USER,
+      createdAt: { $gte: startOfCurrentMonth },
+    }).catch(() => 0),
+    User.countDocuments({
+      role: USER_ROLES.USER,
+      createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
+    }).catch(() => 0),
+    Product.countDocuments({
+      status: PRODUCT_STATUS.LISTED,
+      is_deleted: false,
+      createdAt: { $gte: startOfCurrentMonth },
+    }).catch(() => 0),
+    Product.countDocuments({
+      status: PRODUCT_STATUS.LISTED,
+      is_deleted: false,
+      createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
+    }).catch(() => 0),
+    Deal.countDocuments({
+      status: {
+        $in: [
+          DEAL_STATUS.COMPLETED,
+          DEAL_STATUS.PAYMENT_CONFIRMED,
+          DEAL_STATUS.DEAL_CONFIRMED,
+        ],
+      },
+      createdAt: { $gte: startOfCurrentMonth },
+    }).catch(() => 0),
+    Deal.countDocuments({
+      status: {
+        $in: [
+          DEAL_STATUS.COMPLETED,
+          DEAL_STATUS.PAYMENT_CONFIRMED,
+          DEAL_STATUS.DEAL_CONFIRMED,
+        ],
+      },
+      createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
+    }).catch(() => 0),
   ]);
+
+  // Payment.amount is recorded in paise in schema; divide by 100 for INR.
+  const paymentRupees = Math.round((paymentsAgg?.[0]?.total || 0) / 100);
+  const dealRupees = Math.round(dealsAgg?.[0]?.total || 0);
+  const totalRevenue = paymentRupees + dealRupees;
+
+  const paymentThisMonthRupees = Math.round((paymentsThisMonthAgg?.[0]?.total || 0) / 100);
+  const paymentPrevMonthRupees = Math.round((paymentsPrevMonthAgg?.[0]?.total || 0) / 100);
+  const dealThisMonthRupees = Math.round(dealsThisMonthAgg?.[0]?.total || 0);
+  const dealPrevMonthRupees = Math.round(dealsPrevMonthAgg?.[0]?.total || 0);
+
+  const revenueThisMonth = paymentThisMonthRupees + dealThisMonthRupees;
+  const revenuePrevMonth = paymentPrevMonthRupees + dealPrevMonthRupees;
+
+  const calculateChange = (current, previous) => {
+    if (!previous || previous === 0) {
+      if (!current || current === 0) return null;
+      return `+${current}`;
+    }
+    const diff = Math.round(((current - previous) / previous) * 100);
+    return diff >= 0 ? `+${diff}%` : `${diff}%`;
+  };
+
+  const campusColors = ["#3B82F6", "#8B5CF6", "#10B981", "#F97316", "#64748B"];
+  const usersByCampus = campusDistributionRaw
+    .filter((c) => c.campusName)
+    .map((c, index) => ({
+      name: c.campusName,
+      count: c.count,
+      percentage: totalUsers > 0 ? Math.round((c.count / totalUsers) * 100) : 0,
+      color: campusColors[index % campusColors.length],
+    }));
 
   return {
     stats: {
-      totalUsers,
-      activeUsers,
-      suspendedUsers,
-      inactiveUsers,
-      listedProducts,
-      blockedProducts,
-      pendingReports,
-      activeCampuses,
+      totalUsers: totalUsers || 0,
+      activeUsers: activeUsers || 0,
+      suspendedUsers: suspendedUsers || 0,
+      inactiveUsers: inactiveUsers || 0,
+      listedProducts: listedProducts || 0,
+      blockedProducts: blockedProducts || 0,
+      pendingReports: pendingReports || 0,
+      activeCampuses: activeCampuses || 0,
+      totalOrders: totalOrders || 0,
+      totalRevenue: totalRevenue || 0,
+      usersByCampus,
+      trends: {
+        users: calculateChange(usersThisMonth, usersPrevMonth),
+        products: calculateChange(productsThisMonth, productsPrevMonth),
+        orders: calculateChange(ordersThisMonth, ordersPrevMonth),
+        revenue: calculateChange(revenueThisMonth, revenuePrevMonth),
+      },
     },
     recentActivity: recentAuditLogs.map((log) => ({
       id: log._id.toString(),
