@@ -98,6 +98,12 @@ const notificationSchema = new Schema(
   }
 );
 
+// 30-Day TTL (Time-To-Live) index: MongoDB automatically sweeps and deletes records older than 30 days
+notificationSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 30 * 24 * 60 * 60 }
+);
+
 // Read receipt schema to track individual user reads/clicks on broadcast notifications
 const notificationReceiptSchema = new Schema(
   {
@@ -138,6 +144,12 @@ const notificationReceiptSchema = new Schema(
 notificationReceiptSchema.index(
   { notification_id: 1, user_id: 1 },
   { unique: true }
+);
+
+// 30-Day TTL for read receipts as well
+notificationReceiptSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 30 * 24 * 60 * 60 }
 );
 
 export const NotificationReceipt = mongoose.model(
