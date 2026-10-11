@@ -452,3 +452,99 @@ export const deleteAccount = async (req, res) => {
     });
   }
 };
+// Chat preferences: wallpaper + read receipts + typing indicators.
+// Strict whitelist, unknown keys ignored, wrong types rejected.
+const CHAT_WALLPAPERS = ["default", "campus", "grid", "paper", "waves"];
+
+export const updateChatSettings = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const body = req.body || {};
+    const set = {};
+
+    if (body.wallpaper !== undefined) {
+      if (typeof body.wallpaper !== "string" || !CHAT_WALLPAPERS.includes(body.wallpaper)) {
+        return res.status(400).json({
+          message: "Invalid wallpaper",
+          success: false,
+          error: true,
+        });
+      }
+      set["chat_settings.wallpaper"] = body.wallpaper;
+    }
+    for (const key of ["read_receipts", "typing_indicators"]) {
+      if (body[key] !== undefined) {
+        if (typeof body[key] !== "boolean") {
+          return res.status(400).json({
+            message: `Invalid value for ${key}`,
+            success: false,
+            error: true,
+          });
+        }
+        set[`chat_settings.${key}`] = body[key];
+      }
+    }
+
+    if (Object.keys(set).length === 0) {
+      return res.status(400).json({
+        message: "Nothing to update",
+        success: false,
+        error: true,
+      });
+    }
+
+    // Read receipts control is a Pro/Pro+ perk (admins are always entitled).
+    // Base users stay on the default (enabled) and cannot switch it off.
+    if (set["chat_settings.read_receipts"] === false) {
+      const me = await userModel
+        .findById(userId)
+        .select("subscription role")
+        .lean();
+      const entitled =
+        me &&
+        (me.role === "admin" ||
+          me.subscription === "pro" ||
+          me.subscription === "pro_plus");
+      if (!entitled) {
+        return res.status(403).json({
+          message: "Read receipts control is a Pro feature. Upgrade to unlock it.",
+          success: false,
+          error: true,
+          code: "UPGRADE_REQUIRED",
+        });
+      }
+    }
+
+    const updated = await userModel
+      .findByIdAndUpdate(userId, { $set: set }, { new: true })
+      .select("chat_settings")
+      .lean();
+
+    if (!updated) {
+      return res.status(404).json({
+        message: "User Not Found",
+        success: false,
+        error: true,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Chat settings updated",
+      success: true,
+      error: false,
+      chat_settings: {
+        wallpaper: "default",
+        read_receipts: true,
+        typing_indicators: true,
+        ...(updated.chat_settings || {}),
+      },
+    });
+  } catch (err) {
+    console.error("Error updating chat settings:", err);
+    return res.status(500).json({
+      message: safeErrorMessage(err),
+      success: false,
+      error: true,
+    });
+  }
+};

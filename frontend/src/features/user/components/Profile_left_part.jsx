@@ -15,6 +15,7 @@ import { ChevronLeft, Crown, Menu, Trophy } from "lucide-react";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
+import axios from "../../../services/axiosInstance.js";
 
 // ─── NavItem defined OUTSIDE the parent so hooks are stable across renders ───
 // Having it inside caused React to reset state (including isCollapsed) on every
@@ -75,10 +76,38 @@ const NavItem = ({ path, label, icon: Icon, badge, isCollapsed, pathname }) => {
 };
 
 function Profile_left_part() {
-  const { userDetails, loading } = useUser();
+  const { userDetails, loading, isLoggedIn } = useUser();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Live chat unread (same counters the chat list renders) — hidden at 0.
+  const [chatUnread, setChatUnread] = useState(0);
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setChatUnread(0);
+      return;
+    }
+    let stop = false;
+    const load = async () => {
+      try {
+        const res = await axios.get("/api/conversations", {
+          params: { limit: 1 },
+        });
+        if (!stop) setChatUnread(Number(res.data?.meta?.unreadTotal || 0));
+      } catch {
+        // Badge stays stale — never break the menu over it.
+      }
+    };
+    load();
+    const t = setInterval(load, 30000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      stop = true;
+      clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (!loading && !userDetails) {
@@ -97,7 +126,7 @@ function Profile_left_part() {
   // MENU CONFIGURATIONS
   const mainMenu = [
     { path: "/profile", label: "Overview", icon: DashboardIcon },
-    { path: "/chat", label: "Message", icon: MessageCircleIcon, badge: 4 },
+    { path: "/chat", label: "Message", icon: MessageCircleIcon, badge: chatUnread },
     { path: "/notification", label: "Notification", icon: BellIcon, badge: 3 },
     { path: "/myorders", label: "Orders", icon: BoxIcon },
     { path: "/productlisted", label: "My Listings", icon: ShoppingBagIcon },
@@ -134,7 +163,7 @@ function Profile_left_part() {
             <AvatarComponent
               name={userDetails?.name || "User"}
               imageUrl={userDetails?.avatar?.url}
-              plan={userDetails?.subscription}
+              plan={userDetails?.subscription} role={userDetails?.role} isOwn
               showBadge
               className="rounded-full bg-blue-50 dark:bg-gray-800"
               size="xmedium"

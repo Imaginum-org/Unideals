@@ -27,6 +27,7 @@ import PickupSpotModal from "../components/PickupSpotModal.jsx";
 import AlertDialogDemo from "../components/Deletebutton.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import SecuritySettings from "../components/SecuritySettings.jsx";
+import ChatSettings from "../components/ChatSettings.jsx";
 import {
   getUserProfile,
   createPickupSpot,
@@ -39,7 +40,7 @@ import {
   removeAvatar,
 } from "../api/userApi";
 
-const tabs = ["Profile", "Security", "Pickup Spots", "Verification"];
+const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "Verification"];
 
 const formatMemberSince = (date) => {
   if (!date) return "Member since date unavailable";
@@ -487,7 +488,7 @@ function Settings() {
                           <AvatarComponent
                             name={userDetails?.name}
                             imageUrl={userDetails?.avatar?.url}
-                            plan={userDetails?.subscription}
+                            plan={userDetails?.subscription} role={userDetails?.role} isOwn
                             showBadge
                             size="large"
                             isLoading={loading}
@@ -846,6 +847,18 @@ function Settings() {
                   share your hostel room or home address.
                 </p>
               </section>
+            )}
+
+            {activeTab === "Chat" && (
+              <ChatSettings
+                user={userDetails}
+                onSaved={(chat_settings) => {
+                  setUserDetails((prev) =>
+                    prev ? { ...prev, chat_settings } : prev,
+                  );
+                  updateUserDetails({ chat_settings });
+                }}
+              />
             )}
 
             {activeTab === "Verification" && (

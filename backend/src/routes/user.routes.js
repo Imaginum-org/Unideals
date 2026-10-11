@@ -8,6 +8,7 @@ import {
   updateUserAvatar,
   deleteAccount,
   removeUserAvatar,
+  updateChatSettings,
 } from "../controllers/user.controller.js";
 
 const userRouter = Router();
@@ -24,6 +25,7 @@ const deleteAccountLimiter = rateLimit({
 
 userRouter.get("/userProfile", auth, getUserProfile);
 userRouter.put("/updateProfile", auth, updateUserProfile)
+userRouter.put("/chatSettings", auth, updateChatSettings);
 userRouter.put("/updateAvatar", auth, updateUserAvatar);
 userRouter.delete("/removeAvatar", auth, removeUserAvatar);
 userRouter.delete("/deleteAccount", auth, deleteAccountLimiter, deleteAccount);

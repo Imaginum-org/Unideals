@@ -1,5 +1,7 @@
 import Product from "../models/Product.model.js";
 import Campus from "../models/Campus.model.js";
+import Conversation from "../models/conversation.model.js";
+import Deal from "../models/deal.model.js";
 import mongoose from "mongoose";
 import {
   PRODUCT_STATUS,
@@ -118,7 +120,7 @@ export const createProduct = async (data, user) => {
   delete data.slug;
   delete data.location;
   delete data.meetup_location;
-  // Campus is never client-controlled — stamped from the seller below.
+  // Campus is never client-controlled, stamped from the seller below.
   delete data.campus_id;
 
   // Campus pickup-spot model: snapshot carries only spot name/detail.
@@ -346,7 +348,7 @@ export const getBoostedProducts = async (campusId) => {
     .select(
       "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier",
     )
-    .populate("seller_id", "name avatar subscription")
+    .populate("seller_id", "name avatar subscription role")
     .lean();
 };
 
@@ -373,7 +375,7 @@ export const getAllProducts = async (query, campusId) => {
   const skip = (page - 1) * limit;
   const now = new Date();
 
-  // Base filter — campus first: legacy campus-less listings are excluded
+  // Base filter, campus first: legacy campus-less listings are excluded
   // from every feed (their sellers assign campus via the onboarding gate).
   const baseMatch = {
     campus_id: requireCampusId(campusId),
@@ -639,8 +641,10 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
   const viewerCampusId = requireCampusId(campusId);
 
   // Read first so cross-campus views never increment views_count.
-  const product = await Product.findOne({ _id: id, is_deleted: false })
-    .populate("seller_id", "name avatar subscription")
+  // Soft-deleted docs are fetched too, gated below so sellers and deal
+  // participants keep their history while everyone else gets a 404.
+  const product = await Product.findOne({ _id: id })
+    .populate("seller_id", "name avatar subscription role")
     .populate("campus_id", "slug name short_name")
     .lean();
 
@@ -661,15 +665,16 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
   }
 
   // Anti-farm: the seller's own views never count, and each IP counts at
-  // most once per product per 10 minutes.
+  // most once per product per 10 minutes. Hidden (deleted) listings never
+  // count views at all.
   const sellerIdStr = String(product.seller_id?._id || product.seller_id || "");
   const isOwnerView = !!requesterId && sellerIdStr && String(requesterId) === sellerIdStr;
-  if (!isOwnerView && shouldCountView(id, clientIp)) {
+  if (!product.is_deleted && !isOwnerView && shouldCountView(id, clientIp)) {
     await Product.updateOne({ _id: id }, { $inc: { views_count: 1 } });
     product.views_count = (product.views_count || 0) + 1;
   }
 
-  // Pickup snapshot carries seller mobile/pincode — visible to the owner
+  // Pickup snapshot carries seller mobile/pincode, visible to the owner
   // only. Buyers keep the public meetup fields (spot name/city).
   const sellerId = product.seller_id?._id || product.seller_id;
   if (!requesterId || String(sellerId) !== String(requesterId)) {
@@ -679,7 +684,59 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
     }
   }
 
+  // Soft-deleted (sold) listings: only the seller and users with a chat
+  // thread on this product may still open it (orders history, receipts).
+  // Everyone else gets the same 404 as a missing listing, zero confusion.
+  if (product.is_deleted) {
+    const req = requesterId ? String(requesterId) : "";
+    const isSeller = !!req && !!sellerIdStr && req === sellerIdStr;
+    const isParty =
+      !!req &&
+      (await Conversation.exists({
+        product_id: id,
+        $or: [{ buyer_id: requesterId }, { seller_id: requesterId }],
+      }));
+    if (!isSeller && !isParty) {
+      throw new Error("Product not found");
+    }
+    product.reservation = { reserved: false, buyerId: null };
+    return product;
+  }
+
+  // Live reservation flag, same Deal statuses the chat treats as reserved.
+  // Drives the product page CTA (Reserved vs Chat with Seller) so it can
+  // never disagree with chat/orders. Cancelling the deal clears it.
+  product.reservation = await getProductReservation(id);
+
   return product;
+};
+
+/**
+ * Whether a product is currently reserved by a confirmed deal.
+ * Returns { reserved, buyerId }, buyerId lets the reserving buyer keep
+ * their own Chat CTA while everyone else sees "Reserved".
+ */
+export const getProductReservation = async (productId) => {
+  try {
+    const convIds = await Conversation.find({ product_id: productId })
+      .select("_id buyer_id")
+      .lean();
+    if (!convIds.length) return { reserved: false, buyerId: null };
+    const deal = await Deal.findOne({
+      conversation_id: { $in: convIds.map((c) => c._id) },
+      status: { $in: ["deal_confirmed", "pickup_scheduled", "payment_confirmed"] },
+    })
+      .select("conversation_id")
+      .lean();
+    if (!deal) return { reserved: false, buyerId: null };
+    const conv = convIds.find(
+      (c) => String(c._id) === String(deal.conversation_id),
+    );
+    return { reserved: true, buyerId: conv ? String(conv.buyer_id) : null };
+  } catch {
+    // Reservation is advisory, never break the product page over it.
+    return { reserved: false, buyerId: null };
+  }
 };
 
 export const getSearchSuggestions = async (query, campusId) => {
@@ -899,7 +956,7 @@ export const searchProducts = async (queryOrOptions = {}, campusId) => {
       ],
     },
   ];
-  // $or requires at least one clause — only score typos when variants exist.
+  // $or requires at least one clause, only score typos when variants exist.
   if (typoVariants.length > 0) {
     relevanceAdds.push({
       $cond: [
@@ -1307,7 +1364,7 @@ export const relistProduct = async (productId, userId) => {
 
   const prevStatus = product.status;
 
-  // Relisting reactivates against the plan cap — same rule as creation.
+  // Relisting reactivates against the plan cap, same rule as creation.
   const { default: UserModel } = await import("../models/User.model.js");
   const owner = await UserModel.findById(product.seller_id)
     .select("subscription")
@@ -1334,7 +1391,7 @@ export const relistProduct = async (productId, userId) => {
   try {
     saved = await product.save();
   } catch (err) {
-    // Drafts missing required listing fields fail validation on relist —
+    // Drafts missing required listing fields fail validation on relist,
     // that is a client error (incomplete draft), not a 500.
     if (err?.name === "ValidationError") {
       err.statusCode = 400;
@@ -1343,7 +1400,7 @@ export const relistProduct = async (productId, userId) => {
   }
 
   // Atomic post-check (race guard, same pattern as boost): parallel relists
-  // may have filled the last plan slot — revert instead of overserving.
+  // may have filled the last plan slot, revert instead of overserving.
   const postLimit = getListingLimit(owner?.subscription);
   if (typeof postLimit === "number") {
     const activeAfter = await Product.countDocuments({

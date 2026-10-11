@@ -2,7 +2,10 @@ import cron from "node-cron";
 import Product from "../models/Product.model.js";
 
 /**
- * Cleanup Job: Hard delete soft-deleted products after 30 days
+ * Cleanup Job: hard delete soft-deleted products.
+ * - Sold listings (deal completed): 15 days after completion, so finished
+ *   deals vanish fast and nobody trips over dead listings.
+ * - Manually deleted listings: 30 days (unchanged grace window).
  * Runs daily at 2 AM
  */
 export const scheduleCleanupDeletedProducts = () => {
@@ -11,13 +14,18 @@ export const scheduleCleanupDeletedProducts = () => {
     try {
       console.log("[Job] Starting cleanup of deleted products...");
 
+      const fifteenDaysAgo = new Date();
+      fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      // Find soft-deleted products older than 30 days
+      // Sold + deleted 15+ days ago, or anything deleted 30+ days ago.
       const deletedProducts = await Product.find({
         is_deleted: true,
-        updatedAt: { $lt: thirtyDaysAgo },
+        $or: [
+          { status: "sold", updatedAt: { $lt: fifteenDaysAgo } },
+          { updatedAt: { $lt: thirtyDaysAgo } },
+        ],
       });
 
       console.log(

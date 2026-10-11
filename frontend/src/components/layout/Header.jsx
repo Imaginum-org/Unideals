@@ -33,6 +33,9 @@ import useDebounce from "../../features/search/hooks/useDebounce";
 import { searchProducts, getTrendingProducts } from "../../features/search/api/searchApi";
 import SearchDropdown from "../../features/search/components/SearchDropdown";
 import { toast } from "../ui/toast.js";
+import axios from "../../services/axiosInstance.js";
+import { timeAgo } from "../../features/chat/components/ConversationCard.jsx";
+import { avatarUrl, formatName } from "../../features/chat/utils/display.js";
 import { levelProgress, xpToNextLevel } from "../../utils/badgeConfig.js";
 import {
   latestFirst,
@@ -113,7 +116,7 @@ const ProfileDropdown = ({
             name={userDetails?.name}
             imageUrl={userDetails?.avatar?.url}
             size="xmedium"
-            plan={userDetails?.subscription}
+            plan={userDetails?.subscription} role={userDetails?.role} isOwn
             isLoading={userLoading}
             className="shrink-0 rounded-full"
             showBadge
@@ -477,6 +480,129 @@ const NotifDropdown = ({ items, unread, onOpen, onMarkAll, onViewAll }) => (
   </motion.div>
 );
 
+// Latest chats dropdown (mirrors the notification dropdown): newest 5
+// threads + View more. Rows jump straight into the thread.
+const MsgDropdown = ({ items, unread, loading, onOpen, onViewAll }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+    transition={{
+      duration: 0.18,
+      ease: [0.22, 1, 0.36, 1],
+    }}
+    role="menu"
+    aria-label="Messages"
+    className="
+        absolute
+        -right-3
+        top-full
+        z-50
+        mt-2.5
+        max-h-[calc(100vh-6rem)]
+        w-[340px]
+        max-w-[calc(100vw-2rem)]
+        overflow-hidden
+        rounded-2xl
+        border
+        border-neutral-200
+        bg-[#F7F8FA]
+        shadow-[0_14px_34px_rgba(15,23,42,0.12)]
+        dark:border-neutral-800
+        dark:bg-[#1A1D20]
+        sm:-right-4
+      "
+  >
+    <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-3.5">
+      <p className="flex items-center gap-2 text-[15px] font-bold text-[#1F2937] dark:text-white">
+        Messages
+        {unread > 0 && (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#2E4BFF] px-1.5 text-[11px] font-bold text-white">
+            {unread}
+          </span>
+        )}
+      </p>
+    </div>
+
+    {loading ? (
+      <p className="px-4 pb-4 pt-1 text-center text-[13px] font-medium text-neutral-400 dark:text-neutral-500">
+        Loading chats…
+      </p>
+    ) : items.length === 0 ? (
+      <p className="px-4 pb-4 pt-1 text-center text-[13px] font-medium text-neutral-400 dark:text-neutral-500">
+        No chats yet. Open a product and say hi.
+      </p>
+    ) : (
+      <div className="max-h-[320px] overflow-y-auto px-2 pb-1">
+        {items.map((c) => (
+          <button
+            key={c._id}
+            type="button"
+            role="menuitem"
+            onClick={() => onOpen(c)}
+            className={`
+                flex
+                w-full
+                items-center
+                gap-3
+                rounded-xl
+                px-3
+                py-2.5
+                text-left
+                transition-colors
+                duration-150
+                ${
+                  c.unread > 0
+                    ? "bg-[#4B45FF]/[0.07] hover:bg-[#4B45FF]/[0.12] dark:bg-[#4B45FF]/15 dark:hover:bg-[#4B45FF]/25"
+                    : "hover:bg-[#4B45FF]/10 dark:hover:bg-[#4B45FF]/20"
+                }
+              `}
+          >
+            <img
+              src={c.img}
+              alt=""
+              loading="lazy"
+              width={40}
+              height={40}
+              className="size-10 shrink-0 rounded-full bg-white object-cover"
+            />
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="flex items-start justify-between gap-2">
+                <span className="truncate text-[13px] font-semibold text-[#090A0B] dark:text-white">
+                  {c.title}
+                </span>
+                <span className="shrink-0 text-[11px] font-bold text-neutral-400 dark:text-neutral-500">
+                  {c.time}
+                </span>
+              </span>
+              <span className="mt-0.5 flex items-center justify-between gap-2">
+                <span className="truncate text-[12px] font-medium text-neutral-400 dark:text-neutral-500">
+                  {c.preview}
+                </span>
+                {c.unread > 0 && (
+                  <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#2E4BFF] px-1.5 text-[11px] font-bold text-white">
+                    {c.unread > 9 ? "9+" : c.unread}
+                  </span>
+                )}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    )}
+
+    <div className="border-t border-neutral-200 p-2 dark:border-neutral-800">
+      <button
+        type="button"
+        onClick={onViewAll}
+        className="w-full rounded-xl bg-[#4B45FF]/10 px-4 py-2.5 text-[13px] font-bold text-[#2E40DC] transition-colors duration-150 hover:bg-[#4B45FF]/20 dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]"
+      >
+        View all messages
+      </button>
+    </div>
+  </motion.div>
+);
+
 const Header = () => {
   const {
     userDetails,
@@ -513,7 +639,106 @@ const Header = () => {
   const [showNotif, setShowNotif] = useState(false);
   const [notifItems, setNotifItems] = useState([]);
   const notifRef = useRef(null);
-  const chatBadge = 1;
+  // Live chat unread badge (same unread counters the chat list renders).
+  const [chatBadge, setChatBadge] = useState(0);
+  const [showMsg, setShowMsg] = useState(false);
+  const [msgItems, setMsgItems] = useState([]);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const msgRef = useRef(null);
+
+  const loadMsgPreview = async () => {
+    setMsgLoading(true);
+    try {
+      const res = await axios.get("/api/conversations", {
+        params: { limit: 5 },
+      });
+      const rows = res.data?.data || [];
+      setMsgItems(
+        rows.map((c) => {
+          const rawImg =
+            c?.product?.images?.[0]?.url ||
+            c?.product?.images?.[0] ||
+            avatarUrl(c?.otherParty?.avatar);
+          return {
+            _id: c._id,
+            img: typeof rawImg === "string" && rawImg ? rawImg : "/userdp.webp",
+            title: c?.product?.title || "Product",
+            preview: `${formatName(c?.otherParty?.name)} · ${c?.last_message || "Say hi"}`,
+            time: timeAgo(c?.last_activity_at),
+            unread: c?.unread || 0,
+          };
+        }),
+      );
+      setChatBadge(Number(res.data?.meta?.unreadTotal || 0));
+    } catch {
+      // keep stale items, never break the header
+    } finally {
+      setMsgLoading(false);
+    }
+  };
+
+  const toggleMsg = () => {
+    setShowNotif(false);
+    setShowMsg((v) => {
+      if (!v) loadMsgPreview();
+      return !v;
+    });
+  };
+
+  // Messages dropdown: close on outside click, Escape, or scroll.
+  useEffect(() => {
+    if (!showMsg) return;
+
+    const handleOutsideMsg = (event) => {
+      if (msgRef.current && !msgRef.current.contains(event.target)) {
+        setShowMsg(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setShowMsg(false);
+    };
+
+    const handleScroll = () => {
+      setShowMsg(false);
+    };
+
+    document.addEventListener("mousedown", handleOutsideMsg);
+    document.addEventListener("keydown", handleEscape);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideMsg);
+      document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [showMsg]);
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setChatBadge(0);
+      return;
+    }
+    let stop = false;
+    const load = async () => {
+      try {
+        const res = await axios.get("/api/conversations", {
+          params: { limit: 1 },
+        });
+        if (!stop) setChatBadge(Number(res.data?.meta?.unreadTotal || 0));
+      } catch {
+        // Badge stays stale — never break the header over it.
+      }
+    };
+    load();
+    const t = setInterval(load, 30000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      stop = true;
+      clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [isLoggedIn]);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [cube, setCube] = useState({ step: 0, faces: [0, 1, 2, 3] });
   const reduceMotion = useReducedMotion();
@@ -779,6 +1004,7 @@ const Header = () => {
 
   const toggleNotif = () => {
     if (!showNotif) refreshNotifs();
+    setShowMsg(false);
     setShowNotif((prev) => !prev);
   };
 
@@ -1174,7 +1400,7 @@ const Header = () => {
                       name={userDetails?.name}
                       imageUrl={userDetails?.avatar?.url}
                       size="small"
-                      plan={userDetails?.subscription}
+                      plan={userDetails?.subscription} role={userDetails?.role} isOwn
                       isLoading={userLoading}
                       className="rounded-full"
                       showBadge
@@ -1938,19 +2164,40 @@ lg:pr-24"
                       </AnimatePresence>
                     </div>
 
-                    <Link
-                      to="/chat"
-                      className="relative shrink-0 rounded-full p-2 transition-colors duration-200 hover:bg-[#F3F4F6] dark:hover:bg-neutral-800"
-                      aria-label="Chat"
-                    >
-                      <LuMessageSquare className="size-[22px] text-[#111111] dark:text-neutral-200" />
+                    <div className="relative shrink-0" ref={msgRef}>
+                      <button
+                        onClick={toggleMsg}
+                        className="relative shrink-0 rounded-full p-2 transition-colors duration-200 hover:bg-[#F3F4F6] dark:hover:bg-neutral-800"
+                        aria-label="Messages"
+                        aria-expanded={showMsg}
+                      >
+                        <LuMessageSquare className="size-[22px] text-[#111111] dark:text-neutral-200" />
 
-                      {chatBadge > 0 && (
-                        <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#2E4BFF] px-1 text-[10px] font-bold text-white">
-                          {chatBadge}
-                        </span>
-                      )}
-                    </Link>
+                        {chatBadge > 0 && (
+                          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#2E4BFF] px-1 text-[10px] font-bold text-white">
+                            {chatBadge}
+                          </span>
+                        )}
+                      </button>
+
+                      <AnimatePresence>
+                        {showMsg && (
+                          <MsgDropdown
+                            items={msgItems}
+                            unread={chatBadge}
+                            loading={msgLoading}
+                            onOpen={(c) => {
+                              setShowMsg(false);
+                              navigate(`/chat?conversation=${c._id}`);
+                            }}
+                            onViewAll={() => {
+                              setShowMsg(false);
+                              navigate("/chat");
+                            }}
+                          />
+                        )}
+                      </AnimatePresence>
+                    </div>
 
                     <span
                       aria-hidden="true"
@@ -1978,7 +2225,7 @@ lg:pr-24"
                           name={userDetails?.name}
                           imageUrl={userDetails?.avatar?.url}
                           size="medium"
-                          plan={userDetails?.subscription}
+                          plan={userDetails?.subscription} role={userDetails?.role} isOwn
                           isLoading={userLoading}
                           className="rounded-full"
                           showBadge

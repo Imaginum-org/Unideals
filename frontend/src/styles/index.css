@@ -138,3 +138,153 @@
     animation-duration: 0.01s;
   }
 }
+
+/* ── Chat: WhatsApp-style thread entrance (replays per conversation via key) ── */
+@keyframes chat-slide-in {
+  from {
+    transform: translateX(28px);
+    opacity: 0.35;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.animate-chat-in {
+  animation: chat-slide-in 0.18s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-chat-in {
+    animation: none;
+  }
+}
+
+/* ── Deal complete celebration: overlay fades in, a dotted road draws
+   itself while the brand cart rides across Zomato-style, then everything
+   fades and the deal card content returns. ── */
+@keyframes deal-celeb-overlay {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes deal-cart-ride {
+  0% { left: -60px; transform: translateY(-50%) rotate(-8deg); }
+  12% { transform: translateY(-50%) rotate(0deg); }
+  86% { transform: translateY(-50%) rotate(0deg); }
+  100% { left: 100%; transform: translateY(-50%) rotate(8deg); }
+}
+@keyframes deal-road-draw {
+  from { stroke-dashoffset: 120; }
+  to { stroke-dashoffset: 0; }
+}
+.animate-deal-celeb {
+  animation: deal-celeb-overlay 2.6s ease forwards;
+}
+.animate-deal-cart {
+  animation: deal-cart-ride 2.2s cubic-bezier(0.4, 0, 0.3, 1) 0.15s both;
+}
+.animate-deal-road {
+  stroke-dasharray: 120;
+  animation: deal-road-draw 1.6s ease-out 0.15s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-deal-celeb,
+  .animate-deal-cart,
+  .animate-deal-road {
+    animation: none;
+  }
+}
+
+/* ── Chat wallpapers: transparent motif layers over the theme thread
+   background, so every option works in light and dark mode. ── */
+.wall-campus {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(56, 56, 236, 0.05) 0 1px,
+      transparent 1px 14px
+    ),
+    radial-gradient(
+      ellipse 90% 34% at 50% -6%,
+      rgba(56, 56, 236, 0.06),
+      transparent 70%
+    );
+}
+.wall-grid {
+  background-image:
+    linear-gradient(rgba(56, 56, 236, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 56, 236, 0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wall-paper {
+  background-image:
+    radial-gradient(ellipse 46% 30% at 12% 8%, rgba(56, 56, 236, 0.07), transparent 70%),
+    radial-gradient(ellipse 40% 28% at 88% 30%, rgba(245, 158, 11, 0.06), transparent 70%),
+    radial-gradient(ellipse 50% 32% at 50% 96%, rgba(56, 56, 236, 0.05), transparent 70%);
+}
+.wall-waves {
+  background-image:
+    repeating-radial-gradient(circle at 50% -40px, transparent 0 26px, rgba(56, 56, 236, 0.05) 26px 27.5px),
+    repeating-radial-gradient(circle at 50% calc(100% + 40px), transparent 0 26px, rgba(0, 0, 0, 0.03) 26px 27.5px);
+}
+
+/* ── Chat: WhatsApp-like doodle texture over the thread background ──
+   Double dot-grid (ink + a whisper of brand indigo) with a soft top glow.
+   Near-invisible on dark surfaces by construction. */
+.chat-doodle {
+  background-image:
+    radial-gradient(rgba(56, 56, 236, 0.055) 1px, transparent 1.5px),
+    radial-gradient(rgba(0, 0, 0, 0.045) 1px, transparent 1.5px),
+    radial-gradient(
+      ellipse 90% 34% at 50% -6%,
+      rgba(56, 56, 236, 0.06),
+      transparent 70%
+    );
+  background-size:
+    24px 24px,
+    12px 12px,
+    100% 100%;
+}
+
+/* ── Wallpaper dark variants: the light indigo washes out on near-black,
+   so dark mode gets a brighter indigo pass at higher strength. ── */
+.dark .chat-doodle {
+  background-image:
+    radial-gradient(rgba(165, 180, 252, 0.1) 1px, transparent 1.5px),
+    radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1.5px),
+    radial-gradient(
+      ellipse 90% 34% at 50% -6%,
+      rgba(99, 102, 241, 0.1),
+      transparent 70%
+    );
+}
+.dark .wall-campus {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(165, 180, 252, 0.09) 0 1px,
+      transparent 1px 14px
+    ),
+    radial-gradient(
+      ellipse 90% 34% at 50% -6%,
+      rgba(99, 102, 241, 0.1),
+      transparent 70%
+    );
+}
+.dark .wall-grid {
+  background-image:
+    linear-gradient(rgba(165, 180, 252, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(165, 180, 252, 0.1) 1px, transparent 1px);
+}
+.dark .wall-paper {
+  background-image:
+    radial-gradient(ellipse 46% 30% at 12% 8%, rgba(99, 102, 241, 0.12), transparent 70%),
+    radial-gradient(ellipse 40% 28% at 88% 30%, rgba(245, 158, 11, 0.09), transparent 70%),
+    radial-gradient(ellipse 50% 32% at 50% 96%, rgba(99, 102, 241, 0.09), transparent 70%);
+}
+.dark .wall-waves {
+  background-image:
+    repeating-radial-gradient(circle at 50% -40px, transparent 0 26px, rgba(165, 180, 252, 0.09) 26px 27.5px),
+    repeating-radial-gradient(circle at 50% calc(100% + 40px), transparent 0 26px, rgba(255, 255, 255, 0.05) 26px 27.5px);
+}

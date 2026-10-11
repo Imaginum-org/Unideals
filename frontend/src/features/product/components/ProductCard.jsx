@@ -523,6 +523,7 @@ md:group-hover:pointer-events-auto
                     imageUrl={sellerAvatarUrl}
                     size="small"
                     plan={sellerPlan}
+                    role={sellerInfo?.role}
                     showBadge
                     className="shrink-0 h-6 w-6 md:h-7 md:w-7"
                   />

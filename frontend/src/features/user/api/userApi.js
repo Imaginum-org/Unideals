@@ -5,6 +5,9 @@ export const getUserProfile = () => axios.get("/api/user/userProfile");
 export const updateProfile = (data) =>
   axios.put("/api/user/updateProfile", data);
 
+export const updateChatSettings = (data) =>
+  axios.put("/api/user/chatSettings", data);
+
 export const updateAvatar = (data) => axios.put("/api/user/updateAvatar", data);
 
 export const removeAvatar = () => axios.delete("/api/user/removeAvatar");

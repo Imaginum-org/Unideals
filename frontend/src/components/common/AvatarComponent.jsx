@@ -7,6 +7,8 @@ const AvatarComponent = ({
   imageUrl,
   size = "large",
   plan = "base_user", // "base_user", "pro", "pro_plus"
+  role = "user", // "user", "admin", "support" — admin always wins the badge
+  isOwn = false, // admin treatment renders only for your own avatar
   showBadge = false,
   shape = "circle", // "circle" or "square"
   className = "",
@@ -77,14 +79,18 @@ const AvatarComponent = ({
     typeof cachedImage === "string" && cachedImage.includes("avatar-default");
   const shouldShowImage = hasValidImage && !isDefaultAvatar;
 
-  const isProPlus = plan === "pro_plus";
-  const isPremium = plan === "pro" || plan === "pro_plus";
+  // Admin styling is self-view only: nobody else ever sees the tag.
+  const isAdmin = role === "admin" && isOwn;
+  const isProPlus = !isAdmin && plan === "pro_plus";
+  const isPremium = isAdmin || plan === "pro" || plan === "pro_plus";
   const isSquare = shape === "square";
 
-  // Gradients for Pro/Pro+
-  const gradientClass = isProPlus
-    ? "bg-gradient-to-tr from-[#FFD700] via-[#FDB931] to-[#FF8C00]"
-    : "bg-gradient-to-tr from-[#3838EC] to-[#5C6DFF]";
+  // Gradients: admin graphite supreme, then Pro/Pro+
+  const gradientClass = isAdmin
+    ? "bg-gradient-to-tr from-[#111827] via-[#4B5563] to-[#111827]"
+    : isProPlus
+      ? "bg-gradient-to-tr from-[#FFD700] via-[#FDB931] to-[#FF8C00]"
+      : "bg-gradient-to-tr from-[#3838EC] to-[#5C6DFF]";
 
   return (
     <div
@@ -135,15 +141,22 @@ const AvatarComponent = ({
         )}
       </div>
 
+      {/* ADMIN Badge — supreme over any plan badge */}
+      {showBadge && isAdmin && (
+        <span className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-r from-[#111827] to-[#4B5563] text-white shadow-black/40 shadow-md text-[8px] leading-none font-extrabold px-1.5 py-0.5 rounded-full border border-white dark:border-[#131313] z-20 pointer-events-none select-none">
+          ADMIN
+        </span>
+      )}
+
       {/* PRO Badge */}
-      {showBadge && plan === "pro" && (
+      {showBadge && !isAdmin && plan === "pro" && (
         <span className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-r from-[#3838EC] to-[#5C6DFF] text-white shadow-[#3838EC]/40 shadow-md text-[8px] leading-none font-extrabold px-1.5 py-0.5 rounded-full border border-white dark:border-[#131313] z-20 pointer-events-none select-none">
           PRO
         </span>
       )}
 
       {/* PRO+ Badge */}
-      {showBadge && plan === "pro_plus" && (
+      {showBadge && !isAdmin && plan === "pro_plus" && (
         <span className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black shadow-[#FFD700]/40 shadow-md text-[8px] leading-none font-extrabold px-1.5 py-0.5 rounded-full border border-white dark:border-[#131313] z-20 pointer-events-none select-none">
           PRO+
         </span>

@@ -257,7 +257,7 @@ const MyOrdersCard = ({
           </span>
         ) : (
           <button
-            onClick={() => navigate(`/chat?seller=${orderId}`)}
+            onClick={() => navigate(`/chat?product=${orderId}`)}
             className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors"
           >
             <FiMessageSquare size={16} />

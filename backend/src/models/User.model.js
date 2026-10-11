@@ -137,6 +137,26 @@ const userSchema = new Schema(
       ref: "Subscription",
     },
 
+    // Chat preferences (wallpaper, read receipts, typing indicators).
+    // Defaults keep classic behaviour; clients merge over these.
+    chat_settings: {
+      _id: false,
+      wallpaper: {
+        type: String,
+        trim: true,
+        maxlength: 40,
+        default: "default",
+      },
+      read_receipts: {
+        type: Boolean,
+        default: true,
+      },
+      typing_indicators: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
     refresh_token: {
       type: String,
       select: false,

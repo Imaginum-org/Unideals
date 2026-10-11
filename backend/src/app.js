@@ -22,6 +22,9 @@ import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js
 import badgeRouter from "./routes/badgeRoutes.js";
 import rewardRouter from "./routes/rewardRoutes.js";
 import handoffRouter from "./routes/handoff.routes.js";
+import conversationRouter from "./routes/conversation.route.js";
+import dealRouter from "./routes/deal.route.js";
+import orderRouter from "./routes/order.routes.js";
 import { verifyOrigin } from "./middlewares/csrf.middleware.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
@@ -227,6 +230,9 @@ app.use("/api/payments", paymentRouter);
 app.use("/api/badges", badgeRouter);
 app.use("/api/rewards", rewardRouter);
 app.use("/api/handoff", handoffRouter);
+app.use("/api/conversations", conversationRouter);
+app.use("/api/deals", dealRouter);
+app.use("/api/orders", orderRouter);
 
 // If no route matches
 app.use((req, res) => {
@@ -268,6 +274,9 @@ app.use((err, req, res, next) => {
     success: false,
     message,
     ...(err.code ? { code: err.code } : {}),
+    ...(typeof err.retryAfterMs === "number"
+      ? { retryAfterMs: err.retryAfterMs }
+      : {}),
   });
 });
 

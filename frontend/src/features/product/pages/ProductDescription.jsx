@@ -30,8 +30,29 @@ import Seo from "../../../components/Seo.jsx";
 // date of purchase
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaArrowRight } from "react-icons/fa6";
+import { PRODUCT_USAGE_OPTIONS } from "../constants/productOptions.js";
 
 const FALLBACK_IMAGE = "/logo.svg";
+
+// "2024-04-12T00:00:00.000Z" -> "12 Apr 2024". Never throws, "" when empty.
+const formatPurchaseDate = (raw) => {
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+// Enum key -> human label ("one_to_three_months" -> "1 - 3 months").
+const formatUsageDuration = (raw) => {
+  const v = String(raw || "").trim();
+  if (!v) return "";
+  const hit = PRODUCT_USAGE_OPTIONS.find((o) => o.value === v);
+  return hit ? hit.label : v.replaceAll("_", " ");
+};
 
 const ProductDescription = () => {
   const { toggleWishlist, isInWishlist } = useWishlist();
@@ -279,15 +300,33 @@ ${shareUrl}`;
   // Availability derived from real status — never hardcoded.
   const productStatus = String(product?.status || "listed").toLowerCase();
   const isAvailable = ["listed", "active"].includes(productStatus);
-  const availabilityLabel = isAvailable
-    ? "Available"
-    : productStatus === "sold" || productStatus === "delivered"
+  // Live reservation (same Deal statuses chat treats as reserved). Reserved
+  // for someone else -> CTA becomes "Reserved"; the reserving buyer keeps
+  // their Chat CTA; cancelling the deal flips this back automatically.
+  const myIdForReservation = (() => {
+    try {
+      const cached = localStorage.getItem("cachedUserDetails");
+      return cached ? JSON.parse(cached)?._id : null;
+    } catch {
+      return null;
+    }
+  })();
+  const reservedByOther = Boolean(
+    isAvailable &&
+      product?.reservation?.reserved &&
+      String(product?.reservation?.buyerId || "") !==
+        String(myIdForReservation || ""),
+  );
+  const availabilityLabel = !isAvailable
+    ? productStatus === "sold" || productStatus === "delivered"
       ? "Sold"
       : productStatus === "unlisted"
         ? "Unlisted"
         : productStatus
           ? productStatus.charAt(0).toUpperCase() + productStatus.slice(1)
-          : "Unavailable";
+          : "Unavailable"
+    : "Available";
+  const displayAvailability = reservedByOther ? "Reserved" : availabilityLabel;
   const savesCount =
     product?.wishlist_count ??
     product?.wishlisted_count ??
@@ -476,7 +515,7 @@ ${shareUrl}`;
   return (
     <>
     <Seo
-      title={product?.title ? `${product.title} — Unideals` : "Product — Unideals"}
+      title={product?.title ? `${product.title} | Unideals` : "Product | Unideals"}
       description={
         product?.description
           ? String(product.description).slice(0, 160)
@@ -599,19 +638,21 @@ ${shareUrl}`;
                     icon: <GoChecklist size={17} className="text-[#3838EC]" />,
                     label: "Usage Duration",
                     value:
-                      product?.attributes?.usage_duration || "Not specified",
+                      formatUsageDuration(
+                        product?.attributes?.usage_duration,
+                      ) || "Not specified",
                   },
 
                   {
                     icon: <GoChecklist size={17} className="text-[#3838EC]" />,
                     label: "Brand",
-                    value: product?.attributes?.brand || "N/A",
+                    value: String(product?.attributes?.brand || "").trim(),
                   },
 
                   {
                     icon: <GoChecklist size={17} className="text-[#3838EC]" />,
                     label: "Model",
-                    value: product?.title,
+                    value: String(product?.title || "").trim(),
                   },
                   {
                     icon: (
@@ -621,35 +662,40 @@ ${shareUrl}`;
                       />
                     ),
                     label: "Color",
-                    value: product?.attributes?.color || "N/A",
+                    value: String(product?.attributes?.color || "").trim(),
                   },
                   {
                     icon: (
                       <IoCalendarOutline size={17} className="text-[#3838EC]" />
                     ),
                     label: "Purchase Date",
-                    value: product?.attributes?.purchase_date || "N/A",
+                    value: formatPurchaseDate(
+                      product?.attributes?.purchase_date,
+                    ),
                   },
-                ].map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start justify-between text-sm"
-                  >
-                    <div className="flex items-center gap-3 text-[#6B7280] dark:text-white">
-                      <div className="flex items-center justify-center">
-                        {item.icon}
+                  // Empty optionals are omitted instead of showing "N/A" walls.
+                ]
+                  .filter((item) => item.value)
+                  .map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start justify-between gap-3 text-sm"
+                    >
+                      <div className="flex items-center gap-3 text-[#6B7280] dark:text-white shrink-0">
+                        <div className="flex items-center justify-center">
+                          {item.icon}
+                        </div>
+
+                        <span className="text-[#64748B] text-sm lg:text-base dark:text-slate-300">
+                          {item.label}
+                        </span>
                       </div>
 
-                      <span className="text-[#64748B] text-sm lg:text-base dark:text-slate-300">
-                        {item.label}
+                      <span className="max-w-[180px] text-end text-sm lg:text-base font-medium text-[#0F172A] dark:text-slate-300 break-words">
+                        {item.value}
                       </span>
                     </div>
-
-                    <span className="capitalize max-w-[180px] text-start text-sm lg:text-base font-medium text-[#0F172A] dark:text-slate-300">
-                      {item.value.replaceAll("_", " ")}
-                    </span>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
@@ -665,18 +711,20 @@ ${shareUrl}`;
                 </div>
                 <div
                   className={`text-sm font-medium px-4 py-1 rounded-full ${
-                    isAvailable
-                      ? "bg-[#E9F9EE] text-[#319F43]"
-                      : "bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-300"
+                    reservedByOther
+                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                      : isAvailable
+                        ? "bg-[#E9F9EE] text-[#319F43]"
+                        : "bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-300"
                   }`}
                 >
-                  {availabilityLabel}
+                  {displayAvailability}
                 </div>
               </div>
 
               {!isAvailable && (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
-                  No longer available — this listing is {availabilityLabel.toLowerCase()}.
+                  No longer available. This listing is {availabilityLabel.toLowerCase()}.
                 </div>
               )}
 
@@ -711,7 +759,7 @@ ${shareUrl}`;
                   <AvatarComponent
                     name={product?.seller_id?.name || "Seller"}
                     imageUrl={product?.seller_id?.avatar?.url}
-                    plan={product?.seller_id?.subscription} // Shows the seller's badge to buyers!
+                    plan={product?.seller_id?.subscription} role={product?.seller_id?.role} // Shows the seller's badge to buyers!
                     showBadge
                     size="small"
                     className="lg:scale-125 origin-left" // This keeps your responsive sizing (w-7 to w-9)
@@ -775,8 +823,15 @@ ${shareUrl}`;
                   )}
                 </button>
 
-                {/* Chat — hidden when the listing is no longer available */}
-                {isAvailable ? (
+                {/* Chat — Reserved for others once a deal is confirmed */}
+                {reservedByOther ? (
+                  <div
+                    title="This item is reserved for another buyer"
+                    className="flex-1 h-[55px] rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 text-amber-700 font-semibold text-base"
+                  >
+                    Reserved for another buyer
+                  </div>
+                ) : isAvailable ? (
                   <Link
                     to={
                       product?.seller_id?._id
@@ -950,6 +1005,14 @@ ${shareUrl}`;
             )}
           </button>
 
+          {reservedByOther ? (
+            <div
+              title="This item is reserved for another buyer"
+              className="flex-1 h-[56px] rounded-2xl bg-amber-50 border border-amber-200 shadow flex items-center justify-center gap-2 text-amber-700 font-semibold"
+            >
+              Reserved for another buyer
+            </div>
+          ) : (
           <Link
             to={
               product?.seller_id?._id
@@ -973,6 +1036,7 @@ ${shareUrl}`;
             <LuMessageSquareText size={20} />
             {isAvailable ? "Chat with Seller" : "No longer available"}
           </Link>
+          )}
         </div>
       </div>
       {showShareMenu && (
@@ -1307,7 +1371,7 @@ function ReportListingModal({ productId, productTitle, onClose }) {
         reason: REPORT_REASON_MAP[reason] || "other",
         description: String(details).slice(0, 500),
       });
-      toast.success("Thanks — our team will review this listing");
+      toast.success("Thanks. Our team will review this listing");
       onClose();
     } catch (err) {
       toast.error(
@@ -1332,7 +1396,7 @@ function ReportListingModal({ productId, productTitle, onClose }) {
           Report listing
         </h3>
         <p className="mt-1 text-sm text-zinc-500">
-          {productTitle || "This listing"} — reports are reviewed within 24
+          {productTitle || "This listing"}. Reports are reviewed within 24
           hours.
         </p>
         <label className="mt-4 block text-xs font-semibold text-gray-600 dark:text-gray-300">
@@ -1357,7 +1421,7 @@ function ReportListingModal({ productId, productTitle, onClose }) {
           rows={3}
           value={details}
           onChange={(e) => setDetails(e.target.value.slice(0, 2000))}
-          placeholder="Be specific — dates, messages, what's wrong…"
+          placeholder="Be specific: dates, messages, what's wrong…"
           className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#F7F8FA] px-3 py-2.5 text-sm outline-none resize-none focus:border-[#3838EC] dark:bg-zinc-900 dark:text-white"
         />
         <div className="mt-5 flex gap-3">

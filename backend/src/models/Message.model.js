@@ -49,6 +49,15 @@ const messageSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Quote-reply target. Must live in the same conversation (enforced on
+    // send); resolved live on read so later masking still applies.
+    reply_to: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
+      index: true,
+    },
+
     // Delivery status
     message_status: {
       type: String,
@@ -65,6 +74,25 @@ const messageSchema = new mongoose.Schema(
 
     // Read timestamp
     read_at: {
+      type: Date,
+      default: null,
+    },
+
+    // Safety screen: abusive/sexual content is masked for clients but
+    // kept verbatim for moderator review. Never client-settable.
+    is_flagged: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    flag_reason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    flagged_at: {
       type: Date,
       default: null,
     },

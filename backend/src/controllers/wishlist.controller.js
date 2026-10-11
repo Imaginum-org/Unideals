@@ -221,7 +221,7 @@ export const getWishlist = async (req, res) => {
             .populate({
               path: "seller_id",
               model: "User",
-              select: "name avatar subscription",
+              select: "name avatar subscription role",
             })
             // Stable order so page boundaries never duplicate/skip items.
             .sort({ _id: -1 })
