@@ -1,10 +1,12 @@
 import { useRef, useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "../../../components/ui/toast.js";
 import { HiOutlineTrash } from "react-icons/hi";
 import useProductListing from "../hooks/useProductListing";
 import PhoneHandoffCard from "../../handoff/components/PhoneHandoffCard.jsx";
 import { RiCameraAiLine } from "react-icons/ri";
 import { IoArrowForward } from "react-icons/io5";
+import { FaDesktop, FaMobileAlt } from "react-icons/fa";
 import { validateImages } from "../validations";
 
 const MAX_IMAGES = 3;
@@ -19,6 +21,9 @@ const ImagesStep = () => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [fileErrors, setFileErrors] = useState([]);
+  // Tabbed upload source: "pc" | "mobile". Single dashed box below swaps
+  // its inner content based on this (per final UI).
+  const [uploadSource, setUploadSource] = useState("pc");
   // Tracks phone-delivered fileIds so repeat polls never re-add them.
   const phoneFileIds = useRef(new Set());
   // Live mirror of blob URLs for reliable revoke-on-unmount (avoids stale closure).
@@ -177,7 +182,7 @@ const ImagesStep = () => {
       return;
     }
     if (fresh.length > room) {
-      toast(`Only ${room} more fit — attaching the first ${room}.`);
+      toast(`Only ${room} more fit, attaching the first ${room}.`);
       fresh.splice(room);
     }
 
@@ -241,10 +246,10 @@ const ImagesStep = () => {
     updateField("images", files);
   };
 
-  // DRAG EVENTS
+  // DRAG EVENTS (PC tab only — mobile tab owns its own clicks for QR)
   const handleDragOver = (e) => {
     e.preventDefault();
-
+    if (uploadSource !== "pc") return;
     setIsDragging(true);
   };
 
@@ -254,10 +259,14 @@ const ImagesStep = () => {
 
   const handleDrop = (e) => {
     e.preventDefault();
-
     setIsDragging(false);
-
+    if (uploadSource !== "pc") return;
     processFiles(e.dataTransfer.files);
+  };
+
+  const handleBoxClick = () => {
+    if (uploadSource !== "pc") return;
+    fileInputRef.current?.click();
   };
 
   return (
@@ -274,20 +283,178 @@ const ImagesStep = () => {
       </div>
 
       <div data-field="images">
-        {/* Upload Area */}
+        {/* Source tabs — Sell-button language, single dashed box below */}
+        <div className="mt-4 flex flex-wrap items-end gap-3 pl-2" role="tablist" aria-label="Choose how to upload photos">
+          {/* PC tab — active tab sits flush on the box (folder-tab joint) */}
+          <div className={`relative transition-all duration-200 ${uploadSource === "pc" ? "" : "mb-[6px]"}`}>
+            <motion.button
+              type="button"
+              role="tab"
+              aria-selected={uploadSource === "pc"}
+              onClick={() => setUploadSource("pc")}
+              initial={false}
+              animate={{
+                borderBottomLeftRadius: uploadSource === "pc" ? 0 : 8,
+                borderBottomRightRadius: uploadSource === "pc" ? 0 : 8,
+              }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className={`flex shrink-0 items-center gap-2 rounded-t-lg px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:scale-[1.02] active:scale-[0.98] md:px-5 md:text-base ${
+                uploadSource === "pc"
+                  ? "bg-[#3838EC] text-[#FCFCFC] shadow-lg shadow-indigo-200"
+                  : "rounded-b-lg border border-[#3838EC]/25 bg-white text-[#3838EC] hover:border-[#3838EC]/60 hover:bg-[#EEF2FF] dark:border-[#6366F1]/40 dark:bg-transparent dark:text-[#A5B0FF] dark:hover:bg-[#6366F1]/10"
+              }`}
+            >
+              <FaDesktop className="size-4" />
+              <span>Browse files</span>
+            </motion.button>
+            {/* Concave corner notches: ease the tab's bottom corners into
+                the box's top dashed border so both read as one closed shape. */}
+            <AnimatePresence>
+              {uploadSource === "pc" && (
+                <>
+                  <motion.svg
+                    key="pc-notch-l"
+                    viewBox="0 0 10 10"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="pointer-events-none absolute -left-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <motion.path
+                      d="M10 0 Q10 10 0 10"
+                      fill="none"
+                      stroke="#3838EC"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </motion.svg>
+                  <motion.svg
+                    key="pc-notch-r"
+                    viewBox="0 0 10 10"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="pointer-events-none absolute -right-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <motion.path
+                      d="M0 0 Q0 10 10 10"
+                      fill="none"
+                      stroke="#3838EC"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </motion.svg>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Mobile tab — active tab sits flush on the box (folder-tab joint) */}
+          <div className={`relative transition-all duration-200 ${uploadSource === "mobile" ? "" : "mb-[6px]"}`}>
+            <motion.button
+              type="button"
+              role="tab"
+              aria-selected={uploadSource === "mobile"}
+              onClick={() => setUploadSource("mobile")}
+              initial={false}
+              animate={{
+                borderBottomLeftRadius: uploadSource === "mobile" ? 0 : 8,
+                borderBottomRightRadius: uploadSource === "mobile" ? 0 : 8,
+              }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className={`flex shrink-0 items-center gap-2 rounded-t-lg px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:scale-[1.02] active:scale-[0.98] md:px-5 md:text-base ${
+                uploadSource === "mobile"
+                  ? "bg-[#3838EC] text-[#FCFCFC] shadow-lg shadow-indigo-200"
+                  : "rounded-b-lg border border-[#3838EC]/25 bg-white text-[#3838EC] hover:border-[#3838EC]/60 hover:bg-[#EEF2FF] dark:border-[#6366F1]/40 dark:bg-transparent dark:text-[#A5B0FF] dark:hover:bg-[#6366F1]/10"
+              }`}
+            >
+              <FaMobileAlt className="size-4" />
+              <span>Scan with phone</span>
+            </motion.button>
+            {/* Concave corner notches: ease the tab's bottom corners into
+                the box's top dashed border so both read as one closed shape. */}
+            <AnimatePresence>
+              {uploadSource === "mobile" && (
+                <>
+                  <motion.svg
+                    key="mobile-notch-l"
+                    viewBox="0 0 10 10"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="pointer-events-none absolute -left-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <motion.path
+                      d="M10 0 Q10 10 0 10"
+                      fill="none"
+                      stroke="#3838EC"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </motion.svg>
+                  <motion.svg
+                    key="mobile-notch-r"
+                    viewBox="0 0 10 10"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="pointer-events-none absolute -right-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <motion.path
+                      d="M0 0 Q0 10 10 10"
+                      fill="none"
+                      stroke="#3838EC"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </motion.svg>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Single dashed box — content swaps by tab */}
         <div
+          role="tabpanel"
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`mt-4 rounded-[28px] border-2 bg-[#F8FAFC] border-dashed p-8 md:p-10 transition-all duration-200 cursor-pointer
-        
+          onClick={handleBoxClick}
+          className={`mt-0 rounded-[28px] border-2 bg-[#F8FAFC] border-dashed p-8 transition-all duration-200 md:p-10 dark:bg-neutral-900/40
+        ${
+          uploadSource === "pc" ? "cursor-pointer" : "cursor-default"
+        }
         ${
           errors.images
             ? "border-red-500"
-            : isDragging
+            : isDragging && uploadSource === "pc"
               ? "border-[#4F46E5]"
-              : "border-[#D1D5DB]"
+              : "border-[#D1D5DB] dark:border-neutral-700"
         }`}
         >
           <input
@@ -299,28 +466,61 @@ const ImagesStep = () => {
             onChange={handleInputChange}
           />
 
-          <div className="flex flex-col items-center justify-center text-center">
-            {/* Icon */}
-            <div className="w-14 h-14 rounded-3xl bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5]">
-              <RiCameraAiLine size={25} />
-            </div>
-
-            {/* Heading */}
-            <h3 className="mt-2 text-base xl:text-lg font-bold text-[#181C1F]">
-              Drag & drop or click to browse
-            </h3>
-
-            {/* Description */}
-            <p className="mt-1 max-w-md text-sm md:text-base text-[#6B7280] leading-7">
-              Supports JPG, PNG and WEBP up to 10MB each · 30MB total
-            </p>
-
-            {/* Info */}
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              <div className="rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-semibold text-[#4F46E5]">
-                Max {MAX_IMAGES} images
+          {/* PC pane */}
+          {uploadSource === "pc" && (
+            <motion.div
+              key="pc-pane"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col items-center justify-center text-center"
+            >
+              {/* Icon */}
+              <div className="w-14 h-14 rounded-3xl bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5]">
+                <RiCameraAiLine size={25} />
               </div>
-            </div>
+
+              {/* Heading */}
+              <h3 className="mt-2 text-base xl:text-lg font-bold text-[#181C1F] dark:text-white">
+                Drag & drop or click to browse
+              </h3>
+
+              {/* Description */}
+              <p className="mt-1 max-w-md text-sm md:text-base text-[#6B7280] leading-7">
+                Supports JPG, PNG and WEBP up to 10MB each · 30MB total
+              </p>
+
+              {/* Info */}
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <div className="rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-semibold text-[#4F46E5]">
+                  Max {MAX_IMAGES} images
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Mobile pane — always mounted so the QR session / polling
+              survives tab switches; only hidden with display:none. */}
+          <div
+            className={uploadSource === "mobile" ? "block" : "hidden"}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <motion.div
+              initial={false}
+              animate={
+                uploadSource === "mobile"
+                  ? { opacity: 1, y: 0 }
+                  : { opacity: 0, y: 12 }
+              }
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <PhoneHandoffCard
+                bare
+                onPhotos={handlePhonePhotos}
+                attachedCount={formData.imagePreviews?.length || 0}
+                remainingSlots={MAX_IMAGES - (formData.imagePreviews?.length || 0)}
+              />
+            </motion.div>
           </div>
         </div>
 
@@ -337,14 +537,6 @@ const ImagesStep = () => {
           </ul>
         )}
       </div>
-
-      {/* Phone handoff: QR -> gallery/camera -> auto-attach. Slots stay in
-          sync with laptop picks (max 3 combined). */}
-      <PhoneHandoffCard
-        onPhotos={handlePhonePhotos}
-        attachedCount={formData.imagePreviews?.length || 0}
-        remainingSlots={MAX_IMAGES - (formData.imagePreviews?.length || 0)}
-      />
 
       {/* Uploaded Images */}
       {formData.imagePreviews?.length > 0 && (

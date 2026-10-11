@@ -375,7 +375,7 @@ const ExplorePage = () => {
               )}
               {priceInvalid && (
                 <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600 ring-1 ring-red-100 dark:bg-red-950/20 dark:text-red-300 dark:ring-red-900/40">
-                  Invalid price range — min and max must be numbers ≥ 0 and min
+                  Invalid price range: min and max must be numbers ≥ 0 and min
                   ≤ max. Clear the price filter to browse.
                 </p>
               )}

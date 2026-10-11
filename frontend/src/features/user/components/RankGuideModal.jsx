@@ -280,7 +280,7 @@ export default function RankGuideModal({
                     Level up = Real rewards, automatically!
                   </h4>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                    Every milestone level and rank unlock drops free Boost Credits, subscription upgrades, and exclusive cosmetics — no action needed.
+                    Every milestone level and rank unlock drops free Boost Credits, subscription upgrades, and exclusive cosmetics, no action needed.
                   </p>
                 </div>
               </div>
@@ -408,7 +408,7 @@ export default function RankGuideModal({
               <div className="rounded-xl p-3 border border-amber-200/60 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-950/10 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
                 <Info size={14} className="shrink-0 mt-0.5" />
                 <span>
-                  All rewards are granted automatically when you hit the milestone — just keep trading! Subscription rewards stack on top of your existing plan (time is extended, not replaced).
+                  All rewards are granted automatically when you hit the milestone. Just keep trading! Subscription rewards stack on top of your existing plan (time is extended, not replaced).
                 </span>
               </div>
             </div>

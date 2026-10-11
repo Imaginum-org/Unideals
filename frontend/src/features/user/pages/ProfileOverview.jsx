@@ -127,7 +127,7 @@ function ProfileOverview() {
                 <AvatarComponent
                   name={userDetails?.name || "User"}
                   imageUrl={userDetails?.avatar?.url}
-                  plan={userDetails?.subscription}
+                  plan={userDetails?.subscription} role={userDetails?.role} isOwn
                   size="xlarge"
                   className="rounded-2xl"
                   showBadge
@@ -302,7 +302,7 @@ function ProfileOverview() {
                     </div>
                   </div>
                   <h2 className="text-[1.2rem] font-extrabold text-gray-900 dark:text-white">
-                    —
+                    -
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Avg Rating · no ratings yet
@@ -317,7 +317,7 @@ function ProfileOverview() {
                     </div>
                   </div>
                   <h2 className="text-[1.2rem] font-extrabold text-gray-900 dark:text-white">
-                    —
+                    -
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Response Time · no data yet
@@ -354,9 +354,9 @@ function ProfileOverview() {
                 {userProducts.length === 0 ? (
                   <div className="py-6 text-center">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      No orders yet —{" "}
+                      No orders yet.{" "}
                       <Link to="/" className="font-semibold text-blue-600 hover:underline">
-                        browse the marketplace
+                        Browse the marketplace
                       </Link>
                     </p>
                   </div>
@@ -427,9 +427,9 @@ function ProfileOverview() {
 
                 <div className="py-6 text-center">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    No chats yet —{" "}
+                    No chats yet.{" "}
                     <Link to="/" className="font-semibold text-blue-600 hover:underline">
-                      browse products
+                      Browse products
                     </Link>{" "}
                     to start a conversation.
                   </p>
@@ -490,9 +490,9 @@ function ProfileOverview() {
                   ) : (
                     <div className="py-6 text-center">
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No saved items yet —{" "}
+                        No saved items yet.{" "}
                         <Link to="/" className="font-semibold text-blue-600 hover:underline">
-                          browse the marketplace
+                          Browse the marketplace
                         </Link>
                       </p>
                     </div>

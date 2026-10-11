@@ -24,6 +24,7 @@ const PhoneHandoffCard = ({
   disabled = false,
   remainingSlots = 3,
   attachedCount = 0,
+  bare = false,
 }) => {
   const [session, setSession] = useState(null); // { code, url, secret, expiresAt }
   const [creating, setCreating] = useState(false);
@@ -135,37 +136,48 @@ const PhoneHandoffCard = ({
   ).padStart(2, "0")}`;
 
   // Collapsed state: entry point.
+  // `bare` renders only the inner content (no outer card) so the parent can
+  // own the single dashed box for the tabbed PC / Mobile layout.
   if (!session) {
     if (remainingSlots <= 0) {
-      return (
-        <div className="mt-4 rounded-[24px] border border-[#E5E7EB] bg-[#F8FAFC] p-6 text-center">
-          <p className="text-sm font-semibold text-[#374151]">
+      const fullInner = (
+        <>
+          <p className="text-sm font-semibold text-[#374151] dark:text-neutral-200">
             All 3 photo slots are full.
           </p>
           <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[#6B7280]">
             Remove a photo above to free a slot for phone upload.
           </p>
+        </>
+      );
+      if (bare) return <div className="text-center">{fullInner}</div>;
+      return (
+        <div className="mt-4 rounded-[24px] border border-[#E5E7EB] bg-[#F8FAFC] p-6 text-center">
+          {fullInner}
         </div>
       );
     }
-    return (
-      <div className="mt-4 rounded-[24px] border-2 border-dashed border-[#D1D5DB] bg-[#F8FAFC] p-6 text-center">
+    const collapsedInner = (
+      <>
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
           <MdOutlinePhonelinkSetup size={24} />
         </div>
-        <h3 className="mt-3 text-base font-bold text-[#181C1F]">
-          {expired ? "Session expired — generate a new one" : "Add photos from your phone"}
+        <h3 className="mt-3 text-base font-bold text-[#181C1F] dark:text-white">
+          {expired ? "Session expired. Generate a new one" : "Add photos from your phone"}
         </h3>
         <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[#6B7280]">
           {expired
             ? "QR codes expire after 15 minutes for security."
             : attachedCount > 0
-              ? `${attachedCount} already on this laptop — your phone can send ${remainingSlots} more. Laptop upload above keeps working as usual.`
-              : "Scan a QR with your phone and the pictures attach here automatically. Laptop upload above keeps working as usual."}
+              ? `${attachedCount} already on this device, your phone can send ${remainingSlots} more.`
+              : "Scan a QR with your phone and the pictures attach here automatically."}
         </p>
         <button
           type="button"
-          onClick={startSession}
+          onClick={(e) => {
+            e.stopPropagation();
+            startSession();
+          }}
           disabled={disabled || creating}
           className="mt-4 inline-flex h-[46px] items-center gap-2 rounded-xl bg-[#4F46E5] px-6 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -177,51 +189,62 @@ const PhoneHandoffCard = ({
             "Show phone QR"
           )}
         </button>
+      </>
+    );
+    if (bare) return <div className="text-center">{collapsedInner}</div>;
+    return (
+      <div className="mt-4 rounded-[24px] border-2 border-dashed border-[#D1D5DB] bg-[#F8FAFC] p-6 text-center">
+        {collapsedInner}
       </div>
     );
   }
 
   // Active session: QR + code + countdown.
+  const activeInner = (
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+      <div className="rounded-2xl border border-[#ECECEC] bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+        <Suspense fallback={<div className="size-[160px] animate-pulse rounded-xl bg-zinc-100" />}>
+          <LazyQRCode value={session.url} size={160} />
+        </Suspense>
+      </div>
+      <div className="min-w-0 flex-1 text-center sm:text-left">
+        <h3 className="text-base font-bold text-[#181C1F] dark:text-white">
+          Scan with your phone camera
+        </h3>
+        <p className="mt-1 text-sm leading-6 text-[#6B7280]">
+          A page opens on your phone. Pick from gallery or take a photo.
+          Pictures appear here on their own.
+          {attachedCount > 0 && (
+            <> Your phone can send {remainingSlots} more.</>
+          )}
+        </p>
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+          <span className="rounded-lg bg-[#EEF2FF] px-3 py-1.5 font-mono text-sm font-bold tracking-[0.2em] text-[#4F46E5]">
+            {session.code}
+          </span>
+          <span className="rounded-lg bg-[#F3F4F6] px-3 py-1.5 text-xs font-semibold text-[#6B7280] dark:bg-neutral-800 dark:text-neutral-300">
+            expires in {mmss}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            clearTimers();
+            setSession(null);
+            seenFileIds.current = new Set();
+          }}
+          className="mt-3 text-sm font-semibold text-[#9CA3AF] hover:text-[#4B5563]"
+        >
+          Cancel session
+        </button>
+      </div>
+    </div>
+  );
+  if (bare) return activeInner;
   return (
     <div className="mt-4 rounded-[24px] border border-[#E5E7EB] bg-[#F7F8FA] p-6">
-      <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-        <div className="rounded-2xl border border-[#ECECEC] bg-[#F7F8FA] p-3">
-          <Suspense fallback={<div className="size-[160px] animate-pulse rounded-xl bg-zinc-100" />}>
-            <LazyQRCode value={session.url} size={160} />
-          </Suspense>
-        </div>
-        <div className="min-w-0 flex-1 text-center sm:text-left">
-          <h3 className="text-base font-bold text-[#181C1F]">
-            Scan with your phone camera
-          </h3>
-          <p className="mt-1 text-sm leading-6 text-[#6B7280]">
-            A page opens on your phone — pick from gallery or take a photo.
-            Pictures appear here on their own.
-            {attachedCount > 0 && (
-              <> Your phone can send {remainingSlots} more.</>
-            )}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-            <span className="rounded-lg bg-[#EEF2FF] px-3 py-1.5 font-mono text-sm font-bold tracking-[0.2em] text-[#4F46E5]">
-              {session.code}
-            </span>
-            <span className="rounded-lg bg-[#F3F4F6] px-3 py-1.5 text-xs font-semibold text-[#6B7280]">
-              expires in {mmss}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              clearTimers();
-              setSession(null);
-              seenFileIds.current = new Set();
-            }}
-            className="mt-3 text-sm font-semibold text-[#9CA3AF] hover:text-[#4B5563]"
-          >
-            Cancel session
-          </button>
-        </div>
-      </div>
+      {activeInner}
     </div>
   );
 };

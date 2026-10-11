@@ -82,7 +82,7 @@ const privacySections = [
         type: "list-chevron",
         items: [
           "You transact or chat: the other user sees your display name, profile photo, campus, and your listing content including its pickup spot text",
-          "Service providers process data on our behalf under contractual safeguards — hosting and database, image storage and delivery, Razorpay for payments, and Resend/EmailJS/Google for email and sign-in",
+          "Service providers process data on our behalf under contractual safeguards: hosting and database, image storage and delivery, Razorpay for payments, and Resend/EmailJS/Google for email and sign-in",
           "Safety requires it: reported chats, listings, or accounts reviewed by our moderation team",
           "Required by court order, law-enforcement request, or Indian regulatory authority, or in a merger/acquisition under equivalent protections",
         ],
@@ -104,7 +104,7 @@ const privacySections = [
       {
         type: "list-chevron",
         items: [
-          "Essential HttpOnly cookies keep you signed in and protect sessions — the app cannot function without them",
+          "Essential HttpOnly cookies keep you signed in and protect sessions. The app cannot function without them",
           "Your browser/device may hold preferences (theme), listing drafts, recent searches, and anti-spam timers, which you can clear anytime via browser settings or in-app controls",
           "We run no third-party advertising trackers; analytics, if any, are anonymised",
           "Disabling storage or cookies may break sign-in, drafts, and other core features",
@@ -120,7 +120,7 @@ const privacySections = [
         items: [
           "HTTPS encryption in transit, hashed passwords, short-lived sessions with instant revocation, signed image uploads, and abuse rate-limiting",
           "Access to personal data is restricted to personnel and systems that need it for the purposes above",
-          "No internet transmission is 100% secure — use a strong unique password, log out on shared devices, and report suspected breaches immediately",
+          "No internet transmission is 100% secure. Use a strong unique password, log out on shared devices, and report suspected breaches immediately",
           "If a breach affecting your data occurs, we will notify you and the authorities as required by law",
         ],
       },
@@ -146,7 +146,7 @@ const privacySections = [
     ],
   },
   {
-    title: "9. ACCOUNT DELETION — WHAT HAPPENS",
+    title: "9. ACCOUNT DELETION: WHAT HAPPENS",
     body: [
       {
         type: "list-chevron",
@@ -173,7 +173,7 @@ const privacySections = [
     body: [
       {
         type: "p",
-        text: "Payments open Razorpay's secure checkout and sign-in may use Google — both operate under their own privacy policies for data they process directly. External links in listings or chats are not covered by this policy; interact with them at your own discretion.",
+        text: "Payments open Razorpay's secure checkout and sign-in may use Google. Both operate under their own privacy policies for data they process directly. External links in listings or chats are not covered by this policy; interact with them at your own discretion.",
       },
     ],
   },
@@ -219,7 +219,7 @@ const termsSections = [
         items: [
           "You must be at least 18 years old. Unideals is not for minors.",
           "You must be currently enrolled at a recognised Indian university or college.",
-          "You must verify your email address before listing, buying, chatting, or boosting — verification links expire 24 hours after issue.",
+          "You must verify your email address before listing, buying, chatting, or boosting. Verification links expire 24 hours after issue.",
           "One account per person. Duplicate, shared, transferred, or sold accounts are grounds for permanent suspension of all related accounts.",
           "You must provide accurate registration details and keep them up to date, including your campus.",
         ],
@@ -227,7 +227,7 @@ const termsSections = [
     ],
   },
   {
-    title: "3. OUR ROLE — A VENUE, NOT A PARTY",
+    title: "3. OUR ROLE: A VENUE, NOT A PARTY",
     body: [
       {
         type: "p",
@@ -245,7 +245,7 @@ const termsSections = [
           "Respond to buyer or seller messages within a reasonable time once you engage.",
           "Honour prices and terms once both sides have confirmed a deal.",
           "Inspect the item before paying, and never share OTPs, bank passwords, or advance payments with strangers.",
-          "Meet only in safe, public campus locations — preferably your saved pickup spots — and consider daylight hours and high-value caution.",
+          "Meet only in safe, public campus locations, preferably your saved pickup spots, and consider daylight hours and high-value caution.",
           "Report suspicious listings, users, or messages promptly instead of engaging further.",
           "Keep your login credentials confidential and log out on shared devices.",
         ],
@@ -261,7 +261,7 @@ const termsSections = [
           "Listing illegal, stolen, counterfeit, or recalled goods; weapons; drugs; alcohol; tobacco; or prescription medication.",
           "Misrepresenting condition, authenticity, ownership, or MRP of any item, including fake discounts and bait-and-switch pricing.",
           "Fraud of any kind, including fake payments, payment screenshots, and chargeback abuse after receiving goods or benefits.",
-          "Harassment, threats, hate speech, discrimination, or any sexual content or conduct — zero tolerance where minors could be involved.",
+          "Harassment, threats, hate speech, discrimination, or any sexual content or conduct: zero tolerance where minors could be involved.",
           "Scams and phishing, including fake links, impersonation of students, staff, or Unideals representatives, and soliciting credentials or money.",
           "Publishing your exact room number, home address, live location, or government ID details in listings, chats, or images.",
           "Fake reviews, rating manipulation, badge/XP gaming, shill accounts, and coordinated or retaliatory false reporting.",
@@ -280,7 +280,7 @@ const termsSections = [
         items: [
           "By posting you confirm you own the item or are authorised to sell it, and that the title, description, photos, price, category, and condition are accurate and lawful.",
           "Use a correct category and honest condition; miscategorised or misleading listings may be corrected or removed.",
-          "Do not spam duplicate listings for the same item — edit or relist instead. Drafts are stored on your device and may expire.",
+          "Do not spam duplicate listings for the same item. Edit or relist instead. Drafts are stored on your device and may expire.",
           "Mark items sold and unlist unavailable items promptly so buyers are not misled.",
           "Listing visibility is campus-scoped: your live listings appear on your current campus, and switching campus moves them with you.",
           "Unideals may edit, reject, unlist, or remove any listing at any time, with or without notice, for policy, safety, or legal reasons.",
@@ -294,11 +294,11 @@ const termsSections = [
       {
         type: "list-chevron",
         items: [
-          "Unideals provides pickup spots so you never need to share street addresses — use public campus spots, not private rooms or homes.",
+          "Unideals provides pickup spots so you never need to share street addresses. Use public campus spots, not private rooms or homes.",
           "Check the item and confirm it matches the listing before paying; test electronics on the spot where possible.",
           "Keep a record of the deal (chat confirmation, receipt or photo) until both sides are satisfied.",
           "Either side may walk away before money or goods change hands; after handover, disputes are between buyer and seller.",
-          "If you feel unsafe at any point, leave immediately and report the user — no deal is worth a safety risk.",
+          "If you feel unsafe at any point, leave immediately and report the user. No deal is worth a safety risk.",
         ],
       },
     ],
@@ -313,7 +313,7 @@ const termsSections = [
           "Founder plans (Pro ₹99, Pro+ ₹199) are one-time launch offers granting lifetime benefits to the purchasing account; future buyers move to semester billing. Benefits are tied to your account and cannot be transferred, shared, or sold.",
           "All digital purchases (plans and boost add-ons) are final once activated and are non-refundable, except where consumer law requires otherwise. Failed or duplicate charges are reviewed case-by-case through support.",
           "Chargebacks, disputes, or refunds initiated after receiving benefits will lead to revocation of the entitlement and review or suspension of the account.",
-          "Monthly boost quotas reset each calendar month and do not roll over. A boost stays attached to its listing — deleting or moving the listing ends the remaining boost time without refund or credit.",
+          "Monthly boost quotas reset each calendar month and do not roll over. A boost stays attached to its listing, deleting or moving the listing ends the remaining boost time without refund or credit.",
           "Plan limits (listings, wishlist, boosts, priority) are enforced live; attempting to bypass limits may trigger suspension.",
           "We may evolve plan features and prices with reasonable notice; Founder lifetime benefits already granted are honoured.",
         ],
@@ -326,7 +326,7 @@ const termsSections = [
       {
         type: "list-chevron",
         items: [
-          "Keep negotiations inside Unideals chat so there is a record if anything goes wrong — deals struck entirely off-platform carry no platform protection or support.",
+          "Keep negotiations inside Unideals chat so there is a record if anything goes wrong. Deals struck entirely off-platform carry no platform protection or support.",
           "Never share bank details, card numbers, Aadhaar, OTPs, or passwords in chat, and never open suspicious links or QR codes from strangers.",
           "Chats may be reviewed by our safety team when a conversation is reported, solely for safety, fraud, and dispute purposes.",
           "Use block and report tools instead of continuing hostile or suspicious conversations.",
@@ -340,7 +340,7 @@ const termsSections = [
       {
         type: "list-chevron",
         items: [
-          "All Unideals software, trademarks, branding, and platform content belong to Unideals or its licensors — do not copy, scrape, or reuse them.",
+          "All Unideals software, trademarks, branding, and platform content belong to Unideals or its licensors. Do not copy, scrape, or reuse them.",
           "By uploading photos, descriptions, or profile content you confirm you own the rights and grant Unideals a non-exclusive, royalty-free licence to host, display, and distribute that content to operate and improve the platform.",
           "Do not upload anyone else's photos, personal data, or copyrighted material (e.g. watermarked stock images, textbook scans) without rights.",
         ],
@@ -353,7 +353,7 @@ const termsSections = [
       {
         type: "list-chevron",
         items: [
-          "XP, levels, ranks, badges, and leaderboards are reputation signals for fun and trust only — they carry no monetary value and cannot be redeemed, transferred, or sold.",
+          "XP, levels, ranks, badges, and leaderboards are reputation signals for fun and trust only. They carry no monetary value and cannot be redeemed, transferred, or sold.",
           "Gaming, farming, or exploiting badge mechanics may lead to correction or reset of gamification standing and further moderation.",
           "We may tune formulas, badges, and leaderboards as the system evolves; standings are computed per campus unless stated otherwise.",
         ],
@@ -366,7 +366,7 @@ const termsSections = [
       {
         type: "list-chevron",
         items: [
-          "Report inappropriate products, users, or messages with specifics — every report is reviewed by our safety team, and you may be contacted by email for follow-up.",
+          "Report inappropriate products, users, or messages with specifics. Every report is reviewed by our safety team, and you may be contacted by email for follow-up.",
           "Moderation outcomes range from warnings and listing removal to temporary suspension and permanent bans, depending on severity and history.",
           "Deliberately false, retaliatory, or brigaded reports are themselves violations and may lead to action against the reporter.",
           "If you believe moderation was a mistake, appeal through the Contact page or support email with your account email and details.",

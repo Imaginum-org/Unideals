@@ -188,7 +188,7 @@ function Subscription() {
   const renewalLabel = billing?.isLifetime
     ? "Never expires (lifetime)"
     : formatDate(billing?.expiresAt) || "No renewal scheduled";
-  const purchasedLabel = formatDate(billing?.startedAt) || "—";
+  const purchasedLabel = formatDate(billing?.startedAt) || "-";
   const orderRef =
     billing?.lastPayment?.razorpay_order_id ||
     billing?.payments?.[0]?.razorpay_order_id ||
@@ -205,7 +205,7 @@ function Subscription() {
       const last =
         billing?.lastPayment || billing?.payments?.[0] || null;
       const lines = [
-        "Unideals — Payment Receipt",
+        "Unideals | Payment Receipt",
         "---------------------------",
         `Plan: ${selectedPlan.name}`,
         `Amount: Rs.${selectedPlan.price} (one-time)`,
@@ -358,7 +358,7 @@ function Subscription() {
                 <p className="font-extrabold text-[#4A3CFF]">
                   {billing.usage?.boost
                     ? `${billing.usage.boost.monthlyUsed} used · ${billing.usage.boost.monthlyRemaining} left`
-                    : "—"}
+                    : "-"}
                 </p>
               </div>
 
@@ -373,7 +373,7 @@ function Subscription() {
                 {billing.isLifetime && selectedPlan.id !== "free" ? (
                   <span className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-2 text-[12px] font-semibold text-[#059447]">
                     <Check size={13} />
-                    Lifetime access — no renewals
+                    Lifetime access: no renewals
                   </span>
                 ) : null}
               </div>

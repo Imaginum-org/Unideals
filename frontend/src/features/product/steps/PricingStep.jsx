@@ -357,7 +357,7 @@ const [legalTab, setLegalTab] = useState(null);
                           {pickupSpots.map((spot) => (
                             <option key={spot._id} value={spot._id}>
                               {spot.name}
-                              {spot.isPrimary ? " (Primary)" : ""} —{" "}
+                              {spot.isPrimary ? " (Primary)" : ""},{" "}
                               {spot.detail}
                             </option>
                           ))}
@@ -377,7 +377,7 @@ const [legalTab, setLegalTab] = useState(null);
                       </>
                     ) : (
                       <p className="text-sm text-red-500">
-                        No pickup spot found — add one to continue
+                        No pickup spot found. Add one to continue
                       </p>
                     )}
                   </div>

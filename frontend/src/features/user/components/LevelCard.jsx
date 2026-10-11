@@ -162,7 +162,7 @@ export default function LevelCard({
                   Boost Credits
                 </p>
                 <p className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 leading-tight">
-                  {boostCredits === null ? "—" : boostCredits}
+                  {boostCredits === null ? "-" : boostCredits}
                 </p>
               </div>
             </div>

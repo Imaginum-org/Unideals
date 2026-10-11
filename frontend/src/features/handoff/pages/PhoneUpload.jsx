@@ -82,7 +82,7 @@ const PhoneUpload = () => {
     if (remaining <= 0) {
       toast.error(
         laptopCount > 0
-          ? `${laptopCount} already on the laptop — only ${maxFiles} more fit.`
+          ? `${laptopCount} already on the laptop, only ${maxFiles} more fit.`
           : `Only ${maxFiles} photo${maxFiles === 1 ? "" : "s"} fit.`,
       );
       return;
@@ -182,7 +182,7 @@ const PhoneUpload = () => {
           <MdCheckCircle size={56} className="text-emerald-500" />
           <p className="text-sm leading-6 text-[#6B7280]">
             {files.length} photo{files.length === 1 ? "" : "s"} attached to your
-            listing draft. You can go back to your laptop — they are already
+            listing draft. You can go back to your laptop. They are already
             there. You may close this page.
           </p>
         </div>
@@ -205,7 +205,7 @@ const PhoneUpload = () => {
       {/* Pickers */}
       {laptopCount > 0 && (
         <p className="mt-4 rounded-xl bg-[#EEF2FF] px-4 py-2.5 text-center text-sm font-semibold text-[#4F46E5]">
-          {laptopCount} already on the laptop — you can send {maxFiles} more
+          {laptopCount} already on the laptop, you can send {maxFiles} more
         </p>
       )}
       <div className="mt-4 grid grid-cols-2 gap-3">

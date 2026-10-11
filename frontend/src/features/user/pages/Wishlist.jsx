@@ -80,7 +80,7 @@ function Wishlist() {
 
   return (
     <>
-      <Seo title="Wishlist — Unideals" robots="noindex,nofollow" />
+      <Seo title="Wishlist | Unideals" robots="noindex,nofollow" />
       <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
         <div className="flex h-[calc(100vh-70px)] ">
           {/* LEFT PANEL */}

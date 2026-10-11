@@ -204,7 +204,7 @@ const PreviewStep = () => {
             newUploads.map((u) => (u?.fileId ? deleteImage(u.fileId) : Promise.resolve())),
           );
           toast.error(
-            `${failed.length} image${failed.length > 1 ? "s" : ""} failed to upload. Nothing was saved — please retry.`,
+            `${failed.length} image${failed.length > 1 ? "s" : ""} failed to upload. Nothing was saved. Please retry.`,
           );
           setPublishStage("");
           setLoading(false);
@@ -306,7 +306,7 @@ const PreviewStep = () => {
           uploads.map((u) => (u?.fileId ? deleteImage(u.fileId) : Promise.resolve())),
         );
         toast.error(
-          `${failed.length} of ${results.length} images failed to upload. Please retry — nothing was published.`,
+          `${failed.length} of ${results.length} images failed to upload. Please retry. Nothing was published.`,
         );
         setPublishStage("");
         setLoading(false);

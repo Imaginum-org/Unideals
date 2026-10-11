@@ -88,12 +88,11 @@ const dealSchema = new mongoose.Schema(
       default: OFFER_STATUS.PENDING,
     },
 
-    // Transaction status
+    // Transaction status (indexed via dealSchema.index below)
     status: {
       type: String,
       enum: Object.values(DEAL_STATUS),
       default: DEAL_STATUS.NEGOTIATING,
-      index: true,
     },
 
     // Seller confirmed deal

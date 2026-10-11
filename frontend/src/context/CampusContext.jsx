@@ -116,7 +116,7 @@ export const CampusProvider = ({ children }) => {
       setGuestSlug(null);
       if (!guestFallbackAnnouncedRef.current) {
         guestFallbackAnnouncedRef.current = true;
-        toast("Campus no longer available — showing VIT Vellore.", {
+        toast("Campus no longer available, showing VIT Vellore.", {
           id: "campus-deleted-fallback",
         });
       }

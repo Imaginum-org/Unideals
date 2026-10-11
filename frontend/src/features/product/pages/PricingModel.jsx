@@ -169,7 +169,7 @@ const PricingModel = () => {
     { feature: "Monthly Boost Credits", free: "0", pro: "2", proPlus: "5" },
     {
       feature: "Boost Duration",
-      free: "—",
+      free: "-",
       pro: "3 Days",
       proPlus: "7 Days",
     },

@@ -214,7 +214,7 @@ const OrderCard = ({
       const msg = error?.response?.data?.message || "Failed to boost product";
       // Quota exhausted (403): paid options are visible below + upgrade link.
       if (status === 403 || /limit reached/i.test(msg)) {
-        toast.error("Boost quota exhausted — buy an extra boost or upgrade below");
+        toast.error("Boost quota exhausted. Buy an extra boost or upgrade below");
       } else {
         toast.error(msg);
       }

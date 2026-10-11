@@ -29,7 +29,7 @@ const faqData = [
       },
       {
         q: "Can I return an item after buying it?",
-        a: "UniDeals connects students directly — there is no platform-level returns system. We strongly recommend inspecting all items before completing a deal. Once marked as done, transactions cannot be reversed.",
+        a: "UniDeals connects students directly. There is no platform-level returns system. We strongly recommend inspecting all items before completing a deal. Once marked as done, transactions cannot be reversed.",
       },
       {
         q: "What if I got scammed or the item is not as described?",
@@ -43,7 +43,7 @@ const faqData = [
     questions: [
       {
         q: "Is it safe to meet a seller on campus?",
-        a: "All users on UniDeals are verified students. Always meet in public, well-lit campus areas — the canteen, library lobby, or main gate. Never share home addresses or pay before inspecting the item.",
+        a: "All users on UniDeals are verified students. Always meet in public, well-lit campus areas: the canteen, library lobby, or main gate. Never share home addresses or pay before inspecting the item.",
       },
       {
         q: "What if a seller stops responding?",
@@ -65,7 +65,7 @@ const faqData = [
       },
       {
         q: "Can I change my campus or pickup location ?",
-        a: "Yes — go to Settings → Pickup Spots to update your preferred campus meetup locations. To change your campus, update it under Settings → Profile.",
+        a: "Yes. Go to Settings → Pickup Spots to update your preferred campus meetup locations. To change your campus, update it under Settings → Profile.",
       },
     ],
   },

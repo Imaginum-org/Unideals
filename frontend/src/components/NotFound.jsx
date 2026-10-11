@@ -15,7 +15,7 @@ export default function NotFound() {
 
   return (
     <>
-      <Seo title="Page not found — Unideals" robots="noindex,nofollow" />
+      <Seo title="Page not found | Unideals" robots="noindex,nofollow" />
       <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-[#F7F8FA] px-6 py-16 text-center font-figtree dark:bg-[#131313]">
         {/* Campus-marketplace dressing: two bags on a diagonal balance */}
         <img
