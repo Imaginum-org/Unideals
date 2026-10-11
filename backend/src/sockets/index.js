@@ -37,7 +37,7 @@ const authSocket = async (socket, next) => {
     // Session + account check per connection (cheap, once per socket).
     // Revoked sessions and suspended users get no realtime channel.
     const user = await User.findById(decoded.id)
-      .select("_id status tokenVersion")
+      .select("_id status tokenVersion campus_id")
       .lean();
     if (
       !user ||
@@ -47,6 +47,7 @@ const authSocket = async (socket, next) => {
       return next(new Error("Unauthorized"));
     }
     socket.userId = String(user._id);
+    socket.campusId = user.campus_id ? String(user.campus_id) : null;
     return next();
   } catch {
     return next(new Error("Unauthorized"));
@@ -90,6 +91,10 @@ export const initSockets = (httpServer) => {
   io.on("connection", (socket) => {
     const userId = socket.userId;
     socket.join(`user:${userId}`);
+    socket.join("broadcast:all");
+    if (socket.campusId) {
+      socket.join(`campus:${socket.campusId}`);
+    }
 
     // Join a conversation room after verifying participation.
     socket.on("join_conversation", async (conversationId, ack) => {

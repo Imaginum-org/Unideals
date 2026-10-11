@@ -1,85 +1,165 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { io } from "socket.io-client";
 import {
   CheckCheck,
   ArrowUpRight,
   Check,
+  MessageSquare,
+  Package,
+  Tag,
+  Bell,
+  Megaphone,
 } from "lucide-react";
 
 import Profile_left_part from "../../../features/user/components/Profile_left_part.jsx";
-import {
-  READ_KEY,
-  SAMPLES_CLEARED_KEY,
-  initialNotifications,
-  readStoredIds,
-} from "../data/notifications.js";
+import { notificationApi } from "../api/notificationApi.js";
+import { initialNotifications } from "../data/notifications.js";
+
+const baseURL = import.meta.env.VITE_API_BASE_URL || "";
+const socketURL = baseURL.replace(/\/api\/?$/, "") || undefined;
+
+// Resolve icon and style by notification type
+const getNotificationTypeMeta = (type = "") => {
+  const norm = String(type).toUpperCase();
+  if (norm.includes("OFFER") || norm.includes("PROMOTION")) {
+    return {
+      Icon: Tag,
+      iconColor: "text-amber-500",
+      dotColor: "bg-amber-500",
+      badgeBg: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+      displayType: "OFFER / PROMO",
+    };
+  }
+  if (norm.includes("MESSAGE")) {
+    return {
+      Icon: MessageSquare,
+      iconColor: "text-sky-500",
+      dotColor: "bg-sky-500",
+      badgeBg: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
+      displayType: "DIRECT MESSAGE",
+    };
+  }
+  if (norm.includes("ORDER")) {
+    return {
+      Icon: Package,
+      iconColor: "text-emerald-500",
+      dotColor: "bg-emerald-500",
+      badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+      displayType: "ORDER UPDATE",
+    };
+  }
+  if (norm.includes("ANNOUNCE")) {
+    return {
+      Icon: Megaphone,
+      iconColor: "text-indigo-500",
+      dotColor: "bg-indigo-500",
+      badgeBg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300",
+      displayType: "ANNOUNCEMENT",
+    };
+  }
+  return {
+    Icon: Bell,
+    iconColor: "text-slate-500",
+    dotColor: "bg-slate-500",
+    badgeBg: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300",
+    displayType: "GENERAL",
+  };
+};
 
 export default function Notification() {
   const navigate = useNavigate();
-  const [samplesCleared, setSamplesCleared] = useState(() => {
-    try {
-      return localStorage.getItem(SAMPLES_CLEARED_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
-  const [notifications, setNotifications] = useState(() => {
-    const readIds = readStoredIds();
-    return initialNotifications.map((n) =>
-      readIds.has(n.id) ? { ...n, unread: false } : n,
-    );
-  });
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Persist read state so refreshes keep what's been seen.
+  // Load from backend on mount
   useEffect(() => {
-    try {
-      const readIds = notifications
-        .filter((n) => !n.unread)
-        .map((n) => n.id);
-      localStorage.setItem(READ_KEY, JSON.stringify(readIds));
-    } catch {
-      // private mode — in-memory state still works for the session
-    }
-  }, [notifications]);
+    let mounted = true;
+    const fetchNotifications = async () => {
+      try {
+        const res = await notificationApi.getNotifications();
+        if (mounted && res?.data) {
+          setNotifications(res.data);
+          return;
+        }
+      } catch {
+        // Fallback to sample items if backend request fails / offline
+        if (mounted) {
+          setNotifications(initialNotifications);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
 
-  const visible = useMemo(
-    () => (samplesCleared ? [] : notifications),
-    [samplesCleared, notifications],
-  );
+    fetchNotifications();
+
+    // Listen to real-time notification pushes via Socket.IO
+    let socket;
+    try {
+      socket = io(socketURL, {
+        withCredentials: true,
+        transports: ["websocket", "polling"],
+      });
+
+      socket.on("notification:new", (newNotif) => {
+        setNotifications((prev) => [
+          {
+            ...newNotif,
+            id: newNotif.id || newNotif._id,
+            unread: true,
+            time: "Just now",
+          },
+          ...prev,
+        ]);
+      });
+    } catch {
+      // socket is best effort
+    }
+
+    return () => {
+      mounted = false;
+      socket?.disconnect();
+    };
+  }, []);
 
   const unreadCount = useMemo(
-    () => visible.filter((notification) => notification.unread).length,
-    [visible],
+    () => notifications.filter((n) => n.unread).length,
+    [notifications]
   );
 
-  const markRead = (id) => {
+  const markRead = async (id) => {
     setNotifications((current) =>
-      current.map((notification) =>
-        notification.id === id
-          ? { ...notification, unread: false }
-          : notification,
-      ),
+      current.map((n) => (n.id === id ? { ...n, unread: false } : n))
     );
-  };
-
-  const markAllRead = () => {
-    setNotifications((current) =>
-      current.map((notification) => ({ ...notification, unread: false })),
-    );
-  };
-
-  const openNotification = (notification) => {
-    markRead(notification.id);
-    navigate(notification.actionPath);
-  };
-
-  const handleClearSamples = () => {
     try {
-      localStorage.setItem(SAMPLES_CLEARED_KEY, "true");
+      await notificationApi.markRead(id);
     } catch {
       // ignore
     }
-    setSamplesCleared(true);
+  };
+
+  const markAllRead = async () => {
+    setNotifications((current) =>
+      current.map((n) => ({ ...n, unread: false }))
+    );
+    try {
+      await notificationApi.markAllRead();
+    } catch {
+      // ignore
+    }
+  };
+
+  const openNotification = async (notification) => {
+    try {
+      await notificationApi.trackClick(notification.id);
+    } catch {
+      // ignore
+    }
+    await markRead(notification.id);
+    const targetPath =
+      notification.actionPath || notification.action_url || "/deals";
+    navigate(targetPath);
   };
 
   return (
@@ -97,26 +177,16 @@ export default function Notification() {
                   Notifications
                 </h1>
                 <p className="text-[13px] font-semibold text-[#9AA3B2] dark:text-gray-400">
-                  Stay updated with transactions, messages, and your onboarding
-                  guides
+                  Stay updated with campus offers, deals, transactions, and direct messages
                 </p>
               </div>
 
               <div className="flex items-center gap-2">
-                {!samplesCleared && (
-                  <button
-                    type="button"
-                    onClick={handleClearSamples}
-                    className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-[13px] font-bold text-gray-500 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
-                  >
-                    Clear samples
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={markAllRead}
                   disabled={unreadCount === 0}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-[13px] font-extrabold text-[#4A3CFF] transition hover:bg-[#EEEFFF] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-[13px] font-extrabold text-[#4A3CFF] transition hover:bg-[#EEEFFF] disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-indigo-950/40"
                 >
                   <CheckCheck size={18} />
                   Mark all read
@@ -124,28 +194,34 @@ export default function Notification() {
               </div>
             </header>
 
-            {visible.length === 0 ? (
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="rounded-2xl border border-[#E2E6EF] bg-[#F7F8FA] p-10 text-center dark:border-gray-800 dark:bg-[#1c1c1c]">
                 <p className="text-4xl">🎉</p>
                 <h2 className="mt-3 text-base font-bold text-[#09111F] dark:text-white">
                   You&apos;re caught up
                 </h2>
                 <p className="mx-auto mt-2 max-w-sm text-[13px] font-medium leading-6 text-[#9AA3B2]">
-                  New messages, order updates, and price drops will appear
-                  here. Manage notification preferences in Settings.
+                  New announcements, messages, order updates, and campus offers will appear here.
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {visible.map((notification) => {
-                  const Icon = notification.icon;
+                {notifications.map((notification) => {
+                  const meta = getNotificationTypeMeta(notification.type);
+                  const Icon = meta.Icon;
+                  const bannerImage =
+                    notification.imageUrl || notification.image_url;
 
                   return (
                     <article
-                      key={notification.id}
+                      key={notification.id || notification._id}
                       className={`rounded-2xl border p-4 shadow-[0_10px_26px_rgba(15,23,42,0.055)] transition dark:bg-[#1c1c1c] ${
                         notification.unread
-                          ? "border-[#DEDFFC] bg-[#F7F7FF]"
+                          ? "border-[#DEDFFC] bg-[#F7F7FF] dark:border-indigo-900/60 dark:bg-indigo-950/20"
                           : "border-[#E2E6EF] bg-[#F7F8FA] dark:border-gray-800"
                       }`}
                     >
@@ -154,31 +230,41 @@ export default function Notification() {
                           <Icon
                             size={22}
                             strokeWidth={1.8}
-                            className={notification.iconColor}
+                            className={meta.iconColor}
                           />
                           {notification.unread && (
                             <span
-                              className={`h-2 w-2 rounded-full ${notification.dotColor}`}
+                              className={`h-2 w-2 rounded-full ${meta.dotColor}`}
                             />
                           )}
                         </div>
 
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-md bg-[#EEF0F5] px-3 py-1 text-[10px] font-black tracking-wide text-[#9AA3B2] dark:bg-[#262626] dark:text-gray-300">
-                              {notification.type}
-                            </span>
-                            <span className="rounded-md bg-amber-100 px-2 py-1 text-[9px] font-black tracking-wide text-amber-700">
-                              Preview
+                            <span
+                              className={`rounded-md px-2.5 py-0.5 text-[10px] font-black tracking-wider ${meta.badgeBg}`}
+                            >
+                              {meta.displayType}
                             </span>
                             <h2 className="text-[15px] font-extrabold text-[#09111F] dark:text-white">
                               {notification.title}
                             </h2>
                           </div>
 
-                          <p className="mt-3 max-w-3xl text-[13px] font-medium leading-6 text-[#09111F] dark:text-white">
-                            {notification.description}
+                          <p className="mt-2.5 max-w-3xl text-[13px] font-medium leading-6 text-[#09111F] dark:text-slate-200">
+                            {notification.message || notification.description}
                           </p>
+
+                          {/* Attached Banner Image Preview */}
+                          {bannerImage && (
+                            <div className="mt-3 max-w-md overflow-hidden rounded-xl border border-slate-200 dark:border-gray-800">
+                              <img
+                                src={bannerImage}
+                                alt="Offer Banner"
+                                className="h-32 w-full object-cover"
+                              />
+                            </div>
+                          )}
 
                           <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center">
                             <button
@@ -186,7 +272,9 @@ export default function Notification() {
                               onClick={() => openNotification(notification)}
                               className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl bg-[#4A3CFF] px-4 text-[13px] font-extrabold text-white shadow-sm shadow-indigo-500/25 transition hover:bg-[#3832E8] sm:w-auto"
                             >
-                              {notification.actionLabel}
+                              {notification.actionLabel ||
+                                notification.action_label ||
+                                "View Offers"}
                               <ArrowUpRight size={14} />
                             </button>
 

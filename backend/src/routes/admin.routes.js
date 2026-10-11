@@ -53,6 +53,14 @@ import {
   updateCampusSchema,
 } from "../validations/campus.validation.js";
 import { validate } from "../middlewares/validation.middleware.js";
+import {
+  adminCreateNotification,
+  adminGetStats,
+  adminGetHistory,
+  adminGetScheduled,
+  adminCancelScheduled,
+  adminEstimateRecipients,
+} from "../controllers/notification.controller.js";
 
 const router = express.Router();
 
@@ -262,6 +270,45 @@ router.get(
   auth,
   requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
   getAuditLogs,
+);
+
+// Push Notifications
+// Read stats, history, scheduled for both admin & support; mutations for admin only.
+router.get(
+  "/notifications/stats",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  adminGetStats,
+);
+router.get(
+  "/notifications/history",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  adminGetHistory,
+);
+router.get(
+  "/notifications/scheduled",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  adminGetScheduled,
+);
+router.get(
+  "/notifications/estimate-recipients",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  adminEstimateRecipients,
+);
+router.post(
+  "/notifications",
+  auth,
+  requireRoles(USER_ROLES.ADMIN),
+  adminCreateNotification,
+);
+router.patch(
+  "/notifications/:id/cancel",
+  auth,
+  requireRoles(USER_ROLES.ADMIN),
+  adminCancelScheduled,
 );
 
 export default router;

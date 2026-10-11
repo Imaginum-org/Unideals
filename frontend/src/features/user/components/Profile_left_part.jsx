@@ -82,18 +82,27 @@ function Profile_left_part() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   // Live chat unread (same counters the chat list renders) — hidden at 0.
   const [chatUnread, setChatUnread] = useState(0);
+  const [notifUnread, setNotifUnread] = useState(0);
+
   useEffect(() => {
     if (!isLoggedIn) {
       setChatUnread(0);
+      setNotifUnread(0);
       return;
     }
     let stop = false;
     const load = async () => {
       try {
-        const res = await axios.get("/api/conversations", {
-          params: { limit: 1 },
-        });
-        if (!stop) setChatUnread(Number(res.data?.meta?.unreadTotal || 0));
+        const [chatRes, notifRes] = await Promise.all([
+          axios.get("/api/conversations", { params: { limit: 1 } }),
+          axios.get("/api/notifications"),
+        ]);
+        if (!stop) {
+          setChatUnread(Number(chatRes.data?.meta?.unreadTotal || 0));
+          if (typeof notifRes.data?.unreadCount === "number") {
+            setNotifUnread(notifRes.data.unreadCount);
+          }
+        }
       } catch {
         // Badge stays stale — never break the menu over it.
       }
@@ -127,7 +136,7 @@ function Profile_left_part() {
   const mainMenu = [
     { path: "/profile", label: "Overview", icon: DashboardIcon },
     { path: "/chat", label: "Message", icon: MessageCircleIcon, badge: chatUnread },
-    { path: "/notification", label: "Notification", icon: BellIcon, badge: 3 },
+    { path: "/notification", label: "Notification", icon: BellIcon, badge: notifUnread },
     { path: "/myorders", label: "Orders", icon: BoxIcon },
     { path: "/productlisted", label: "My Listings", icon: ShoppingBagIcon },
     { path: "/wishlist", label: "Wishlist", icon: HeartIcon },

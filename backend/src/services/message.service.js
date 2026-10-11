@@ -8,6 +8,7 @@ import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS } from "../
 import { AppError } from "../utils/appError.js";
 import { emitToConversation, emitToUser } from "../utils/socket.js";
 import { screenText, BLOCKED_PLACEHOLDER } from "../utils/profanity.js";
+import { notifyNewMessage } from "./notification.service.js";
 
 /** Strip flagged originals before anything reaches a client. */
 const toClientMessage = (doc) => {
@@ -250,6 +251,20 @@ export const sendTextMessage = async ({ conversationId, senderId, text, replyTo 
     last_message: conversation.last_message,
     last_activity_at: conversation.last_activity_at,
   });
+
+  // Best-effort in-app message notification
+  try {
+    const sender = await User.findById(senderId).select("name").lean();
+    notifyNewMessage({
+      conversationId: conversation._id,
+      senderId,
+      receiverId,
+      senderName: sender?.name || "A user",
+      textSnippet: preview,
+    });
+  } catch {
+    // never break message sending if notification fails
+  }
 
   return payload;
 };

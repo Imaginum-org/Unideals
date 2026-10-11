@@ -24,3 +24,35 @@ export const emitToUser = (userId, event, payload) => {
     // ignore
   }
 };
+
+export const emitToCampus = (campusId, event, payload) => {
+  try {
+    ioInstance?.to(`campus:${campusId}`)?.emit(event, payload);
+  } catch {
+    // ignore
+  }
+};
+
+export const emitToAll = (event, payload) => {
+  try {
+    ioInstance?.to("broadcast:all")?.emit(event, payload);
+  } catch {
+    // ignore
+  }
+};
+
+export const getActiveUserCount = () => {
+  try {
+    if (!ioInstance) return 0;
+    const sockets = ioInstance.sockets?.sockets;
+    if (!sockets) return 0;
+    const userIds = new Set();
+    for (const [_, s] of sockets) {
+      if (s.userId) userIds.add(s.userId);
+    }
+    return userIds.size;
+  } catch {
+    return 0;
+  }
+};
+

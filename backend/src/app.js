@@ -25,6 +25,7 @@ import handoffRouter from "./routes/handoff.routes.js";
 import conversationRouter from "./routes/conversation.route.js";
 import dealRouter from "./routes/deal.route.js";
 import orderRouter from "./routes/order.routes.js";
+import notificationRouter from "./routes/notification.routes.js";
 import { verifyOrigin } from "./middlewares/csrf.middleware.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
@@ -233,6 +234,7 @@ app.use("/api/handoff", handoffRouter);
 app.use("/api/conversations", conversationRouter);
 app.use("/api/deals", dealRouter);
 app.use("/api/orders", orderRouter);
+app.use("/api/notifications", notificationRouter);
 
 // If no route matches
 app.use((req, res) => {

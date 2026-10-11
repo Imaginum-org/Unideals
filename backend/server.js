@@ -12,6 +12,7 @@ import { connectDB } from "./src/config/db.js";
 import { scheduleCleanupDeletedProducts } from "./src/jobs/cleanupDeletedProducts.job.js";
 import { scheduleExpireBoosts } from "./src/jobs/expireBoosts.job.js";
 import { scheduleExpireSubscriptions } from "./src/jobs/expireSubscriptions.job.js";
+import { scheduleDispatchNotifications } from "./src/jobs/dispatchScheduledNotifications.job.js";
 import { initSockets } from "./src/sockets/index.js";
 
 const PORT = process.env.PORT || 5000;
@@ -23,6 +24,7 @@ const startServer = async () => {
     scheduleCleanupDeletedProducts();
     scheduleExpireBoosts();
     scheduleExpireSubscriptions();
+    scheduleDispatchNotifications();
 
     const httpServer = http.createServer(app);
     initSockets(httpServer);

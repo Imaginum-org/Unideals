@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { io } from "socket.io-client";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { GrLocation } from "react-icons/gr";
 import { CiSearch } from "react-icons/ci";
@@ -739,6 +740,51 @@ const Header = () => {
       window.removeEventListener("focus", onFocus);
     };
   }, [isLoggedIn]);
+
+  // Live in-app notifications sync with Socket.IO
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setUnreadCount(0);
+      return;
+    }
+    let stop = false;
+    const loadNotif = async () => {
+      try {
+        const res = await axios.get("/api/notifications");
+        if (!stop && typeof res.data?.unreadCount === "number") {
+          setUnreadCount(res.data.unreadCount);
+        }
+      } catch {
+        // keep current fallback
+      }
+    };
+    loadNotif();
+
+    let socket;
+    try {
+      const socketURL =
+        (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/?$/, "") ||
+        undefined;
+      socket = io(socketURL, {
+        withCredentials: true,
+        transports: ["websocket", "polling"],
+      });
+      socket.on("notification:new", (item) => {
+        setUnreadCount((c) => c + 1);
+        if (item?.title) {
+          toast.info(item.title);
+        }
+      });
+    } catch {
+      // socket is best effort
+    }
+
+    return () => {
+      stop = true;
+      socket?.disconnect();
+    };
+  }, [isLoggedIn]);
+
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [cube, setCube] = useState({ step: 0, faces: [0, 1, 2, 3] });
   const reduceMotion = useReducedMotion();
