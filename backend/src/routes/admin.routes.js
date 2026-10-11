@@ -13,7 +13,7 @@ import {
 } from "../controllers/adminAuth.controller.js";
 
 // Legacy controllers (still used directly for simple cases)
-import { getUsers, getUserStats } from "../controllers/admin.user.controller.js";
+import { getUsers, getUserStats, updateUserRole } from "../controllers/admin.user.controller.js";
 import { getProducts } from "../controllers/admin.product.controller.js";
 import {
   getOrders,
@@ -36,6 +36,7 @@ import {
   resolveReports,
   createCampusWithAudit,
   updateCampusWithAudit,
+  deleteCampusWithAudit,
   getAuditLogs,
 } from "../controllers/admin.controller.js";
 
@@ -129,8 +130,15 @@ router.get(
 router.patch(
   "/users/:id/status",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireRoles(USER_ROLES.ADMIN),
   updateUserStatusWithAudit,
+);
+
+router.patch(
+  "/users/:id/role",
+  auth,
+  requireRoles(USER_ROLES.ADMIN),
+  updateUserRole,
 );
 
 // Products
@@ -154,7 +162,7 @@ router.get(
 router.patch(
   "/products/:id/status",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireRoles(USER_ROLES.ADMIN),
   updateProductStatusWithAudit,
 );
 
@@ -196,7 +204,7 @@ router.get(
 router.patch(
   "/orders/:id/status",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireRoles(USER_ROLES.ADMIN),
   updateOrderStatus,
 );
 
@@ -238,6 +246,13 @@ router.patch(
   requireRoles(USER_ROLES.ADMIN),
   validate(updateCampusSchema),
   updateCampusWithAudit,
+);
+
+router.delete(
+  "/campuses/:id",
+  auth,
+  requireRoles(USER_ROLES.ADMIN),
+  deleteCampusWithAudit,
 );
 
 // Audit Log

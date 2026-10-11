@@ -1,6 +1,7 @@
 import * as adminService from "../services/admin.service.js";
 import * as adminUserService from "../services/admin.user.service.js";
 import * as adminProductService from "../services/admin.product.service.js";
+import * as campusService from "../services/campus.service.js";
 import * as auditLogService from "../services/auditLog.service.js";
 import { safeErrorMessage } from "../utils/response.js";
 
@@ -215,7 +216,6 @@ export const resolveReports = async (req, res) => {
 
 export const createCampusWithAudit = async (req, res, next) => {
   try {
-    const { default: campusService } = await import("../services/campus.service.js");
     const campus = await campusService.createCampus(req.body);
 
     auditLogService
@@ -240,7 +240,6 @@ export const createCampusWithAudit = async (req, res, next) => {
 
 export const updateCampusWithAudit = async (req, res, next) => {
   try {
-    const { default: campusService } = await import("../services/campus.service.js");
     const campus = await campusService.updateCampus(req.params.id, req.body);
 
     // Determine action subtype
@@ -262,6 +261,30 @@ export const updateCampusWithAudit = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Campus updated successfully",
+      data: campus,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteCampusWithAudit = async (req, res, next) => {
+  try {
+    const campus = await campusService.deleteCampus(req.params.id);
+
+    auditLogService
+      .logAdminAction({
+        actor: req.user,
+        action: "campus.delete",
+        targetType: "campus",
+        targetId: campus._id,
+        targetSnapshot: { name: campus.name, slug: campus.slug },
+      })
+      .catch(() => {});
+
+    return res.status(200).json({
+      success: true,
+      message: "Campus deleted successfully",
       data: campus,
     });
   } catch (error) {

@@ -1,4 +1,5 @@
 import * as adminUserService from "../services/admin.user.service.js";
+import * as auditLogService from "../services/auditLog.service.js";
 import { safeErrorMessage } from "../utils/response.js";
 
 const sendSuccess = (res, message, payload, statusCode = 200) =>
@@ -33,6 +34,32 @@ export const updateUserStatus = async (req, res) => {
     );
 
     return sendSuccess(res, "User status updated successfully", {
+      data: user,
+    });
+  } catch (error) {
+    return sendFailure(res, error);
+  }
+};
+
+export const updateUserRole = async (req, res) => {
+  try {
+    const user = await adminUserService.updateUserRole(
+      req.params.id,
+      req.body.role,
+    );
+
+    auditLogService
+      .logAdminAction({
+        actor: req.user,
+        action: "user.role_change",
+        targetType: "user",
+        targetId: user.id || user._id,
+        targetSnapshot: { name: user.name, email: user.email, role: user.role },
+        metadata: { role: user.role },
+      })
+      .catch(() => {});
+
+    return sendSuccess(res, "User role updated successfully", {
       data: user,
     });
   } catch (error) {

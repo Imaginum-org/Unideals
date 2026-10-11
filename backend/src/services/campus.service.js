@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import Campus from "../models/Campus.model.js";
+import User from "../models/User.model.js";
 
 /**
  * Campus service — single place that turns "which campus?" into a Campus
@@ -82,8 +84,14 @@ export const resolveRequestCampus = async (req) => {
 };
 
 export const createCampus = async (data) => {
+  const slug = String(data.slug || "").trim().toLowerCase();
+  const existing = await Campus.findOne({ slug });
+  if (existing) {
+    throw err(409, "A campus with this slug already exists", "CAMPUS_EXISTS");
+  }
+
   const campus = await Campus.create({
-    slug: String(data.slug || "").trim().toLowerCase(),
+    slug,
     name: data.name,
     short_name: data.short_name,
     city: data.city || null,
@@ -96,6 +104,10 @@ export const createCampus = async (data) => {
 };
 
 export const updateCampus = async (id, data) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw err(400, "Invalid campus ID");
+  }
+
   const allowed = {};
   if (data.name !== undefined) allowed.name = data.name;
   if (data.short_name !== undefined) allowed.short_name = data.short_name;
@@ -114,4 +126,30 @@ export const updateCampus = async (id, data) => {
   if (!campus) throw err(404, "Campus not found");
   invalidateCampusCache();
   return campus;
+};
+
+export const deleteCampus = async (id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw err(400, "Invalid campus ID");
+  }
+
+  const campus = await Campus.findByIdAndDelete(id).lean();
+  if (!campus) throw err(404, "Campus not found");
+
+  // Reset campus_id for any users belonging to the deleted campus so they can pick a new one
+  await User.updateMany({ campus_id: id }, { $set: { campus_id: null } });
+
+  invalidateCampusCache();
+  return campus;
+};
+
+export default {
+  invalidateCampusCache,
+  listActiveCampuses,
+  getCampusBySlug,
+  getActiveCampusBySlug,
+  resolveRequestCampus,
+  createCampus,
+  updateCampus,
+  deleteCampus,
 };

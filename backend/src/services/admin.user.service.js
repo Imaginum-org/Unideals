@@ -16,7 +16,7 @@ export const getUsers = async (query = {}) => {
   const skip = (page - 1) * limit;
 
   const match = {
-    role: USER_ROLES.USER,
+    role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] },
   };
 
   if (query.status) {
@@ -63,6 +63,14 @@ export const getUsers = async (query = {}) => {
         },
       },
     },
+    {
+      $lookup: {
+        from: "campuses",
+        localField: "campus_id",
+        foreignField: "_id",
+        as: "campus",
+      },
+    },
     { $sort: { createdAt: -1 } },
     {
       $facet: {
@@ -80,6 +88,17 @@ export const getUsers = async (query = {}) => {
               gender: 1,
               role: 1,
               status: 1,
+              campus: {
+                $let: {
+                  vars: { campus: { $arrayElemAt: ["$campus", 0] } },
+                  in: {
+                    id: { $toString: "$$campus._id" },
+                    name: "$$campus.name",
+                    short_name: "$$campus.short_name",
+                    slug: "$$campus.slug",
+                  },
+                },
+              },
               listings: 1,
               joined: "$createdAt",
               createdAt: 1,
@@ -112,7 +131,7 @@ export const updateUserStatus = async (userId, status) => {
   const isDeactivation = status !== USER_STATUS.ACTIVE;
 
   const user = await User.findOneAndUpdate(
-    { _id: userId, role: USER_ROLES.USER },
+    { _id: userId, role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] } },
     {
       status,
       ...(isDeactivation
@@ -170,6 +189,52 @@ export const updateUserStatus = async (userId, status) => {
   };
 };
 
+export const updateUserRole = async (userId, role) => {
+  if (!ObjectId.isValid(userId)) {
+    throw new Error("Invalid user id");
+  }
+
+  if (![USER_ROLES.USER, USER_ROLES.SUPPORT].includes(role)) {
+    throw new Error("Only support role can be assigned from the admin portal");
+  }
+
+  const targetUser = await User.findById(userId).select("role").lean();
+  if (!targetUser) {
+    throw new Error("User not found");
+  }
+
+  if (targetUser.role === USER_ROLES.ADMIN) {
+    throw new Error("Admin roles cannot be changed via the admin portal");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { role },
+    { new: true, runValidators: true },
+  )
+    .select("name email avatar mobile gender role status createdAt")
+    .lean();
+
+  const listings = await Product.countDocuments({
+    seller_id: user._id,
+    is_deleted: false,
+  });
+
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar,
+    mobile: user.mobile,
+    gender: user.gender,
+    role: user.role,
+    status: user.status,
+    listings,
+    joined: user.createdAt,
+    createdAt: user.createdAt,
+  };
+};
+
 export const getUserStats = async () => {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -186,13 +251,13 @@ export const getUserStats = async () => {
     newUsers30d,
     newUsersPrev30d,
   ] = await Promise.all([
-    User.countDocuments({ role: USER_ROLES.USER }),
-    User.countDocuments({ role: USER_ROLES.USER, status: USER_STATUS.ACTIVE }),
-    User.countDocuments({ role: USER_ROLES.USER, status: USER_STATUS.SUSPENDED }),
-    User.countDocuments({ role: USER_ROLES.USER, createdAt: { $gte: startOfCurrentMonth } }),
-    User.countDocuments({ role: USER_ROLES.USER, createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } }),
-    User.countDocuments({ role: USER_ROLES.USER, createdAt: { $gte: thirtyDaysAgo } }),
-    User.countDocuments({ role: USER_ROLES.USER, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] } }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.ACTIVE }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.SUSPENDED }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, createdAt: { $gte: startOfCurrentMonth } }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, createdAt: { $gte: thirtyDaysAgo } }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }),
   ]);
 
   const activePct = totalUsers > 0 ? Number(((activeUsers / totalUsers) * 100).toFixed(1)) : 0;

@@ -49,10 +49,10 @@ export const getDashboardMetrics = async (range = "month") => {
     ordersThisMonth,
     ordersPrevMonth,
   ] = await Promise.all([
-    User.countDocuments({ role: USER_ROLES.USER }),
-    User.countDocuments({ role: USER_ROLES.USER, status: USER_STATUS.ACTIVE }),
-    User.countDocuments({ role: USER_ROLES.USER, status: USER_STATUS.SUSPENDED }),
-    User.countDocuments({ role: USER_ROLES.USER, status: USER_STATUS.INACTIVE }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] } }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.ACTIVE }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.SUSPENDED }),
+    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.INACTIVE }),
     Product.countDocuments({ status: PRODUCT_STATUS.LISTED, is_deleted: false }),
     Product.countDocuments({ status: PRODUCT_STATUS.BLOCKED, is_deleted: false }),
     Report.countDocuments({ status: REPORT_STATUS.PENDING }),
@@ -111,7 +111,7 @@ export const getDashboardMetrics = async (range = "month") => {
       { $group: { _id: null, total: { $sum: "$current_price" } } },
     ]).catch(() => []),
     User.aggregate([
-      { $match: { role: USER_ROLES.USER, campus_id: { $ne: null } } },
+      { $match: { role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, campus_id: { $ne: null } } },
       { $group: { _id: "$campus_id", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 5 },
@@ -135,11 +135,11 @@ export const getDashboardMetrics = async (range = "month") => {
       .limit(8)
       .lean(),
     User.countDocuments({
-      role: USER_ROLES.USER,
+      role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] },
       createdAt: { $gte: startOfCurrentMonth },
     }).catch(() => 0),
     User.countDocuments({
-      role: USER_ROLES.USER,
+      role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] },
       createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
     }).catch(() => 0),
     Product.countDocuments({
@@ -246,7 +246,7 @@ export const getUserDetails = async (userId) => {
   if (!ObjectId.isValid(userId)) throw new Error("Invalid user id");
 
   const [user, listingsCount, recentProducts, reportCount] = await Promise.all([
-    User.findOne({ _id: userId, role: USER_ROLES.USER })
+    User.findOne({ _id: userId, role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] } })
       .select("name email avatar mobile gender role status campus_id subscription createdAt last_login_date gamification")
       .populate("campus_id", "name short_name slug")
       .lean(),
