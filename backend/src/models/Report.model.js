@@ -7,24 +7,33 @@ const reportSchema = new Schema(
     reporter_id: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
+    },
+
+    reporter_email: {
+      type: String,
+      trim: true,
+    },
+
+    reporter_name: {
+      type: String,
+      trim: true,
     },
 
     target_id: {
       type: Schema.Types.ObjectId,
-      required: true,
+      default: () => new mongoose.Types.ObjectId(),
       refPath: "target_model",
     },
 
     target_model: {
       type: String,
       required: true,
-      enum: ["Product", "User"],
+      enum: ["Product", "User", "Support"],
     },
 
     reason: {
       type: String,
-      enum: Object.values(REPORT_REASONS),
       required: true,
       trim: true,
     },
@@ -32,7 +41,25 @@ const reportSchema = new Schema(
     description: {
       type: String,
       trim: true,
-      maxlength: 500,
+      maxlength: 3000,
+    },
+
+    reference: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
+
+    support_type: {
+      type: String,
+      trim: true,
+      default: "contact",
+    },
+
+    priority: {
+      type: String,
+      enum: ["low", "normal", "medium", "high"],
+      default: "normal",
     },
 
     status: {
@@ -44,7 +71,7 @@ const reportSchema = new Schema(
     admin_note: {
       type: String,
       trim: true,
-      maxlength: 500,
+      maxlength: 1000,
     },
 
     reviewed_at: {
@@ -63,12 +90,23 @@ reportSchema.index(
     target_id: 1,
     target_model: 1,
   },
-  { unique: true },
+  {
+    unique: true,
+    partialFilterExpression: {
+      target_model: { $in: ["Product", "User"] },
+      reporter_id: { $exists: true, $ne: null },
+    },
+  },
 );
 
 reportSchema.index({
   status: 1,
   createdAt: -1,
+});
+
+reportSchema.index({
+  target_model: 1,
+  status: 1,
 });
 
 const Report = mongoose.model("Report", reportSchema);

@@ -9,7 +9,7 @@ import {
   reportUserSchema,
 } from "../validations/report.validation.js";
 
-import { reportProduct, reportUser } from "../controllers/report.controller.js";
+import { reportProduct, reportUser, reportSupport } from "../controllers/report.controller.js";
 
 const router = express.Router();
 
@@ -21,6 +21,16 @@ const reportLimiter = rateLimit({
   message: { success: false, message: "Too many reports, try later" },
 });
 
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next();
+  }
+  return auth(req, res, () => {
+    next();
+  });
+};
+
 router.post(
   "/product/:productId",
   auth,
@@ -30,5 +40,7 @@ router.post(
 );
 
 router.post("/user/:userId", auth, reportLimiter, validate(reportUserSchema), reportUser);
+
+router.post("/support", optionalAuth, reportLimiter, reportSupport);
 
 export default router;

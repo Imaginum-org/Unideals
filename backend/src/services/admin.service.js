@@ -425,8 +425,11 @@ export const getModerationQueue = async (query = {}) => {
   const userIds = groups
     .filter((g) => g._id.target_model === "User")
     .map((g) => g._id.target_id);
+  const supportIds = groups
+    .filter((g) => g._id.target_model === "Support")
+    .map((g) => g._id.target_id);
 
-  const [products, users] = await Promise.all([
+  const [products, users, supportTickets] = await Promise.all([
     productIds.length
       ? Product.find({ _id: { $in: productIds } })
           .select("title status selling_price images category is_deleted seller_id")
@@ -438,10 +441,16 @@ export const getModerationQueue = async (query = {}) => {
           .select("name email avatar status")
           .lean()
       : [],
+    supportIds.length
+      ? Report.find({ target_id: { $in: supportIds } })
+          .populate("reporter_id", "name email avatar")
+          .lean()
+      : [],
   ]);
 
   const productMap = new Map(products.map((p) => [p._id.toString(), p]));
   const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+  const supportMap = new Map(supportTickets.map((s) => [s.target_id.toString(), s]));
 
   const queueItems = groups.map((g) => {
     const targetId = g._id.target_id.toString();
@@ -481,6 +490,23 @@ export const getModerationQueue = async (query = {}) => {
           status: u.status,
         };
       }
+    } else if (targetModel === "Support") {
+      const s = supportMap.get(targetId);
+      if (s) {
+        targetDetail = {
+          id: targetId,
+          type: "support",
+          title: s.reason || "Support Request",
+          description: s.description,
+          email: s.reporter_email || s.reporter_id?.email || "—",
+          name: s.reporter_name || s.reporter_id?.name || "Visitor",
+          reference: s.reference || "",
+          support_type: s.support_type || "contact",
+          priority: s.priority || "normal",
+          status: s.status,
+          createdAt: s.createdAt,
+        };
+      }
     }
 
     return {
@@ -493,7 +519,9 @@ export const getModerationQueue = async (query = {}) => {
       target: targetDetail,
       // Priority badge: high ≥5, medium ≥2, low = 1
       priority:
-        g.reportCount >= 5 ? "high" : g.reportCount >= 2 ? "medium" : "low",
+        targetModel === "Support" && targetDetail?.priority
+          ? targetDetail.priority
+          : g.reportCount >= 5 ? "high" : g.reportCount >= 2 ? "medium" : "low",
     };
   });
 
@@ -510,7 +538,7 @@ export const getModerationQueue = async (query = {}) => {
 export const dismissReports = async (targetId, targetModel, actor) => {
   if (!ObjectId.isValid(targetId)) throw new Error("Invalid target id");
 
-  const validModels = ["Product", "User"];
+  const validModels = ["Product", "User", "Support"];
   if (!validModels.includes(targetModel)) {
     throw new Error("Invalid target model");
   }
@@ -539,4 +567,39 @@ export const dismissReports = async (targetId, targetModel, actor) => {
   } catch { /* audit log failure never blocks action */ }
 
   return { dismissedCount: result.modifiedCount };
+};
+
+export const resolveReports = async (targetId, targetModel, adminNote, actor) => {
+  if (!ObjectId.isValid(targetId)) throw new Error("Invalid target id");
+
+  const validModels = ["Product", "User", "Support"];
+  if (!validModels.includes(targetModel)) {
+    throw new Error("Invalid target model");
+  }
+
+  const result = await Report.updateMany(
+    {
+      target_id: new ObjectId(targetId),
+      target_model: targetModel,
+      status: REPORT_STATUS.PENDING,
+    },
+    {
+      status: REPORT_STATUS.ACTION_TAKEN,
+      admin_note: adminNote || "Resolved by moderator",
+      reviewed_at: new Date(),
+    },
+  );
+
+  try {
+    const { logAdminAction } = await import("./auditLog.service.js");
+    await logAdminAction({
+      actor,
+      action: "report.resolve",
+      targetType: "report",
+      targetId: new ObjectId(targetId),
+      metadata: { targetModel, resolvedCount: result.modifiedCount },
+    });
+  } catch { /* audit log failure never blocks action */ }
+
+  return { resolvedCount: result.modifiedCount };
 };

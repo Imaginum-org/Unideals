@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getProducts } from "../api/productApi";
-import { MessageSquare, Eye, ShieldCheck, Clock3 } from "lucide-react";
+import { MessageSquare, Eye, ShieldCheck, Clock3, Flag } from "lucide-react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
 import ProductGallery from "../../../features/product/components/ProductGallery.jsx";
@@ -779,8 +779,9 @@ ${shareUrl}`;
                 <button
                   type="button"
                   onClick={() => setShowReportModal(true)}
-                  className="text-xs font-semibold text-gray-400 underline-offset-2 hover:text-red-500 hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-red-500 underline-offset-2 hover:underline transition-colors"
                 >
+                  <Flag size={13} className="text-red-500" />
                   Report listing
                 </button>
               </div>

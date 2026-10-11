@@ -18,7 +18,7 @@ const REASONS = [
  * Report-a-user modal: reason dropdown + description + Send/Cancel.
  * White card in both themes (matches the offer popup language).
  */
-const ReportUserModal = ({ open, userName, submitting, onClose, onSubmit }) => {
+const ReportUserModal = ({ open, userName, title, targetType = "user", submitting, onClose, onSubmit }) => {
   const [reason, setReason] = useState("spam_or_advertisement");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
@@ -29,7 +29,7 @@ const ReportUserModal = ({ open, userName, submitting, onClose, onSubmit }) => {
       setDescription("");
       setError("");
     }
-  }, [open ]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -53,24 +53,26 @@ const ReportUserModal = ({ open, userName, submitting, onClose, onSubmit }) => {
     onSubmit?.(reason, description.trim());
   };
 
+  const displayName = title || (targetType === "product" ? "this product" : userName || "user");
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
       onClick={() => onClose?.()}
       role="dialog"
       aria-modal="true"
-      aria-label={`Report ${userName || "user"}`}
+      aria-label={`Report ${displayName}`}
     >
       <div
         className="w-full max-w-sm rounded-xl bg-white shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 pt-4">
-          <p className="flex items-center gap-2 font-bold text-[15px] text-zinc-900">
+          <p className="flex items-center gap-2 font-bold text-[15px] text-zinc-900 truncate">
             <span className="size-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center shrink-0">
               <Flag size={16} />
             </span>
-            Report {userName || "user"}?
+            Report {displayName}?
           </p>
           <button
             onClick={() => onClose?.()}

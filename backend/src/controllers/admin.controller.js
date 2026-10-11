@@ -194,6 +194,23 @@ export const dismissReports = async (req, res) => {
   }
 };
 
+// ─── Resolve Reports ──────────────────────────────────────────────────────
+
+export const resolveReports = async (req, res) => {
+  try {
+    const { targetId, targetModel, adminNote } = req.body;
+    if (!targetId || !targetModel) {
+      return sendFailure(res, new Error("targetId and targetModel are required"));
+    }
+
+    const result = await adminService.resolveReports(targetId, targetModel, adminNote, req.user);
+    return sendSuccess(res, "Reports resolved", { data: result });
+  } catch (error) {
+    return sendFailure(res, error);
+  }
+};
+
+
 // ─── Campus Management (with audit log) ───────────────────────────────────
 
 export const createCampusWithAudit = async (req, res, next) => {

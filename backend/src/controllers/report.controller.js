@@ -47,6 +47,51 @@ export const reportUser = async (req, res, next) => {
   }
 };
 
+export const reportSupport = async (req, res, next) => {
+  try {
+    const user = req.user;
+    const {
+      topic,
+      category,
+      title,
+      message,
+      description,
+      link,
+      reference,
+      email,
+      name,
+      support_type,
+      priority,
+    } = req.body;
+
+    const report = await reportService.reportSupport(
+      {
+        topic,
+        category,
+        title,
+        message,
+        description,
+        link,
+        reference,
+        email,
+        name,
+        support_type,
+        priority,
+      },
+      user,
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Help & support report submitted successfully",
+      data: report,
+    });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+
 // ---- Admin moderation queue (support/admin roles enforced at the route) ----
 
 // GET /api/admin/reports?page=&limit=&status=&target_model=&sort=latest|count

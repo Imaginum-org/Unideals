@@ -39,3 +39,13 @@ export const updateUserStatus = async (req, res) => {
     return sendFailure(res, error);
   }
 };
+
+export const getUserStats = async (req, res) => {
+  try {
+    const stats = await adminUserService.getUserStats();
+    return sendSuccess(res, "User stats fetched successfully", { data: stats });
+  } catch (error) {
+    return sendFailure(res, error);
+  }
+};
+

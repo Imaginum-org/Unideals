@@ -13,8 +13,14 @@ import {
 } from "../controllers/adminAuth.controller.js";
 
 // Legacy controllers (still used directly for simple cases)
-import { getUsers } from "../controllers/admin.user.controller.js";
+import { getUsers, getUserStats } from "../controllers/admin.user.controller.js";
 import { getProducts } from "../controllers/admin.product.controller.js";
+import {
+  getOrders,
+  getOrderStats,
+  getOrderDetails,
+  updateOrderStatus,
+} from "../controllers/admin.order.controller.js";
 
 // New unified admin controller with audit logging
 import {
@@ -27,6 +33,7 @@ import {
   hardDeleteProductWithAudit,
   getModerationQueue,
   dismissReports,
+  resolveReports,
   createCampusWithAudit,
   updateCampusWithAudit,
   getAuditLogs,
@@ -86,8 +93,22 @@ router.post(
   requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
   dismissReports,
 );
+router.post(
+  "/moderation/resolve",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  resolveReports,
+);
 
 // Users
+// Stats summary — both roles
+router.get(
+  "/users/stats",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  getUserStats,
+);
+
 // List (paginated, searchable) — both roles
 router.get(
   "/users",
@@ -151,6 +172,32 @@ router.delete(
   auth,
   requireRoles(USER_ROLES.ADMIN),
   hardDeleteProductWithAudit,
+);
+
+// Orders / Deals
+router.get(
+  "/orders/stats",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  getOrderStats,
+);
+router.get(
+  "/orders",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  getOrders,
+);
+router.get(
+  "/orders/:id",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  getOrderDetails,
+);
+router.patch(
+  "/orders/:id/status",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  updateOrderStatus,
 );
 
 // Campus Directory

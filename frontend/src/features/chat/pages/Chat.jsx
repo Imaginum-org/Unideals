@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Ban, ChevronDown, ChevronLeft, Crown, Lock, Reply, Search, Send, ShieldAlert, Timer, WifiOff, X } from "lucide-react";
+import { Ban, ChevronDown, ChevronLeft, Crown, Flag, Lock, Reply, Search, Send, ShieldAlert, Timer, WifiOff, X } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 import axios from "../../../services/axiosInstance";
 import { useUser } from "../../../context/useUserContext.jsx";
@@ -808,6 +808,8 @@ const ChatPanel = ({ embedded = false }) => {
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reportBusy, setReportBusy] = useState(false);
+  const [reportProductOpen, setReportProductOpen] = useState(false);
+  const [reportProductBusy, setReportProductBusy] = useState(false);
   // Quote-reply draft + jump highlight.
   const [replyingTo, setReplyingTo] = useState(null);
   const [highlightId, setHighlightId] = useState(null);
@@ -855,6 +857,27 @@ const ChatPanel = ({ embedded = false }) => {
       toast.error(err?.response?.data?.message || "Could not submit report");
     } finally {
       setReportBusy(false);
+    }
+  };
+
+  const handleReportProductSubmit = async (reason, description) => {
+    const prodId = product?._id || product?.id || detail?.product_id?._id || detail?.product?._id;
+    if (!prodId) {
+      toast.error("Could not find product to report");
+      return;
+    }
+    setReportProductBusy(true);
+    try {
+      await axios.post(`/api/report/product/${prodId}`, {
+        reason,
+        description: `${description} (Reported from chat for: ${productTitle})`,
+      });
+      setReportProductOpen(false);
+      toast.success("Product report submitted. Our team will review it.");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not submit report");
+    } finally {
+      setReportProductBusy(false);
     }
   };
 
@@ -1119,17 +1142,25 @@ const ChatPanel = ({ embedded = false }) => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                   {badge && (
                     <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${badge.cls}`}>
                       {badge.label}
                     </span>
                   )}
                   <button
+                    onClick={() => setReportProductOpen(true)}
+                    title="Report product / listing"
+                    aria-label="Report product / listing"
+                    className="p-1.5 sm:p-2 text-zinc-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-lg transition shrink-0"
+                  >
+                    <Flag size={18} />
+                  </button>
+                  <button
                     onClick={() => setReportOpen(true)}
                     title="Report user"
                     aria-label="Report user"
-                    className="p-1.5 sm:p-2 text-zinc-400 hover:text-red-500 shrink-0"
+                    className="p-1.5 sm:p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition shrink-0"
                   >
                     <ShieldAlert size={18} />
                   </button>
@@ -1549,9 +1580,18 @@ const ChatPanel = ({ embedded = false }) => {
       <ReportUserModal
         open={reportOpen}
         userName={otherName}
+        targetType="user"
         submitting={reportBusy}
         onClose={() => setReportOpen(false)}
         onSubmit={handleReportSubmit}
+      />
+      <ReportUserModal
+        open={reportProductOpen}
+        title={productTitle}
+        targetType="product"
+        submitting={reportProductBusy}
+        onClose={() => setReportProductOpen(false)}
+        onSubmit={handleReportProductSubmit}
       />
     </div>
   );

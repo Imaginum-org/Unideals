@@ -29,6 +29,10 @@ export const getProducts = async (query = {}) => {
     match.status = query.status;
   }
 
+  if (query.category?.trim() && !query.category.includes("All")) {
+    match.category = { $regex: new RegExp(`^${escapeRegex(query.category.trim())}$`, "i") };
+  }
+
   const pipeline = [
     { $match: match },
     {

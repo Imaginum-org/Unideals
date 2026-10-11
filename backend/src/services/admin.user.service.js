@@ -169,3 +169,51 @@ export const updateUserStatus = async (userId, status) => {
     createdAt: user.createdAt,
   };
 };
+
+export const getUserStats = async () => {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  const [
+    totalUsers,
+    activeUsers,
+    suspendedUsers,
+    usersThisMonth,
+    usersPrevMonth,
+    newUsers30d,
+    newUsersPrev30d,
+  ] = await Promise.all([
+    User.countDocuments({ role: USER_ROLES.USER }),
+    User.countDocuments({ role: USER_ROLES.USER, status: USER_STATUS.ACTIVE }),
+    User.countDocuments({ role: USER_ROLES.USER, status: USER_STATUS.SUSPENDED }),
+    User.countDocuments({ role: USER_ROLES.USER, createdAt: { $gte: startOfCurrentMonth } }),
+    User.countDocuments({ role: USER_ROLES.USER, createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } }),
+    User.countDocuments({ role: USER_ROLES.USER, createdAt: { $gte: thirtyDaysAgo } }),
+    User.countDocuments({ role: USER_ROLES.USER, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }),
+  ]);
+
+  const activePct = totalUsers > 0 ? Number(((activeUsers / totalUsers) * 100).toFixed(1)) : 0;
+  const suspendedPct = totalUsers > 0 ? Number(((suspendedUsers / totalUsers) * 100).toFixed(1)) : 0;
+
+  const totalGrowth = usersPrevMonth > 0
+    ? Number((((usersThisMonth - usersPrevMonth) / usersPrevMonth) * 100).toFixed(1))
+    : usersThisMonth > 0 ? 100 : 0;
+
+  const newUsersGrowth = newUsersPrev30d > 0
+    ? Number((((newUsers30d - newUsersPrev30d) / newUsersPrev30d) * 100).toFixed(1))
+    : newUsers30d > 0 ? 100 : 0;
+
+  return {
+    totalUsers,
+    totalGrowth,
+    activeUsers,
+    activePct,
+    suspendedUsers,
+    suspendedPct,
+    newUsers30d,
+    newUsersGrowth,
+  };
+};

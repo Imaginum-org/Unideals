@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "../../../context/useUserContext.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import { toast } from "../../../components/ui/toast.js";
+import axios from "../../../services/axiosInstance.js";
 import {
   Search,
   MessageSquare,
@@ -213,7 +214,23 @@ function ContactUs() {
     }
 
     try {
-      // emailjs loads only when a message is actually sent.
+      // 1. Save to backend database for the Admin Portal moderation queue
+      try {
+        await axios.post("/api/report/support", {
+          topic: templateParams.user_subject,
+          category: templateParams.user_subject,
+          description: templateParams.user_message,
+          reference: templateParams.reference,
+          email: cleanReplyEmail,
+          name: userDetails?.name,
+          support_type: activeForm,
+          priority: templateParams.priority,
+        });
+      } catch (backendErr) {
+        console.warn("Could not save support ticket to database:", backendErr);
+      }
+
+      // 2. Send via email service
       const { default: emailjs } = await import("@emailjs/browser");
       await emailjs.send(
         import.meta.env.VITE_EMAILJS_SERVICE_ID,
@@ -537,6 +554,18 @@ function ContactUs() {
                         </option>
                         <option value="Inappropriate Content">
                           Inappropriate Content
+                        </option>
+                        <option value="Payment / Deal Dispute">
+                          Payment / Deal Dispute
+                        </option>
+                        <option value="Account or Login Issue">
+                          Account or Login Issue
+                        </option>
+                        <option value="Fake or Misleading Product">
+                          Fake or Misleading Product
+                        </option>
+                        <option value="Other Issue">
+                          Other Issue
                         </option>
                       </select>
 

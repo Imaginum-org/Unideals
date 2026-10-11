@@ -202,6 +202,31 @@ export const reportUser = async (targetUserId, data, user) => {
   }
 };
 
+export const reportSupport = async (data, user) => {
+  const reporterEmail = (data.email || user?.email || "").trim().toLowerCase();
+  if (!reporterEmail || !reporterEmail.includes("@")) {
+    throw badRequest("A valid email address is required");
+  }
+
+  const reason = (data.reason || data.topic || data.category || "Support Request").trim();
+  const description = (data.description || data.message || "").trim();
+
+  const report = await Report.create({
+    reporter_id: user?._id || undefined,
+    reporter_email: reporterEmail,
+    reporter_name: (data.name || user?.name || "Visitor").trim(),
+    target_model: "Support",
+    reason,
+    description,
+    reference: (data.reference || data.link || "").trim(),
+    support_type: data.support_type || "contact",
+    priority: (data.priority || "normal").toLowerCase(),
+    status: REPORT_STATUS.PENDING,
+  });
+
+  return report;
+};
+
 // ---- Admin moderation queue (additive; mounted under /api/admin/reports
 // via the admin router — see controller exports) ----
 
@@ -225,7 +250,7 @@ export const getReportQueue = async ({ page = 1, limit = 20, status, target_mode
 
   const match = {};
   if (status && Object.values(REPORT_STATUS).includes(status)) match.status = status;
-  if (target_model === "Product" || target_model === "User") {
+  if (target_model === "Product" || target_model === "User" || target_model === "Support") {
     match.target_model = target_model;
   }
 
