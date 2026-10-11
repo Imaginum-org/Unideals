@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Product from "../models/Product.model.js";
 import User from "../models/User.model.js";
+import Campus from "../models/Campus.model.js";
 import { USER_ROLES, USER_STATUS } from "../config/constants.js";
 import {
   buildPagination,
@@ -65,7 +66,7 @@ export const getUsers = async (query = {}) => {
     },
     {
       $lookup: {
-        from: "campuses",
+        from: Campus.collection.name,
         localField: "campus_id",
         foreignField: "_id",
         as: "campus",

@@ -112,12 +112,31 @@ export const getDashboardMetrics = async (range = "month") => {
     ]).catch(() => []),
     User.aggregate([
       { $match: { role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, campus_id: { $ne: null } } },
-      { $group: { _id: "$campus_id", count: { $sum: 1 } } },
+      {
+        $addFields: {
+          campusObjId: {
+            $cond: {
+              if: { $eq: [{ $type: "$campus_id" }, "objectId"] },
+              then: "$campus_id",
+              else: {
+                $convert: {
+                  input: "$campus_id",
+                  to: "objectId",
+                  onError: null,
+                  onNull: null,
+                },
+              },
+            },
+          },
+        },
+      },
+      { $match: { campusObjId: { $ne: null } } },
+      { $group: { _id: "$campusObjId", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 5 },
       {
         $lookup: {
-          from: "campuses",
+          from: Campus.collection.name,
           localField: "_id",
           foreignField: "_id",
           as: "campus",
@@ -196,15 +215,35 @@ export const getDashboardMetrics = async (range = "month") => {
     return diff >= 0 ? `+${diff}%` : `${diff}%`;
   };
 
-  const campusColors = ["#3B82F6", "#8B5CF6", "#10B981", "#F97316", "#64748B"];
-  const usersByCampus = campusDistributionRaw
-    .filter((c) => c.campusName)
-    .map((c, index) => ({
-      name: c.campusName,
-      count: c.count,
-      percentage: totalUsers > 0 ? Math.round((c.count / totalUsers) * 100) : 0,
-      color: campusColors[index % campusColors.length],
-    }));
+  const campusColors = ["#3B82F6", "#8B5CF6", "#10B981", "#F97316", "#EC4899", "#06B6D4", "#64748B"];
+  const countMap = new Map();
+  for (const c of campusDistributionRaw) {
+    if (c.campusName) {
+      countMap.set(c.campusName, c.count);
+    }
+  }
+
+  const activeCampusesList = await Campus.find({ is_active: true }).select("name").lean();
+  for (const ac of activeCampusesList) {
+    if (!countMap.has(ac.name)) {
+      countMap.set(ac.name, 0);
+    }
+  }
+
+  const combinedCampuses = Array.from(countMap.entries()).map(([name, count]) => ({
+    name,
+    count,
+  }));
+
+  combinedCampuses.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const totalCampusUsers = combinedCampuses.reduce((sum, c) => sum + c.count, 0) || totalUsers;
+
+  const usersByCampus = combinedCampuses.slice(0, 6).map((c, index) => ({
+    name: c.name,
+    count: c.count,
+    percentage: totalCampusUsers > 0 ? Math.round((c.count / totalCampusUsers) * 100) : 0,
+    color: campusColors[index % campusColors.length],
+  }));
 
   return {
     stats: {
