@@ -11,7 +11,7 @@ import React from "react";
  */
 
 export const DEFAULT_DURATIONS = { success: 4000, error: 5200, info: 4200 };
-export const MAX_TOASTS = 5;
+export const MAX_TOASTS = 2;
 
 let toastSeq = 0;
 let toastState = [];

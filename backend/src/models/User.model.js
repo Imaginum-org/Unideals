@@ -162,6 +162,20 @@ const userSchema = new Schema(
       select: false,
     },
 
+    // Previous refresh token kept briefly after rotation so parallel
+    // refresh calls (two tabs, retry storms) converge instead of nuking
+    // the session. Never accepted after refresh_token_prev_expires_at.
+    refresh_token_prev: {
+      type: String,
+      select: false,
+      default: null,
+    },
+
+    refresh_token_prev_expires_at: {
+      type: Date,
+      default: null,
+    },
+
     forgot_password_otp: {
       type: String,
       select: false,

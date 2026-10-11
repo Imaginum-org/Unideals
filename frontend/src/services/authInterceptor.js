@@ -26,6 +26,19 @@ const clearStoredAuth = () => {
   localStorage.removeItem("accessToken");
 };
 
+const notifySessionExpired = () => {
+  window.dispatchEvent(new CustomEvent("unideals:session-expired"));
+};
+
+// Auth endpoints report credential problems with their own status codes —
+// a 401 here means "wrong password", not "session dead". Never spend the
+// refresh token on them: it would rotate sessions on every failed login
+// and could wipe a valid session when the refresh then fails.
+const isAuthEndpoint = (url = "") =>
+  /\/api\/auth\/(login|register|refresh-token|google|verify-email|forgot-password|reset-password|resend-verification|check-verification)/.test(
+    String(url || ""),
+  );
+
 const notifyAccountBlocked = (payload = {}) => {
   window.dispatchEvent(
     new CustomEvent("unideals:account-blocked", {
@@ -51,7 +64,17 @@ instance.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      // Never attempt a silent refresh for auth endpoints themselves:
+      // their 401s are credential errors, not expired sessions.
+      if (isAuthEndpoint(originalRequest?.url)) {
+        return Promise.reject(error);
+      }
+      // A 401 without a response (network down) or a 429 (rate limited)
+      // must never wipe the session — the cookies may be perfectly fine.
+      if (!error.response) {
+        return Promise.reject(error);
+      }
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           addRefreshSubscriber((refreshErr) => {
@@ -86,10 +109,20 @@ instance.interceptors.response.use(
       } catch (err) {
         isRefreshing = false;
         onRefreshFailed(err);
-        clearStoredAuth();
 
         if (err.response?.data?.accountBlocked) {
+          clearStoredAuth();
           notifyAccountBlocked(err.response.data);
+          return Promise.reject(err);
+        }
+
+        // Only a hard 401 from the refresh endpoint means the session is
+        // truly dead (expired/revoked refresh token). Rate limits (429),
+        // network blips, or 5xx keep the local session: the cookies may
+        // still be valid and the next attempt can succeed.
+        if (err.response?.status === 401) {
+          clearStoredAuth();
+          notifySessionExpired();
         }
 
         return Promise.reject(err);

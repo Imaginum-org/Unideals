@@ -104,6 +104,22 @@ const PreviewStep = () => {
     return true;
   };
 
+  // Free every local blob URL once photos are safely uploaded. Runs only
+  // on success — failures keep previews alive for retry. Remote (existing)
+  // URLs are skipped.
+  const revokeAllPreviewBlobs = () => {
+    (formData.imagePreviews || []).forEach((p) => {
+      const url = p?.preview;
+      if (typeof url === "string" && url.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore
+        }
+      }
+    });
+  };
+
   // Order uploads to match the cover-first preview order, so the selected
   // cover photo is always images[0] for mixed existing+new sets.
   const buildOrderedImages = (uploads) => {
@@ -251,6 +267,7 @@ const PreviewStep = () => {
 
       setPublishStage("");
       toast.success("Product updated successfully!");
+      revokeAllPreviewBlobs();
       removeDraftFromLocal();
       navigate("/productlisted");
     } catch (error) {
@@ -371,6 +388,7 @@ const PreviewStep = () => {
       }
 
       setPublishStage("");
+      revokeAllPreviewBlobs();
       resetForm();
       removeDraftFromLocal();
       setSelectedImageIndex(0);
@@ -433,19 +451,27 @@ const PreviewStep = () => {
         <div className="grid grid-cols-1 xl:grid-cols-[520px_minmax(0,1fr)] gap-9">
           {/* LEFT */}
           <div>
-            {/* Main Image */}
+            {/* Main Image (index clamped: removing photos never strands the viewer on a missing slot) */}
             <div className="overflow-hidden rounded-2xl border border-[#ECECEC]">
-              {formData.imagePreviews?.[0] ? (
-                <img
-                  src={formData.imagePreviews?.[selectedImageIndex]?.preview}
-                  alt="Product"
-                  className="w-full aspect-square object-cover transition-all duration-300"
-                />
-              ) : (
-                <div className="w-full aspect-square bg-[#F9FAFB] flex items-center justify-center text-[#9CA3AF]">
-                  No Image
-                </div>
-              )}
+              {(() => {
+                const previews = formData.imagePreviews || [];
+                const safeIndex = Math.min(
+                  selectedImageIndex,
+                  Math.max(0, previews.length - 1),
+                );
+                const current = previews[safeIndex];
+                return current?.preview ? (
+                  <img
+                    src={current.preview}
+                    alt="Product"
+                    className="w-full aspect-square object-cover transition-all duration-300"
+                  />
+                ) : (
+                  <div className="w-full aspect-square bg-[#F9FAFB] flex items-center justify-center text-[#9CA3AF]">
+                    No Image
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Thumbnails */}

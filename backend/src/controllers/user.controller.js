@@ -371,6 +371,8 @@ export const deleteAccount = async (req, res) => {
       {
         status: USER_STATUS.INACTIVE,
         refresh_token: null,
+        refresh_token_prev: null,
+        refresh_token_prev_expires_at: null,
         $inc: { tokenVersion: 1 },
       },
       { new: true },

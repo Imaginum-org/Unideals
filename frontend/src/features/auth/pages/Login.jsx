@@ -120,6 +120,7 @@ function Login() {
         if (!isActive) return;
 
         if (profileLoaded) {
+          toast.success("Logged in with Google");
           navigate(getReturnTo(), { replace: true });
         } else {
           localStorage.removeItem("isAuthenticated");
@@ -212,7 +213,7 @@ function Login() {
           <div className="flex min-h-0 flex-1 items-end justify-center md:items-center font-figtree">
             <form
               onSubmit={handleLogin}
-              className=" w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none"
+              className=" w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden no-scrollbar rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none"
             >
               {/* Heading */}
               <div className="mb-4 md:mb-[2vh] lg:mb-4 xl:mb-[2.5vh] 2xl:mb-[2.6vh]">
@@ -254,17 +255,17 @@ function Login() {
                     <span
                       className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                         email
-                          ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
                           : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
+                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8]`}
                     >
                       Email
                     </span>
                     <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
+                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-sm lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
                         hasEmailError
-                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                          : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
+                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
                       }`}
                       type="email"
                       value={email}
@@ -286,17 +287,17 @@ function Login() {
                     <span
                       className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                         password
-                          ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
                           : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
+                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8]`}
                     >
                       Password
                     </span>
                     <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-10 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:pr-12 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
+                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-10 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:pr-12 md:text-sm lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
                         hasPasswordError
-                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                          : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
+                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
                       }`}
                       type={showPassword ? "text" : "password"}
                       value={password}

@@ -18,6 +18,8 @@ import { cn } from "../../utils/cn.js";
  * - opticalY: vertical optical correction in px (default 1). The wordmark
  *   has no descenders, so geometrically-centered ink reads ~1px high;
  *   tune this single number if it ever looks off.
+ * - reversed: rest on the logo mark and morph back to the U on hover
+ *   (auth screens), instead of U-first like the navbar.
  */
 const TRACE_SIZE = 200;
 const N_POINTS = 160;
@@ -211,6 +213,7 @@ export default function Wordmark({
   letterSpacing = -0.5,
   opticalY = 1,
   className,
+  reversed = false,
 }) {
   const textRef = useRef(null);
   const restRef = useRef(null);
@@ -220,8 +223,8 @@ export default function Wordmark({
   const sampler2Ref = useRef(null);
   const modelRef = useRef(null);
   const rafRef = useRef(0);
-  const tRef = useRef(0);
-  const targetRef = useRef(0);
+  const tRef = useRef(reversed ? 1 : 0);
+  const targetRef = useRef(reversed ? 1 : 0);
   const lastRef = useRef(0);
   const [fallback, setFallback] = useState(false);
   const [adv, setAdv] = useState(null);
@@ -436,11 +439,11 @@ export default function Wordmark({
     <span
       className="wm inline-flex"
       onMouseEnter={() => {
-        targetRef.current = 1;
+        targetRef.current = reversed ? 0 : 1;
         kick();
       }}
       onMouseLeave={() => {
-        targetRef.current = 0;
+        targetRef.current = reversed ? 1 : 0;
         kick();
       }}
     >

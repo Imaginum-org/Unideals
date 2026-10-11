@@ -21,7 +21,7 @@ import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 
 const cardShell =
-  "w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none";
+  "w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden no-scrollbar rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none";
 
 const primaryBtn =
   "mt-[2.2vh] h-[6.3vh] w-full rounded-xl bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-3 md:h-10 md:rounded-xl md:text-xs lg:mt-3 lg:h-10 lg:text-sm xl:mt-[2.9vh] xl:h-[6.4vh] xl:text-[0.8rem] 2xl:mt-[2.6vh] 2xl:h-[6.4vh] 2xl:text-[0.85rem]";
@@ -221,7 +221,7 @@ function ResetPassword() {
                         <input
                           className={`h-[6.3vh] w-full rounded-xl border pl-10 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] pr-20 ${
                             hasPasswordError
-                              ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
+                              ? "border-red-500 bg-[#F7F8FA] focus:border-red-500 dark:border-red-500 dark:bg-[#1A1D20]"
                               : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
                           }`}
                           type={showPassword ? "text" : "password"}
@@ -280,7 +280,7 @@ function ResetPassword() {
                         <input
                           className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 md:pr-3 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
                             hasConfirmError
-                              ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
+                              ? "border-red-500 bg-[#F7F8FA] focus:border-red-500 dark:border-red-500 dark:bg-[#1A1D20]"
                               : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
                           }`}
                           type={showPassword ? "text" : "password"}

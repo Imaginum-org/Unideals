@@ -26,10 +26,10 @@ const initialFormData = {
   images: [],
   imagePreviews: [],
 
-  // Pricing
+  // Pricing (negotiation defaults to Yes for new listings)
   sellingPrice: "",
   originalPrice: "",
-  negotiable: false,
+  negotiable: true,
   paymentMethod: "",
 
   // Address

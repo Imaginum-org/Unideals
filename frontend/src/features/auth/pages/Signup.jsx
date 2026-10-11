@@ -9,6 +9,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { registerUser } from "../api/authApi.js";
+import { toast } from "../../../components/ui/toast.js";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
@@ -17,8 +18,8 @@ import LegalAgreementModal from "../components/LegalAgreementModal";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import SignInwithGoogle from "../components/signinWithGoogle";
 import {
-  getPasswordStrength,
   isPasswordStrongEnough,
+  suggestPassword,
 } from "../utils/passwordStrength.js";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 
@@ -38,10 +39,7 @@ function Signup() {
   const navigate = useNavigate();
   const location = useLocation();
   const safeTimeout = useSafeTimeout();
-  const strength = getPasswordStrength(password);
   const showPasswordOk = isPasswordStrongEnough(password);
-  const showPasswordRequirements =
-    password.length > 0 && !isPasswordStrongEnough(password);
 
   const clearFormMessage = () => setFormMessage(null);
 
@@ -160,11 +158,11 @@ function Signup() {
           <div className="flex min-h-0 flex-1 items-end justify-center md:items-center  xl:px-16">
             <form
               onSubmit={handleRegister}
-              className=" w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:p-0 md:shadow-none"
+              className=" w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden no-scrollbar rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:p-0 md:shadow-none"
             >
               {/* Heading */}
               <div className="mb-4 md:mb-[2vh] lg:mb-2.5 xl:mb-[2.5vh] 2xl:mb-[2.6vh]">
-                <h1 className="font-figtree text-[1.25rem] sm:text-[1.125rem] md:text-[1.15rem] lg:text-lg xl:text-[1.45rem] 2xl:text-[1.5rem] font-semibold leading-snug tracking-normal">
+                <h1 className="font-figtree text-[1.25rem] sm:text-[1.125rem] md:text-[1.15rem] lg:text-lg xl:text-[1.2rem] 2xl:text-[1.5rem] font-semibold leading-snug tracking-normal">
                   Create Account
                 </h1>
                 <p className="mt-1 font-figtree text-[0.75rem] leading-snug text-gray-700 dark:text-[#D6D6D6] sm:text-[0.8125rem] md:text-[0.72rem] lg:text-xs xl:text-[0.8rem] 2xl:text-[0.85rem]">
@@ -201,17 +199,17 @@ function Signup() {
                     <span
                       className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                         fname
-                          ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
                           : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
+                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
                     >
                       Full Name
                     </span>
                     <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] md:text-xs xl:text-xs ${
+                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] md:text-sm ${
                         hasNameError
-                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                          : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
+                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
                       }`}
                       type="text"
                       placeholder=" "
@@ -233,17 +231,17 @@ function Signup() {
                     <span
                       className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                         email
-                          ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
                           : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
+                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
                     >
                       Email
                     </span>
                     <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
+                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-sm lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
                         hasEmailError
-                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                          : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
+                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
                       }`}
                       type="email"
                       placeholder=" "
@@ -265,17 +263,17 @@ function Signup() {
                     <span
                       className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                         password
-                          ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
                           : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
+                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
                     >
                       Password
                     </span>
                     <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] pr-20 ${
+                      className={`h-[6.3vh] w-full rounded-xl border pl-10 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-sm lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] pr-20 ${
                         hasPasswordError
-                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                          : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
+                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
                       }`}
                       type={showPassword ? "text" : "password"}
                       placeholder=" "
@@ -309,13 +307,19 @@ function Signup() {
                       )}
                     </button>
                   </span>
-                  <PasswordStrengthMeter password={password} />
-                  {showPasswordRequirements ? (
-                    <p className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-[0.7rem] font-medium leading-5 text-red-600 ring-1 ring-red-100 dark:bg-red-950/20 dark:text-red-300 dark:ring-red-900/40">
-                      Use at least 8 characters with uppercase, lowercase, and a
-                      number. Add a symbol for a stronger password.
-                    </p>
-                  ) : null}
+                  <PasswordStrengthMeter
+                    password={password}
+                    email={email}
+                    onSuggest={() => {
+                      const fresh = suggestPassword(fname, email);
+                      setPassword(fresh);
+                      setConfirmPassword(fresh);
+                      clearFormMessage();
+                      toast.success("Strong password filled. Save it somewhere safe.", {
+                        id: "suggest-password",
+                      });
+                    }}
+                  />
                 </label>
 
                 {/* Confirm Password */}
@@ -325,17 +329,17 @@ function Signup() {
                     <span
                       className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
                         confirmPassword
-                          ? "-top-0 -translate-y-1/2 bg-[#F7F8FA] text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
+                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
                           : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-[#F7F8FA] group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
+                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
                     >
                       Confirm Password
                     </span>
                     <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] pr-12 ${
+                      className={`h-[6.3vh] w-full rounded-xl border pl-10 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-sm lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] pr-12 ${
                         hasConfirmError
-                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
-                          : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
+                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
                       }`}
                       type={showConfirmPassword ? "text" : "password"}
                       placeholder=" "
@@ -381,7 +385,7 @@ function Signup() {
                       });
                     }
                   }}
-                  className="mt-0.2 size-3.5 rounded border-slate-300/50 text-[#393AF2] focus:ring-[#393AF2] md:mt-[0.2vh] xl:mt-[0.1vh] md:size-2.5 lg:size-3 xl:size-3 shrink-0  2xl:size-3 2xl:mt-[0.19vh]"
+                  className="mt-0.2 size-3.5 rounded border-slate-300/50 bg-white text-[#393AF2] accent-[#393AF2] focus:ring-[#393AF2] md:mt-[0.2vh] xl:mt-[0.1vh] md:size-2.5 lg:size-3 xl:size-3 shrink-0  2xl:size-3 2xl:mt-[0.19vh] dark:border-zinc-500 dark:bg-white"
                 />
                 <span>
                   I agree to the{" "}

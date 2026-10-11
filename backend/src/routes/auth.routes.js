@@ -36,10 +36,12 @@ const emailLimiter = rateLimit({
   message: { success: false, message: "Too many email requests, please try later" },
 });
 
-// Low-cost enumeration/DoS surface: probe and session endpoints.
-const probeLimiter = rateLimit({
+// Refresh is called by every tab roughly every 15 minutes plus retries —
+// keep it out of the shared probe bucket so background refreshes never
+// get 429s (a 429 on refresh looks exactly like a dead session).
+const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 120,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { success: false, message: "Too many attempts, please try later" },
@@ -62,7 +64,7 @@ authRouter.post("/forgot-password", emailLimiter, forgotPasswordController);
 authRouter.get("/reset-password/:token", probeLimiter, verifyResetTokenPreCheck);
 authRouter.post("/reset-password/:token", strictAuthLimiter, resetPasswordController);
 
-authRouter.post("/refresh-token", probeLimiter, refreshAccessTokenController);
+authRouter.post("/refresh-token", refreshLimiter, refreshAccessTokenController);
 
 // POST only: a GET logout is a logout-CSRF vector (<img src=...> logs
 // the victim out). Frontend uses POST with GET fallback that never fires.

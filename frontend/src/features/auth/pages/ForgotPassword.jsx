@@ -145,7 +145,7 @@ function ForgotPassword() {
                       required
                       className={`h-[6.3vh] sm:h-11 md:h-10 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] w-full border pl-10 pr-4 text-[#111827] text-[0.6875rem] md:text-xs outline-none transition placeholder:text-gray-400/70 dark:text-white md:rounded-xl md:pl-11 ${
                         hasEmailError
-                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
+                          ? "border-red-500 bg-[#F7F8FA] focus:border-red-500 dark:border-red-500 dark:bg-[#1A1D20]"
                           : "border-transparent bg-[#F7F8FA] focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
                       }`}
                     />

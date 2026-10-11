@@ -136,7 +136,12 @@ export const updateUserStatus = async (userId, status) => {
     {
       status,
       ...(isDeactivation
-        ? { refresh_token: null, $inc: { tokenVersion: 1 } }
+        ? {
+            refresh_token: null,
+            refresh_token_prev: null,
+            refresh_token_prev_expires_at: null,
+            $inc: { tokenVersion: 1 },
+          }
         : {}),
     },
     { new: true, runValidators: true },

@@ -37,7 +37,7 @@ const privacySections = [
           },
           {
             label: "Messages:",
-            text: "In-app chat content, stored so conversations continue across sessions and can be reviewed if a chat is reported for safety, fraud, or disputes.",
+            text: "In-app chat content, stored so conversations continue across sessions. Every message passes an automated safety screen for abusive or sexual content; flagged messages are masked in chat and kept for human moderator review. Safety cooldown records and chat preferences (wallpaper, read receipts, typing indicators) are stored with your account.",
           },
           {
             label: "Payment metadata:",
@@ -94,7 +94,7 @@ const privacySections = [
     body: [
       {
         type: "p",
-        text: "We keep your data while your account is active. Deletion requests are fulfilled within 30 days. Limited records are kept longer where the law requires it (e.g. payment records) or where legitimate safety needs apply (e.g. minimal moderation history against fraud and ban evasion). Backups roll over on their normal cycle.",
+        text: "We keep your data while your account is active. Deletion requests are fulfilled within 30 days. Completed sales vanish from the marketplace at once and are permanently deleted after about 15 days. Flagged chat content is kept until reviewed, then handled like any other moderation record. Limited records are kept longer where the law requires it (e.g. payment records) or where legitimate safety needs apply (e.g. minimal moderation history against fraud and ban evasion). Backups roll over on their normal cycle.",
       },
     ],
   },
@@ -282,6 +282,8 @@ const termsSections = [
           "Use a correct category and honest condition; miscategorised or misleading listings may be corrected or removed.",
           "Do not spam duplicate listings for the same item. Edit or relist instead. Drafts are stored on your device and may expire.",
           "Mark items sold and unlist unavailable items promptly so buyers are not misled.",
+          "When a seller confirms a deal in chat, the item is reserved for that buyer and other visitors see it as Reserved. Cancelling the deal releases it back.",
+          "Completed sales are hidden from the marketplace immediately and permanently deleted after about 15 days, along with their photos.",
           "Listing visibility is campus-scoped: your live listings appear on your current campus, and switching campus moves them with you.",
           "Unideals may edit, reject, unlist, or remove any listing at any time, with or without notice, for policy, safety, or legal reasons.",
         ],
@@ -296,6 +298,7 @@ const termsSections = [
         items: [
           "Unideals provides pickup spots so you never need to share street addresses. Use public campus spots, not private rooms or homes.",
           "Check the item and confirm it matches the listing before paying; test electronics on the spot where possible.",
+          "Agree the pickup date and location in chat before meeting. After handover, the seller confirms payment received and the buyer confirms item received in chat to close the deal.",
           "Keep a record of the deal (chat confirmation, receipt or photo) until both sides are satisfied.",
           "Either side may walk away before money or goods change hands; after handover, disputes are between buyer and seller.",
           "If you feel unsafe at any point, leave immediately and report the user. No deal is worth a safety risk.",
@@ -327,8 +330,11 @@ const termsSections = [
         type: "list-chevron",
         items: [
           "Keep negotiations inside Unideals chat so there is a record if anything goes wrong. Deals struck entirely off-platform carry no platform protection or support.",
+          "Offers must sit below the asking price. Once the seller confirms a final price, it is locked for that deal, and either side may still cancel before handover.",
           "Never share bank details, card numbers, Aadhaar, OTPs, or passwords in chat, and never open suspicious links or QR codes from strangers.",
-          "Chats may be reviewed by our safety team when a conversation is reported, solely for safety, fraud, and dispute purposes.",
+          "Every message passes an automated safety screen. Abusive or sexual content is masked in chat, flagged for human review, and repeated flags temporarily pause sending.",
+          "Chats may be reviewed by our safety team when a conversation is reported or auto-flagged, solely for safety, fraud, and dispute purposes.",
+          "Read receipts (blue ticks) can be switched off with Pro or Pro+. Turning them off hides your reads and theirs, both ways.",
           "Use block and report tools instead of continuing hostile or suspicious conversations.",
         ],
       },
@@ -367,6 +373,7 @@ const termsSections = [
         type: "list-chevron",
         items: [
           "Report inappropriate products, users, or messages with specifics. Every report is reviewed by our safety team, and you may be contacted by email for follow-up.",
+          "Auto-flagged chat content enters the same review queue. Flagged messages stay masked until reviewed, and automation alone never suspends or bans an account.",
           "Moderation outcomes range from warnings and listing removal to temporary suspension and permanent bans, depending on severity and history.",
           "Deliberately false, retaliatory, or brigaded reports are themselves violations and may lead to action against the reporter.",
           "If you believe moderation was a mistake, appeal through the Contact page or support email with your account email and details.",

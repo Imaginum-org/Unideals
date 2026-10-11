@@ -288,3 +288,22 @@
     repeating-radial-gradient(circle at 50% -40px, transparent 0 26px, rgba(165, 180, 252, 0.09) 26px 27.5px),
     repeating-radial-gradient(circle at 50% calc(100% + 40px), transparent 0 26px, rgba(255, 255, 255, 0.05) 26px 27.5px);
 }
+
+/* ── Auth inputs: force white bg + black text even under browser autofill.
+   Chrome paints :-webkit-autofill pale blue/grey with its own text color,
+   so the inset shadow + text-fill override must win in both themes. ── */
+.auth-field:-webkit-autofill,
+.auth-field:-webkit-autofill:hover,
+.auth-field:-webkit-autofill:focus,
+.auth-field:-webkit-autofill:active {
+  -webkit-text-fill-color: #09090b;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  caret-color: #09090b;
+  transition: background-color 600000s ease-in-out 0s;
+}
+.auth-field:-moz-autofill {
+  filter: none;
+  background-color: #ffffff;
+  color: #09090b;
+}

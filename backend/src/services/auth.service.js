@@ -6,12 +6,25 @@ import generatedAccessToken from "../utils/generatedAccessToken.js";
 import generatedRefreshToken from "../utils/generatedRefreshToken.js";
 
 export const getAuthCookieOptions = () => {
-  const isProduction = process.env.NODE_ENV === "production";
+  const frontendUrl = process.env.FRONTEND_URL || "";
+  // Secure cookies are required whenever the frontend is served over https
+  // (cross-site None cookies are rejected without Secure). Don't rely
+  // solely on NODE_ENV — a missing NODE_ENV=production on the host would
+  // otherwise set Lax/non-secure cookies that browsers refuse to send
+  // cross-site, breaking refresh and logging users out after ~15 minutes.
+  const frontendIsHttps = frontendUrl
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .some((s) => s.startsWith("https://"));
+  const secure =
+    process.env.NODE_ENV === "production" ||
+    process.env.COOKIE_SECURE === "true" ||
+    frontendIsHttps;
 
   return {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "None" : "Lax",
+    secure,
+    sameSite: secure ? "None" : "Lax",
     path: "/",
   };
 };
@@ -198,22 +211,25 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
     process.env.SECRET_KEY_REFRESH_TOKEN,
     { algorithms: ["HS256"] },
   );
-  const user = await userModel.findById(decoded.id).select("+refresh_token");
+  const user = await userModel
+    .findById(decoded.id)
+    .select("+refresh_token +refresh_token_prev +refresh_token_prev_expires_at");
 
-  if (!user || !user.refresh_token || user.refresh_token !== refreshToken) {
-    // Possible reuse/theft: if token decodes but doesn't match stored token,
-    // revoke stored session + bump tokenVersion to kill the stolen 15m
-    // access token as well (force re-login on all devices).
-    if (user && user.refresh_token && user.refresh_token !== refreshToken) {
-      try {
-        await userModel.findByIdAndUpdate(user._id, {
-          refresh_token: null,
-          $inc: { tokenVersion: 1 },
-        });
-      } catch {
-        // ignore revocation errors
-      }
-    }
+  // Grace-window replay: the token we just rotated out is still honored
+  // briefly so parallel refreshes (multi-tab, retry storms) converge on
+  // the same session instead of killing it. Reuses the CURRENT stored
+  // token result below; no rotation here to avoid token thrash.
+  const isGraceReplay =
+    Boolean(user?.refresh_token_prev) &&
+    user.refresh_token_prev === refreshToken &&
+    user.refresh_token_prev_expires_at &&
+    new Date(user.refresh_token_prev_expires_at).getTime() > Date.now();
+
+  if (!user || (!isGraceReplay && (!user.refresh_token || user.refresh_token !== refreshToken))) {
+    // Failed refresh never revokes: missing/expired/forged cookies just
+    // fail this call. Only explicit logout, password reset, suspend, or
+    // delete clear sessions. This stops false reuse-nukes from logging
+    // users out on parallel refreshes or stale cookies.
     const error = new Error("Invalid or expired refresh token");
     error.statusCode = 401;
     throw error;
@@ -254,6 +270,18 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
     throw error;
   }
 
+  // Grace replay: hand out a fresh access token but keep the CURRENT
+  // stored refresh token untouched, so both parallel callers converge on
+  // the same session instead of thrashing rotations.
+  if (isGraceReplay) {
+    const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
+    return {
+      accessToken,
+      refreshToken: user.refresh_token,
+      user: sanitizeAuthUser(user),
+    };
+  }
+
   const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
   const newRefreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
 
@@ -269,6 +297,8 @@ export const revokeRefreshToken = async (userId) => {
 
   await userModel.findByIdAndUpdate(userId, {
     refresh_token: null,
+    refresh_token_prev: null,
+    refresh_token_prev_expires_at: null,
     $inc: { tokenVersion: 1 },
   });
 };
@@ -283,10 +313,16 @@ export const revokeRefreshTokenByToken = async (refreshToken) => {
     );
     const user = await userModel
       .findById(decoded.id)
-      .select("+refresh_token");
-    if (user && user.refresh_token === refreshToken) {
+      .select("+refresh_token +refresh_token_prev");
+    if (
+      user &&
+      (user.refresh_token === refreshToken ||
+        user.refresh_token_prev === refreshToken)
+    ) {
       await userModel.findByIdAndUpdate(user._id, {
         refresh_token: null,
+        refresh_token_prev: null,
+        refresh_token_prev_expires_at: null,
         $inc: { tokenVersion: 1 },
       });
       return true;

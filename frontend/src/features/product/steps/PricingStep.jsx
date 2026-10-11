@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 import { HiOutlineLocationMarker, HiOutlineCash } from "react-icons/hi";
 import { FaRupeeSign } from "react-icons/fa";
@@ -134,6 +136,12 @@ const [legalTab, setLegalTab] = useState(null);
           activeTab={legalTab}
           onTabChange={setLegalTab}
           onClose={() => setLegalTab(null)}
+          onAccept={() => {
+            // Accept ticks the consent box (recording version + timestamp)
+            // when unticked; when already ticked it simply closes the popup.
+            if (!formData.termsAccepted) handleTermsChange(true);
+            setLegalTab(null);
+          }}
         />
       )}
       <div className="w-full text-black dark:text-white rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8">
@@ -229,6 +237,7 @@ const [legalTab, setLegalTab] = useState(null);
 
             <button
               onClick={() => updateField("negotiable", !formData.negotiable)}
+              aria-label="Allow negotiation"
               className={`relative w-[56px] h-[32px] rounded-full transition-all duration-300
       
       ${formData.negotiable ? "bg-[#2E3FDC]" : "bg-[#D1D5DB]"}`}
@@ -239,6 +248,38 @@ const [legalTab, setLegalTab] = useState(null);
           ${formData.negotiable ? "translate-x-7" : "translate-x-1"}`}
               />
             </button>
+          </div>
+
+          {/* Negotiation nudge — fixed-height slot so swapping messages never
+              shifts the layout below. */}
+          <div className="mt-2 min-h-[34px] sm:min-h-[22px]" aria-live="polite">
+            <AnimatePresence mode="wait" initial={false}>
+              {formData.negotiable ? (
+                <motion.p
+                  key="nego-on"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                >
+                  <CheckCircle2 size={14} className="shrink-0" />
+                  Nice, negotiable listings get more chats and usually sell faster.
+                </motion.p>
+              ) : (
+                <motion.p
+                  key="nego-off"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-red-500"
+                >
+                  <AlertTriangle size={14} className="shrink-0" />
+                  Heads up, turning this off can slow down your sale. Most buyers love to negotiate.
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Payment Method */}

@@ -112,7 +112,19 @@ export const UserProvider = ({ children }) => {
 
       return false;
     } catch (error) {
-      if (error.response?.status === 401 || error.response?.status === 403) {
+      const status = error.response?.status;
+      if (status === 401) {
+        // 401 here already passed through the refresh interceptor: the
+        // refresh endpoint itself returned 401, so the session is truly
+        // dead (expired/revoked). Clear it.
+        clearUserData();
+      } else if (status === 403 && !error.response?.data?.accountBlocked) {
+        // Non-block 403s (e.g. unverified email, CSRF/origin rejection)
+        // are not session death — keep the user cached so a retry or
+        // verification can recover without forcing a re-login.
+        hasFetchedRef.current = false;
+        console.error("Fetch user error:", error?.message || error);
+      } else if (status === 403) {
         clearUserData();
       } else {
         // Network/server error - allow retry later
@@ -148,6 +160,52 @@ export const UserProvider = ({ children }) => {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [clearUserData]);
+
+  // Session keeper: proactively refresh ~1 minute before the 15-minute
+  // access token expires so users never hit a 401 mid-click. Idle tabs
+  // stay quiet (no timer churn); activity resets the countdown. On tab
+  // focus, refresh immediately if a refresh isn't already in flight.
+  // A failed keeper refresh never clears state — only a hard 401 from the
+  // refresh endpoint (handled in the interceptor) means session death.
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+
+    const KEEP_ALIVE_MS = 14 * 60 * 1000;
+    let timer = null;
+    let disposed = false;
+
+    const keepAlive = async () => {
+      try {
+        const { refreshToken } = await import(
+          "../features/auth/api/authApi.js"
+        );
+        await refreshToken();
+      } catch {
+        // Swallow: interceptor owns session-death decisions.
+      }
+      if (!disposed && localStorage.getItem("isAuthenticated") === "true") {
+        timer = window.setTimeout(keepAlive, KEEP_ALIVE_MS);
+      }
+    };
+
+    const poke = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(keepAlive, KEEP_ALIVE_MS);
+    };
+
+    const onFocus = () => {
+      poke();
+    };
+
+    timer = window.setTimeout(keepAlive, KEEP_ALIVE_MS);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      disposed = true;
+      if (timer) window.clearTimeout(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [isLoggedIn]);
 
   return (
     <UserContext.Provider

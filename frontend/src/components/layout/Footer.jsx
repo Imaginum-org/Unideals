@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FiArrowRight } from "react-icons/fi";
+import { FiArrowRight, FiShield } from "react-icons/fi";
 import { FaInstagram, FaLinkedinIn } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import footerBg from "/footer_bg.webp";
@@ -191,6 +191,24 @@ gap-6"
                   </ul>
                 </div>
               ))}
+            </div>
+
+            {/* Payment trust strip: every rupee flows through Razorpay,
+                Unideals never touches card, UPI, or bank details. */}
+            <div className="mt-6 flex flex-row items-center justify-center gap-2 overflow-x-auto no-scrollbar whitespace-nowrap rounded-2xl border border-[#E8EAF0] bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-white/5 sm:gap-3">
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <FiShield size={13} />
+                Secure
+              </span>
+              <img
+                src="/razorpay.svg"
+                alt="Razorpay"
+                loading="lazy"
+                className="h-4 w-auto shrink-0 rounded bg-white px-2 py-0.5"
+              />
+              <p className="shrink-0 text-[10px] font-medium text-[#7A8697] dark:text-slate-400 sm:text-[11px]">
+                We never see card details.
+              </p>
             </div>
 
             <div className="mt-6 flex flex-col gap-4 border-t border-[#e7e8e9] pt-4 text-xs text-[#9CA3AF] md:flex-row md:items-center md:justify-between">

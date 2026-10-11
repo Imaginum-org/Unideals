@@ -18,12 +18,26 @@ function App() {
       navigate("/login", { replace: true });
     };
 
+    // Fired only when the refresh endpoint itself returns 401 — the
+    // session is truly dead (expired/revoked). Ordinary 401s are healed
+    // silently by the interceptor and never reach here.
+    const handleSessionExpired = () => {
+      clearUserData();
+      toast.error("Your session expired. Please log in again.");
+      navigate("/login", { replace: true });
+    };
+
     window.addEventListener("unideals:account-blocked", handleBlockedAccount);
+    window.addEventListener("unideals:session-expired", handleSessionExpired);
 
     return () => {
       window.removeEventListener(
         "unideals:account-blocked",
         handleBlockedAccount,
+      );
+      window.removeEventListener(
+        "unideals:session-expired",
+        handleSessionExpired,
       );
     };
   }, [clearUserData, navigate]);

@@ -796,6 +796,8 @@ export const resetPasswordController = async (req, res) => {
       reset_password_token: "",
       reset_password_expiry: null,
       refresh_token: null,
+      refresh_token_prev: null,
+      refresh_token_prev_expires_at: null,
       $inc: { tokenVersion: 1 },
     });
 

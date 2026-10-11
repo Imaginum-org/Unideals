@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "../../../components/ui/toast.js";
 import { HiOutlineTrash } from "react-icons/hi";
@@ -26,7 +26,10 @@ const ImagesStep = () => {
   const [uploadSource, setUploadSource] = useState("pc");
   // Tracks phone-delivered fileIds so repeat polls never re-add them.
   const phoneFileIds = useRef(new Set());
-  // Live mirror of blob URLs for reliable revoke-on-unmount (avoids stale closure).
+  // Live mirror of blob URLs so removing a photo frees its memory.
+  // NOTE: never revoke on unmount — the Preview step renders these same
+  // blob URLs after this step unmounts. Revoke-all happens once after a
+  // successful publish/save (see PreviewStep).
   const blobUrlsRef = useRef(new Set());
   const previewsRef = useRef([]);
   previewsRef.current = formData.imagePreviews || [];
@@ -43,19 +46,6 @@ const ImagesStep = () => {
       }
     }
   };
-
-  useEffect(() => {
-    return () => {
-      blobUrlsRef.current.forEach((url) => {
-        try {
-          URL.revokeObjectURL(url);
-        } catch {
-          // ignore
-        }
-      });
-      blobUrlsRef.current.clear();
-    };
-  }, []);
 
   // PROCESS FILES
   // Builds a combined [existing..., new...] array, validates, then splits back
@@ -580,18 +570,24 @@ const ImagesStep = () => {
                   </button>
                 )}
 
-                {/* Image */}
-                <img
-                  src={imageItem.preview}
-                  alt={`Preview ${index}`}
-                  loading="lazy"
-                  draggable={false}
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "/logo.svg";
-                  }}
-                  className="w-full aspect-square object-cover select-none"
-                />
+                {/* Image (guarded: a missing URL renders a tile, never the logo fallback) */}
+                {imageItem?.preview ? (
+                  <img
+                    src={imageItem.preview}
+                    alt={`Preview ${index}`}
+                    loading="lazy"
+                    draggable={false}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "/logo.svg";
+                    }}
+                    className="w-full aspect-square object-cover select-none"
+                  />
+                ) : (
+                  <div className="w-full aspect-square bg-[#F1F3F6] dark:bg-zinc-800 flex items-center justify-center text-xs font-semibold text-[#9CA3AF] select-none">
+                    No preview
+                  </div>
+                )}
 
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">

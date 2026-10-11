@@ -1,25 +1,33 @@
 import { Link } from "react-router-dom";
-import cmlogo from "/logo.svg";
-import whitecmlogo from "/white_cm_logo_mobile.webp";
+import Wordmark from "../../../components/ui/Wordmark.jsx";
 
+// Same animated wordmark as the navbar, reversed (logo mark at rest, U on
+// hover), with metrics matched per breakpoint: 17/500 on mobile, 21/700 on
+// sm and up — exactly the two navbar sizes. Shared by every auth screen.
 function AuthBrandLogo() {
   return (
     <Link
       to="/"
-      className="inline-flex items-center gap-2.5 sm:gap-3 font-figtree text-xl font-semibold text-white md:gap-1.5 md:text-sm md:text-[#012436] dark:md:text-white lg:gap-2 lg:text-sm xl:gap-0 xl:text-base 2xl:gap-0 2xl:text-lg"
+      aria-label="Unideals home"
+      className="inline-flex items-center font-figtree"
     >
-      <img
-        src={cmlogo}
-        className="h-10 w-10 object-cover mb-1 hidden md:block"
-        alt="Unideals logo"
-      />
-      <img
-        src={whitecmlogo}
-        className="mb-1 block h-7 w-6  size-5 md:hidden sm:h-7.5 sm:w-6"
-        alt="Unideals logo"
-      />
-      <span className="text-xl md:text-lg lg:text-xl font-semibold  dark:text-white">
-        Unideals
+      <span className="sm:hidden">
+        <Wordmark
+          fontSize={17}
+          fontWeight={500}
+          letterSpacing={0}
+          reversed
+          className="text-white md:text-[#012436] dark:md:text-white"
+        />
+      </span>
+      <span className="hidden sm:block">
+        <Wordmark
+          fontSize={21}
+          fontWeight={700}
+          letterSpacing={-0.5}
+          reversed
+          className="text-white md:text-[#012436] dark:md:text-white"
+        />
       </span>
     </Link>
   );

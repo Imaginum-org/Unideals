@@ -118,11 +118,15 @@ function Profile_left_part() {
     };
   }, [isLoggedIn]);
 
+  // Redirect to login only when the session is definitively gone:
+  // not loading AND explicitly logged out. A transient null userDetails
+  // (e.g. profile refetch in flight after a silent refresh) must not
+  // bounce the user to /login.
   useEffect(() => {
-    if (!loading && !userDetails) {
+    if (!loading && !isLoggedIn && !userDetails) {
       navigate("/login");
     }
-  }, [loading, userDetails, navigate]);
+  }, [loading, isLoggedIn, userDetails, navigate]);
 
   if (loading) {
     return (

@@ -115,11 +115,19 @@ function Settings() {
           setCampusSlug(slug || "");
         }
       } catch (err) {
-        if (err.response?.status === 401 || err.response?.status === 403) {
+        // Only clear + redirect when the session is truly dead (401 after
+        // the interceptor already tried a silent refresh). 403s here are
+        // permission/verification issues, not logout signals — the auth
+        // context owns session state and will react if needed.
+        if (err.response?.status === 401) {
           localStorage.removeItem("isAuthenticated");
           localStorage.removeItem("cachedUserDetails");
           localStorage.removeItem("accessToken");
           navigate("/login");
+        } else if (err.response?.status === 403) {
+          toast.error(
+            err.response?.data?.message || "You don't have access right now.",
+          );
         } else {
           toast.error("Failed to load profile");
         }
