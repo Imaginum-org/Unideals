@@ -73,7 +73,7 @@ function Login() {
         stripOAuthCodeFromUrl();
 
         localStorage.setItem("isAuthenticated", "true");
-        const profileLoaded = await fetchUserProfile();
+        const profileLoaded = await fetchUserProfile({ force: true });
 
         if (!isActive) return;
 
@@ -116,7 +116,7 @@ function Login() {
     if (params.get("oauth") === "success" || params.get("auth") === "success") {
       stripOAuthCodeFromUrl();
       localStorage.setItem("isAuthenticated", "true");
-      fetchUserProfile().then((profileLoaded) => {
+      fetchUserProfile({ force: true }).then((profileLoaded) => {
         if (!isActive) return;
 
         if (profileLoaded) {
@@ -150,7 +150,7 @@ function Login() {
         // Cookie-based session - backend sets HttpOnly cookies, no token in storage
         toast.success(response.data.message || "Logged in successfully!");
         localStorage.setItem("isAuthenticated", "true");
-        await fetchUserProfile();
+        await fetchUserProfile({ force: true });
         // Honor return-to from ProtectedLayout
         navigate(getReturnTo(), { replace: true });
       }

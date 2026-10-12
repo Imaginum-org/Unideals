@@ -39,6 +39,20 @@ const isAuthEndpoint = (url = "") =>
     String(url || ""),
   );
 
+// True when the request carries its own capability credential instead of
+// the user session (case-insensitive — axios may store AxiosHeaders or a
+// plain object depending on where the error was raised).
+const hasCapabilityAuth = (headers) => {
+  if (!headers) return false;
+  if (typeof headers.get === "function") {
+    return Boolean(headers.get("x-handoff-secret"));
+  }
+  return Object.keys(headers).some(
+    (key) =>
+      key.toLowerCase() === "x-handoff-secret" && Boolean(headers[key]),
+  );
+};
+
 const notifyAccountBlocked = (payload = {}) => {
   window.dispatchEvent(
     new CustomEvent("unideals:account-blocked", {
@@ -68,6 +82,15 @@ instance.interceptors.response.use(
       // Never attempt a silent refresh for auth endpoints themselves:
       // their 401s are credential errors, not expired sessions.
       if (isAuthEndpoint(originalRequest?.url)) {
+        return Promise.reject(error);
+      }
+      // Capability-token requests (e.g. phone photo handoff via the
+      // x-handoff-secret header) authenticate with a single-use secret,
+      // not the user session. A 401 here means a bad/expired QR link —
+      // attempting a cookie refresh would 401 on a cookie-less phone and
+      // fire a bogus "session expired" toast. Let the caller handle it
+      // (PhoneUpload shows its own "scan a fresh QR" message).
+      if (hasCapabilityAuth(originalRequest.headers)) {
         return Promise.reject(error);
       }
       // A 401 without a response (network down) or a 429 (rate limited)
@@ -122,7 +145,12 @@ instance.interceptors.response.use(
         // still be valid and the next attempt can succeed.
         if (err.response?.status === 401) {
           clearStoredAuth();
-          notifySessionExpired();
+          // Background session probes (initial page-load profile check)
+          // must never bounce guests to /login — they were never logged
+          // in. Only user-initiated requests trigger the redirect.
+          if (!originalRequest._silentProbe) {
+            notifySessionExpired();
+          }
         }
 
         return Promise.reject(err);

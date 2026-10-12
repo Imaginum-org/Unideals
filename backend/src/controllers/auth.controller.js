@@ -328,7 +328,13 @@ export const googleAuthCallbackController = async (req, res) => {
         error: true,
       });
     }
-    res.clearCookie("oauth_state", { path: "/" });
+    // Clear with the same flags used at set time or the cookie survives.
+    res.clearCookie("oauth_state", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      path: "/",
+    });
 
     const { tokens } = await oauth2Client.getToken(code);
     if (!tokens?.id_token) {
@@ -663,6 +669,12 @@ export const refreshAccessTokenController = async (req, res) => {
       data: { user: session.user },
     });
   } catch (err) {
+    // Dead refresh token (401): wipe stale cookies so the browser stops
+    // sending them. Other failures (429/5xx/network) keep cookies — they
+    // may still be valid and the next attempt can succeed.
+    if ((err.statusCode || 401) === 401) {
+      clearAuthCookies(res);
+    }
     return res.status(err.statusCode || 401).json({
       message: safeErrorMessage(err, "Invalid refresh token"),
       success: false,

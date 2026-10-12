@@ -4,6 +4,7 @@ import { USER_STATUS } from "../config/constants.js";
 import { deleteImage } from "../utils/imagekit.js";
 import { safeErrorMessage } from "../utils/response.js";
 import { computeLevel, xpToNextLevel, levelProgress } from "../services/badgeService.js";
+import { clearAuthCookies } from "../services/auth.service.js";
 
 // GET USER PROFILE
 export const getUserProfile = async (req, res) => {
@@ -427,23 +428,15 @@ export const deleteAccount = async (req, res) => {
       // best-effort only
     }
 
-    const isProduction = process.env.NODE_ENV === "production";
+    // Reuse the shared clearer so Secure/SameSite/Path always match the
+    // flags the cookies were set with (a mismatched clear leaves orphans).
+    clearAuthCookies(res);
 
-    const cookieOptions = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "None" : "Lax",
-    };
-
-    res
-      .clearCookie("accessToken", cookieOptions)
-      .clearCookie("refreshToken", cookieOptions)
-      .status(200)
-      .json({
-        message: "Account deleted successfully",
-        success: true,
-        error: false,
-      });
+    res.status(200).json({
+      message: "Account deleted successfully",
+      success: true,
+      error: false,
+    });
   } catch (err) {
     console.error("Error in deleteAccount controller:", err);
 

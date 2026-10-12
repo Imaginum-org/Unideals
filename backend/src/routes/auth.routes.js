@@ -1,6 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import auth from "../middlewares/auth.middleware.js";
+import { optionalAuth } from "../middlewares/auth.middleware.js";
 import {
   registerUserController,
   loginController,
@@ -78,6 +78,9 @@ authRouter.post("/refresh-token", refreshLimiter, refreshAccessTokenController);
 
 // POST only: a GET logout is a logout-CSRF vector (<img src=...> logs
 // the victim out). Frontend uses POST with GET fallback that never fires.
-authRouter.post("/logoutUser", auth, logoutUser);
+// optionalAuth (not auth): users with an expired access token must still
+// reach logout so cookies are cleared + the refresh token is revoked.
+// With strict auth they would get 401 and stay stuck with stale cookies.
+authRouter.post("/logoutUser", optionalAuth, logoutUser);
 
 export default authRouter;

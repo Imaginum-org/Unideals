@@ -83,7 +83,14 @@ export const UserProvider = ({ children }) => {
 
   // Fetch user profile - cookie-based (withCredentials). Works even without
   // isAuthenticated flag so cookie-only sessions recover after cache clear.
-  const fetchUserProfile = useCallback(async () => {
+  // Pass { force: true } after an explicit login (email/Google/One Tap):
+  // the mount probe already set hasFetchedRef, which would otherwise make
+  // this return stale `false` without fetching and leave the user looking
+  // logged-out until a reload.
+  const fetchUserProfile = useCallback(async ({ force = false } = {}) => {
+    if (force) {
+      hasFetchedRef.current = false;
+    }
     if (hasFetchedRef.current) return Boolean(userDetails?._id);
 
     hasFetchedRef.current = true;
@@ -91,7 +98,13 @@ export const UserProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      const response = await axios.get("/api/user/userProfile");
+      // _silentProbe: this is a background session check, not a user
+      // action. If there is no session, the interceptor must NOT fire
+      // "session-expired" (which would bounce guests browsing public
+      // pages to /login). See authInterceptor.js.
+      const response = await axios.get("/api/user/userProfile", {
+        _silentProbe: true,
+      });
 
       if (response.data.success) {
         const user = response.data.user;

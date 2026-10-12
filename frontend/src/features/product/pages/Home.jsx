@@ -108,7 +108,7 @@ const Home = () => {
         // Cookie-based session - HttpOnly cookies set by backend
 
         localStorage.setItem("isAuthenticated", "true");
-        await fetchUserProfile();
+        await fetchUserProfile({ force: true });
       } catch (err) {
         localStorage.removeItem("isAuthenticated");
         console.error("Google One Tap login failed:", err?.response?.data?.message || err?.message);
