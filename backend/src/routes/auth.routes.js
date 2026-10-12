@@ -36,6 +36,16 @@ const emailLimiter = rateLimit({
   message: { success: false, message: "Too many email requests, please try later" },
 });
 
+// Lightweight probe endpoints (verify/check/reset pre-check) —
+// enumerable without this, so keep a modest shared bucket.
+const probeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many attempts, please try later" },
+});
+
 // Refresh is called by every tab roughly every 15 minutes plus retries —
 // keep it out of the shared probe bucket so background refreshes never
 // get 429s (a 429 on refresh looks exactly like a dead session).
