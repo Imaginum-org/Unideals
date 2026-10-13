@@ -3,6 +3,7 @@ import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
 import Deal from "../models/deal.model.js";
 import Product from "../models/Product.model.js";
+import User from "../models/User.model.js";
 import {
   MESSAGE_TYPE,
   MESSAGE_STATUS,
@@ -12,6 +13,13 @@ import {
 } from "../config/constants.js";
 import { AppError } from "../utils/appError.js";
 import { emitToConversation, emitToUser } from "../utils/socket.js";
+import {
+  notifyNewOffer,
+  notifyOfferAccepted,
+  notifyPickupScheduled,
+  notifyDealCompleted,
+  notifyDealCancelled,
+} from "./notification.service.js";
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
@@ -204,6 +212,19 @@ export const makeOffer = async ({ conversationId, userId, amount }) => {
 
   emitToConversation(conversation._id, "message:new", offerMsg.toObject());
   broadcastDeal(conversation, deal.toObject());
+
+  // Notify the other party (seller) about the new offer — fire-and-forget
+  const buyerUser = await User.findById(userId).select("name").lean();
+  const productSnap = conversation.product_snapshot;
+  notifyNewOffer({
+    conversationId: conversation._id,
+    buyerId: userId,
+    buyerName: buyerUser?.name || "A buyer",
+    amount: amt,
+    productTitle: productSnap?.title || "the item",
+    sellerId: receiverId,
+  }).catch(() => {});
+
   return { deal, message: offerMsg };
 };
 
@@ -242,6 +263,15 @@ export const respondOffer = async ({ conversationId, userId, messageId, action }
       text: `Offer of ${inr(entry.amount)} accepted. Let's go.`,
       deal,
     });
+    // Notify the buyer (offerer) that their offer was accepted — fire-and-forget
+    const sellerUser = await User.findById(userId).select("name").lean();
+    notifyOfferAccepted({
+      conversationId: conversation._id,
+      sellerName: sellerUser?.name || "The seller",
+      productTitle: conversation.product_snapshot?.title || "the item",
+      amount: entry.amount,
+      buyerId: entry.offered_by,
+    }).catch(() => {});
   } else {
     entry.status = OFFER_STATUS.DECLINED;
     entry.response_by = userId;
@@ -387,6 +417,13 @@ export const schedulePickup = async ({ conversationId, userId, date, location })
     text: `Pickup set for ${dateLabel} at ${loc}. Don't ghost.`,
     deal,
   });
+  // Notify the buyer about pickup details — fire-and-forget
+  notifyPickupScheduled({
+    conversationId: conversation._id,
+    location: loc,
+    scheduledDate: d,
+    recipientId: conversation.buyer_id,
+  }).catch(() => {});
   const fresh = await Deal.findById(deal._id);
   broadcastDeal(conversation, fresh.toObject());
   return fresh;
@@ -446,6 +483,14 @@ export const confirmItemReceived = async ({ conversationId, userId }) => {
     text: "Item received. Deal done. Enjoy it.",
     deal,
   });
+  // Notify the seller that the deal is complete — fire-and-forget
+  const buyerCompleteUser = await User.findById(userId).select("name").lean();
+  notifyDealCompleted({
+    conversationId: conversation._id,
+    buyerName: buyerCompleteUser?.name || "The buyer",
+    productTitle: conversation.product_snapshot?.title || "the item",
+    sellerId: conversation.seller_id,
+  }).catch(() => {});
   const fresh = await Deal.findById(deal._id);
   broadcastDeal(conversation, fresh.toObject());
   return fresh;
@@ -480,6 +525,15 @@ export const cancelDeal = async ({ conversationId, userId, reason = "" }) => {
     text: "Deal cancelled. Item's back on the shelf.",
     deal,
   });
+  // Notify the other party about cancellation — fire-and-forget
+  const cancellerUser = await User.findById(userId).select("name").lean();
+  const cancelRecipient = otherPartyOf(conversation, userId);
+  notifyDealCancelled({
+    conversationId: conversation._id,
+    productTitle: conversation.product_snapshot?.title || "the item",
+    cancellerName: cancellerUser?.name || "The other party",
+    recipientId: cancelRecipient,
+  }).catch(() => {});
   const fresh = await Deal.findById(deal._id);
   broadcastDeal(conversation, fresh.toObject());
   return fresh;

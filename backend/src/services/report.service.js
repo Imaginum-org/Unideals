@@ -4,6 +4,7 @@ import Report from "../models/Report.model.js";
 import Product from "../models/Product.model.js";
 import User from "../models/User.model.js";
 import { PRODUCT_STATUS, REPORT_STATUS } from "../config/constants.js";
+import { notifyModerationWarning } from "./notification.service.js";
 
 const MAX_REPORTS_PER_HOUR = 10;
 // Cross-user per-target throttle: at most 20 reports/hour land on the same
@@ -310,9 +311,29 @@ export const reviewReport = async (reportId, { status, admin_note } = {}) => {
   if (admin_note !== undefined) {
     update.$set.admin_note = String(admin_note).slice(0, 500);
   }
-  const report = await Report.findByIdAndUpdate(reportId, update, { new: true });
+  const report = await Report.findByIdAndUpdate(reportId, update, { new: true })
+    .populate("target_id", "title seller_id")
+    .lean();
   if (!report) {
     throw new Error("Report not found");
   }
+
+  // Notify the product seller when a report is actioned (not on dismiss) — fire-and-forget
+  if (
+    status === REPORT_STATUS.ACTION_TAKEN &&
+    report.target_model === "Product" &&
+    report.target_id
+  ) {
+    const product = report.target_id;
+    if (product?.seller_id) {
+      notifyModerationWarning({
+        productId: product._id,
+        productTitle: product.title,
+        sellerId: product.seller_id,
+        adminNote: admin_note || null,
+      }).catch(() => {});
+    }
+  }
+
   return report;
 };

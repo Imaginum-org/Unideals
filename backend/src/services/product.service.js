@@ -11,6 +11,7 @@ import {
 } from "../config/constants.js";
 import { getListingLimit } from "../config/subscriptionPlans.js";
 import { deleteImage } from "../utils/imagekit.js";
+import { notifyPriceDrop } from "./notification.service.js";
 import {
   isEligibleGender,
   isAdminRole,
@@ -1397,9 +1398,24 @@ export const updateProduct = async (productId, userId, data = {}) => {
     updates.quantity = qty;
   }
 
+  const oldSellingPrice = Number(product.selling_price);
   Object.assign(product, updates);
   try {
-    return await product.save();
+    const saved = await product.save();
+    // Fire price-drop wishlist alerts when price genuinely drops — fire-and-forget
+    const newSellingPrice = Number(saved.selling_price);
+    if (
+      updates.selling_price !== undefined &&
+      newSellingPrice < oldSellingPrice
+    ) {
+      notifyPriceDrop({
+        productId: saved._id,
+        productTitle: saved.title,
+        oldPrice: oldSellingPrice,
+        newPrice: newSellingPrice,
+      }).catch(() => {});
+    }
+    return saved;
   } catch (err) {
     // Incomplete/invalid edit payloads are client errors, not 500s.
     if (err?.name === "ValidationError") {

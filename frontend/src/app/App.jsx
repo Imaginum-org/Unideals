@@ -5,6 +5,7 @@ import { toast } from "../components/ui/toast.js";
 import SiteLockGate from "../siteLock/SiteLockGate.jsx"; // [SITE-LOCK] delete this import to remove the lock
 import AppRoutes from "./routes.jsx";
 import { useUser } from "../context/useUserContext.jsx";
+import { NotificationProvider } from "../context/NotificationContext.jsx";
 
 // Prefixes that require a session (must mirror ProtectedLayout in
 // routes.jsx). A dead session on any other page clears state silently
@@ -83,10 +84,12 @@ function App() {
 
   return (
     <div className="App">
-      {/* [SITE-LOCK] remove the wrapper (keep <AppRoutes />) to remove the lock */}
-      <SiteLockGate>
+       <SiteLockGate>
+      <NotificationProvider>
+        {/* [SITE-LOCK] remove the wrapper (keep <AppRoutes />) to remove the lock */}
         <AppRoutes />
-      </SiteLockGate>
+       </NotificationProvider>
+          </SiteLockGate>
       <Toaster />
     </div>
   );

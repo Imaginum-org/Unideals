@@ -10,6 +10,8 @@ import {
   Tag,
   Bell,
   Megaphone,
+  ShieldAlert,
+  X,
 } from "lucide-react";
 
 import Profile_left_part from "../../../features/user/components/Profile_left_part.jsx";
@@ -22,13 +24,22 @@ const socketURL = baseURL.replace(/\/api\/?$/, "") || undefined;
 // Resolve icon and style by notification type
 const getNotificationTypeMeta = (type = "") => {
   const norm = String(type).toUpperCase();
-  if (norm.includes("OFFER") || norm.includes("PROMOTION")) {
+  if (norm.includes("OFFER") || norm.includes("PROMOTION") || norm.includes("PROMO")) {
     return {
       Icon: Tag,
       iconColor: "text-amber-500",
       dotColor: "bg-amber-500",
       badgeBg: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
       displayType: "OFFER / PROMO",
+    };
+  }
+  if (norm.includes("WISHLIST") || norm.includes("PRICE")) {
+    return {
+      Icon: Tag,
+      iconColor: "text-orange-500",
+      dotColor: "bg-orange-500",
+      badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300",
+      displayType: "WISHLIST ALERT",
     };
   }
   if (norm.includes("MESSAGE")) {
@@ -56,6 +67,15 @@ const getNotificationTypeMeta = (type = "") => {
       dotColor: "bg-indigo-500",
       badgeBg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300",
       displayType: "ANNOUNCEMENT",
+    };
+  }
+  if (norm.includes("MODERAT") || norm.includes("REVIEW") || norm.includes("FLAG")) {
+    return {
+      Icon: ShieldAlert,
+      iconColor: "text-rose-500",
+      dotColor: "bg-rose-500",
+      badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300",
+      displayType: "MODERATION",
     };
   }
   return {
@@ -148,6 +168,12 @@ export default function Notification() {
     } catch {
       // ignore
     }
+  };
+
+  const dismissNotification = (id) => {
+    setNotifications((current) => current.filter((n) => n.id !== id));
+    // Best-effort: mark as read on dismiss so it doesn't reappear
+    try { notificationApi.markRead(id); } catch { /* ignore */ }
   };
 
   const openNotification = async (notification) => {
@@ -286,6 +312,15 @@ export default function Notification() {
                             >
                               <Check size={14} />
                               {notification.unread ? "Mark as read" : "Read"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => dismissNotification(notification.id)}
+                              className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[#E2E6EF] bg-[#F7F8FA] px-4 text-[13px] font-bold text-[#9AA3B2] transition hover:border-rose-400 hover:text-rose-500 dark:border-gray-800 dark:bg-[#1c1c1c] sm:w-auto"
+                            >
+                              <X size={14} />
+                              Dismiss
                             </button>
                           </div>
                         </div>

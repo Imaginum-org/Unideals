@@ -38,13 +38,15 @@ import axios from "../../services/axiosInstance.js";
 import { timeAgo } from "../../features/chat/components/ConversationCard.jsx";
 import { avatarUrl, formatName } from "../../features/chat/utils/display.js";
 import { levelProgress, xpToNextLevel } from "../../utils/badgeConfig.js";
+import { useNotification } from "../../context/NotificationContext.jsx";
 import {
-  latestFirst,
-  loadNotifications,
-  markStoredAllRead,
-  markStoredRead,
-  unreadCountOf,
-} from "../../features/notification/data/notifications.js";
+  Tag,
+  MessageSquare,
+  Package,
+  Bell,
+  Megaphone,
+  ShieldAlert,
+} from "lucide-react";
 
 const ProfileDropdown = ({
   userDetails,
@@ -775,6 +777,26 @@ const Header = () => {
         if (item?.title) {
           toast.info(item.title);
         }
+        // Prepend to dropdown preview with icon metadata
+        if (item) {
+          setNotifItems((prev) => {
+            const meta = {
+              Icon: Bell,
+              iconColor: "text-slate-500",
+              dotColor: "bg-slate-500",
+            };
+            const newItem = {
+              id: item.id || item._id || Date.now(),
+              title: item.title || "New Notification",
+              description: item.description || item.message || "",
+              time: "Just now",
+              actionPath: item.actionPath || item.action_url || "/notification",
+              unread: true,
+              ...meta,
+            };
+            return [newItem, ...prev].slice(0, 5);
+          });
+        }
       });
     } catch {
       // socket is best effort
@@ -1043,10 +1065,45 @@ const Header = () => {
     };
   }, [showmenu]);
 
-  const refreshNotifs = () => {
-    const list = loadNotifications();
-    setNotifItems(latestFirst(list).slice(0, 5));
-    setUnreadCount(unreadCountOf(list));
+
+  // Map notification type string -> icon metadata for dropdown rows
+  const notifIconMeta = (type = "") => {
+    const norm = String(type).toUpperCase();
+    if (norm.includes("MESSAGE")) return { Icon: MessageSquare, iconColor: "text-sky-500", dotColor: "bg-sky-500" };
+    if (norm.includes("ORDER")) return { Icon: Package, iconColor: "text-emerald-500", dotColor: "bg-emerald-500" };
+    if (norm.includes("OFFER") || norm.includes("PROMO") || norm.includes("WISHLIST") || norm.includes("PRICE"))
+      return { Icon: Tag, iconColor: "text-amber-500", dotColor: "bg-amber-500" };
+    if (norm.includes("ANNOUNCE")) return { Icon: Megaphone, iconColor: "text-indigo-500", dotColor: "bg-indigo-500" };
+    if (norm.includes("MODERAT") || norm.includes("REVIEW") || norm.includes("FLAG"))
+      return { Icon: ShieldAlert, iconColor: "text-rose-500", dotColor: "bg-rose-500" };
+    return { Icon: Bell, iconColor: "text-slate-500", dotColor: "bg-slate-500" };
+  };
+
+  const refreshNotifs = async () => {
+    try {
+      const res = await axios.get("/api/notifications");
+      const items = (res.data?.data || []).slice(0, 5).map((n) => {
+        const meta = notifIconMeta(n.type);
+        return {
+          id: n.id || n._id,
+          title: n.title,
+          description: n.message || n.description,
+          time: n.time || "Just now",
+          actionPath: n.actionPath || n.action_url || "/notification",
+          unread: n.unread,
+          ...meta,
+        };
+      });
+      setNotifItems(items);
+      if (typeof res.data?.unreadCount === "number") {
+        setUnreadCount(res.data.unreadCount);
+      }
+    } catch {
+      // Fallback to localStorage-backed sample notifications
+      const list = loadNotifications();
+      setNotifItems(latestFirst(list).slice(0, 5));
+      setUnreadCount(unreadCountOf(list));
+    }
   };
 
   const toggleNotif = () => {
@@ -1055,20 +1112,27 @@ const Header = () => {
     setShowNotif((prev) => !prev);
   };
 
-  const openNotif = (item) => {
-    markStoredRead(item.id);
+  const openNotif = async (item) => {
+    // Optimistic UI update
     setNotifItems((current) =>
       current.map((n) => (n.id === item.id ? { ...n, unread: false } : n)),
     );
     setUnreadCount((c) => Math.max(0, c - (item.unread ? 1 : 0)));
     setShowNotif(false);
-    navigate(item.actionPath);
+    // Best-effort backend mark read + click tracking
+    try {
+      await axios.patch(`/api/notifications/${item.id}/read`);
+      await notificationApi.trackClick(item.id);
+    } catch { /* ignore */ }
+    markStoredRead(item.id);
+    navigate(item.actionPath || "/notification");
   };
 
-  const markAllNotifRead = () => {
+  const markAllNotifRead = async () => {
     markStoredAllRead();
     setNotifItems((current) => current.map((n) => ({ ...n, unread: false })));
     setUnreadCount(0);
+    try { await axios.patch("/api/notifications/read-all"); } catch { /* ignore */ }
   };
 
   // Keep badge/count in sync when returning from the Notifications page

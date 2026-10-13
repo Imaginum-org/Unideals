@@ -511,6 +511,398 @@ export const cancelScheduledNotification = async (notificationId) => {
   return notif;
 };
 
+/**
+ * Notify seller when a buyer makes a new offer
+ */
+export const notifyNewOffer = async ({
+  conversationId,
+  buyerId,
+  buyerName,
+  amount,
+  productTitle,
+  sellerId,
+}) => {
+  try {
+    const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+    const notification = await Notification.create({
+      title: "New Offer Received!",
+      message: `${buyerName || "A buyer"} offered ${inr(amount)} for "${productTitle || "your item"}".`,
+      type: "order",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: sellerId,
+      sent_by: buyerId,
+      action_url: `/chat?conversationId=${conversationId}`,
+      action_label: "View Offer",
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    });
+    emitToUser(sellerId, "notification:new", {
+      id: String(notification._id),
+      _id: String(notification._id),
+      title: notification.title,
+      message: notification.message,
+      description: notification.message,
+      type: "ORDER UPDATE",
+      actionPath: `/chat?conversationId=${conversationId}`,
+      actionLabel: "View Offer",
+      action_url: `/chat?conversationId=${conversationId}`,
+      action_label: "View Offer",
+      createdAt: notification.createdAt,
+      time: "Just now",
+      unread: true,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Failed to notify new offer:", error);
+    return null;
+  }
+};
+
+/**
+ * Notify buyer when their offer is accepted / deal is confirmed
+ */
+export const notifyOfferAccepted = async ({
+  conversationId,
+  sellerName,
+  productTitle,
+  amount,
+  buyerId,
+}) => {
+  try {
+    const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+    const notification = await Notification.create({
+      title: "Offer Accepted! 🎉",
+      message: `${sellerName || "The seller"} accepted your offer of ${inr(amount)} for "${productTitle || "the item"}". Schedule pickup now.`,
+      type: "order",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: buyerId,
+      action_url: `/myorders`,
+      action_label: "View Deal",
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    });
+    emitToUser(buyerId, "notification:new", {
+      id: String(notification._id),
+      _id: String(notification._id),
+      title: notification.title,
+      message: notification.message,
+      description: notification.message,
+      type: "ORDER UPDATE",
+      actionPath: `/myorders`,
+      actionLabel: "View Deal",
+      action_url: `/myorders`,
+      action_label: "View Deal",
+      createdAt: notification.createdAt,
+      time: "Just now",
+      unread: true,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Failed to notify offer accepted:", error);
+    return null;
+  }
+};
+
+/**
+ * Notify counterparty when pickup is scheduled
+ */
+export const notifyPickupScheduled = async ({
+  conversationId,
+  location,
+  scheduledDate,
+  recipientId,
+}) => {
+  try {
+    const dateLabel = scheduledDate
+      ? new Date(scheduledDate).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "a scheduled date";
+    const notification = await Notification.create({
+      title: "Pickup Spot Confirmed 📍",
+      message: `Meeting scheduled at "${location || "a spot"}" on ${dateLabel}.`,
+      type: "order",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: recipientId,
+      action_url: `/myorders`,
+      action_label: "View Pickup",
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    });
+    emitToUser(recipientId, "notification:new", {
+      id: String(notification._id),
+      _id: String(notification._id),
+      title: notification.title,
+      message: notification.message,
+      description: notification.message,
+      type: "ORDER UPDATE",
+      actionPath: `/myorders`,
+      actionLabel: "View Pickup",
+      action_url: `/myorders`,
+      action_label: "View Pickup",
+      createdAt: notification.createdAt,
+      time: "Just now",
+      unread: true,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Failed to notify pickup scheduled:", error);
+    return null;
+  }
+};
+
+/**
+ * Notify seller when buyer confirms item received (deal completed)
+ */
+export const notifyDealCompleted = async ({
+  conversationId,
+  buyerName,
+  productTitle,
+  sellerId,
+}) => {
+  try {
+    const notification = await Notification.create({
+      title: "Deal Completed Successfully 🎉",
+      message: `${buyerName || "The buyer"} confirmed receiving "${productTitle || "the item"}". Payment balance updated.`,
+      type: "order",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: sellerId,
+      action_url: `/myorders`,
+      action_label: "View Order Details",
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    });
+    emitToUser(sellerId, "notification:new", {
+      id: String(notification._id),
+      _id: String(notification._id),
+      title: notification.title,
+      message: notification.message,
+      description: notification.message,
+      type: "ORDER UPDATE",
+      actionPath: `/myorders`,
+      actionLabel: "View Order Details",
+      action_url: `/myorders`,
+      action_label: "View Order Details",
+      createdAt: notification.createdAt,
+      time: "Just now",
+      unread: true,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Failed to notify deal completed:", error);
+    return null;
+  }
+};
+
+/**
+ * Notify counterparty when a deal is cancelled
+ */
+export const notifyDealCancelled = async ({
+  conversationId,
+  productTitle,
+  cancellerName,
+  recipientId,
+}) => {
+  try {
+    const notification = await Notification.create({
+      title: "Deal Cancelled",
+      message: `Deal for "${productTitle || "the item"}" was cancelled by ${cancellerName || "the other party"}.`,
+      type: "order",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: recipientId,
+      action_url: `/myorders`,
+      action_label: "View Details",
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    });
+    emitToUser(recipientId, "notification:new", {
+      id: String(notification._id),
+      _id: String(notification._id),
+      title: notification.title,
+      message: notification.message,
+      description: notification.message,
+      type: "ORDER UPDATE",
+      actionPath: `/myorders`,
+      actionLabel: "View Details",
+      action_url: `/myorders`,
+      action_label: "View Details",
+      createdAt: notification.createdAt,
+      time: "Just now",
+      unread: true,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Failed to notify deal cancelled:", error);
+    return null;
+  }
+};
+
+/**
+ * Fan-out price drop alerts to all users who have the product in their wishlist
+ */
+export const notifyPriceDrop = async ({
+  productId,
+  productTitle,
+  oldPrice,
+  newPrice,
+}) => {
+  try {
+    const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+    const diff = Number(oldPrice) - Number(newPrice);
+    if (diff <= 0) return null; // Only notify on actual price drop
+
+    // Find all users who have this product in their wishlist
+    const wishlistUsers = await User.find({ wishlist: productId })
+      .select("_id")
+      .lean();
+    if (!wishlistUsers.length) return null;
+
+    const message = `"${productTitle || "An item"}" on your wishlist dropped by ${inr(diff)}! Now at ${inr(newPrice)}. Grab it before it sells out!`;
+
+    // Create individual direct notifications (not a broadcast) for each wishlist user
+    const ops = wishlistUsers.map((u) => ({
+      title: "Price Drop Alert! 🔥",
+      message,
+      type: "promotion",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: u._id,
+      action_url: `/product/${productId}`,
+      action_label: "Buy Now",
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    }));
+
+    const notifications = await Notification.insertMany(ops, { ordered: false });
+
+    // Push live to each wishlist holder
+    const payload = {
+      title: "Price Drop Alert! 🔥",
+      message,
+      description: message,
+      type: "OFFER / PROMO",
+      actionPath: `/product/${productId}`,
+      actionLabel: "Buy Now",
+      action_url: `/product/${productId}`,
+      action_label: "Buy Now",
+      time: "Just now",
+      unread: true,
+    };
+    for (const u of wishlistUsers) {
+      emitToUser(u._id, "notification:new", { ...payload, id: String(u._id) });
+    }
+
+    return notifications;
+  } catch (error) {
+    console.error("Failed to notify price drop:", error);
+    return null;
+  }
+};
+
+/**
+ * Notify seller when their listing is flagged/actioned by moderation
+ */
+export const notifyModerationWarning = async ({
+  productId,
+  productTitle,
+  sellerId,
+  adminNote = null,
+}) => {
+  try {
+    const message = adminNote
+      ? `Your listing "${productTitle || "a product"}" has been flagged: ${adminNote}`
+      : `Your listing "${productTitle || "a product"}" has been flagged for moderation review. Please review our guidelines.`;
+
+    const notification = await Notification.create({
+      title: "Listing Under Review ⚠️",
+      message,
+      type: "general",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: sellerId,
+      action_url: `/productlisted`,
+      action_label: "Review Guidelines",
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    });
+    emitToUser(sellerId, "notification:new", {
+      id: String(notification._id),
+      _id: String(notification._id),
+      title: notification.title,
+      message: notification.message,
+      description: notification.message,
+      type: "GENERAL",
+      actionPath: `/productlisted`,
+      actionLabel: "Review Guidelines",
+      action_url: `/productlisted`,
+      action_label: "Review Guidelines",
+      createdAt: notification.createdAt,
+      time: "Just now",
+      unread: true,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Failed to notify moderation warning:", error);
+    return null;
+  }
+};
+
+/**
+ * Notify user when their role is updated (e.g., promoted to support)
+ */
+export const notifyRoleAssigned = async ({ userId, newRole }) => {
+  try {
+    const roleLabel =
+      newRole === "support" ? "Support Staff" : newRole.charAt(0).toUpperCase() + newRole.slice(1);
+    const notification = await Notification.create({
+      title: "Staff Role Updated",
+      message: `You have been granted ${roleLabel} permissions on UniDeals Admin Portal.`,
+      type: "general",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: userId,
+      action_url: `/profile`,
+      action_label: "View Profile",
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    });
+    emitToUser(userId, "notification:new", {
+      id: String(notification._id),
+      _id: String(notification._id),
+      title: notification.title,
+      message: notification.message,
+      description: notification.message,
+      type: "GENERAL",
+      actionPath: `/profile`,
+      actionLabel: "View Profile",
+      action_url: `/profile`,
+      action_label: "View Profile",
+      createdAt: notification.createdAt,
+      time: "Just now",
+      unread: true,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Failed to notify role assigned:", error);
+    return null;
+  }
+};
+
 // Helper function for human-readable relative time
 const formatRelativeTime = (date) => {
   if (!date) return "Just now";

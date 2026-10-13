@@ -8,6 +8,7 @@ import {
   escapeRegex,
   toPositiveInt,
 } from "../utils/adminQuery.js";
+import { notifyRoleAssigned } from "./notification.service.js";
 
 const { ObjectId } = mongoose.Types;
 
@@ -225,6 +226,11 @@ export const updateUserRole = async (userId, role) => {
     seller_id: user._id,
     is_deleted: false,
   });
+
+  // Notify user when they are promoted to support — fire-and-forget
+  if (role === USER_ROLES.SUPPORT) {
+    notifyRoleAssigned({ userId, newRole: role }).catch(() => {});
+  }
 
   return {
     id: user._id.toString(),

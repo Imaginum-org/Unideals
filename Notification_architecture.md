@@ -3,6 +3,7 @@
 ## 1. Executive Summary
 
 UniDeals implements a **100% in-house, zero-external-broker real-time notification engine**. It connects three core application components:
+
 1. **Admin Portal (`Campus-Mart-Admin`)**: Campaign creation, audience filtering, live preview, scheduled broadcasts, and deliverability analytics.
 2. **Backend Engine (`Campus-Mart/backend`)**: Mongoose data models, Socket.IO rooms and real-time push dispatch, node-cron background schedule runner, and recipient resolution engine.
 3. **Main User Marketplace (`Campus-Mart/frontend`)**: Real-time WebSocket listeners, header bell counter, profile sidebar badge, floating toast alerts, and interactive `/notification` inbox.
@@ -24,9 +25,9 @@ flowchart TD
     subgraph BackendEngine [Backend Processing]
         T1 & T2 & T3 & T4 & T5 --> Core[notification.service.js]
         Core --> DB[(MongoDB: Notification & NotificationReceipt)]
-        
+
         Cron[node-cron: * * * * *] -->|Every minute| Core
-        
+
         Core --> TargetEngine[Recipient & Room Engine]
         TargetEngine --> Sockets[Socket.IO Server]
     end
@@ -50,13 +51,13 @@ flowchart TD
 
 ## 3. Technology Stack & Design Decisions
 
-| Layer | Technology | Architecture Rationale |
-|---|---|---|
-| **Data Persistence** | MongoDB + Mongoose | Fast document queries, indexing on campus/roles, dual model for broadcasts vs direct receipts. |
-| **Real-time Push** | WebSockets via `socket.io` (v4.8+) | Sub-50ms push delivery to online clients without HTTP polling overhead. |
-| **Task Scheduling** | `node-cron` (v3.0+) | Lightweight, runs in-process every minute to check and trigger scheduled campaigns without RabbitMQ/Redis. |
-| **Client UI** | React 19 + Tailwind CSS + Lucide Icons | Responsive layout, dark/light mode compatible, instant preview matching admin creation controls. |
-| **Infrastructure Cost** | **$0 / Zero Third-Party Dependencies** | No Firebase Cloud Messaging, OneSignal, Pusher, Novu, or external queue clusters required. |
+| Layer                   | Technology                             | Architecture Rationale                                                                                     |
+| ----------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Data Persistence**    | MongoDB + Mongoose                     | Fast document queries, indexing on campus/roles, dual model for broadcasts vs direct receipts.             |
+| **Real-time Push**      | WebSockets via `socket.io` (v4.8+)     | Sub-50ms push delivery to online clients without HTTP polling overhead.                                    |
+| **Task Scheduling**     | `node-cron` (v3.0+)                    | Lightweight, runs in-process every minute to check and trigger scheduled campaigns without RabbitMQ/Redis. |
+| **Client UI**           | React 19 + Tailwind CSS + Lucide Icons | Responsive layout, dark/light mode compatible, instant preview matching admin creation controls.           |
+| **Infrastructure Cost** | **$0 / Zero Third-Party Dependencies** | No Firebase Cloud Messaging, OneSignal, Pusher, Novu, or external queue clusters required.                 |
 
 ---
 
@@ -64,25 +65,26 @@ flowchart TD
 
 Below is the complete specification of **every scenario when a notification is created**, who receives it, and what actions are taken.
 
-| # | Trigger Event | Trigger Source | Target Audience | Notification Type | Badge | Title & Message Template | Action CTA |
-|---|---|---|---|---|---|---|---|
-| **1** | **Admin Instant Broadcast** | Admin clicks "Send Notification" in Admin Portal | • All Users<br>• Specific Campus<br>• Buyers<br>• Sellers | `promotion` / `announcement` / `general` | `OFFER` / `ANNOUNCEMENT` / `GENERAL` | **Title**: As configured by admin<br>**Body**: Custom announcement message<br>**Image**: Attached promotional banner | `[Action Label ↗]` → Configured target URL (e.g., `/deals`, `/product/:id`) |
-| **2** | **Admin Scheduled Broadcast** | Cron runner executes at `scheduled_at` | • Selected Audience<br>• Selected Campus | `promotion` / `announcement` / `general` | `OFFER` / `ANNOUNCEMENT` | Dispatched automatically when schedule time arrives | Configured URL |
-| **3** | **Direct Chat Message** | User sends message in active conversation | Conversation recipient (`receiverId`) | `message` | `DIRECT MESSAGE` | **Title**: `New message from {Sender Name}`<br>**Body**: Excerpt of message text<br>*(Suppressed if recipient is already inside that chat room)* | `[Reply in Chat ↗]` → `/chat?conversationId={id}` |
-| **4** | **New Deal Offer** | Buyer makes an offer on a listed item | Seller of the product (`seller_id`) | `order` | `ORDER UPDATE` | **Title**: `New Offer Received!`<br>**Body**: `{Buyer Name} offered ₹{Amount} for {Product Title}` | `[View Offer ↗]` → `/chat?conversationId={id}` |
-| **5** | **Offer Accepted / Deal Confirmed** | Seller accepts offer / deal agreed | Buyer (`buyer_id`) | `order` | `ORDER UPDATE` | **Title**: `Offer Accepted!`<br>**Body**: `{Seller Name} accepted your offer for {Product Title}. Schedule pickup now.` | `[View Deal ↗]` → `/myorders` |
-| **6** | **Pickup Spot Scheduled** | Either party proposes/confirms pickup spot & time | Counterparty | `order` | `ORDER UPDATE` | **Title**: `Pickup Spot Confirmed`<br>**Body**: `Meeting scheduled at {Spot Name} on {Date & Time}` | `[View Pickup ↗]` → `/myorders` |
-| **7** | **Item Received & Deal Completed** | Buyer confirms item inspected & received | Seller (`seller_id`) | `order` | `ORDER UPDATE` | **Title**: `Deal Completed Successfully 🎉`<br>**Body**: `{Buyer Name} confirmed receiving {Product Title}. Payment balance updated.` | `[View Order Details ↗]` → `/myorders` |
-| **8** | **Deal Cancelled** | Either party cancels active deal | Counterparty | `order` | `ORDER UPDATE` | **Title**: `Deal Cancelled`<br>**Body**: `Deal for {Product Title} was cancelled by {Name}` | `[View Details ↗]` → `/myorders` |
-| **9** | **Price Drop Alert** | Seller reduces price of a listed item | Users who saved item to **Wishlist** | `promotion` | `OFFER / PROMO` | **Title**: `Price Drop Alert!`<br>**Body**: `{Product Title} dropped by ₹{Diff}. Grab it before it sells out!` | `[Buy Now ↗]` → `/product/{id}` |
-| **10** | **Listing Moderation Warning** | Admin/System flags listing for safety violation | Product Owner (`seller_id`) | `general` | `GENERAL` | **Title**: `Listing Under Review`<br>**Body**: `Your listing for {Product Title} has been flagged for moderation review.` | `[Review Guidelines ↗]` → `/productlisted` |
-| **11** | **Support Role Assigned** | Admin promotes a user to Support role | Assigned User | `general` | `GENERAL` | **Title**: `Staff Role Updated`<br>**Body**: `You have been granted Support permissions on UniDeals Admin Portal.` | `[Open Admin Portal ↗]` → `/dashboard` |
+| #      | Trigger Event                       | Trigger Source                                    | Target Audience                                           | Notification Type                        | Badge                                | Title & Message Template                                                                                                                         | Action CTA                                                                  |
+| ------ | ----------------------------------- | ------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| **1**  | **Admin Instant Broadcast**         | Admin clicks "Send Notification" in Admin Portal  | • All Users<br>• Specific Campus<br>• Buyers<br>• Sellers | `promotion` / `announcement` / `general` | `OFFER` / `ANNOUNCEMENT` / `GENERAL` | **Title**: As configured by admin<br>**Body**: Custom announcement message<br>**Image**: Attached promotional banner                             | `[Action Label ↗]` → Configured target URL (e.g., `/deals`, `/product/:id`) |
+| **2**  | **Admin Scheduled Broadcast**       | Cron runner executes at `scheduled_at`            | • Selected Audience<br>• Selected Campus                  | `promotion` / `announcement` / `general` | `OFFER` / `ANNOUNCEMENT`             | Dispatched automatically when schedule time arrives                                                                                              | Configured URL                                                              |
+| **3**  | **Direct Chat Message**             | User sends message in active conversation         | Conversation recipient (`receiverId`)                     | `message`                                | `DIRECT MESSAGE`                     | **Title**: `New message from {Sender Name}`<br>**Body**: Excerpt of message text<br>_(Suppressed if recipient is already inside that chat room)_ | `[Reply in Chat ↗]` → `/chat?conversationId={id}`                           |
+| **4**  | **New Deal Offer**                  | Buyer makes an offer on a listed item             | Seller of the product (`seller_id`)                       | `order`                                  | `ORDER UPDATE`                       | **Title**: `New Offer Received!`<br>**Body**: `{Buyer Name} offered ₹{Amount} for {Product Title}`                                               | `[View Offer ↗]` → `/chat?conversationId={id}`                              |
+| **5**  | **Offer Accepted / Deal Confirmed** | Seller accepts offer / deal agreed                | Buyer (`buyer_id`)                                        | `order`                                  | `ORDER UPDATE`                       | **Title**: `Offer Accepted!`<br>**Body**: `{Seller Name} accepted your offer for {Product Title}. Schedule pickup now.`                          | `[View Deal ↗]` → `/myorders`                                               |
+| **6**  | **Pickup Spot Scheduled**           | Either party proposes/confirms pickup spot & time | Counterparty                                              | `order`                                  | `ORDER UPDATE`                       | **Title**: `Pickup Spot Confirmed`<br>**Body**: `Meeting scheduled at {Spot Name} on {Date & Time}`                                              | `[View Pickup ↗]` → `/myorders`                                             |
+| **7**  | **Item Received & Deal Completed**  | Buyer confirms item inspected & received          | Seller (`seller_id`)                                      | `order`                                  | `ORDER UPDATE`                       | **Title**: `Deal Completed Successfully 🎉`<br>**Body**: `{Buyer Name} confirmed receiving {Product Title}. Payment balance updated.`            | `[View Order Details ↗]` → `/myorders`                                      |
+| **8**  | **Deal Cancelled**                  | Either party cancels active deal                  | Counterparty                                              | `order`                                  | `ORDER UPDATE`                       | **Title**: `Deal Cancelled`<br>**Body**: `Deal for {Product Title} was cancelled by {Name}`                                                      | `[View Details ↗]` → `/myorders`                                            |
+| **9**  | **Price Drop Alert**                | Seller reduces price of a listed item             | Users who saved item to **Wishlist**                      | `promotion`                              | `OFFER / PROMO`                      | **Title**: `Price Drop Alert!`<br>**Body**: `{Product Title} dropped by ₹{Diff}. Grab it before it sells out!`                                   | `[Buy Now ↗]` → `/product/{id}`                                             |
+| **10** | **Listing Moderation Warning**      | Admin/System flags listing for safety violation   | Product Owner (`seller_id`)                               | `general`                                | `GENERAL`                            | **Title**: `Listing Under Review`<br>**Body**: `Your listing for {Product Title} has been flagged for moderation review.`                        | `[Review Guidelines ↗]` → `/productlisted`                                  |
+| **11** | **Support Role Assigned**           | Admin promotes a user to Support role             | Assigned User                                             | `general`                                | `GENERAL`                            | **Title**: `Staff Role Updated`<br>**Body**: `You have been granted Support permissions on UniDeals Admin Portal.`                               | `[Open Admin Portal ↗]` → `/dashboard`                                      |
 
 ---
 
 ## 5. Database Schema & Data Models
 
 ### A. `Notification` Model (Campaigns & Direct Events)
+
 Stored in MongoDB collection: `notifications`
 
 ```javascript
@@ -115,9 +117,11 @@ Stored in MongoDB collection: `notifications`
 ```
 
 ### B. `NotificationReceipt` Model (Broadcast Read & Click Tracking)
+
 Stored in MongoDB collection: `notificationreceipts`
 
 Allows millions of broadcast reads without cloning whole notification payloads into thousands of individual documents:
+
 ```javascript
 {
   _id: ObjectId,
@@ -132,50 +136,55 @@ Allows millions of broadcast reads without cloning whole notification payloads i
 ```
 
 ### C. Automatic Self-Cleaning (30-Day MongoDB TTL Index)
+
 To prevent the database from filling up with old notifications:
-* Both `Notification` and `NotificationReceipt` have native MongoDB **TTL (Time-To-Live)** indexes:
+
+- Both `Notification` and `NotificationReceipt` have native MongoDB **TTL (Time-To-Live)** indexes:
   ```javascript
   notificationSchema.index(
     { createdAt: 1 },
-    { expireAfterSeconds: 30 * 24 * 60 * 60 } // Automatically expires after 30 days
+    { expireAfterSeconds: 30 * 24 * 60 * 60 }, // Automatically expires after 30 days
   );
   ```
-* MongoDB's internal background thread automatically cleans up documents older than 30 days, keeping database storage lean and high-performing with zero CPU overhead.
+- MongoDB's internal background thread automatically cleans up documents older than 30 days, keeping database storage lean and high-performing with zero CPU overhead.
 
 ---
 
 ## 6. Endpoints & API Contract
 
 ### User Marketplace Endpoints (`/api/notifications`)
+
 All routes require standard user authentication cookie/bearer token:
 
-* **`GET /api/notifications`**
-  * Fetches combined personalized feed: broadcast campaigns matching user's campus + direct notifications (messages, orders).
-  * Returns: `{ success: true, data: Notification[], unreadCount: Number }`
-* **`PATCH /api/notifications/:id/read`**
-  * Marks single item as read (updates receipt or direct document).
-* **`PATCH /api/notifications/read-all`**
-  * Marks all visible items as read in bulk.
-* **`POST /api/notifications/:id/click`**
-  * Increments click analytics counter and records `is_clicked: true`.
+- **`GET /api/notifications`**
+  - Fetches combined personalized feed: broadcast campaigns matching user's campus + direct notifications (messages, orders).
+  - Returns: `{ success: true, data: Notification[], unreadCount: Number }`
+- **`PATCH /api/notifications/:id/read`**
+  - Marks single item as read (updates receipt or direct document).
+- **`PATCH /api/notifications/read-all`**
+  - Marks all visible items as read in bulk.
+- **`POST /api/notifications/:id/click`**
+  - Increments click analytics counter and records `is_clicked: true`.
 
 ### Admin Portal Endpoints (`/api/admin/notifications`)
-Protected by role authorization:
-* `admin` role has full permissions (create, schedule, cancel).
-* `support` role has read-only access (stats, history, scheduled preview).
 
-* **`POST /api/admin/notifications`** *(Admin only)*
-  * Creates and dispatches instant notification, or schedules for later.
-* **`GET /api/admin/notifications/stats`** *(Admin & Support)*
-  * Returns `{ totalSent, delivered, deliveredPercent, clicked, clickedPercent, activeUsers }`.
-* **`GET /api/admin/notifications/history?page=1&limit=20`** *(Admin & Support)*
-  * Paginated list of sent campaigns with stats.
-* **`GET /api/admin/notifications/scheduled`** *(Admin & Support)*
-  * List of pending scheduled campaigns.
-* **`PATCH /api/admin/notifications/:id/cancel`** *(Admin only)*
-  * Cancels a pending scheduled campaign.
-* **`GET /api/admin/notifications/estimate-recipients?target_audience=&target_campus=`**
-  * Live estimate of recipients for form preview.
+Protected by role authorization:
+
+- `admin` role has full permissions (create, schedule, cancel).
+- `support` role has read-only access (stats, history, scheduled preview).
+
+- **`POST /api/admin/notifications`** _(Admin only)_
+  - Creates and dispatches instant notification, or schedules for later.
+- **`GET /api/admin/notifications/stats`** _(Admin & Support)_
+  - Returns `{ totalSent, delivered, deliveredPercent, clicked, clickedPercent, activeUsers }`.
+- **`GET /api/admin/notifications/history?page=1&limit=20`** _(Admin & Support)_
+  - Paginated list of sent campaigns with stats.
+- **`GET /api/admin/notifications/scheduled`** _(Admin & Support)_
+  - List of pending scheduled campaigns.
+- **`PATCH /api/admin/notifications/:id/cancel`** _(Admin only)_
+  - Cancels a pending scheduled campaign.
+- **`GET /api/admin/notifications/estimate-recipients?target_audience=&target_campus=`**
+  - Live estimate of recipients for form preview.
 
 ---
 
@@ -193,12 +202,12 @@ sequenceDiagram
     Admin->>Server: POST /api/admin/notifications (Send Now)
     Server->>Server: Save Notification to MongoDB
     Server->>Socket: emitToCampus(campusId, 'notification:new', payload)
-    
+
     Socket-->>UserOnline: Pushed via WebSocket (<50ms)
     Note over UserOnline: Header Bell increments (+1)<br/>Toast pop-up displays<br/>/notification feed prepends item
 
     Note over UserOffline: WebSocket not connected.<br/>Event dropped safely.
-    
+
     UserOffline->>Server: Logs in later -> GET /api/notifications
     Server-->>UserOffline: Fetches unread notification from MongoDB
     Note over UserOffline: Unread bell count displayed accurately
@@ -221,9 +230,78 @@ sequenceDiagram
 
 ## 9. Future Roadmap & Extensibility
 
-* **Browser Web Push API (Service Worker)**:
+- **Browser Web Push API (Service Worker)**:
   Integrate Web Push Notifications so users receive desktop/mobile OS notifications even when the browser tab is completely closed.
-* **Custom Notification Sound**:
+- **Custom Notification Sound**:
   Audio chime toggle in User Settings when high-priority notifications (deals or messages) arrive.
-* **Email Digest Option**:
+- **Email Digest Option**:
   Daily/weekly email summary of unread notifications for inactive users.
+
+# Notification System — Audit & Gap Analysis
+
+## ✅ What Is Fully Built
+
+| #   | Trigger                                | Status                                                                                            |
+| --- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 1   | **Admin Instant Broadcast**            | ✅ Built & working — `createAdminNotification()` → Socket.IO emitToAll/emitToCampus               |
+| 2   | **Admin Scheduled Broadcast**          | ✅ Built — `dispatchDueScheduledNotifications()` via cron job every minute                        |
+| 3   | **Direct Chat Message**                | ✅ Built — `notifyNewMessage()` called in `message.service.js`, chat-room presence check included |
+| —   | **Header Bell Badge**                  | ✅ Built — Socket.IO listener in `Header.jsx` increments count live                               |
+| —   | **Toast on new notification**          | ✅ Built — `toast.info()` fires in Header on `notification:new`                                   |
+| —   | **`/notification` Inbox Page**         | ✅ Built — full card feed with read/mark-all/click-track                                          |
+| —   | **Mark Read / Mark All Read**          | ✅ Built — PATCH endpoints + service functions                                                    |
+| —   | **Click tracking analytics**           | ✅ Built — POST endpoint increments `stats.clicked`                                               |
+| —   | **Admin notification stats & history** | ✅ Built — GET endpoints for admin portal                                                         |
+| —   | **30-day TTL auto-cleanup**            | ✅ Defined in schema                                                                              |
+
+---
+
+## ❌ What Is Missing (Spec says built, but NOT called anywhere)
+
+| #   | Trigger                             | What's Missing                                                                                                   |
+| --- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 4   | **New Deal Offer made**             | `makeOffer()` in `deal.service.js` has NO notification call. Seller never hears about a new offer via bell/toast |
+| 5   | **Offer Accepted / Deal Confirmed** | `respondOffer()` / `confirmDeal()` — buyer gets NO notification                                                  |
+| 6   | **Pickup Spot Scheduled**           | `schedulePickup()` — counterparty gets NO notification                                                           |
+| 7   | **Item Received / Deal Completed**  | `confirmItemReceived()` — seller gets NO notification                                                            |
+| 8   | **Deal Cancelled**                  | `cancelDeal()` — counterparty gets NO notification                                                               |
+| 9   | **Price Drop Alert**                | Product price update in `product.service.js` has NO wishlist fan-out notification                                |
+| 10  | **Listing Moderation Warning**      | Report/flag actions in `report.service.js` has NO seller notification                                            |
+| 11  | **Support Role Assigned**           | Admin role promotion has NO notification to the user                                                             |
+
+### Summary
+
+- **3 of 11 triggers are wired** (Admin broadcast, Scheduled broadcast, Chat message)
+- **8 of 11 triggers are completely missing** — deal lifecycle, price drops, moderation, role assignment
+
+---
+
+## 🔨 Implementation Plan
+
+### Step 1 — Add notification functions to `notification.service.js`
+
+- `notifyNewOffer(conversationId, buyerId, buyerName, amount, productTitle, sellerId)`
+- `notifyOfferAccepted(conversationId, sellerName, productTitle, buyerId)`
+- `notifyPickupScheduled(conversationId, spotName, scheduledAt, recipientId, cancellerId)`
+- `notifyDealCompleted(conversationId, buyerName, productTitle, sellerId)`
+- `notifyDealCancelled(conversationId, productTitle, cancellerName, recipientId)`
+- `notifyPriceDrop(productId, oldPrice, newPrice, productTitle)` — fans out to all wishlist holders
+- `notifyModerationWarning(productId, productTitle, sellerId)`
+- `notifyRoleAssigned(userId, newRole)`
+
+### Step 2 — Wire notifications into `deal.service.js`
+
+- After `makeOffer()` saves — call `notifyNewOffer()`
+- After `respondOffer()` accept branch — call `notifyOfferAccepted()`
+- After `schedulePickup()` saves — call `notifyPickupScheduled()`
+- After `confirmItemReceived()` completes — call `notifyDealCompleted()`
+- After `cancelDeal()` saves — call `notifyDealCancelled()`
+
+### Step 3 — Wire into `product.service.js` (price drop)
+
+- When product price is updated downward → fan-out to wishlist holders
+
+### Step 4 — Wire into moderation & admin role flows
+
+- In `report.service.js` or `admin.service.js` — flag listing → notify seller
+- In admin role update → notify user
