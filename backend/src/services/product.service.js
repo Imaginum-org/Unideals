@@ -20,7 +20,6 @@ import {
   girlsCornerError,
   GIRLS_ERRORS,
 } from "../utils/girlsCorner.js";
-import { notifyPriceDrop } from "./notification.service.js";
 
 const campusError = (statusCode, message, code) => {
   const error = new Error(message);
