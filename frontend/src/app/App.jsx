@@ -84,12 +84,11 @@ function App() {
 
   return (
     <div className="App">
-       <SiteLockGate>
-      <NotificationProvider>
-        {/* [SITE-LOCK] remove the wrapper (keep <AppRoutes />) to remove the lock */}
-        <AppRoutes />
-       </NotificationProvider>
-          </SiteLockGate>
+      <SiteLockGate>
+        <NotificationProvider>
+          <AppRoutes />
+        </NotificationProvider>
+      </SiteLockGate>
       <Toaster />
     </div>
   );
