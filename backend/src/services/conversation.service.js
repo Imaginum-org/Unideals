@@ -16,7 +16,7 @@ export const createConversation = async ({ buyerId, productId }) => {
     throw new AppError("Invalid product ID", 400);
   }
   const product = await Product.findById(productId).select(
-    "_id seller_id title images selling_price status is_deleted",
+    "_id seller_id title images selling_price status is_deleted isGirlsOnly",
   );
   if (!product || product.is_deleted) {
     throw new AppError("Product not found.", 404);
@@ -24,6 +24,18 @@ export const createConversation = async ({ buyerId, productId }) => {
   const sellerId = product.seller_id;
   if (String(buyerId) === String(sellerId)) {
     throw new AppError("You cannot start a conversation with yourself.", 400);
+  }
+
+  // Girls Corner 🌸 Chat Lock — hard-reject boy → girls-only product before
+  // findOne||create so no thread/Deal is created. 403 (not 404) here because
+  // the buyer already knew the ID; listing itself stays 404-masked elsewhere.
+  if (product.isGirlsOnly) {
+    const buyer = await User.findById(buyerId).select("gender").lean();
+    if (buyer?.gender !== "female") {
+      const err = new AppError("This is a girls-only listing. Only girls can start this chat.", 403);
+      err.code = "GIRLS_ONLY_PRODUCT";
+      throw err;
+    }
   }
 
   let conversation = await Conversation.findOne({
@@ -40,6 +52,7 @@ export const createConversation = async ({ buyerId, productId }) => {
         title: product.title || "Product",
         image: product.images?.[0]?.url || "",
         selling_price: product.selling_price || 0,
+        isGirlsOnly: Boolean(product.isGirlsOnly),
       },
     });
   }

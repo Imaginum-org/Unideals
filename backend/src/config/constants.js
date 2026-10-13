@@ -30,7 +30,24 @@ export const PRODUCT_CATEGORIES = Object.freeze({
   VEHICLES: "vehicles",
   EVENT_PASSES: "event_passes",
   OTHERS: "others",
+  // Girls Corner 🌸 — visible ONLY in Girls Mode (female + admin/support).
+  BEAUTY_PERSONAL_CARE: "beauty_personal_care",
+  WOMENS_FASHION: "womens_fashion",
+  JEWELLERY_HAIR_ACCESSORIES: "jewellery_hair_accessories",
+  FOOTWEAR_HANDBAGS: "footwear_handbags",
+  ROOM_DECOR: "room_decor",
 });
+
+// Categories that are implicitly girls-only: picking one auto-enables the
+// Girl-only flag, and default (non-girls) feeds/search/boosted/trending
+// never include them (admins see everything for moderation).
+export const GIRLS_ONLY_CATEGORIES = Object.freeze([
+  "beauty_personal_care",
+  "womens_fashion",
+  "jewellery_hair_accessories",
+  "footwear_handbags",
+  "room_decor",
+]);
 
 export const PRODUCT_CONDITION = Object.freeze({
   BRAND_NEW: "brand_new",
@@ -74,6 +91,7 @@ export const REPORT_REASONS = Object.freeze({
   DUPLICATE_LISTING: "duplicate_listing",
   WRONG_CATEGORY: "wrong_category",
   SOLD_OR_UNAVAILABLE: "sold_or_unavailable",
+  FAKE_GENDER_GIRLS_CORNER: "fake_gender_girls_corner",
   OTHER: "other",
 });
 
@@ -145,6 +163,11 @@ export const PRODUCT_CATEGORY_LABELS = {
   vehicles: "Vehicles",
   event_passes: "Event Passes",
   others: "Others",
+  beauty_personal_care: "Beauty & Personal Care",
+  womens_fashion: "Women's Fashion",
+  jewellery_hair_accessories: "Jewellery & Hair Accessories",
+  footwear_handbags: "Footwear & Handbags",
+  room_decor: "Room & Hostel Decor",
 };
 
 export const PRODUCT_CONDITION_LABELS = {
@@ -196,6 +219,7 @@ export const REPORT_REASON_LABELS = {
   duplicate_listing: "Duplicate Listing",
   wrong_category: "Wrong Category",
   sold_or_unavailable: "Item Already Sold or Unavailable",
+  fake_gender_girls_corner: "Fake gender to access Girls Corner",
   other: "Other",
 };
 

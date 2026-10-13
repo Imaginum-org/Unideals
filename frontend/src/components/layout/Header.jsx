@@ -614,13 +614,14 @@ const Header = () => {
   } = useUser();
 
   // Campus marketplace scope (locked for members — changed only via
-  // Settings; guests may switch their browse campus freely).
+  // Settings; admins + guests may switch freely from the header).
   const {
     campus: activeCampus,
     campusSlug,
     campuses,
     selectCampus,
   } = useCampus();
+  const isAdmin = userDetails?.role === "admin";
   const [showCampusDropdown, setShowCampusDropdown] = useState(false);
   const [showMobileCampus, setShowMobileCampus] = useState(false);
 
@@ -1392,7 +1393,7 @@ const Header = () => {
               </button>
 
               {activeCampus &&
-                (isLoggedIn ? (
+                (isLoggedIn && !isAdmin ? (
                   <span
                     title="Your campus marketplace. Change it in Settings."
                     className="rounded-full p-2"
@@ -1871,10 +1872,10 @@ const Header = () => {
               className="h-6 w-px shrink-0 bg-[#dbdde0] dark:bg-neutral-800"
             />
 
-            {/* Campus — pill; locked for members (opens Settings), switchable for guests */}
+            {/* Campus — pill; locked for members (opens Settings), switchable for admins + guests */}
             {activeCampus ? (
               <div className="relative min-w-0 max-w-[38vw] shrink-0 sm:max-w-[210px] lg:max-w-none" ref={campusRef}>
-                {isLoggedIn ? (
+                {isLoggedIn && !isAdmin ? (
                   <div title="Your campus marketplace. Change it in Settings.">
                     <div
                       className="
@@ -2309,7 +2310,7 @@ lg:pr-24"
               ) : (
                 <>
                   <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-                    <ThemeToggle className="mr-4 sm:mr-5" />
+                    <ThemeToggle className="mr-1 sm:mr-2" />
 
                     <button
                       onClick={goToSignup}

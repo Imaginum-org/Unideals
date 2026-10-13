@@ -1,5 +1,6 @@
 /**
- * CategoryIcon — thin line-style icons for the 11 marketplace categories,
+ * CategoryIcon — thin line-style icons for the marketplace categories
+ * (11 classic blue + 5 pink Girls Corner exclusives),
  * drawn on a 48×48 grid (3px rounded strokes, blue primary with
  * orange/green/red accents). No images, no background tiles.
  *
@@ -223,6 +224,58 @@ const ART = {
         strokeWidth="2.6"
         strokeLinecap="round"
       />
+    </>
+  ),
+  beauty_personal_care: (
+    <>
+      <rect x="18" y="20" width="12" height="18" rx="3" fill="#FCE7F3" stroke="#EC4899" strokeWidth="3" />
+      <rect x="20" y="12" width="8" height="8" rx="2" fill="#EC4899" />
+      <line x1="16" y1="27" x2="32" y2="27" stroke="#F9A8D4" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M33 15l1.5 3 3.3.5-2.4 2.3.6 3.2-3-1.6-3 1.6.6-3.2-2.4-2.3 3.3-.5z" fill="#F9A8D4" />
+    </>
+  ),
+  womens_fashion: (
+    <>
+      <path
+        d="M24 7c-4 5-6.5 10-7.5 16l-3 12 5 2 3.5-7 3.5 7 5-2-3-12c-1-6-3.5-11-7.5-16z"
+        fill="#FCE7F3"
+        stroke="#EC4899"
+        strokeWidth="3"
+        {...STROKE}
+      />
+      <path d="M21 7h6" stroke="#EC4899" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="24" cy="20" r="1.8" fill="#EC4899" />
+      <circle cx="24" cy="26" r="1.8" fill="#EC4899" />
+    </>
+  ),
+  jewellery_hair_accessories: (
+    <>
+      <circle cx="24" cy="27" r="9" fill="none" stroke="#EC4899" strokeWidth="3" />
+      <circle cx="24" cy="27" r="3" fill="#F9A8D4" />
+      <path d="M24 18V9M20 11l4-2 4 2" stroke="#DB2777" strokeWidth="2.6" {...STROKE} />
+      <path d="M35 10l1.4 2.8 3 .5-2.2 2.1.5 3-2.7-1.4-2.7 1.4.5-3-2.2-2.1 3-.5z" fill="#FBCFE8" stroke="#EC4899" strokeWidth="1.6" strokeLinejoin="round" />
+    </>
+  ),
+  footwear_handbags: (
+    <>
+      <path
+        d="M10 32c4-1 7-3.5 9-7l4-8c1 2.5 3 4 6 4.5L34 23c3 .5 5 2 6 5v4H10z"
+        fill="#FCE7F3"
+        stroke="#EC4899"
+        strokeWidth="3"
+        {...STROKE}
+      />
+      <path d="M23 17l3-6h4" stroke="#DB2777" strokeWidth="3" {...STROKE} />
+      <circle cx="15" cy="36" r="1.6" fill="#EC4899" />
+      <circle cx="33" cy="36" r="1.6" fill="#EC4899" />
+    </>
+  ),
+  room_decor: (
+    <>
+      <rect x="10" y="16" width="28" height="22" rx="3" fill="#FDF2F8" stroke="#EC4899" strokeWidth="3" />
+      <path d="M10 16l14 10L38 16" stroke="#F9A8D4" strokeWidth="2.6" {...STROKE} />
+      <path d="M17 24l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.2-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z" fill="#F9A8D4" />
+      <circle cx="29" cy="28" r="3" fill="none" stroke="#DB2777" strokeWidth="2.4" />
     </>
   ),
   others: (

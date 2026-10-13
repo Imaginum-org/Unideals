@@ -122,7 +122,7 @@ const findOrCreateGoogleUser = async (payload) => {
 
 export const registerUserController = async (req, res) => {
   try {
-    let { name, email, password } = req.body;
+    let { name, email, password, gender } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -211,6 +211,8 @@ export const registerUserController = async (req, res) => {
     }
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Girls Corner 🌸 optional self-declared gender at signup.
+    const cleanGender = gender === "female" || gender === "male" ? gender : undefined;
     await userModel.create({
       name,
       email,
@@ -218,6 +220,7 @@ export const registerUserController = async (req, res) => {
       verifyTokenEmail: hashedVerifyToken,
       verifyTokenEmailExpiry: verifyExpiry,
       is_email_verified: false,
+      ...(cleanGender ? { gender: cleanGender, genderUpdatedAt: new Date() } : {}),
     });
 
     recordEmailSend(normalizedEmail);

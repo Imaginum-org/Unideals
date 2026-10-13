@@ -31,6 +31,7 @@ const ConversationCard = ({ conv, selected, onClick }) => {
   const rawImg = product?.images?.[0]?.url || product?.images?.[0];
   const img = typeof rawImg === "string" && rawImg ? rawImg : userdp;
   const title = product?.title || conv?.product_snapshot?.title || "Product";
+  const isGirls = Boolean(conv?.product_snapshot?.isGirlsOnly);
   const pro = isProTier(other?.subscription);
   const name = formatName(other?.name);
   const photo = avatarUrl(other?.avatar);
@@ -63,7 +64,7 @@ const ConversationCard = ({ conv, selected, onClick }) => {
               pro ? "text-white" : "text-[#2A2A2A] dark:text-white"
             }`}
           >
-            {title}
+            {isGirls ? "🌸 " : ""}{title}
           </h3>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span

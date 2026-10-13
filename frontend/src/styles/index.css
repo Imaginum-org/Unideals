@@ -139,6 +139,45 @@
   }
 }
 
+/* ── Girls Mode 🌸 pink theme — activated by .girls-mode on <html>.
+   Same circular reveal as dark toggle (shares --theme-tx/--theme-ty).
+   Pink wash via CSS vars + targeted overrides; dark mode still composes. ── */
+.girls-mode {
+  --girls-pink: #ec4899;
+  --girls-pink-deep: #db2777;
+  --girls-pink-soft: #fce7f3;
+}
+.girls-mode body,
+.girls-mode #root {
+  background-image:
+    radial-gradient(ellipse 60% 22% at 50% -4%, rgba(236, 72, 153, 0.1), transparent 70%),
+    radial-gradient(ellipse 30% 18% at 8% 12%, rgba(236, 72, 153, 0.06), transparent 70%);
+}
+.girls-mode .bg-\[\#F7F8FA\] {
+  background-color: #fdf2f8 !important;
+}
+.girls-mode .bg-\[\#F7F9FD\] {
+  background-color: #fdf2f8 !important;
+}
+.girls-mode .bg-\[\#4B45FF\],
+.girls-mode .bg-\[\#2E4BFF\],
+.girls-mode .bg-\[\#1E1E1E\] {
+  background-color: var(--girls-pink-deep) !important;
+}
+.girls-mode .text-\[\#4B45FF\],
+.girls-mode .text-\[\#2E40DC\],
+.girls-mode .text-\[\#2E4BFF\] {
+  color: var(--girls-pink-deep) !important;
+}
+.girls-mode .border-\[\#4B45FF\],
+.girls-mode .ring-\[\#3838EC\] {
+  border-color: var(--girls-pink) !important;
+}
+.girls-mode a:focus-visible,
+.girls-mode button:focus-visible {
+  outline-color: var(--girls-pink);
+}
+
 /* ── Chat: WhatsApp-style thread entrance (replays per conversation via key) ── */
 @keyframes chat-slide-in {
   from {

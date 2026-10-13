@@ -27,6 +27,7 @@ import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 import { ikThumb } from "../../../utils/imageTransform.js";
 import LimitModal from "../../../components/ui/LimitModal.jsx";
 import Seo from "../../../components/Seo.jsx";
+import { useUser } from "../../../context/useUserContext.jsx";
 // date of purchase
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaArrowRight } from "react-icons/fa6";
@@ -57,6 +58,7 @@ const formatUsageDuration = (raw) => {
 const ProductDescription = () => {
   const { toggleWishlist, isInWishlist } = useWishlist();
   const { campus, campusSlug } = useCampus();
+  const { userDetails, isLoggedIn } = useUser();
   const safeTimeout = useSafeTimeout();
   const { id } = useParams();
   const [product, setProduct] = useState(null);
@@ -77,6 +79,12 @@ const ProductDescription = () => {
   const productId = product?._id;
   const inWishlist = isInWishlist(productId);
   const navigate = useNavigate();
+  // Girls Corner: non-eligible viewers (male/other/logged-out) never chat on
+  // girls-only listings. Admins see the product but chat stays girls-only.
+  const viewerGender = userDetails?.gender ?? null;
+  const viewerRole = userDetails?.role ?? null;
+  const viewerCanSeeGirls = viewerGender === "female" || viewerRole === "admin" || viewerRole === "support";
+  const girlsBlocked = Boolean(product?.isGirlsOnly) && !viewerCanSeeGirls;
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -521,8 +529,9 @@ ${shareUrl}`;
           ? String(product.description).slice(0, 160)
           : "View this campus listing on Unideals."
       }
+      robots={product?.isGirlsOnly ? "noindex,nofollow" : "index,follow"}
       canonical={
-        typeof window !== "undefined" && product?._id
+        typeof window !== "undefined" && product?._id && !product?.isGirlsOnly
           ? `${window.location.origin}/product/${product._id}`
           : undefined
       }
@@ -709,6 +718,11 @@ ${shareUrl}`;
                 <div className="bg-[#EAECFB] text-[#3838EC] text-sm font-medium px-4 py-1 rounded-full capitalize">
                   {product?.category?.replaceAll("_", " ")}
                 </div>
+                {product?.isGirlsOnly && (
+                  <div className="bg-pink-100 text-pink-700 border border-pink-200 text-sm font-bold px-4 py-1 rounded-full">
+                    🌸 Girls Only
+                  </div>
+                )}
                 <div
                   className={`text-sm font-medium px-4 py-1 rounded-full ${
                     reservedByOther
@@ -725,6 +739,11 @@ ${shareUrl}`;
               {!isAvailable && (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
                   No longer available. This listing is {availabilityLabel.toLowerCase()}.
+                </div>
+              )}
+              {product?.isGirlsOnly && (
+                <div className="mt-4 rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-sm font-medium text-pink-700 dark:bg-pink-950/30 dark:text-pink-200">
+                  🌸 Girls-only listing — only girls can chat with the seller.
                 </div>
               )}
 
@@ -831,6 +850,10 @@ ${shareUrl}`;
                     className="flex-1 h-[55px] rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 text-amber-700 font-semibold text-base"
                   >
                     Reserved for another buyer
+                  </div>
+                ) : girlsBlocked ? (
+                  <div className="flex-1 min-h-[55px] rounded-2xl bg-pink-50 border border-pink-200 flex items-center justify-center gap-2 text-pink-700 font-semibold text-sm px-4 py-3 text-center dark:bg-pink-950/30 dark:text-pink-200">
+                    🌸 Girls-only listing — only girls can chat. {!isLoggedIn ? "Login to continue." : "Contact support for help."}
                   </div>
                 ) : isAvailable ? (
                   <Link
@@ -1012,6 +1035,10 @@ ${shareUrl}`;
               className="flex-1 h-[56px] rounded-2xl bg-amber-50 border border-amber-200 shadow flex items-center justify-center gap-2 text-amber-700 font-semibold"
             >
               Reserved for another buyer
+            </div>
+          ) : girlsBlocked ? (
+            <div className="flex-1 h-[56px] rounded-2xl bg-pink-50 border border-pink-200 shadow flex items-center justify-center gap-2 px-4 text-center text-sm font-semibold text-pink-700 dark:bg-pink-950/30 dark:text-pink-200">
+              🌸 Girls-only listing — only girls can chat.
             </div>
           ) : (
           <Link

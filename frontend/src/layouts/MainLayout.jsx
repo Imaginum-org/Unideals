@@ -3,12 +3,13 @@ import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer";
 import CampusGate from "../features/campus/components/CampusGate.jsx";
+import GenderGate from "../features/user/components/GenderGate.jsx";
 import { useCampus } from "../context/CampusContext.jsx";
 import { useUser } from "../context/useUserContext.jsx";
 
 const MainLayout = () => {
   const location = useLocation();
-  const { loading: userLoading } = useUser();
+  const { loading: userLoading, isLoggedIn, userDetails } = useUser();
   const { needsGate, directoryLoading } = useCampus();
 
   const hideFooterRoutes = [
@@ -29,13 +30,15 @@ const MainLayout = () => {
     location.pathname.startsWith(route),
   );
 
-  // Campus-less sessions never see app content: the gate is the only UI
-  // until a campus is chosen (one screen, asked once, stored server-side).
-  // While identity/directory is still loading, render content normally to
-  // avoid flashing the gate on every refresh.
+  // Location (campus) gate first, then gender gate. Same blocking
+  // takeover language so everything stays in sync. Guests never gated.
   const gateReady = !userLoading && !directoryLoading;
   if (gateReady && needsGate) {
     return <CampusGate />;
+  }
+  const needsGenderGate = gateReady && isLoggedIn && userDetails && (userDetails.gender === null || userDetails.gender === undefined || userDetails.gender === "");
+  if (needsGenderGate) {
+    return <GenderGate />;
   }
 
   return (

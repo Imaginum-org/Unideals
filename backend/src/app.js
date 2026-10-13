@@ -26,6 +26,9 @@ import conversationRouter from "./routes/conversation.route.js";
 import dealRouter from "./routes/deal.route.js";
 import orderRouter from "./routes/order.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
+// [SITE-LOCK] testing gate — delete these 2 imports to remove the lock
+import siteGateRouter from "./routes/siteGate.routes.js";
+import { requireSiteGate } from "./middlewares/siteGate.middleware.js";
 import { verifyOrigin } from "./middlewares/csrf.middleware.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
@@ -209,6 +212,14 @@ app.get("/health", (req, res) => {
 
 // Gzip JSON + thumbs metadata (threshold keeps tiny auth payloads fast).
 app.use(compression({ threshold: 1024 }));
+
+// [SITE-LOCK] testing gate — delete this block to remove the lock
+// (must run after cookieParser, before every router).
+// Exempts itself, /health, and the Razorpay webhook. Kill-switch via
+// SITE_GATE_ENABLED=false.
+app.use("/api/site-gate", siteGateRouter);
+app.use(requireSiteGate);
+// [/SITE-LOCK]
 
 // Routes
 app.use(verifyOrigin);

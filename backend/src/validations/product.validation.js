@@ -51,6 +51,9 @@ export const createProductSchema = z
 
     is_negotiable: z.boolean().optional(),
 
+    // Girls Corner 🌸 — seller opt-in per listing.
+    isGirlsOnly: z.boolean().optional(),
+
     // Stock count for single-seller chat sales (default 1, range 1–99).
     quantity: z.coerce
       .number({ invalid_type_error: "Quantity must be a number" })

@@ -14,9 +14,12 @@ const LazyCelebration = lazy(
 );
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { CATEGORY_ITEMS } from "../constants/categories";
+import { GIRLS_MODE_CATEGORY_ORDER } from "../constants/productOptions.js";
 import { FiArrowRight } from "react-icons/fi";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
+import { useGirlsMode } from "../../../context/GirlsModeContext.jsx";
+import GirlsEntryPill from "../../../components/ui/GirlsEntryPill.jsx";
 import { loginWithGoogleOneTap } from "../../auth/api/authApi.js";
 
 const HOME_GOOGLE_LOGIN_TRIGGER_KEY = "homeGoogleLoginTriggered";
@@ -61,9 +64,40 @@ const RevealWords = ({ text, delay = 0, reduceMotion }) => (
 const Home = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isLoggedIn, loading: userLoading, fetchUserProfile } = useUser();
+  const { isLoggedIn, loading: userLoading, fetchUserProfile, userDetails } = useUser();
   const { campusSlug } = useCampus();
   const reduceMotion = useReducedMotion();
+  // Girls Corner 🌸 tab (?tab=girls). Eligible = female + admin/support only.
+  // Male / other / logged-out get zero hint: no tabs, silent reset to "all".
+  const [audienceTab, setAudienceTab] = useState(() => new URLSearchParams(location.search).get("tab") === "girls" ? "girls" : "all");
+  const viewerGender = userDetails?.gender ?? null;
+  const viewerRole = userDetails?.role ?? null;
+  const canSeeGirls = isLoggedIn && (viewerGender === "female" || viewerRole === "admin" || viewerRole === "support");
+  const { girlsMode, setGirlsMode } = useGirlsMode();
+
+  // Pink mode <=> girls feed stay in sync for eligible viewers.
+  useEffect(() => {
+    if (!canSeeGirls) return;
+    if (girlsMode && audienceTab !== "girls") {
+      setAudienceTab("girls");
+      setProducts([]); setPage(1); setHasMore(true); hasMoreRef.current = true;
+      navigate("/?tab=girls", { replace: true });
+    } else if (!girlsMode && audienceTab === "girls") {
+      setGirlsMode(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [girlsMode, canSeeGirls]);
+
+  // Ineligible viewers with a hand-crafted ?tab=girls: silently reset, no hint.
+  useEffect(() => {
+    if (!canSeeGirls && audienceTab === "girls") {
+      setAudienceTab("all");
+      setProducts([]); setPage(1); setHasMore(true); hasMoreRef.current = true;
+      navigate("/", { replace: true });
+      if (girlsMode) setGirlsMode(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSeeGirls, audienceTab]);
 
   //STATE
   const [products, setProducts] = useState([]);
@@ -82,10 +116,25 @@ const Home = () => {
   const hasMoreRef = useRef(true);
   // Guards late responses after a campus switch (no mixed-campus lists).
   const fetchCampusRef = useRef(null);
+  const canSeeGirlsRef = useRef(canSeeGirls);
+  useEffect(() => { canSeeGirlsRef.current = canSeeGirls; }, [canSeeGirls]);
 
   useEffect(() => {
     hasMoreRef.current = hasMore;
   }, [hasMore]);
+
+  // Single audience-switch path for the Girls edge menu, so pink theme
+  // + girls feed stay in sync through one tested flow.
+  const handleAudienceTab = (t) => {
+    setAudienceTab(t);
+    setProducts([]);
+    setPage(1);
+    setHasMore(true);
+    hasMoreRef.current = true;
+    navigate(t === "girls" ? "/?tab=girls" : "/", { replace: true });
+    if (t === "girls" && !girlsMode) setGirlsMode(true);
+    if (t !== "girls" && girlsMode) setGirlsMode(false);
+  };
 
   useEffect(() => {
     if (userLoading || isLoggedIn) return;
@@ -167,15 +216,22 @@ const Home = () => {
     });
   }, [location, navigate]);
 
-  const categoryCards = useMemo(
-    () =>
-      CATEGORY_ITEMS.map((category) => (
-        <div key={category.value} className="flex-shrink-0 snap-start">
-          <Category title={category.label} value={category.value} />
-        </div>
-      )),
-    [],
-  );
+  // Girls Mode ON (eligible viewers) shows the curated girls rail: majors +
+  // exclusives, most → least suitable. Everyone else sees only the classic
+  // set in classic order — zero hint of the exclusives.
+  const showGirlsCategories = audienceTab === "girls" && canSeeGirls;
+  const categoryCards = useMemo(() => {
+    const list = showGirlsCategories
+      ? GIRLS_MODE_CATEGORY_ORDER.map((v) =>
+          CATEGORY_ITEMS.find((c) => c.value === v),
+        ).filter(Boolean)
+      : CATEGORY_ITEMS.filter((category) => !category.girlsOnly);
+    return list.map((category) => (
+      <div key={category.value} className="flex-shrink-0 snap-start">
+        <Category title={category.label} value={category.value} />
+      </div>
+    ));
+  }, [showGirlsCategories]);
 
   const updateScrollButtons = () => {
     const slider = sliderRef.current;
@@ -220,6 +276,12 @@ const Home = () => {
     if (fetchingRef.current) return;
     if (!hasMoreRef.current && !isRetry) return;
     if (!campusSlug) return;
+    // Eligibility gate: never fetch girls feed for non-eligible (no leak).
+    if (audienceTab === "girls" && !canSeeGirlsRef.current) {
+      setInitialLoading(false);
+      setLoading(false);
+      return;
+    }
     if (pageNumber > HOME_MAX_PAGES) {
       setHasMore(false);
       hasMoreRef.current = false;
@@ -236,6 +298,7 @@ const Home = () => {
         page: pageNumber,
         limit: HOME_PAGE_SIZE,
         campus_slug: campusSlug,
+        ...(audienceTab === "girls" ? { audience: "girls_only" } : {}),
       });
 
       // Campus switched mid-flight — drop this stale page entirely.
@@ -265,7 +328,7 @@ const Home = () => {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [campusSlug]);
+  }, [campusSlug, audienceTab]);
 
   useEffect(() => {
     const slider = sliderRef.current;
@@ -294,21 +357,34 @@ const Home = () => {
     setPage(1);
     setHasMore(true);
     hasMoreRef.current = true;
-  }, [campusSlug]);
+  }, [campusSlug, audienceTab]);
 
   useEffect(() => {
     const fetchBoostedProducts = async () => {
       if (!campusSlug) return;
+      // Girl Mode ON → only girls-only boosted (eligible viewers only).
+      if (audienceTab === "girls" && !canSeeGirls) {
+        setBoostedProducts([]);
+        return;
+      }
       try {
-        const res = await getBoostedProducts({ campus_slug: campusSlug });
-        setBoostedProducts(res.data?.data || []);
+        const res = await getBoostedProducts({
+          campus_slug: campusSlug,
+          ...(audienceTab === "girls" ? { audience: "girls_only" } : {}),
+        });
+        const items = res.data?.data || [];
+        // Client-side guard (server already filters): girls feed shows
+        // ONLY girls-only boosted.
+        setBoostedProducts(
+          audienceTab === "girls" ? items.filter((p) => p.isGirlsOnly === true) : items,
+        );
       } catch (err) {
         console.error("Failed to load boosted products", err);
       }
     };
 
     fetchBoostedProducts();
-  }, [campusSlug]);
+  }, [campusSlug, audienceTab, canSeeGirls]);
 
   const scrollLeft = () => {
     sliderRef.current?.scrollBy({
@@ -364,6 +440,8 @@ const Home = () => {
     <motion.div className="w-full bg-[#F7F8FA] dark:bg-[#131313] relative">
       <div className="w-full pl-[4.5vw] pr-[4.5vw]">
       <div className="flex flex-col w-full max-w-[1380px] mx-auto">
+        {/* Girls Corner edge menu — fixed to the right edge, girls + admins only */}
+        <GirlsEntryPill tab={audienceTab} onChange={handleAudienceTab} />
         {/* Blue banner code */}
         <motion.div
           className="relative w-full mx-auto mt-4 mb-3
@@ -652,9 +730,11 @@ const Home = () => {
 
         {/* Products section */}
         <div className="w-full max-w-[1380px] mx-auto lg:mt-12 mt-6 flex flex-col gap-4 lg:mb-6">
-          <h1 className="font-semibold text-[#000000] font-figtree dark:text-white lg:text-[2vw] xl:text-2xl md:text-[2.1vw] text-sm">
-            Trending Items
-          </h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="font-semibold text-[#000000] font-figtree dark:text-white lg:text-[2vw] xl:text-2xl md:text-[2.1vw] text-sm">
+              Trending Items
+            </h1>
+          </div>
 
           <div
             className="

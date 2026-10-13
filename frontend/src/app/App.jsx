@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "../components/ui/Toast.jsx";
 import { toast } from "../components/ui/toast.js";
+import SiteLockGate from "../siteLock/SiteLockGate.jsx"; // [SITE-LOCK] delete this import to remove the lock
 import AppRoutes from "./routes.jsx";
 import { useUser } from "../context/useUserContext.jsx";
 
@@ -39,7 +40,6 @@ function App() {
   isLoggedInRef.current = isLoggedIn;
   const locationRef = useRef(location);
   locationRef.current = location;
-
   useEffect(() => {
     const handleBlockedAccount = (event) => {
       clearUserData();
@@ -83,7 +83,10 @@ function App() {
 
   return (
     <div className="App">
-      <AppRoutes />
+      {/* [SITE-LOCK] remove the wrapper (keep <AppRoutes />) to remove the lock */}
+      <SiteLockGate>
+        <AppRoutes />
+      </SiteLockGate>
       <Toaster />
     </div>
   );

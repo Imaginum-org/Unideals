@@ -57,6 +57,9 @@ export const sanitizeAuthUser = (user) => ({
   role: user.role,
   status: user.status,
   avatar: user.avatar,
+  gender: user.gender ?? null,
+  genderUpdatedAt: user.genderUpdatedAt ?? null,
+  campus_id: user.campus_id ?? null,
 });
 
 // Per-account failed-login throttle (in-memory, no new deps).

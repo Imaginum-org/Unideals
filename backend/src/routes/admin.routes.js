@@ -13,7 +13,7 @@ import {
 } from "../controllers/adminAuth.controller.js";
 
 // Legacy controllers (still used directly for simple cases)
-import { getUsers, getUserStats, updateUserRole } from "../controllers/admin.user.controller.js";
+import { getUsers, getUserStats, updateUserRole, getGenderChangeRequests, reviewGenderChangeRequest } from "../controllers/admin.user.controller.js";
 import { getProducts } from "../controllers/admin.product.controller.js";
 import {
   getOrders,
@@ -147,6 +147,20 @@ router.patch(
   auth,
   requireRoles(USER_ROLES.ADMIN),
   updateUserRole,
+);
+
+// Gender change approvals (set-once gender; admin-only writes).
+router.get(
+  "/gender-requests",
+  auth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  getGenderChangeRequests,
+);
+router.patch(
+  "/gender-requests/:id",
+  auth,
+  requireRoles(USER_ROLES.ADMIN),
+  reviewGenderChangeRequest,
 );
 
 // Products

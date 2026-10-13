@@ -8,12 +8,48 @@ import { getProducts } from "../api/productApi";
 import { FaFilter, FaTimes } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useCampus } from "../../../context/CampusContext.jsx";
+import { useUser } from "../../../context/useUserContext.jsx";
+import { useGirlsMode } from "../../../context/GirlsModeContext.jsx";
+import GirlsEntryPill from "../../../components/ui/GirlsEntryPill.jsx";
 
 const EXPLORE_PAGE_SIZE = 10;
 
 const ExplorePage = () => {
   const { campusSlug } = useCampus();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { userDetails, isLoggedIn } = useUser();
+  const { girlsMode, setGirlsMode } = useGirlsMode();
+  const audienceTab = searchParams.get("tab") === "girls" ? "girls" : "all";
+  const viewerGender = userDetails?.gender ?? null;
+  const viewerRole = userDetails?.role ?? null;
+  const canSeeGirls = isLoggedIn && (viewerGender === "female" || viewerRole === "admin" || viewerRole === "support");
+  const setAudienceTab = (t) => {
+    const next = new URLSearchParams(searchParams);
+    if (t === "girls") next.set("tab", "girls");
+    else next.delete("tab");
+    setSearchParams(next, { replace: true });
+    if (t === "girls" && !girlsMode) setGirlsMode(true);
+    if (t !== "girls" && girlsMode) setGirlsMode(false);
+  };
+
+  // Pink mode <=> girls feed sync; ineligible ?tab=girls silently reset.
+  useEffect(() => {
+    if (!canSeeGirls) {
+      if (audienceTab === "girls") {
+        const next = new URLSearchParams(searchParams);
+        next.delete("tab");
+        setSearchParams(next, { replace: true });
+      }
+      if (girlsMode) setGirlsMode(false);
+      return;
+    }
+    if (girlsMode && audienceTab !== "girls") {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", "girls");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [girlsMode, canSeeGirls]);
 
   // Filters live in the URL (shareable, back/forward-safe) — local state is
   // only the live slider thumb position while dragging.
@@ -79,7 +115,7 @@ const ExplorePage = () => {
     setProducts([]);
     setPagination(null);
     setError(null);
-  }, [selectedCondition, sortBy, minPrice, maxPrice, campusSlug]);
+  }, [selectedCondition, sortBy, minPrice, maxPrice, campusSlug, audienceTab]);
 
   useEffect(() => {
     return () => {
@@ -94,6 +130,7 @@ const ExplorePage = () => {
     let cancelled = false;
     const fetchExploreProducts = async () => {
       if (!campusSlug || priceInvalid) return;
+      if (audienceTab === "girls" && !canSeeGirls) return;
       if (fetchingRef.current) return;
       const isPaging = page > 1;
       try {
@@ -111,6 +148,7 @@ const ExplorePage = () => {
         if (selectedCondition) params.condition = selectedCondition;
         if (minPrice !== "") params.min_price = minPrice;
         if (maxPrice !== "") params.max_price = maxPrice;
+        if (audienceTab === "girls") params.audience = "girls_only";
 
         const res = await getProducts(params);
         if (cancelled) return;
@@ -157,6 +195,8 @@ const ExplorePage = () => {
     page,
     retryKey,
     priceInvalid,
+    audienceTab,
+    canSeeGirls,
   ]);
 
   const hasMore =
@@ -347,10 +387,14 @@ const ExplorePage = () => {
 
         <main className="flex-1 bg-transparent p-4 md:p-8 lg:pl-12 min-w-0">
           <div className="max-w-[1100px] mx-auto">
+            {/* Girls Corner edge menu — fixed to the right edge, girls + admins only */}
+            <GirlsEntryPill tab={audienceTab} onChange={setAudienceTab} />
             <div className="mb-6">
-              <h1 className="text-lg lg:text-xl xl:text-3xl font-bold capitalize text-[#121417] dark:text-white font-figtree">
-                Explore all products
-              </h1>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h1 className="text-lg lg:text-xl xl:text-3xl font-bold capitalize text-[#121417] dark:text-white font-figtree">
+                  Explore all products
+                </h1>
+              </div>
 
               {loading && products.length === 0 && (
                 <div className="flex justify-center py-8">

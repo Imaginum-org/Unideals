@@ -5,10 +5,14 @@ import {
   PRODUCT_CATEGORY_OPTIONS,
   PRODUCT_CONDITION_OPTIONS,
   PRODUCT_USAGE_OPTIONS,
+  GIRLS_ONLY_CATEGORIES,
+  orderCategoriesForGirls,
 } from "../constants/productOptions";
+import { useUser } from "../../../context/useUserContext.jsx";
 import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
 import { validateBasicInfo } from "../validations";
 import FormError from "../components/shared/FormError";
+import VisibilitySelector from "../components/VisibilitySelector.jsx";
 import { motion } from "framer-motion";
 
 // react-select loads only with the listing flow (never in Home/search).
@@ -71,6 +75,26 @@ const CategorySingleValue = ({ data }) => {
 const BasicInfoStep = () => {
   const { formData, updateField, nextStep, errors, validateAndProceed } =
     useProductListing();
+  const { userDetails, isLoggedIn } = useUser();
+
+  // Girls-only categories are offered only to eligible sellers — picking one
+  // auto-enables Girl-only (backend enforces the same). Eligible sellers get
+  // the most → least suitable girls order; everyone else keeps classic order.
+  const sellerRole = userDetails?.role ?? null;
+  const girlsEligible =
+    isLoggedIn &&
+    (userDetails?.gender === "female" || sellerRole === "admin");
+  const categoryOptions = girlsEligible
+    ? orderCategoriesForGirls(PRODUCT_CATEGORY_OPTIONS)
+    : PRODUCT_CATEGORY_OPTIONS.filter((o) => !o.girlsOnly);
+  const isGirlsCategory = GIRLS_ONLY_CATEGORIES.includes(formData.category);
+  const handleCategoryChange = (selected) => {
+    const value = selected?.value || "";
+    updateField("category", value);
+    if (GIRLS_ONLY_CATEGORIES.includes(value)) {
+      updateField("isGirlsOnly", true);
+    }
+  };
 
   // Select Styles
   const selectStyles = {
@@ -236,7 +260,7 @@ const BasicInfoStep = () => {
                 name="category"
                 menuPlacement="auto"
                 menuShouldScrollIntoView={false}
-                options={PRODUCT_CATEGORY_OPTIONS}
+                options={categoryOptions}
                 styles={selectStyles}
                 isSearchable={false}
                 placeholder="Select category"
@@ -249,15 +273,19 @@ const BasicInfoStep = () => {
                     (item) => item.value === formData.category,
                   ) || null
                 }
-                onChange={(selected) =>
-                  updateField("category", selected?.value || "")
-                }
+                onChange={handleCategoryChange}
               />
               </Suspense>
 
               <p className="mt-2 text-sm text-[#94A3B8]">
                 Choose the category that best matches your product.
               </p>
+              {isGirlsCategory && (
+                <p className="mt-2 rounded-xl bg-pink-50 px-4 py-3 text-xs font-medium leading-5 text-[#9D174D] ring-1 ring-pink-200 dark:bg-pink-950/30 dark:text-pink-200 dark:ring-pink-900/50">
+                  🌸 This is a Girls-only category — Girl-only is auto ON. Only
+                  girls in your campus can see this listing.
+                </p>
+              )}
               <FormError error={errors.category} />
             </div>
           </div>
@@ -408,6 +436,9 @@ const BasicInfoStep = () => {
           </div>
         </div>
       </div>
+
+      {/* Step-1 Girls Corner toggle — visible only to girls/admins */}
+      <VisibilitySelector />
 
       {/* Footer */}
       <div className="mt-10 flex items-center justify-between">

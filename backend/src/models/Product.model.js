@@ -257,6 +257,20 @@ const productSchema = new Schema(
       index: true,
     },
 
+    // Girls Corner 🌸 — seller opt-in. true = invisible + uncontactable
+    // to non-females (enforced in product/conversation services).
+    isGirlsOnly: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    // Snapshot proving seller was female at creation; prevents flip loophole.
+    sellerGenderSnapshot: {
+      type: String,
+      enum: ["female"],
+      default: undefined,
+    },
+
     // Legal consent tracking (optional; old listings simply lack it).
     terms_version: {
       type: String,
@@ -305,6 +319,13 @@ productSchema.index({
   campus_id: 1,
   status: 1,
   is_deleted: 1,
+  createdAt: -1,
+});
+// Girls Corner feed: campus + audience + status, avoids collection scans.
+productSchema.index({
+  campus_id: 1,
+  isGirlsOnly: 1,
+  status: 1,
   createdAt: -1,
 });
 productSchema.index({

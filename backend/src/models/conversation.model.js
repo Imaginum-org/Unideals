@@ -70,6 +70,13 @@ const conversationSchema = new mongoose.Schema(
         type: Number,
         required: true,
       },
+
+      // Girls Corner 🌸 — denormalized for thread list icon. Old threads
+      // lack it → readers treat missing as false (backward compat).
+      isGirlsOnly: {
+        type: Boolean,
+        default: false,
+      },
     },
 
     // Unread counts

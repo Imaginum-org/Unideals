@@ -3,7 +3,7 @@ import userModel from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
 import { deleteImage } from "../utils/imagekit.js";
 import { safeErrorMessage } from "../utils/response.js";
-import { computeLevel, xpToNextLevel, levelProgress } from "../services/badgeService.js";
+import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges } from "../services/badgeService.js";
 import { clearAuthCookies } from "../services/auth.service.js";
 
 // GET USER PROFILE
@@ -71,7 +71,9 @@ export const updateUserProfile = async (req, res) => {
       updateData.mobile = mobile;
     }
 
-    // Gender validation
+    // Gender: set-once via onboarding gate, then locked (admin approval only).
+    // First set (gender==null) is free. Later changes via this route are
+    // rejected — users must file POST /requestGenderChange for admin review.
     if (gender !== undefined) {
       const allowed = ["male", "female", "other"];
       if (!allowed.includes(gender)) {
@@ -81,7 +83,19 @@ export const updateUserProfile = async (req, res) => {
           error: true,
         });
       }
-      updateData.gender = gender;
+      const current = await userModel.findById(userId).select("gender genderUpdatedAt role").lean();
+      if (current && current.gender !== gender) {
+        if (current.gender !== null && current.gender !== undefined) {
+          return res.status(403).json({
+            message: "Gender is locked. Please request admin approval to change it.",
+            success: false,
+            error: true,
+            code: "GENDER_LOCKED",
+          });
+        }
+        updateData.gender = gender;
+        updateData.genderUpdatedAt = new Date();
+      }
     }
 
     // Campus selection (onboarding gate + Settings change).
@@ -148,12 +162,29 @@ export const updateUserProfile = async (req, res) => {
       updatedUser.gamification.next_level = level + 1;
     }
 
+    // Girls Corner 🌸 auto-unlist: leaving female unlists girls-only listings
+    // (reversible via relist once eligible again). Widening is free.
+    let unlistedGirlsOnly = 0;
+    if (updateData.gender !== undefined && updateData.gender !== "female") {
+      try {
+        const Product = (await import("../models/Product.model.js")).default;
+        const r = await Product.updateMany(
+          { seller_id: userId, isGirlsOnly: true, status: "listed", is_deleted: false },
+          { $set: { status: "unlisted", is_boosted: false } },
+        );
+        unlistedGirlsOnly = r?.modifiedCount || 0;
+      } catch {
+        // best-effort only
+      }
+    }
+
     return res.status(200).json({
       message: "Profile updated successfully",
       success: true,
       error: false,
       user: updatedUser, // keep same key
       movedListings,
+      unlistedGirlsOnly,
     });
   } catch (err) {
     console.error("Error updating profile:", err);
@@ -536,6 +567,92 @@ export const updateChatSettings = async (req, res) => {
     });
   } catch (err) {
     console.error("Error updating chat settings:", err);
+    return res.status(500).json({
+      message: safeErrorMessage(err),
+      success: false,
+      error: true,
+    });
+  }
+};
+
+// REQUEST GENDER CHANGE (needs admin approval — gender is set-once).
+// Rate-limited by route limiter. One pending request per user; re-POST
+// while pending just refreshes the requested value (idempotent).
+export const requestGenderChange = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { requestedGender } = req.body || {};
+    const allowed = ["male", "female", "other"];
+    if (!allowed.includes(requestedGender)) {
+      return res.status(400).json({
+        message: "Invalid gender value",
+        success: false,
+        error: true,
+      });
+    }
+    const current = await userModel
+      .findById(userId)
+      .select("gender genderChangeRequest")
+      .lean();
+    if (!current) {
+      return res.status(404).json({ message: "User not found", success: false, error: true });
+    }
+    if (current.gender === requestedGender) {
+      return res.status(400).json({
+        message: "This is already your gender.",
+        success: false,
+        error: true,
+      });
+    }
+    const updated = await userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            genderChangeRequest: {
+              requestedGender,
+              status: "pending",
+              requestedAt: new Date(),
+              reviewedAt: null,
+            },
+          },
+        },
+        { new: true },
+      )
+      .select("gender genderChangeRequest")
+      .lean();
+    return res.status(200).json({
+      message: "Request sent for admin approval.",
+      success: true,
+      error: false,
+      genderChangeRequest: updated?.genderChangeRequest || null,
+    });
+  } catch (err) {
+    console.error("Error requesting gender change:", err);
+    return res.status(500).json({
+      message: safeErrorMessage(err),
+      success: false,
+      error: true,
+    });
+  }
+};
+
+export const getGenderChangeStatus = async (req, res) => {
+  try {
+    const user = await userModel
+      .findById(req.userId)
+      .select("gender genderChangeRequest")
+      .lean();
+    if (!user) {
+      return res.status(404).json({ message: "User not found", success: false, error: true });
+    }
+    return res.status(200).json({
+      success: true,
+      error: false,
+      gender: user.gender ?? null,
+      genderChangeRequest: user.genderChangeRequest || null,
+    });
+  } catch (err) {
     return res.status(500).json({
       message: safeErrorMessage(err),
       success: false,

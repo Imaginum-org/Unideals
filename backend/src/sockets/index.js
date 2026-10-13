@@ -4,6 +4,11 @@ import mongoose from "mongoose";
 import Conversation from "../models/conversation.model.js";
 import User from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
+// [SITE-LOCK] testing gate — delete this import to remove the lock
+import {
+  isSiteGateEnabled,
+  verifySiteGateToken,
+} from "../middlewares/siteGate.middleware.js";
 import { setIO } from "../utils/socket.js";
 
 const parseCookies = (header) => {
@@ -18,6 +23,16 @@ const parseCookies = (header) => {
 
 const authSocket = async (socket, next) => {
   try {
+    // [SITE-LOCK] testing gate: no realtime channel without the signed gate
+    // cookie (browsers attach HttpOnly cookies to the handshake
+    // automatically). Delete this block to remove the lock.
+    if (isSiteGateEnabled()) {
+      const gateCookies = parseCookies(socket.handshake.headers?.cookie || "");
+      if (!verifySiteGateToken(gateCookies.site_gate)) {
+        return next(new Error("Unauthorized"));
+      }
+    }
+    // [/SITE-LOCK]
     // Token via auth payload (client sends from memory) or HttpOnly cookie.
     let token =
       socket.handshake.auth?.token ||

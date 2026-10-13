@@ -484,8 +484,16 @@ md:group-hover:pointer-events-auto
             {/* CONTENT SECTION */}
             <div className="mt-3 flex flex-col flex-grow">
               {/* CATEGORY (Plain text style matching image) */}
-              <div className="text-[13px] md:text-base font-semibold text-[#3838EC] dark:text-[#5C6DFF] capitalize">
-                {formattedCategory}
+              <div className="flex items-center gap-2">
+                <div className="text-[13px] md:text-base font-semibold text-[#3838EC] dark:text-[#5C6DFF] capitalize">
+                  {formattedCategory}
+                </div>
+                {/* Girls Corner 🌸 text badge (never color-only, a11y) */}
+                {product?.isGirlsOnly && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-pink-100 px-2 py-0.5 text-[10px] font-bold text-pink-700 ring-1 ring-pink-200 dark:bg-pink-950/60 dark:text-pink-200 dark:ring-pink-900">
+                    🌸 Girls Only
+                  </span>
+                )}
               </div>
 
               {/* TITLE */}

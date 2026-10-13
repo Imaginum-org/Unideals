@@ -5,6 +5,11 @@ export const getProducts = (params = {}) => {
   return axios.get("/api/product", {params});
 };
 
+// Girls Corner 🌸 feed — same endpoint, audience param (no new route).
+export const getGirlsCornerProducts = (params = {}) => {
+  return axios.get("/api/product", { params: { ...params, audience: "girls_only" } });
+};
+
 export const getBoostedProducts = (params = {}) => {
   return axios.get("/api/product/boosted", { params });
 };

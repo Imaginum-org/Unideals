@@ -241,8 +241,7 @@ export const updateUserRole = async (userId, role) => {
   };
 };
 
-export const getUserStats = async () => {
-  const now = new Date();
+export const getUserStats = async () => {  const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
   const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -287,4 +286,72 @@ export const getUserStats = async () => {
     newUsers30d,
     newUsersGrowth,
   };
+};
+
+// Gender change approval queue — scalable paginated query on the embedded
+// pending subdoc (single index-friendly match, lean + limit clamped).
+export const getGenderChangeRequests = async (query = {}) => {
+  const page = toPositiveInt(query.page, 1);
+  const limit = toPositiveInt(query.limit, 20, 50);
+  const skip = (page - 1) * limit;
+  const match = { "genderChangeRequest.status": "pending" };
+  const [total, data] = await Promise.all([
+    User.countDocuments(match),
+    User.find(match)
+      .select("name email gender genderSource genderChangeRequest createdAt")
+      .sort({ "genderChangeRequest.requestedAt": -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+  ]);
+  return {
+    data: data.map((u) => ({
+      id: String(u._id),
+      name: u.name,
+      email: u.email,
+      gender: u.gender ?? null,
+      genderSource: u.genderSource,
+      requestedGender: u.genderChangeRequest?.requestedGender || null,
+      requestedAt: u.genderChangeRequest?.requestedAt || null,
+    })),
+    pagination: buildPagination(total, page, limit),
+  };
+};
+
+export const reviewGenderChangeRequest = async (userId, action) => {
+  if (!ObjectId.isValid(userId)) throw new Error("Invalid user id");
+  const act = String(action || "").toLowerCase();
+  if (!["approve", "reject"].includes(act)) throw new Error("Invalid action");
+  const user = await User.findById(userId).select("gender genderChangeRequest");
+  if (!user) throw new Error("User not found");
+  if (!user.genderChangeRequest || user.genderChangeRequest.status !== "pending") {
+    throw new Error("No pending gender change request");
+  }
+  if (act === "reject") {
+    user.genderChangeRequest.status = "rejected";
+    user.genderChangeRequest.reviewedAt = new Date();
+    await user.save();
+    return user.toObject();
+  }
+  // Approve: set gender as admin, stamp source, auto-unlist girls-only if
+  // leaving female (same safety as profile update, reversible via relist).
+  const next = user.genderChangeRequest.requestedGender;
+  const leavingFemale = user.gender === "female" && next !== "female";
+  user.gender = next;
+  user.genderSource = "admin";
+  user.genderUpdatedAt = new Date();
+  user.genderChangeRequest.status = "approved";
+  user.genderChangeRequest.reviewedAt = new Date();
+  await user.save();
+  if (leavingFemale) {
+    try {
+      await Product.updateMany(
+        { seller_id: user._id, isGirlsOnly: true, status: "listed", is_deleted: false },
+        { $set: { status: "unlisted", is_boosted: false } },
+      );
+    } catch {
+      // best-effort only
+    }
+  }
+  return user.toObject();
 };

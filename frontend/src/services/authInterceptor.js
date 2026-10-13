@@ -72,6 +72,24 @@ instance.interceptors.response.use(
     const originalRequest = error.config;
     const responseData = error.response?.data;
 
+    // [SITE-LOCK] testing gate — delete this block to remove the lock.
+    // Server says the browser has no gate cookie (cleared, expired, or
+    // faked localStorage). Drop the local flag and re-lock the UI — never
+    // retry, the request can't succeed without unlocking.
+    if (
+      error.response?.status === 403 &&
+      responseData?.code === "SITE_LOCKED"
+    ) {
+      try {
+        localStorage.removeItem("unideals_site_unlocked");
+      } catch {
+        // ignore
+      }
+      window.dispatchEvent(new CustomEvent("unideals:site-locked"));
+      return Promise.reject(error);
+    }
+    // [/SITE-LOCK]
+
     if (error.response?.status === 403 && responseData?.accountBlocked) {
       clearStoredAuth();
       notifyAccountBlocked(responseData);

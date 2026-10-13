@@ -85,7 +85,15 @@ export const createProduct = async (req, res) => {
           ? 400
           : 500);
 
-    return res.status(error.code === "LISTING_LIMIT" ? 403 : isClientError ? 400 : 500).json({
+    // Preserve Girls Corner codes (403/429) exactly for frontend gating.
+    const girlsCodes = new Set([
+      "NOT_ELIGIBLE_GIRLS_ONLY",
+      "GIRLS_CORNER_RESTRICTED",
+      "GENDER_LOCKED",
+    ]);
+    const finalStatus = girlsCodes.has(error.code) ? error.statusCode || status : status;
+
+    return res.status(error.code === "LISTING_LIMIT" ? 403 : girlsCodes.has(error.code) ? finalStatus : isClientError ? 400 : 500).json({
       success: false,
       message: isClientError || status < 500 ? error.message : "Product creation failed",
       ...(error.code ? { code: error.code } : {}),
@@ -97,7 +105,9 @@ export const createProduct = async (req, res) => {
 export const getAllProducts = async (req, res, next) => {
   try {
     const campus = await resolveRequestCampus(req);
-    const result = await productService.getAllProducts(req.query, campus._id);
+    const viewerGender = req.user?.gender ?? null;
+    const viewerRole = req.user?.role ?? null;
+    const result = await productService.getAllProducts(req.query, campus._id, viewerGender, viewerRole);
 
     return res.status(200).json({
       success: true,
@@ -123,6 +133,8 @@ export const getSingleProduct = async (req, res, next) => {
       campus._id,
       req.userId || null,
       clientIp || null,
+      req.user?.gender ?? null,
+      req.user?.role ?? null,
     );
 
     // Owner sees extra snapshot fields — never share across users.
@@ -141,7 +153,7 @@ export const getSingleProduct = async (req, res, next) => {
 export const getBoostedProducts = async (req, res, next) => {
   try {
     const campus = await resolveRequestCampus(req);
-    const products = await productService.getBoostedProducts(campus._id);
+    const products = await productService.getBoostedProducts(campus._id, req.user?.gender ?? null, req.user?.role ?? null, req.query?.audience ?? null);
 
     // Same content per campus URL for every viewer — edge-cacheable.
     res.set("Cache-Control", "public, max-age=60, s-maxage=300");
@@ -171,6 +183,8 @@ export const getSearchSuggestions = async (req, res, next) => {
     const suggestions = await productService.getSearchSuggestions(
       q,
       campus._id,
+      req.user?.gender ?? null,
+      req.user?.role ?? null,
     );
 
     return res.status(200).json({
@@ -193,6 +207,7 @@ export const searchProducts = async (req, res, next) => {
       condition,
       min_price,
       max_price,
+      audience,
     } = req.query;
 
     if (!q || String(q).trim().length === 0) {
@@ -213,8 +228,11 @@ export const searchProducts = async (req, res, next) => {
         condition,
         min_price,
         max_price,
+        audience,
       },
       (await resolveRequestCampus(req))._id,
+      req.user?.gender ?? null,
+      req.user?.role ?? null,
     );
 
     return res.status(200).json({
@@ -229,7 +247,7 @@ export const searchProducts = async (req, res, next) => {
 export const getTrendingProducts = async (req, res, next) => {
   try {
     const campus = await resolveRequestCampus(req);
-    const products = await productService.getTrendingProducts(8, campus._id);
+    const products = await productService.getTrendingProducts(8, campus._id, req.user?.gender ?? null, req.user?.role ?? null);
     // Same content per campus URL for every viewer — edge-cacheable.
     res.set("Cache-Control", "public, max-age=60, s-maxage=300");
     return res.status(200).json({

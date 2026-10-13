@@ -11,6 +11,7 @@ const REASONS = [
   { value: "duplicate_listing", label: "Duplicate listing" },
   { value: "wrong_category", label: "Wrong category" },
   { value: "sold_or_unavailable", label: "Sold or unavailable" },
+  { value: "fake_gender_girls_corner", label: "Fake gender to access Girls Corner" },
   { value: "other", label: "Other" },
 ];
 

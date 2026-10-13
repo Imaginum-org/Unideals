@@ -57,6 +57,40 @@ const userSchema = new Schema(
       default: null,
     },
 
+    // Girls Corner 🌸 — self-declared once, then locked (admin approval to change).
+    genderSource: {
+      type: String,
+      enum: ["self", "admin"],
+      default: "self",
+    },
+    genderUpdatedAt: {
+      type: Date,
+      default: null,
+    },
+    // Gender change requests needing admin approval. Single pending subdoc
+    // keeps it atomic + scalable (one indexed user write, no extra collection).
+    genderChangeRequest: {
+      _id: false,
+      requestedGender: {
+        type: String,
+        enum: ["male", "female", "other"],
+        default: null,
+      },
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: null,
+      },
+      requestedAt: {
+        type: Date,
+        default: null,
+      },
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+    },
+
     // Campus marketplace: every user belongs to exactly one campus.
     // Null only for legacy accounts until they pass the onboarding gate.
     campus_id: {

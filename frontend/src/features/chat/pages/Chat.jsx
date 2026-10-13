@@ -373,7 +373,12 @@ const ChatPanel = ({ embedded = false }) => {
         // Clear query so refresh doesn't recreate.
         setSearchParams({}, { replace: true });
       } catch (err) {
-        toast.error(err?.response?.data?.message || "Could not open chat");
+        const code = err?.response?.data?.code;
+        if (code === "GIRLS_ONLY_PRODUCT") {
+          toast.error("This is a girls-only listing. Only girls can start this chat.");
+        } else {
+          toast.error(err?.response?.data?.message || "Could not open chat");
+        }
         setSearchParams({}, { replace: true });
       }
     })();

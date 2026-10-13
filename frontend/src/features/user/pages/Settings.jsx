@@ -8,7 +8,6 @@ import {
   LogOut,
   Mail,
   MapPin,
-  Pencil,
   Phone,
   Plus,
   Shield,
@@ -38,6 +37,8 @@ import {
   updateAvatar,
   updateProfile,
   removeAvatar,
+  requestGenderChange,
+  getGenderChangeStatus,
 } from "../api/userApi";
 
 const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "Verification"];
@@ -67,8 +68,9 @@ function Settings() {
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
   const [campusSlug, setCampusSlug] = useState("");
-  const [isProfileEditing, setIsProfileEditing] = useState(false);
-  const [profileChanged, setProfileChanged] = useState(false);
+  // Per-field editing: only one row (phone | campus | gender) is editable at
+  // a time, with its own Save/Cancel right there. No global "Edit all".
+  const [editingField, setEditingField] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [pickupSpots, setPickupSpots] = useState([]);
   const [pickupLoading, setPickupLoading] = useState(true);
@@ -80,6 +82,9 @@ function Settings() {
   const [listingsToMove, setListingsToMove] = useState(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
+  const [genderRequest, setGenderRequest] = useState(null);
+  const [requestedGender, setRequestedGender] = useState("");
+  const [requestSaving, setRequestSaving] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -155,84 +160,171 @@ function Settings() {
     fetchPickupSpots();
   }, [fetchPickupSpots]);
 
-  const handleSaveProfile = async (confirmed = false) => {
-    if (!profileChanged) {
-      setIsProfileEditing(false);
-      return true;
-    }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getGenderChangeStatus();
+        if (!cancelled && res.data?.success) setGenderRequest(res.data.genderChangeRequest || null);
+      } catch {
+        // best-effort only
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-    const currentSlug =
+  const handleGenderRequest = async () => {
+    if (!requestedGender || requestSaving) return;
+    setRequestSaving(true);
+    try {
+      const res = await requestGenderChange(requestedGender);
+      if (res.data?.success) {
+        setGenderRequest(res.data.genderChangeRequest || null);
+        toast.success("Request sent for admin approval.");
+        setRequestedGender("");
+        // Close gender editing so phone/campus stay editable while pending.
+        setEditingField(null);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not send request.");
+    } finally {
+      setRequestSaving(false);
+    }
+  };
+
+  // Reset all drafts from the saved profile (used when starting / cancelling).
+  const resetDrafts = () => {
+    setPhone(userDetails?.mobile || "");
+    setGender(userDetails?.gender || "");
+    const slug =
       typeof userDetails?.campus_id === "object"
         ? userDetails.campus_id?.slug
-        : activeCampus?.slug;
-    const changingCampus = Boolean(campusSlug) && campusSlug !== currentSlug;
+        : null;
+    setCampusSlug(slug || "");
+    setRequestedGender("");
+  };
 
-    // Campus moves relocate live listings — confirm first (same theme modal).
-    if (changingCampus && !confirmed) {
-      try {
-        const res = await getUserProducts();
-        const items = res.data?.data || [];
-        setListingsToMove(
-          items.filter((p) =>
-            ["listed", "active"].includes((p.status || "").toLowerCase()),
-          ).length,
-        );
-      } catch {
-        setListingsToMove(null);
-      }
-      setShowCampusConfirm(true);
-      return false;
-    }
+  const startEditing = (field) => {
+    resetDrafts();
+    setEditingField(field);
+  };
 
-    try {
-      setIsSavingProfile(true);
-      const updateData = {};
+  const cancelEditing = () => {
+    resetDrafts();
+    setEditingField(null);
+  };
 
-      if (phone) {
-        const digits = String(phone).replace(/\D/g, "");
-        // Validate 10-digit Indian mobile starting 6-9, don't silently truncate
-        if (!/^[6-9]\d{9}$/.test(digits)) {
-          toast.error("Enter a valid 10-digit mobile number starting with 6-9");
-          setIsSavingProfile(false);
-          return false;
-        }
-        updateData.mobile = digits;
-      }
-      if (gender) updateData.gender = gender;
-      if (changingCampus) {
-        updateData.campus_slug = campusSlug;
-      }
+  const syncProfileState = (savedUser, moved = 0) => {
+    setUserDetails(savedUser);
+    updateUserDetails(savedUser);
+    setPhone(savedUser?.mobile || "");
+    setGender(savedUser?.gender || "");
+    const slug =
+      typeof savedUser?.campus_id === "object" ? savedUser.campus_id?.slug : null;
+    setCampusSlug(slug || "");
+    setEditingField(null);
+    setShowCampusConfirm(false);
+    toast.success(
+      moved > 0
+        ? `Campus updated · ${moved} listing${moved > 1 ? "s" : ""} moved`
+        : "Profile updated successfully",
+    );
+  };
 
-      const res = await updateProfile(updateData);
-
-      if (res.data.success) {
-        const moved = res.data.movedListings || 0;
-        toast.success(
-          moved > 0
-            ? `Campus updated · ${moved} listing${moved > 1 ? "s" : ""} moved`
-            : "Profile updated successfully",
-        );
-        setUserDetails(res.data.user);
-        updateUserDetails(res.data.user);
-        setPhone(res.data.user?.mobile || "");
-        setGender(res.data.user?.gender || "");
-        const slug =
-          typeof res.data.user?.campus_id === "object"
-            ? res.data.user.campus_id?.slug
-            : null;
-        setCampusSlug(slug || "");
-        setProfileChanged(false);
-        setIsProfileEditing(false);
-        setShowCampusConfirm(false);
+  // Per-field save — only the edited field is sent to the server.
+  const handleSaveField = async (field, confirmed = false) => {
+    if (field === "campus") {
+      const currentSlug =
+        typeof userDetails?.campus_id === "object"
+          ? userDetails.campus_id?.slug
+          : activeCampus?.slug;
+      const changingCampus = Boolean(campusSlug) && campusSlug !== currentSlug;
+      if (!changingCampus) {
+        setEditingField(null);
         return true;
       }
-      return false;
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update profile");
-      return false;
-    } finally {
-      setIsSavingProfile(false);
+      // Campus moves relocate live listings — confirm first (same theme modal).
+      if (!confirmed) {
+        try {
+          const res = await getUserProducts();
+          const items = res.data?.data || [];
+          setListingsToMove(
+            items.filter((p) =>
+              ["listed", "active"].includes((p.status || "").toLowerCase()),
+            ).length,
+          );
+        } catch {
+          setListingsToMove(null);
+        }
+        setShowCampusConfirm(true);
+        return false;
+      }
+      try {
+        setIsSavingProfile(true);
+        const res = await updateProfile({ campus_slug: campusSlug });
+        if (res.data.success) {
+          syncProfileState(res.data.user, res.data.movedListings || 0);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "Failed to update campus");
+        return false;
+      } finally {
+        setIsSavingProfile(false);
+      }
     }
+
+    if (field === "phone") {
+      const digits = String(phone).replace(/\D/g, "");
+      if ((userDetails?.mobile || "") === digits) {
+        setEditingField(null);
+        return true;
+      }
+      // Validate 10-digit Indian mobile starting 6-9, don't silently truncate
+      if (!/^[6-9]\d{9}$/.test(digits)) {
+        toast.error("Enter a valid 10-digit mobile number starting with 6-9");
+        return false;
+      }
+      try {
+        setIsSavingProfile(true);
+        const res = await updateProfile({ mobile: digits });
+        if (res.data.success) {
+          syncProfileState(res.data.user);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "Failed to update phone");
+        return false;
+      } finally {
+        setIsSavingProfile(false);
+      }
+    }
+
+    if (field === "gender") {
+      // First-set fallback only (locked profiles use admin approval).
+      if (!gender || userDetails?.gender) {
+        setEditingField(null);
+        return true;
+      }
+      try {
+        setIsSavingProfile(true);
+        const res = await updateProfile({ gender });
+        if (res.data.success) {
+          syncProfileState(res.data.user);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "Failed to update gender");
+        return false;
+      } finally {
+        setIsSavingProfile(false);
+      }
+    }
+
+    return false;
   };
 
   const handleAvatarChange = async (event) => {
@@ -600,23 +692,6 @@ function Settings() {
                     <h2 className="text-base font-bold">
                       Personal Information
                     </h2>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        isProfileEditing
-                          ? handleSaveProfile()
-                          : setIsProfileEditing(true)
-                      }
-                      disabled={isSavingProfile}
-                      className="flex items-center gap-2 text-sm font-semibold text-[#4F46FF] disabled:opacity-60"
-                    >
-                      <Pencil size={17} />
-                      {isProfileEditing
-                        ? isSavingProfile
-                          ? "Saving..."
-                          : "Save"
-                        : "Edit all"}
-                    </button>
                   </div>
 
                   <div className="divide-y divide-[#EDF0F5]">
@@ -636,23 +711,21 @@ function Settings() {
                               <div className="text-[0.68rem] font-medium uppercase tracking-normal text-[#98A1B2]">
                                 {row.label}
                               </div>
-                              {isProfileEditing && row.field === "phone" ? (
+                              {editingField === "phone" && row.field === "phone" ? (
                                 <input
                                   value={phone}
                                   onChange={(event) => {
                                     setPhone(event.target.value);
-                                    setProfileChanged(true);
                                   }}
                                   placeholder="10 digit mobile number"
                                   className="mt-1.5 w-full rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                                 />
-                              ) : isProfileEditing && row.field === "campus" ? (
+                              ) : editingField === "campus" && row.field === "campus" ? (
                                 <>
                                   <select
                                     value={campusSlug}
                                     onChange={(event) => {
                                       setCampusSlug(event.target.value);
-                                      setProfileChanged(true);
                                     }}
                                     className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                                   >
@@ -677,19 +750,37 @@ function Settings() {
                               )}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (row.editable) setIsProfileEditing(true);
-                            }}
-                            className={`text-sm font-semibold ${
-                              row.editable
-                                ? "text-[#4F46FF]"
-                                : "cursor-not-allowed text-[#CBD1DD]"
-                            }`}
-                          >
-                            Edit
-                          </button>
+                          {row.editable ? (
+                            editingField === row.field ? (
+                              <span className="flex shrink-0 items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={cancelEditing}
+                                  disabled={isSavingProfile}
+                                  className="text-sm font-semibold text-[#98A1B2] disabled:opacity-50"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveField(row.field)}
+                                  disabled={isSavingProfile}
+                                  className="text-sm font-semibold text-[#4F46FF] disabled:opacity-50"
+                                >
+                                  {isSavingProfile ? "Saving..." : "Save"}
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startEditing(row.field)}
+                                disabled={editingField !== null}
+                                className="text-sm font-semibold text-[#4F46FF] disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Edit
+                              </button>
+                            )
+                          ) : null}
                         </div>
                       );
                     })}
@@ -703,12 +794,11 @@ function Settings() {
                           <div className="text-[0.68rem] font-medium uppercase tracking-normal text-[#98A1B2]">
                             Gender
                           </div>
-                          {isProfileEditing ? (
+                          {editingField === "gender" && !userDetails?.gender ? (
                             <select
                               value={gender}
                               onChange={(event) => {
                                 setGender(event.target.value);
-                                setProfileChanged(true);
                               }}
                               className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                             >
@@ -722,15 +812,82 @@ function Settings() {
                               {userDetails?.gender || "Not added"}
                             </div>
                           )}
+                          {userDetails?.gender && editingField === "gender" ? (
+                            <div className="mt-2 rounded-lg bg-[#F2F4F9] px-3 py-2 text-[11px] font-medium text-[#526071] dark:bg-[#252525] dark:text-slate-300">
+                              Gender is locked after setup. To change it, request admin approval below.
+                              {genderRequest?.status === "pending" ? (
+                                <span className="mt-1 block font-bold text-amber-600">
+                                  Pending approval for “{genderRequest.requestedGender}”.
+                                </span>
+                              ) : (
+                                <>
+                                  {genderRequest?.status === "rejected" ? (
+                                    <span className="mt-1 block font-bold text-red-500">
+                                      Last request was not approved. You can raise a new one.
+                                    </span>
+                                  ) : null}
+                                  <span className="mt-2 flex flex-wrap items-center gap-2">
+                                    <select
+                                      value={requestedGender}
+                                      onChange={(e) => setRequestedGender(e.target.value)}
+                                      className="rounded-lg border border-[#D8DDEA] bg-white px-2 py-1.5 text-xs outline-none dark:bg-[#1A1D20] dark:text-white"
+                                      aria-label="Requested gender"
+                                    >
+                                      <option value="">Select new gender</option>
+                                      {["male", "female", "other"]
+                                        .filter((g) => g !== userDetails?.gender)
+                                        .map((g) => (
+                                          <option key={g} value={g} className="capitalize">
+                                            {g.charAt(0).toUpperCase() + g.slice(1)}
+                                          </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={handleGenderRequest}
+                                      disabled={!requestedGender || requestSaving}
+                                      className="rounded-lg bg-[#111827] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                                    >
+                                      {requestSaving ? "Sending..." : "Request approval"}
+                                    </button>
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsProfileEditing(true)}
-                        className="text-sm font-semibold text-[#4F46FF]"
-                      >
-                        Edit
-                      </button>
+                      {editingField === "gender" ? (
+                        <span className="flex shrink-0 items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={cancelEditing}
+                            disabled={isSavingProfile || requestSaving}
+                            className="text-sm font-semibold text-[#98A1B2] disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          {!userDetails?.gender && (
+                            <button
+                              type="button"
+                              onClick={() => handleSaveField("gender")}
+                              disabled={isSavingProfile || !gender}
+                              className="text-sm font-semibold text-[#4F46FF] disabled:opacity-50"
+                            >
+                              {isSavingProfile ? "Saving..." : "Save"}
+                            </button>
+                          )}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEditing("gender")}
+                          disabled={editingField !== null}
+                          className="text-sm font-semibold text-[#4F46FF] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Edit
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -945,7 +1102,7 @@ function Settings() {
                     <button
                       type="button"
                       disabled={isSavingProfile}
-                      onClick={() => handleSaveProfile(true)}
+                      onClick={() => handleSaveField("campus", true)}
                       className="flex-1 rounded-xl bg-[#4F46FF] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       {isSavingProfile ? "Moving…" : "Move listings"}

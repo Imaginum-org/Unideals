@@ -40,6 +40,9 @@ const initialFormData = {
   termsAccepted: false,
   termsVersion: "v1",
   termsAcceptedAt: null,
+
+  // Girls Corner 🌸 visibility per listing
+  isGirlsOnly: false,
 };
 
 export const ProductListingProvider = ({ children }) => {
@@ -118,6 +121,7 @@ export const ProductListingProvider = ({ children }) => {
       termsAccepted: true, // already accepted when originally listed
       termsVersion: product.terms_version || "v1",
       termsAcceptedAt: product.terms_accepted_at || null,
+      isGirlsOnly: Boolean(product.isGirlsOnly),
     });
 
     setStep(1);

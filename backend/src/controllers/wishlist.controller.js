@@ -34,17 +34,24 @@ const assertWishlistCapacity = async (userId, subscription) => {
 
 // Only live, listed products can be (re-)saved. Cross-campus saves are
 // allowed (no block) — clients render the product's campus chip.
-const assertSaveableProduct = async (productId) => {
+// Girls Corner 🌸: non-females cannot save girls-only (404-masked).
+const assertSaveableProduct = async (productId, viewerGender = null) => {
   const product = await Product.findOne({
     _id: productId,
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
   })
-    .select("_id")
+    .select("_id isGirlsOnly")
     .lean();
   if (!product) {
     const error = new Error("Product not found");
     error.statusCode = 404;
+    throw error;
+  }
+  if (product.isGirlsOnly && viewerGender !== "female") {
+    const error = new Error("Product not found");
+    error.statusCode = 404;
+    error.code = "PRODUCT_NOT_FOUND";
     throw error;
   }
   return product;
@@ -77,7 +84,7 @@ export const addToWishlist = async (req, res) => {
     const alreadySaved = await User.exists({ _id: userId, wishlist: productId });
     if (alreadySaved) {
       try {
-        await assertSaveableProduct(productId);
+        await assertSaveableProduct(productId, req.user?.gender ?? null);
       } catch (saveErr) {
         return res.status(saveErr.statusCode || 404).json({
           success: false,
@@ -93,7 +100,7 @@ export const addToWishlist = async (req, res) => {
     }
 
     try {
-      await assertSaveableProduct(productId);
+      await assertSaveableProduct(productId, req.user?.gender ?? null);
     } catch (saveErr) {
       return res.status(saveErr.statusCode || 404).json({
         success: false,
@@ -210,7 +217,13 @@ export const getWishlist = async (req, res) => {
 
     const wishlistIds = Array.isArray(user.wishlist) ? user.wishlist : [];
     // Dead refs from deleted listings are filtered out of the render.
+    // Girls-only items are invisible to non-eligible viewers (no hint leak).
+    // Admins see both for moderation.
     const match = { _id: { $in: wishlistIds }, is_deleted: false };
+    const viewerGender = req.user?.gender ?? null;
+    const viewerRole = req.user?.role ?? null;
+    const canSeeGirls = viewerGender === "female" || viewerRole === "admin" || viewerRole === "support";
+    if (!canSeeGirls) match.isGirlsOnly = { $ne: true };
     const [total, items] = await Promise.all([
       wishlistIds.length > 0 ? Product.countDocuments(match) : 0,
       wishlistIds.length > 0
@@ -319,7 +332,7 @@ export const toggleWishlist = async (req, res) => {
     // Adding requires a live listed product; cross-campus saves allowed.
     if (!isAlreadyInWishlist) {
       try {
-        await assertSaveableProduct(productId);
+        await assertSaveableProduct(productId, req.user?.gender ?? null);
       } catch (saveErr) {
         return res.status(saveErr.statusCode || 404).json({
           success: false,

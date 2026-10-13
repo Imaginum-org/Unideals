@@ -5,6 +5,12 @@ export const getUserProfile = () => axios.get("/api/user/userProfile");
 export const updateProfile = (data) =>
   axios.put("/api/user/updateProfile", data);
 
+export const requestGenderChange = (requestedGender) =>
+  axios.post("/api/user/requestGenderChange", { requestedGender });
+
+export const getGenderChangeStatus = () =>
+  axios.get("/api/user/genderChangeStatus");
+
 export const updateChatSettings = (data) =>
   axios.put("/api/user/chatSettings", data);
 

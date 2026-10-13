@@ -162,6 +162,7 @@ const PreviewStep = () => {
         condition: formData.condition,
 
         selling_price: Number(formData.sellingPrice),
+        isGirlsOnly: Boolean(formData.isGirlsOnly),
 
         original_price: Number(formData.originalPrice),
 
@@ -239,6 +240,7 @@ const PreviewStep = () => {
         category: formData.category,
         condition: formData.condition,
         selling_price: Number(formData.sellingPrice),
+        isGirlsOnly: Boolean(formData.isGirlsOnly),
         original_price: Number(formData.originalPrice),
         is_negotiable: formData.negotiable,
         payment_preference: formData.paymentMethod,
@@ -346,6 +348,7 @@ const PreviewStep = () => {
         condition: formData.condition,
 
         selling_price: Number(formData.sellingPrice),
+        isGirlsOnly: Boolean(formData.isGirlsOnly),
 
         original_price: Number(formData.originalPrice),
 

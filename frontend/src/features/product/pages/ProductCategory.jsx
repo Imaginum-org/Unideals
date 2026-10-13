@@ -4,18 +4,55 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   PRODUCT_CATEGORY_OPTIONS,
   PRODUCT_CONDITION_OPTIONS,
+  GIRLS_ONLY_CATEGORIES,
+  orderCategoriesForGirls,
 } from "../constants/productOptions.js";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { getBoostedProducts, getProducts } from "../api/productApi";
 import { FaFilter, FaTimes } from "react-icons/fa";
 import { useCampus } from "../../../context/CampusContext.jsx";
+import { useUser } from "../../../context/useUserContext.jsx";
+import { useGirlsMode } from "../../../context/GirlsModeContext.jsx";
+import GirlsEntryPill from "../../../components/ui/GirlsEntryPill.jsx";
 
 const CategoryPage = () => {
   const { categoryName } = useParams();
   const navigate = useNavigate();
   const { campusSlug } = useCampus();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { userDetails, isLoggedIn } = useUser();
+  const { girlsMode, setGirlsMode } = useGirlsMode();
+  const audienceTab = searchParams.get("tab") === "girls" ? "girls" : "all";
+  const viewerGender = userDetails?.gender ?? null;
+  const viewerRole = userDetails?.role ?? null;
+  const canSeeGirls = isLoggedIn && (viewerGender === "female" || viewerRole === "admin" || viewerRole === "support");
+  const setAudienceTab = (t) => {
+    const next = new URLSearchParams(searchParams);
+    if (t === "girls") next.set("tab", "girls");
+    else next.delete("tab");
+    setSearchParams(next, { replace: true });
+    if (t === "girls" && !girlsMode) setGirlsMode(true);
+    if (t !== "girls" && girlsMode) setGirlsMode(false);
+  };
+  // Pink mode <=> girls feed sync; ineligible ?tab=girls silently reset.
+  useEffect(() => {
+    if (!canSeeGirls) {
+      if (audienceTab === "girls") {
+        const next = new URLSearchParams(searchParams);
+        next.delete("tab");
+        setSearchParams(next, { replace: true });
+      }
+      if (girlsMode) setGirlsMode(false);
+      return;
+    }
+    if (girlsMode && audienceTab !== "girls") {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", "girls");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [girlsMode, canSeeGirls]);
   const isBoostedPage = categoryName === "boosted-products";
 
   // Slug mapping (both ways): URL may carry kebab-case (study-material) or
@@ -30,6 +67,18 @@ const CategoryPage = () => {
     return null;
   })();
   const isUnknownCategory = !isBoostedPage && !categoryValue;
+  // Girls-only categories open ONLY in Girls Mode for eligible viewers —
+  // everyone else gets a lock screen (zero listing hints).
+  const isGirlsOnlyCategory =
+    !isBoostedPage && GIRLS_ONLY_CATEGORIES.includes(categoryValue);
+  const girlsCategoryLocked =
+    isGirlsOnlyCategory && !(audienceTab === "girls" && canSeeGirls);
+  // Sidebar dropdown hides girls-only categories outside Girls Mode; inside,
+  // it shares the most → least suitable girls order.
+  const visibleCategoryOptions =
+    audienceTab === "girls" && canSeeGirls
+      ? orderCategoriesForGirls(PRODUCT_CATEGORY_OPTIONS)
+      : PRODUCT_CATEGORY_OPTIONS.filter((o) => !o.girlsOnly);
   const categoryLabel =
     PRODUCT_CATEGORY_OPTIONS.find((o) => o.value === categoryValue)?.label ||
     categoryName;
@@ -92,12 +141,14 @@ const CategoryPage = () => {
     setPage(1);
     setProducts([]);
     setPagination(null);
-  }, [categoryValue, isBoostedPage, selectedCondition, sortBy, minPrice, maxPrice, campusSlug]);
+  }, [categoryValue, isBoostedPage, selectedCondition, sortBy, minPrice, maxPrice, campusSlug, audienceTab]);
 
   useEffect(() => {
     let cancelled = false;
     const fetchCategoryProducts = async () => {
       if (!campusSlug || isUnknownCategory) return;
+      if (audienceTab === "girls" && !canSeeGirls) return;
+      if (girlsCategoryLocked) return;
       const isPaging = page > 1;
       try {
         if (isPaging) setLoadingMore(true);
@@ -105,10 +156,22 @@ const CategoryPage = () => {
         setError(null);
 
         if (isBoostedPage) {
-          const res = await getBoostedProducts({ campus_slug: campusSlug });
+          if (audienceTab === "girls" && !canSeeGirls) {
+            if (!cancelled) setProducts([]);
+            if (!cancelled) setLoading(false);
+            return;
+          }
+          const res = await getBoostedProducts({
+            campus_slug: campusSlug,
+            ...(audienceTab === "girls" ? { audience: "girls_only" } : {}),
+          });
           if (cancelled) return;
           const items = res.data?.data || [];
-          setProducts(items);
+          // Client-side guard (server already filters): girls feed shows
+          // ONLY girls-only boosted.
+          setProducts(
+            audienceTab === "girls" ? items.filter((p) => p.isGirlsOnly === true) : items,
+          );
           const prices = items
             .map((p) => Number(p.selling_price))
             .filter((n) => Number.isFinite(n));
@@ -135,6 +198,7 @@ const CategoryPage = () => {
         if (selectedCondition) params.condition = selectedCondition;
         if (minPrice !== "") params.min_price = minPrice;
         if (maxPrice !== "") params.max_price = maxPrice;
+        if (audienceTab === "girls") params.audience = "girls_only";
 
         const res = await getProducts(params);
         if (cancelled) return;
@@ -189,12 +253,19 @@ const CategoryPage = () => {
     campusSlug,
     page,
     retryKey,
+    audienceTab,
+    canSeeGirls,
   ]);
 
   // Boosted rail: instant client-side filtering over the loaded items.
   const visibleProducts = useMemo(() => {
     if (!isBoostedPage) return products;
     let list = [...products];
+    // Girl Mode ON → only girls-only boosted (server already filters;
+    // this guards stale/cached mixed responses).
+    if (audienceTab === "girls") {
+      list = list.filter((p) => p.isGirlsOnly === true);
+    }
     if (selectedCondition) {
       list = list.filter((p) => p.condition === selectedCondition);
     }
@@ -212,7 +283,7 @@ const CategoryPage = () => {
       list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
     return list;
-  }, [products, isBoostedPage, selectedCondition, minPrice, maxPrice, sortBy]);
+  }, [products, isBoostedPage, selectedCondition, minPrice, maxPrice, sortBy, audienceTab]);
 
   //HANDLERS — write-through to the URL (replace, no history spam).
   const updateParams = useCallback(
@@ -288,7 +359,7 @@ const CategoryPage = () => {
               Boosted Products
             </option>
           )}
-          {PRODUCT_CATEGORY_OPTIONS.map((category) => (
+          {visibleCategoryOptions.map((category) => (
             <option
               key={category.value}
               value={category.value}
@@ -412,6 +483,10 @@ const CategoryPage = () => {
 
         <main className="flex-1 bg-transparent p-4 md:p-8 lg:pl-12 min-w-0">
           <div className="max-w-[1100px] mx-auto">
+            {/* Girls Corner edge menu — fixed to the right edge, girls + admins only */}
+            {!isUnknownCategory && (
+              <GirlsEntryPill tab={audienceTab} onChange={setAudienceTab} />
+            )}
             {isUnknownCategory ? (
               <div className="flex flex-col items-center py-16 text-center">
                 <p className="text-5xl">🧭</p>
@@ -429,14 +504,42 @@ const CategoryPage = () => {
                   Back to Home
                 </button>
               </div>
+            ) : girlsCategoryLocked ? (
+              <div className="flex flex-col items-center py-16 text-center">
+                <p className="text-5xl">🌸</p>
+                <h1 className="mt-4 text-xl font-bold text-[#0F172A] dark:text-white">
+                  Girls Corner exclusive
+                </h1>
+                <p className="mt-2 max-w-md text-sm text-[#64748B] dark:text-gray-400">
+                  “{(categoryLabel || "").replaceAll("_", " ")}” is a girls-only
+                  category. Only accounts set as Female can view listings here.
+                </p>
+                {canSeeGirls ? (
+                  <button
+                    onClick={() => setAudienceTab("girls")}
+                    className="mt-6 rounded-xl bg-[#EC4899] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#DB2777]"
+                  >
+                    Turn on Girl Mode
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => navigate("/")}
+                    className="mt-6 rounded-xl bg-[#394FF1] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
+                  >
+                    Back to Home
+                  </button>
+                )}
+              </div>
             ) : (
             <>
             <div className="mb-6">
-              <h1 className="text-lg lg:text-xl xl:text-3xl font-bold capitalize text-[#121417] dark:text-white font-figtree">
-                {isBoostedPage
-                  ? "Boosted Products"
-                  : (categoryLabel || "").replaceAll("_", " ")}
-              </h1>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h1 className="text-lg lg:text-xl xl:text-3xl font-bold capitalize text-[#121417] dark:text-white font-figtree">
+                  {isBoostedPage
+                    ? "Boosted Products"
+                    : (categoryLabel || "").replaceAll("_", " ")}
+                </h1>
+              </div>
 
               {loading && products.length === 0 && (
                 <div className="flex justify-center py-8">

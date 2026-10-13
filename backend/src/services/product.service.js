@@ -7,9 +7,18 @@ import {
   PRODUCT_STATUS,
   PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
+  GIRLS_ONLY_CATEGORIES,
 } from "../config/constants.js";
 import { getListingLimit } from "../config/subscriptionPlans.js";
 import { deleteImage } from "../utils/imagekit.js";
+import {
+  isEligibleGender,
+  isAdminRole,
+  canViewGirlsFeed,
+  canSeeGirlsProduct,
+  girlsCornerError,
+  GIRLS_ERRORS,
+} from "../utils/girlsCorner.js";
 
 const campusError = (statusCode, message, code) => {
   const error = new Error(message);
@@ -17,6 +26,11 @@ const campusError = (statusCode, message, code) => {
   if (code) error.code = code;
   return error;
 };
+
+// Girls-only categories are implicitly girls-only: picking one auto-enables
+// the Girl-only flag at create/update, and default feeds never show them.
+const isGirlsOnlyCategory = (category) =>
+  typeof category === "string" && GIRLS_ONLY_CATEGORIES.includes(category);
 
 // ---- Marketplace hardening helpers (production-safe, no new deps) ----
 
@@ -240,6 +254,21 @@ export const createProduct = async (data, user) => {
   }
   data.campus_id = campus._id;
 
+  // Girls Corner 🌸 — seller opt-in guard. Coerce + strip snapshot (server-set).
+  // Girls-only categories auto-enable Girl-only (seller is told in the UI).
+  delete data.sellerGenderSnapshot;
+  if (isGirlsOnlyCategory(data.category)) {
+    data.isGirlsOnly = true;
+  }
+  const wantsGirlsOnly = data.isGirlsOnly === true || data.isGirlsOnly === "true";
+  data.isGirlsOnly = Boolean(wantsGirlsOnly);
+  if (data.isGirlsOnly) {
+    if (!isEligibleGender(user.gender)) {
+      throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
+    }
+    data.sellerGenderSnapshot = "female";
+  }
+
   // Plan entitlement: cap active (listed, visible) listings per tier.
   // Drafts never count. null limit = unlimited (Pro+).
   if (data.status === PRODUCT_STATUS.LISTED) {
@@ -333,26 +362,39 @@ export const createProduct = async (data, user) => {
   return created;
 };
 
-export const getBoostedProducts = async (campusId) => {
+export const getBoostedProducts = async (campusId, viewerGender = null, viewerRole = null, audience = null) => {
   const now = new Date();
 
-  return await Product.find({
+  // Girls Corner: default pools never include girls-only (admins see both).
+  // ?audience=girls_only shows ONLY girls-only boosted (female + admin/support).
+  // Indexed filter keeps 1000-concurrent safe.
+  const filter = {
     campus_id: requireCampusId(campusId),
     is_boosted: true,
     boost_expires_at: { $gt: now },
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
-  })
+  };
+  if (audience === "girls_only") {
+    if (!canViewGirlsFeed(viewerGender, viewerRole)) throw girlsCornerError("GIRLS_CORNER_RESTRICTED");
+    filter.isGirlsOnly = true;
+  } else if (!isAdminRole(viewerRole)) {
+    filter.isGirlsOnly = { $ne: true };
+    // Girls-only categories never appear outside Girls Mode.
+    filter.category = { $nin: [...GIRLS_ONLY_CATEGORIES] };
+  }
+
+  return await Product.find(filter)
     .sort({ boost_expires_at: -1 })
     .limit(10)
     .select(
-      "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier",
+      "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier isGirlsOnly",
     )
     .populate("seller_id", "name avatar subscription role")
     .lean();
 };
 
-export const getAllProducts = async (query, campusId) => {
+export const getAllProducts = async (query, campusId, viewerGender = null, viewerRole = null) => {
   let {
     page = 1,
     limit = 10,
@@ -362,6 +404,7 @@ export const getAllProducts = async (query, campusId) => {
     min_price,
     max_price,
     sort = "recommended",
+    audience,
   } = query;
 
   // Clamp pagination to prevent DoS via huge limit / negative skip
@@ -383,8 +426,28 @@ export const getAllProducts = async (query, campusId) => {
     status: PRODUCT_STATUS.LISTED,
   };
 
+  // Girls Corner 🌸 feed: ?audience=girls_only shows ONLY girls-only
+  // listings (female + admin). The default mixed feed NEVER includes
+  // girls-only items (only admins see everything) — $ne:true also covers
+  // legacy docs missing the field. Indexed compound keeps it scalable.
+  const wantsGirlsFeed = audience === "girls_only";
+  if (wantsGirlsFeed) {
+    if (!canViewGirlsFeed(viewerGender, viewerRole)) throw girlsCornerError("GIRLS_CORNER_RESTRICTED");
+    baseMatch.isGirlsOnly = true;
+  } else if (!isAdminRole(viewerRole)) {
+    baseMatch.isGirlsOnly = { $ne: true };
+    // Girls-only categories never appear outside Girls Mode.
+    baseMatch.category = { $nin: [...GIRLS_ONLY_CATEGORIES] };
+  }
+
   if (typeof category === "string" && category) {
-    baseMatch.category = category;
+    // A girls-only category browsed outside Girls Mode stays empty for
+    // non-admins (no hint of its listings).
+    if (!wantsGirlsFeed && !isAdminRole(viewerRole) && isGirlsOnlyCategory(category)) {
+      baseMatch.category = { $in: [] };
+    } else {
+      baseMatch.category = category;
+    }
   }
 
   if (typeof condition === "string" && condition) {
@@ -559,6 +622,7 @@ export const getAllProducts = async (query, campusId) => {
         boost_expires_at: 1,
         boost_tier: 1,
         score: 1,
+        isGirlsOnly: 1,
 
         "seller._id": 1,
         "seller.name": 1,
@@ -634,7 +698,7 @@ const shouldCountView = (productId, clientIp) => {
   return true;
 };
 
-export const getSingleProduct = async (id, campusId, requesterId = null, clientIp = null) => {
+export const getSingleProduct = async (id, campusId, requesterId = null, clientIp = null, viewerGender = null, viewerRole = null) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new Error("Product not found");
   }
@@ -662,6 +726,14 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
       "This product is not available at your campus.",
       "CAMPUS_MISMATCH",
     );
+  }
+
+  // Girls Corner 🌸 anti-enumeration: non-eligible probing IDs get
+  // 404 (not 403) to avoid leaking existence. Owner + admin always see it.
+  const sellerIdStrEarly = String(product.seller_id?._id || product.seller_id || "");
+  const isOwnerEarly = !!requesterId && sellerIdStrEarly && String(requesterId) === sellerIdStrEarly;
+  if (product.isGirlsOnly && !isOwnerEarly && !canSeeGirlsProduct(viewerGender, viewerRole)) {
+    throw campusError(404, "Product not found", "PRODUCT_NOT_FOUND");
   }
 
   // Anti-farm: the seller's own views never count, and each IP counts at
@@ -739,7 +811,7 @@ export const getProductReservation = async (productId) => {
   }
 };
 
-export const getSearchSuggestions = async (query, campusId) => {
+export const getSearchSuggestions = async (query, campusId, viewerGender = null, viewerRole = null) => {
   if (typeof query !== "string") return [];
   const sanitizedQuery = query.trim().slice(0, 100).toLowerCase();
   if (sanitizedQuery.length < 2) return [];
@@ -748,12 +820,15 @@ export const getSearchSuggestions = async (query, campusId) => {
 
   const safeQuery = escapeRegex(sanitizedQuery);
 
-  return await Product.find({
+  const filter = {
     campus_id: requireCampusId(campusId),
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
     title: { $regex: safeQuery, $options: "i" },
-  })
+  };
+  if (!isAdminRole(viewerRole)) filter.isGirlsOnly = { $ne: true };
+
+  return await Product.find(filter)
     .select("title slug images selling_price")
     .limit(6)
     .lean();
@@ -851,7 +926,7 @@ const detectCategories = (sanitizedQuery) => {
   return found.slice(0, 3);
 };
 
-export const searchProducts = async (queryOrOptions = {}, campusId) => {
+export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender = null, viewerRole = null) => {
   const options =
     typeof queryOrOptions === "string" ? { q: queryOrOptions } : queryOrOptions || {};
   const {
@@ -861,6 +936,7 @@ export const searchProducts = async (queryOrOptions = {}, campusId) => {
     condition,
     min_price,
     max_price,
+    audience,
   } = options;
   let { page = 1, limit = 20 } = options;
 
@@ -902,8 +978,22 @@ export const searchProducts = async (queryOrOptions = {}, campusId) => {
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
   };
+  // Girls Corner 🌸 — search respects audience too. Default search never
+  // includes girls-only (admins see everything). Girls-only categories
+  // never appear outside Girls Mode.
+  if (audience === "girls_only") {
+    if (!canViewGirlsFeed(viewerGender, viewerRole)) throw girlsCornerError("GIRLS_CORNER_RESTRICTED");
+    baseMatch.isGirlsOnly = true;
+  } else if (!isAdminRole(viewerRole)) {
+    baseMatch.isGirlsOnly = { $ne: true };
+    baseMatch.category = { $nin: [...GIRLS_ONLY_CATEGORIES] };
+  }
   if (typeof category === "string" && category) {
-    baseMatch.category = category;
+    if (audience !== "girls_only" && !isAdminRole(viewerRole) && isGirlsOnlyCategory(category)) {
+      baseMatch.category = { $in: [] };
+    } else {
+      baseMatch.category = category;
+    }
   }
   if (typeof condition === "string" && condition) {
     baseMatch.condition = condition;
@@ -1113,19 +1203,26 @@ export const searchProducts = async (queryOrOptions = {}, campusId) => {
 const trendingCache = new Map();
 const TRENDING_TTL_MS = 10 * 60 * 1000;
 
-export const getTrendingProducts = async (limit = 8, campusId) => {
+export const getTrendingProducts = async (limit = 8, campusId, viewerGender = null, viewerRole = null) => {
   const campusObjectId = requireCampusId(campusId);
-  const cacheKey = campusObjectId.toString();
+  const adminView = isAdminRole(viewerRole);
+  const cacheKey = `${campusObjectId.toString()}:${adminView ? "admin" : "all"}`;
   const now = Date.now();
   const cached = trendingCache.get(cacheKey);
   if (cached && cached.data.length > 0 && now - cached.at < TRENDING_TTL_MS) {
     return cached.data.slice(0, limit);
   }
-  const products = await Product.find({
+  const filter = {
     campus_id: campusObjectId,
     is_deleted: false,
     status: PRODUCT_STATUS.LISTED,
-  })
+  };
+  if (!adminView) {
+    filter.isGirlsOnly = { $ne: true };
+    // Girls-only categories never trend outside Girls Mode.
+    filter.category = { $nin: [...GIRLS_ONLY_CATEGORIES] };
+  }
+  const products = await Product.find(filter)
     .select("title images selling_price category views_count")
     .sort({ views_count: -1, createdAt: -1 })
     .limit(8)
@@ -1214,6 +1311,7 @@ export const updateProduct = async (productId, userId, data = {}) => {
     "selling_price",
     "original_price",
     "is_negotiable",
+    "isGirlsOnly",
     "payment_preference",
     "images",
     "attributes",
@@ -1259,6 +1357,34 @@ export const updateProduct = async (productId, userId, data = {}) => {
   assertPriceGuards(mergedSelling, mergedOriginal);
   if (mergedOriginal && mergedSelling > mergedOriginal) {
     throw new Error("Selling price cannot be greater than original price");
+  }
+  // Girls Corner 🌸 — everyone→girls-only needs female; widening always allowed.
+  // Moving into a girls-only category auto-enables Girl-only (and needs
+  // female); listings already in one can never be widened to everyone.
+  const mergedCategory = updates.category ?? product.category;
+  if (isGirlsOnlyCategory(mergedCategory)) {
+    updates.isGirlsOnly = true;
+  }
+  if (updates.isGirlsOnly !== undefined) {
+    const wantsGirls = updates.isGirlsOnly === true || updates.isGirlsOnly === "true";
+    if (!wantsGirls && isGirlsOnlyCategory(mergedCategory)) {
+      updates.isGirlsOnly = true;
+    } else {
+      updates.isGirlsOnly = Boolean(wantsGirls);
+    }
+    if (updates.isGirlsOnly && !product.isGirlsOnly) {
+      const { default: UserModel } = await import("../models/User.model.js");
+      const editor = await UserModel.findById(userId).select("gender").lean();
+      if (!isEligibleGender(editor?.gender)) throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
+      updates.sellerGenderSnapshot = "female";
+    }
+  } else if (isGirlsOnlyCategory(mergedCategory) && !product.isGirlsOnly) {
+    // Category changed into a girls-only one without touching the flag.
+    const { default: UserModel } = await import("../models/User.model.js");
+    const editor = await UserModel.findById(userId).select("gender").lean();
+    if (!isEligibleGender(editor?.gender)) throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
+    updates.isGirlsOnly = true;
+    updates.sellerGenderSnapshot = "female";
   }
   assertImageHost(updates.images);
   await assertPickupSnapshot(updates.pickup_address_snapshot, userId);
@@ -1367,8 +1493,16 @@ export const relistProduct = async (productId, userId) => {
   // Relisting reactivates against the plan cap, same rule as creation.
   const { default: UserModel } = await import("../models/User.model.js");
   const owner = await UserModel.findById(product.seller_id)
-    .select("subscription")
+    .select("subscription gender")
     .lean();
+  // Girls Corner 🌸 — relist re-checks female for girls-only.
+  // Girls-only categories auto-carry the flag (incl. legacy docs).
+  if (isGirlsOnlyCategory(product.category)) {
+    product.isGirlsOnly = true;
+  }
+  if (product.isGirlsOnly && !isEligibleGender(owner?.gender)) {
+    throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
+  }
   const listingLimit = getListingLimit(owner?.subscription);
   if (typeof listingLimit === "number") {
     const activeCount = await Product.countDocuments({
