@@ -20,4 +20,9 @@ export const notificationApi = {
     const res = await axios.post(`/api/notifications/${id}/click`);
     return res.data;
   },
+
+  dismiss: async (id) => {
+    const res = await axios.delete(`/api/notifications/${id}`);
+    return res.data;
+  },
 };

@@ -18,39 +18,31 @@ import { AppError } from "../utils/appError.js";
  * Estimate recipient count based on target audience and campus filters
  */
 export const estimateRecipients = async ({ targetAudience = "all", targetCampus = null }) => {
-  try {
-    if (targetAudience === "campus") {
-      if (!targetCampus || !mongoose.Types.ObjectId.isValid(targetCampus)) {
-        return 0;
-      }
-      return await User.countDocuments({
-        status: USER_STATUS.ACTIVE,
-        campus_id: targetCampus,
-      });
+  if (targetAudience === "campus") {
+    if (!targetCampus || !mongoose.Types.ObjectId.isValid(targetCampus)) {
+      throw new AppError("A valid campus must be selected for campus targeting", 400);
     }
-
-    if (targetAudience === "buyers") {
-      const buyerIds = await Deal.distinct("buyer_id");
-      return await User.countDocuments({
-        _id: { $in: buyerIds },
-        status: USER_STATUS.ACTIVE,
-      });
-    }
-
-    if (targetAudience === "sellers") {
-      const sellerIds = await Product.distinct("seller_id");
-      return await User.countDocuments({
-        _id: { $in: sellerIds },
-        status: USER_STATUS.ACTIVE,
-      });
-    }
-
-    // Default: all active users
-    return await User.countDocuments({ status: USER_STATUS.ACTIVE });
-  } catch (error) {
-    console.error("Failed to estimate recipients:", error);
-    return 0;
+    return User.countDocuments({
+      status: USER_STATUS.ACTIVE,
+      campus_id: targetCampus,
+    });
   }
+
+  if (targetAudience === "buyers" || targetAudience === "sellers") {
+    const ids = targetAudience === "buyers"
+      ? await Deal.distinct("buyer_id")
+      : await Product.distinct("seller_id");
+    return User.countDocuments({
+      _id: { $in: ids },
+      status: USER_STATUS.ACTIVE,
+    });
+  }
+
+  if (targetAudience !== "all") {
+    throw new AppError("Invalid notification audience", 400);
+  }
+
+  return User.countDocuments({ status: USER_STATUS.ACTIVE });
 };
 
 /**
@@ -80,31 +72,50 @@ export const dispatchNotificationDocument = async (notification) => {
     targetCampus: notification.target_campus,
   });
 
+  let targetUserIds = null;
+  if (notification.target_audience === "buyers") {
+    targetUserIds = await User.find({
+      _id: { $in: await Deal.distinct("buyer_id") },
+      status: USER_STATUS.ACTIVE,
+    }).distinct("_id");
+  } else if (notification.target_audience === "sellers") {
+    targetUserIds = await User.find({
+      _id: { $in: await Product.distinct("seller_id") },
+      status: USER_STATUS.ACTIVE,
+    }).distinct("_id");
+  }
+
+  const io = getIO();
+  let delivered = 0;
+  if (io) {
+    let sockets;
+    if (notification.target_audience === "all") {
+      sockets = await io.in("broadcast:all").fetchSockets();
+    } else if (notification.target_audience === "campus" && notification.target_campus) {
+      sockets = await io.in(`campus:${notification.target_campus}`).fetchSockets();
+    } else if (targetUserIds?.length) {
+      sockets = await io.in(targetUserIds.map((userId) => `user:${userId}`)).fetchSockets();
+    } else {
+      sockets = [];
+    }
+    delivered = new Set(sockets.map((socket) => socket.userId).filter(Boolean)).size;
+  }
+
+  notification.status = "sent";
+  notification.stats = {
+    total_sent: recipientCount,
+    delivered,
+    clicked: notification.stats?.clicked || 0,
+  };
+  await notification.save();
+
   if (notification.target_audience === "campus" && notification.target_campus) {
     emitToCampus(notification.target_campus, "notification:new", payload);
   } else if (notification.target_audience === "all") {
     emitToAll("notification:new", payload);
-  } else if (notification.target_audience === "buyers") {
-    const buyerIds = await Deal.distinct("buyer_id");
-    for (const bId of buyerIds) {
-      emitToUser(bId, "notification:new", payload);
-    }
-  } else if (notification.target_audience === "sellers") {
-    const sellerIds = await Product.distinct("seller_id");
-    for (const sId of sellerIds) {
-      emitToUser(sId, "notification:new", payload);
-    }
+  } else {
+    targetUserIds?.forEach((userId) => emitToUser(userId, "notification:new", payload));
   }
-
-  // Update delivered/sent counters
-  const activeNow = getActiveUserCount();
-  notification.status = "sent";
-  notification.stats = {
-    total_sent: recipientCount || 1,
-    delivered: Math.max(activeNow, Math.round((recipientCount || 1) * 0.95)),
-    clicked: notification.stats?.clicked || 0,
-  };
-  await notification.save();
 
   return notification;
 };
@@ -136,7 +147,14 @@ export const createAdminNotification = async ({
     campusId = target_campus;
   }
 
-  const isScheduled = schedule_type === "scheduled" && scheduled_at && new Date(scheduled_at) > new Date();
+  let scheduledDate = null;
+  if (schedule_type === "scheduled") {
+    scheduledDate = new Date(scheduled_at);
+    if (!scheduled_at || Number.isNaN(scheduledDate.getTime()) || scheduledDate <= new Date()) {
+      throw new AppError("Scheduled notifications require a future date and time", 400);
+    }
+  }
+  const isScheduled = schedule_type === "scheduled";
 
   const notification = new Notification({
     title: title.trim(),
@@ -148,8 +166,8 @@ export const createAdminNotification = async ({
     action_url: action_url?.trim() || null,
     action_label: action_label?.trim() || "View Offers",
     schedule_type: isScheduled ? "scheduled" : "now",
-    scheduled_at: isScheduled ? new Date(scheduled_at) : null,
-    status: isScheduled ? "scheduled" : "sent",
+    scheduled_at: scheduledDate,
+    status: isScheduled ? "scheduled" : "draft",
     sent_by,
     is_broadcast: true,
   });
@@ -157,6 +175,8 @@ export const createAdminNotification = async ({
   await notification.save();
 
   if (!isScheduled) {
+    notification.status = "draft";
+    await notification.save();
     await dispatchNotificationDocument(notification);
   }
 
@@ -252,28 +272,20 @@ export const getUserNotificationFeed = async (userId) => {
   if (!user) throw new AppError("User not found", 404);
 
   // Broadcast criteria
-  const broadcastQuery = {
-    is_broadcast: true,
-    status: "sent",
-    createdAt: { $gte: new Date(user.createdAt || 0) },
-    $or: [{ target_audience: "all" }],
-  };
-
-  if (user.campus_id) {
-    broadcastQuery.$or.push({
-      target_audience: "campus",
-      target_campus: user.campus_id,
-    });
-  }
-
   // Direct notifications criteria
   const directQuery = {
     is_broadcast: false,
     recipient_id: userId,
+    status: "sent",
+    $or: [
+      { is_dismissed: false },
+      { is_dismissed: { $exists: false } },
+    ],
   };
+  const matchedBroadcastQuery = await getUserBroadcastQuery(user);
 
   const [broadcasts, directNotifications, receipts] = await Promise.all([
-    Notification.find(broadcastQuery).sort({ createdAt: -1 }).limit(50).lean(),
+    Notification.find(matchedBroadcastQuery).sort({ createdAt: -1 }).limit(50).lean(),
     Notification.find(directQuery).sort({ createdAt: -1 }).limit(50).lean(),
     NotificationReceipt.find({ user_id: userId }).lean(),
   ]);
@@ -329,11 +341,39 @@ export const getUserNotificationFeed = async (userId) => {
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   );
 
-  const unreadCount = combined.filter((n) => n.unread).length;
+  const visibleNotifications = combined.filter((notification) => {
+    if (!notification.isBroadcast) return true;
+    return !readReceiptMap.get(String(notification._id))?.is_dismissed;
+  });
+  const unreadCount = visibleNotifications.filter((n) => n.unread).length;
 
   return {
-    notifications: combined,
+    notifications: visibleNotifications,
     unreadCount,
+  };
+};
+
+const getUserBroadcastQuery = async (user) => {
+  const audiences = [{ target_audience: "all" }];
+  if (user.campus_id) {
+    audiences.push({
+      target_audience: "campus",
+      target_campus: user.campus_id,
+    });
+  }
+
+  const [isBuyer, isSeller] = await Promise.all([
+    Deal.exists({ buyer_id: user._id }),
+    Product.exists({ seller_id: user._id }),
+  ]);
+  if (isBuyer) audiences.push({ target_audience: "buyers" });
+  if (isSeller) audiences.push({ target_audience: "sellers" });
+
+  return {
+    is_broadcast: true,
+    status: "sent",
+    createdAt: { $gte: new Date(user.createdAt || 0) },
+    $or: audiences,
   };
 };
 
@@ -349,12 +389,20 @@ export const markNotificationRead = async (notificationId, userId) => {
   if (!notification) throw new AppError("Notification not found", 404);
 
   if (!notification.is_broadcast) {
-    if (String(notification.recipient_id) === String(userId)) {
-      notification.is_read = true;
-      notification.read_at = new Date();
-      await notification.save();
+    if (String(notification.recipient_id) !== String(userId)) {
+      throw new AppError("Notification not found", 404);
     }
+    notification.is_read = true;
+    notification.read_at = new Date();
+    await notification.save();
   } else {
+    const user = await User.findById(userId).select("_id campus_id createdAt").lean();
+    if (!user || !(await Notification.exists({
+      _id: notificationId,
+      ...(await getUserBroadcastQuery(user)),
+    }))) {
+      throw new AppError("Notification not found", 404);
+    }
     await NotificationReceipt.findOneAndUpdate(
       { notification_id: notificationId, user_id: userId },
       { $set: { is_read: true, read_at: new Date() } },
@@ -371,26 +419,14 @@ export const markNotificationRead = async (notificationId, userId) => {
 export const markAllNotificationsRead = async (userId) => {
   // Mark direct notifications
   await Notification.updateMany(
-    { recipient_id: userId, is_read: false },
+    { recipient_id: userId, is_broadcast: false, status: "sent", is_read: false },
     { $set: { is_read: true, read_at: new Date() } }
   );
 
   // Mark broadcasts by creating receipts
-  const user = await User.findById(userId).select("campus_id createdAt").lean();
+  const user = await User.findById(userId).select("_id campus_id createdAt").lean();
   if (user) {
-    const broadcastQuery = {
-      is_broadcast: true,
-      status: "sent",
-      createdAt: { $gte: new Date(user.createdAt || 0) },
-      $or: [{ target_audience: "all" }],
-    };
-    if (user.campus_id) {
-      broadcastQuery.$or.push({
-        target_audience: "campus",
-        target_campus: user.campus_id,
-      });
-    }
-
+    const broadcastQuery = await getUserBroadcastQuery(user);
     const broadcasts = await Notification.find(broadcastQuery).select("_id").lean();
     const ops = broadcasts.map((b) => ({
       updateOne: {
@@ -409,20 +445,88 @@ export const markAllNotificationsRead = async (userId) => {
 };
 
 /**
+ * Dismiss a notification for its intended recipient only
+ */
+export const dismissNotification = async (notificationId, userId) => {
+  if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+    throw new AppError("Invalid notification ID", 400);
+  }
+
+  const notification = await Notification.findById(notificationId);
+  if (!notification) throw new AppError("Notification not found", 404);
+
+  if (!notification.is_broadcast) {
+    if (String(notification.recipient_id) !== String(userId)) {
+      throw new AppError("Notification not found", 404);
+    }
+    await Notification.updateOne(
+      { _id: notificationId, recipient_id: userId },
+      { $set: { is_dismissed: true, is_read: true, read_at: new Date() } },
+    );
+    return { ok: true };
+  }
+
+  const user = await User.findById(userId).select("_id campus_id createdAt").lean();
+  if (!user || !(await Notification.exists({
+    _id: notificationId,
+    ...(await getUserBroadcastQuery(user)),
+  }))) {
+    throw new AppError("Notification not found", 404);
+  }
+
+  await NotificationReceipt.findOneAndUpdate(
+    { notification_id: notificationId, user_id: userId },
+    {
+      $set: { is_dismissed: true, is_read: true, read_at: new Date() },
+    },
+    { upsert: true, new: true },
+  );
+  return { ok: true };
+};
+
+/**
  * Track notification click
  */
 export const trackNotificationClick = async (notificationId, userId) => {
-  if (!mongoose.Types.ObjectId.isValid(notificationId)) return;
+  if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+    throw new AppError("Invalid notification ID", 400);
+  }
 
-  await Notification.findByIdAndUpdate(notificationId, {
-    $inc: { "stats.clicked": 1 },
-  });
+  const notification = await Notification.findById(notificationId).lean();
+  if (!notification) throw new AppError("Notification not found", 404);
 
-  if (userId) {
+  if (notification.is_broadcast) {
+    const user = await User.findById(userId).select("_id campus_id createdAt").lean();
+    if (!user || !(await Notification.exists({
+      _id: notificationId,
+      ...(await getUserBroadcastQuery(user)),
+    }))) {
+      throw new AppError("Notification not found", 404);
+    }
+    await NotificationReceipt.findOneAndUpdate(
+      { notification_id: notificationId, user_id: userId },
+      {
+        $set: { is_clicked: true, clicked_at: new Date() },
+        $setOnInsert: { is_read: false, read_at: null },
+      },
+      { upsert: true },
+    );
+  } else {
+    if (String(notification.recipient_id) !== String(userId)) {
+      throw new AppError("Notification not found", 404);
+    }
+  }
+
+  await Notification.updateOne(
+    { _id: notificationId },
+    { $inc: { "stats.clicked": 1 } },
+  );
+
+  if (!notification.is_broadcast) {
     await NotificationReceipt.findOneAndUpdate(
       { notification_id: notificationId, user_id: userId },
       { $set: { is_clicked: true, clicked_at: new Date() } },
-      { upsert: true }
+      { upsert: true },
     );
   }
 };
@@ -447,16 +551,20 @@ export const getAdminNotificationStats = async () => {
   ]);
 
   const stats = totals[0] || { totalSent: 0, delivered: 0, clicked: 0 };
-  const deliveredPct = stats.totalSent > 0 ? Math.round((stats.delivered / stats.totalSent) * 100) : 95;
-  const clickedPct = stats.totalSent > 0 ? Math.round((stats.clicked / stats.totalSent) * 100) : 33;
+  const deliveredPct = stats.totalSent > 0
+    ? Math.round((stats.delivered / stats.totalSent) * 100)
+    : 0;
+  const clickedPct = stats.totalSent > 0
+    ? Math.round((stats.clicked / stats.totalSent) * 100)
+    : 0;
 
   return {
-    totalSent: stats.totalSent || 2548,
-    delivered: stats.delivered || 2421,
-    deliveredPercent: deliveredPct || 95,
-    clicked: stats.clicked || 842,
-    clickedPercent: clickedPct || 33,
-    activeUsers: activeCount > 0 ? activeCount : 1204,
+    totalSent: stats.totalSent || 0,
+    delivered: stats.delivered || 0,
+    deliveredPercent: deliveredPct,
+    clicked: stats.clicked || 0,
+    clickedPercent: clickedPct,
+    activeUsers: activeCount,
   };
 };
 
@@ -786,23 +894,33 @@ export const notifyPriceDrop = async ({
       stats: { total_sent: 1, delivered: 1, clicked: 0 },
     }));
 
-    const notifications = await Notification.insertMany(ops, { ordered: false });
+    const notifications = await Notification.insertMany(ops, { ordered: true });
+    const notificationByRecipient = new Map(
+      notifications.map((notification) => [
+        String(notification.recipient_id),
+        notification,
+      ]),
+    );
 
     // Push live to each wishlist holder
-    const payload = {
-      title: "Price Drop Alert! 🔥",
-      message,
-      description: message,
-      type: "OFFER / PROMO",
-      actionPath: `/product/${productId}`,
-      actionLabel: "Buy Now",
-      action_url: `/product/${productId}`,
-      action_label: "Buy Now",
-      time: "Just now",
-      unread: true,
-    };
     for (const u of wishlistUsers) {
-      emitToUser(u._id, "notification:new", { ...payload, id: String(u._id) });
+      const notification = notificationByRecipient.get(String(u._id));
+      if (!notification) continue;
+      emitToUser(u._id, "notification:new", {
+        id: String(notification._id),
+        _id: String(notification._id),
+        title: notification.title,
+        message: notification.message,
+        description: notification.message,
+        type: "OFFER / PROMO",
+        actionPath: notification.action_url,
+        actionLabel: notification.action_label,
+        action_url: notification.action_url,
+        action_label: notification.action_label,
+        createdAt: notification.createdAt,
+        time: "Just now",
+        unread: true,
+      });
     }
 
     return notifications;

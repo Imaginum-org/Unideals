@@ -83,6 +83,10 @@ const notificationSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    is_dismissed: {
+      type: Boolean,
+      default: false,
+    },
     read_at: {
       type: Date,
       default: null,
@@ -122,6 +126,10 @@ const notificationReceiptSchema = new Schema(
     is_read: {
       type: Boolean,
       default: true,
+    },
+    is_dismissed: {
+      type: Boolean,
+      default: false,
     },
     read_at: {
       type: Date,

@@ -105,6 +105,7 @@ Stored in MongoDB collection: `notifications`
   is_broadcast: Boolean,     // true = global/campus campaign; false = 1-to-1 event
   recipient_id: ObjectId,    // Target user (when is_broadcast === false)
   is_read: Boolean,          // Read status for 1-to-1 notifications
+  is_dismissed: Boolean,     // Hidden from the recipient's feed
   read_at: Date,             // Timestamp when 1-to-1 was read
   stats: {
     total_sent: Number,      // Target recipient count
@@ -128,6 +129,7 @@ Allows millions of broadcast reads without cloning whole notification payloads i
   notification_id: ObjectId, // Ref: "Notification" (indexed)
   user_id: ObjectId,         // Ref: "User" (indexed)
   is_read: Boolean,          // default: true
+  is_dismissed: Boolean,     // default: false; per-recipient feed dismissal
   read_at: Date,
   is_clicked: Boolean,       // default: false
   clicked_at: Date
@@ -139,14 +141,14 @@ Allows millions of broadcast reads without cloning whole notification payloads i
 
 To prevent the database from filling up with old notifications:
 
-- Both `Notification` and `NotificationReceipt` have native MongoDB **TTL (Time-To-Live)** indexes:
+- Both `Notification` and `NotificationReceipt` records expire after 30 days:
   ```javascript
   notificationSchema.index(
     { createdAt: 1 },
     { expireAfterSeconds: 30 * 24 * 60 * 60 }, // Automatically expires after 30 days
   );
   ```
-- MongoDB's internal background thread automatically cleans up documents older than 30 days, keeping database storage lean and high-performing with zero CPU overhead.
+- MongoDB's internal background thread automatically cleans up documents older than 30 days.
 
 ---
 
@@ -165,6 +167,8 @@ All routes require standard user authentication cookie/bearer token:
   - Marks all visible items as read in bulk.
 - **`POST /api/notifications/:id/click`**
   - Increments click analytics counter and records `is_clicked: true`.
+- **`DELETE /api/notifications/:id`**
+  - Dismisses a notification for the authenticated recipient (receipt-scoped for broadcasts).
 
 ### Admin Portal Endpoints (`/api/admin/notifications`)
 
@@ -256,52 +260,29 @@ sequenceDiagram
 
 ---
 
-## ❌ What Is Missing (Spec says built, but NOT called anywhere)
+## 10. Current Implementation Status
 
-| #   | Trigger                             | What's Missing                                                                                                   |
-| --- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 4   | **New Deal Offer made**             | `makeOffer()` in `deal.service.js` has NO notification call. Seller never hears about a new offer via bell/toast |
-| 5   | **Offer Accepted / Deal Confirmed** | `respondOffer()` / `confirmDeal()` — buyer gets NO notification                                                  |
-| 6   | **Pickup Spot Scheduled**           | `schedulePickup()` — counterparty gets NO notification                                                           |
-| 7   | **Item Received / Deal Completed**  | `confirmItemReceived()` — seller gets NO notification                                                            |
-| 8   | **Deal Cancelled**                  | `cancelDeal()` — counterparty gets NO notification                                                               |
-| 9   | **Price Drop Alert**                | Product price update in `product.service.js` has NO wishlist fan-out notification                                |
-| 10  | **Listing Moderation Warning**      | Report/flag actions in `report.service.js` has NO seller notification                                            |
-| 11  | **Support Role Assigned**           | Admin role promotion has NO notification to the user                                                             |
+The trigger-gap checklist above was previously reported as missing, but those entries are implemented and wired in the current code:
 
-### Summary
+| # | Trigger | Current implementation |
+| --- | --- | --- |
+| 1–2 | Admin instant and scheduled broadcasts | Implemented through the admin notification API, recipient dispatch, Socket.IO, and the scheduled-dispatch job. |
+| 3 | Direct chat message | Implemented in `backend/src/services/message.service.js`; suppressed while the recipient is in the conversation room. |
+| 4 | New deal offer | Implemented in `backend/src/services/deal.service.js`; notifies the seller. |
+| 5 | Offer accepted | Implemented in `backend/src/services/deal.service.js`; notifies the buyer who made the offer. |
+| 6 | Pickup scheduled | Implemented in `backend/src/services/deal.service.js`; notifies the buyer. |
+| 7 | Deal completed | Implemented in `backend/src/services/deal.service.js`; notifies the seller. |
+| 8 | Deal cancelled | Implemented in `backend/src/services/deal.service.js`; notifies the other party. |
+| 9 | Wishlist price drop | Implemented in `backend/src/services/product.service.js`; fans out direct alerts to wishlist owners. |
+| 10 | Listing moderation action | Implemented in `backend/src/services/report.service.js`; notifies the seller when a product report is actioned. |
+| 11 | Support role assignment | Implemented in `backend/src/services/admin.user.service.js`; notifies on a role change to support. |
 
-- **3 of 11 triggers are wired** (Admin broadcast, Scheduled broadcast, Chat message)
-- **8 of 11 triggers are completely missing** — deal lifecycle, price drops, moderation, role assignment
+The marketplace uses a single shared notification context for the header, profile navigation badge, and inbox. Broadcast receipts hold per-user read and dismiss state; direct notifications hold their own read and dismiss state. Admin delivery analytics count eligible recipients and currently connected eligible users rather than returning sample values.
 
----
+The user marketplace and backend are present in this repository. The separate admin portal that consumes the `/api/admin/notifications` endpoints is not part of this repository, so its form, preview, and rendering cannot be verified here.
 
-## 🔨 Implementation Plan
+## 11. Remaining Roadmap
 
-### Step 1 — Add notification functions to `notification.service.js`
-
-- `notifyNewOffer(conversationId, buyerId, buyerName, amount, productTitle, sellerId)`
-- `notifyOfferAccepted(conversationId, sellerName, productTitle, buyerId)`
-- `notifyPickupScheduled(conversationId, spotName, scheduledAt, recipientId, cancellerId)`
-- `notifyDealCompleted(conversationId, buyerName, productTitle, sellerId)`
-- `notifyDealCancelled(conversationId, productTitle, cancellerName, recipientId)`
-- `notifyPriceDrop(productId, oldPrice, newPrice, productTitle)` — fans out to all wishlist holders
-- `notifyModerationWarning(productId, productTitle, sellerId)`
-- `notifyRoleAssigned(userId, newRole)`
-
-### Step 2 — Wire notifications into `deal.service.js`
-
-- After `makeOffer()` saves — call `notifyNewOffer()`
-- After `respondOffer()` accept branch — call `notifyOfferAccepted()`
-- After `schedulePickup()` saves — call `notifyPickupScheduled()`
-- After `confirmItemReceived()` completes — call `notifyDealCompleted()`
-- After `cancelDeal()` saves — call `notifyDealCancelled()`
-
-### Step 3 — Wire into `product.service.js` (price drop)
-
-- When product price is updated downward → fan-out to wishlist holders
-
-### Step 4 — Wire into moderation & admin role flows
-
-- In `report.service.js` or `admin.service.js` — flag listing → notify seller
-- In admin role update → notify user
+- **Browser Web Push API (Service Worker):** Deliver OS-level notifications when the site is closed.
+- **Custom Notification Sound:** Add an opt-in sound control for high-priority notifications.
+- **Email Digest Option:** Send periodic unread-notification summaries to inactive users.

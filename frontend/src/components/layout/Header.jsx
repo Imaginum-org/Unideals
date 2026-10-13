@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { io } from "socket.io-client";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { GrLocation } from "react-icons/gr";
 import { CiSearch } from "react-icons/ci";
@@ -614,6 +613,13 @@ const Header = () => {
     fetchUserProfile,
     clearUserData,
   } = useUser();
+  const {
+    notifications,
+    unreadCount,
+    markRead,
+    markAllRead,
+    trackClick,
+  } = useNotification();
 
   // Campus marketplace scope (locked for members — changed only via
   // Settings; admins + guests may switch freely from the header).
@@ -637,11 +643,7 @@ const Header = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showmenu, setShowmenu] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(() =>
-    unreadCountOf(loadNotifications()),
-  );
   const [showNotif, setShowNotif] = useState(false);
-  const [notifItems, setNotifItems] = useState([]);
   const notifRef = useRef(null);
   // Live chat unread badge (same unread counters the chat list renders).
   const [chatBadge, setChatBadge] = useState(0);
@@ -741,70 +743,6 @@ const Header = () => {
       stop = true;
       clearInterval(t);
       window.removeEventListener("focus", onFocus);
-    };
-  }, [isLoggedIn]);
-
-  // Live in-app notifications sync with Socket.IO
-  useEffect(() => {
-    if (!isLoggedIn) {
-      setUnreadCount(0);
-      return;
-    }
-    let stop = false;
-    const loadNotif = async () => {
-      try {
-        const res = await axios.get("/api/notifications");
-        if (!stop && typeof res.data?.unreadCount === "number") {
-          setUnreadCount(res.data.unreadCount);
-        }
-      } catch {
-        // keep current fallback
-      }
-    };
-    loadNotif();
-
-    let socket;
-    try {
-      const socketURL =
-        (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/?$/, "") ||
-        undefined;
-      socket = io(socketURL, {
-        withCredentials: true,
-        transports: ["websocket", "polling"],
-      });
-      socket.on("notification:new", (item) => {
-        setUnreadCount((c) => c + 1);
-        if (item?.title) {
-          toast.info(item.title);
-        }
-        // Prepend to dropdown preview with icon metadata
-        if (item) {
-          setNotifItems((prev) => {
-            const meta = {
-              Icon: Bell,
-              iconColor: "text-slate-500",
-              dotColor: "bg-slate-500",
-            };
-            const newItem = {
-              id: item.id || item._id || Date.now(),
-              title: item.title || "New Notification",
-              description: item.description || item.message || "",
-              time: "Just now",
-              actionPath: item.actionPath || item.action_url || "/notification",
-              unread: true,
-              ...meta,
-            };
-            return [newItem, ...prev].slice(0, 5);
-          });
-        }
-      });
-    } catch {
-      // socket is best effort
-    }
-
-    return () => {
-      stop = true;
-      socket?.disconnect();
     };
   }, [isLoggedIn]);
 
@@ -1079,67 +1017,28 @@ const Header = () => {
     return { Icon: Bell, iconColor: "text-slate-500", dotColor: "bg-slate-500" };
   };
 
-  const refreshNotifs = async () => {
-    try {
-      const res = await axios.get("/api/notifications");
-      const items = (res.data?.data || []).slice(0, 5).map((n) => {
-        const meta = notifIconMeta(n.type);
-        return {
-          id: n.id || n._id,
-          title: n.title,
-          description: n.message || n.description,
-          time: n.time || "Just now",
-          actionPath: n.actionPath || n.action_url || "/notification",
-          unread: n.unread,
-          ...meta,
-        };
-      });
-      setNotifItems(items);
-      if (typeof res.data?.unreadCount === "number") {
-        setUnreadCount(res.data.unreadCount);
-      }
-    } catch {
-      // Fallback to localStorage-backed sample notifications
-      const list = loadNotifications();
-      setNotifItems(latestFirst(list).slice(0, 5));
-      setUnreadCount(unreadCountOf(list));
-    }
-  };
-
   const toggleNotif = () => {
-    if (!showNotif) refreshNotifs();
     setShowMsg(false);
     setShowNotif((prev) => !prev);
   };
 
   const openNotif = async (item) => {
-    // Optimistic UI update
-    setNotifItems((current) =>
-      current.map((n) => (n.id === item.id ? { ...n, unread: false } : n)),
-    );
-    setUnreadCount((c) => Math.max(0, c - (item.unread ? 1 : 0)));
     setShowNotif(false);
-    // Best-effort backend mark read + click tracking
-    try {
-      await axios.patch(`/api/notifications/${item.id}/read`);
-      await notificationApi.trackClick(item.id);
-    } catch { /* ignore */ }
-    markStoredRead(item.id);
+    await trackClick(item.id);
+    await markRead(item.id);
     navigate(item.actionPath || "/notification");
   };
 
-  const markAllNotifRead = async () => {
-    markStoredAllRead();
-    setNotifItems((current) => current.map((n) => ({ ...n, unread: false })));
-    setUnreadCount(0);
-    try { await axios.patch("/api/notifications/read-all"); } catch { /* ignore */ }
-  };
-
-  // Keep badge/count in sync when returning from the Notifications page
-  // (Header persists across route changes).
-  useEffect(() => {
-    refreshNotifs();
-  }, [location.pathname]);
+  const markAllNotifRead = () => markAllRead();
+  const notifItems = notifications.slice(0, 5).map((notification) => {
+    const meta = notifIconMeta(notification.type);
+    return {
+      ...notification,
+      icon: meta.Icon,
+      iconColor: meta.iconColor,
+      dotColor: meta.dotColor,
+    };
+  });
 
   // Notification dropdown: close on outside click, Escape, or scroll.
   useEffect(() => {

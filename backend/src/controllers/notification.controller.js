@@ -62,6 +62,23 @@ export const trackNotificationClick = async (req, res, next) => {
   }
 };
 
+// DELETE /api/notifications/:id
+export const dismissNotification = async (req, res, next) => {
+  try {
+    const result = await notificationService.dismissNotification(
+      req.params.id,
+      req.userId
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Notification dismissed",
+      data: result,
+    });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
 // ==================== ADMIN CONTROLLERS ====================
 
 // POST /api/admin/notifications

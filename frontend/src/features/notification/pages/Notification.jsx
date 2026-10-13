@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
 import {
   CheckCheck,
   ArrowUpRight,
@@ -15,11 +13,7 @@ import {
 } from "lucide-react";
 
 import Profile_left_part from "../../../features/user/components/Profile_left_part.jsx";
-import { notificationApi } from "../api/notificationApi.js";
-import { initialNotifications } from "../data/notifications.js";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL || "";
-const socketURL = baseURL.replace(/\/api\/?$/, "") || undefined;
+import { useNotification } from "../../../context/NotificationContext.jsx";
 
 // Resolve icon and style by notification type
 const getNotificationTypeMeta = (type = "") => {
@@ -89,99 +83,20 @@ const getNotificationTypeMeta = (type = "") => {
 
 export default function Notification() {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Load from backend on mount
-  useEffect(() => {
-    let mounted = true;
-    const fetchNotifications = async () => {
-      try {
-        const res = await notificationApi.getNotifications();
-        if (mounted && res?.data) {
-          setNotifications(res.data);
-          return;
-        }
-      } catch {
-        // Fallback to sample items if backend request fails / offline
-        if (mounted) {
-          setNotifications(initialNotifications);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    fetchNotifications();
-
-    // Listen to real-time notification pushes via Socket.IO
-    let socket;
-    try {
-      socket = io(socketURL, {
-        withCredentials: true,
-        transports: ["websocket", "polling"],
-      });
-
-      socket.on("notification:new", (newNotif) => {
-        setNotifications((prev) => [
-          {
-            ...newNotif,
-            id: newNotif.id || newNotif._id,
-            unread: true,
-            time: "Just now",
-          },
-          ...prev,
-        ]);
-      });
-    } catch {
-      // socket is best effort
-    }
-
-    return () => {
-      mounted = false;
-      socket?.disconnect();
-    };
-  }, []);
-
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => n.unread).length,
-    [notifications]
-  );
-
-  const markRead = async (id) => {
-    setNotifications((current) =>
-      current.map((n) => (n.id === id ? { ...n, unread: false } : n))
-    );
-    try {
-      await notificationApi.markRead(id);
-    } catch {
-      // ignore
-    }
-  };
-
-  const markAllRead = async () => {
-    setNotifications((current) =>
-      current.map((n) => ({ ...n, unread: false }))
-    );
-    try {
-      await notificationApi.markAllRead();
-    } catch {
-      // ignore
-    }
-  };
-
-  const dismissNotification = (id) => {
-    setNotifications((current) => current.filter((n) => n.id !== id));
-    // Best-effort: mark as read on dismiss so it doesn't reappear
-    try { notificationApi.markRead(id); } catch { /* ignore */ }
-  };
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    error,
+    markRead,
+    markAllRead,
+    trackClick,
+    dismiss,
+    fetchNotifications,
+  } = useNotification();
 
   const openNotification = async (notification) => {
-    try {
-      await notificationApi.trackClick(notification.id);
-    } catch {
-      // ignore
-    }
+    await trackClick(notification.id);
     await markRead(notification.id);
     const targetPath =
       notification.actionPath || notification.action_url || "/deals";
@@ -220,11 +135,27 @@ export default function Notification() {
               </div>
             </header>
 
+            {error && (
+              <div
+                role="alert"
+                className="mb-4 flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={fetchNotifications}
+                  className="font-bold underline underline-offset-2"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+
             {loading ? (
               <div className="flex justify-center py-16">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
               </div>
-            ) : notifications.length === 0 ? (
+            ) : error && notifications.length === 0 ? null : notifications.length === 0 ? (
               <div className="rounded-2xl border border-[#E2E6EF] bg-[#F7F8FA] p-10 text-center dark:border-gray-800 dark:bg-[#1c1c1c]">
                 <p className="text-4xl">🎉</p>
                 <h2 className="mt-3 text-base font-bold text-[#09111F] dark:text-white">
@@ -316,7 +247,7 @@ export default function Notification() {
 
                             <button
                               type="button"
-                              onClick={() => dismissNotification(notification.id)}
+                              onClick={() => dismiss(notification.id)}
                               className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[#E2E6EF] bg-[#F7F8FA] px-4 text-[13px] font-bold text-[#9AA3B2] transition hover:border-rose-400 hover:text-rose-500 dark:border-gray-800 dark:bg-[#1c1c1c] sm:w-auto"
                             >
                               <X size={14} />

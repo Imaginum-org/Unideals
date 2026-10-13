@@ -228,7 +228,7 @@ export const updateUserRole = async (userId, role) => {
   });
 
   // Notify user when they are promoted to support — fire-and-forget
-  if (role === USER_ROLES.SUPPORT) {
+  if (role === USER_ROLES.SUPPORT && targetUser.role !== role) {
     notifyRoleAssigned({ userId, newRole: role }).catch(() => {});
   }
 

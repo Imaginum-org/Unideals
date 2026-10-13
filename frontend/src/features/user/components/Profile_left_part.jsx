@@ -16,6 +16,7 @@ import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import axios from "../../../services/axiosInstance.js";
+import { useNotification } from "../../../context/NotificationContext.jsx";
 
 // ─── NavItem defined OUTSIDE the parent so hooks are stable across renders ───
 // Having it inside caused React to reset state (including isCollapsed) on every
@@ -77,31 +78,26 @@ const NavItem = ({ path, label, icon: Icon, badge, isCollapsed, pathname }) => {
 
 function Profile_left_part() {
   const { userDetails, loading, isLoggedIn } = useUser();
+  const { unreadCount: notifUnread } = useNotification();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   // Live chat unread (same counters the chat list renders) — hidden at 0.
   const [chatUnread, setChatUnread] = useState(0);
-  const [notifUnread, setNotifUnread] = useState(0);
 
   useEffect(() => {
     if (!isLoggedIn) {
       setChatUnread(0);
-      setNotifUnread(0);
       return;
     }
     let stop = false;
     const load = async () => {
       try {
-        const [chatRes, notifRes] = await Promise.all([
-          axios.get("/api/conversations", { params: { limit: 1 } }),
-          axios.get("/api/notifications"),
-        ]);
+        const chatRes = await axios.get("/api/conversations", {
+          params: { limit: 1 },
+        });
         if (!stop) {
           setChatUnread(Number(chatRes.data?.meta?.unreadTotal || 0));
-          if (typeof notifRes.data?.unreadCount === "number") {
-            setNotifUnread(notifRes.data.unreadCount);
-          }
         }
       } catch {
         // Badge stays stale — never break the menu over it.
