@@ -200,25 +200,25 @@ export const getAdminOrders = async (query = {}) => {
     const pickupLoc = d.pickup?.location || product.pickup_address_snapshot || {};
     const deliveryAddress = [pickupLoc.address_line, pickupLoc.city, campusName]
       .filter(Boolean)
-      .join(", ") || `${campusName} Campus Meetup Spot`;
+      .join(", ") || null;
 
     return {
       id: d._id.toString(),
       orderId: formatOrderId(d._id),
       buyer: {
-        id: buyer._id ? buyer._id.toString() : `USR${String(d._id).slice(-4)}`,
+        id: buyer._id ? buyer._id.toString() : null,
         name: buyer.name || "Student Buyer",
-        email: buyer.email || "buyer@college.edu",
+        email: buyer.email || null,
         avatar: buyer.avatar?.url || (typeof buyer.avatar === "string" ? buyer.avatar : null),
-        phone: buyer.mobile || "+91 98765 43210",
+        phone: buyer.mobile || null,
         campus: campusName,
       },
       seller: {
         id: seller._id ? seller._id.toString() : null,
         name: seller.name || "Student Seller",
-        email: seller.email || "seller@college.edu",
+        email: seller.email || null,
         avatar: seller.avatar?.url || (typeof seller.avatar === "string" ? seller.avatar : null),
-        phone: seller.mobile || "+91 98123 45678",
+        phone: seller.mobile || null,
       },
       product: {
         id: product._id ? product._id.toString() : null,
@@ -233,8 +233,8 @@ export const getAdminOrders = async (query = {}) => {
       originalAmount: d.original_price || d.current_price || 0,
       payment: {
         status: isPaid ? "Paid" : d.status === DEAL_STATUS.CANCELLED ? "Refunded" : "Pending",
-        method: isPaid ? "Razorpay (UPI)" : "Cash on Meetup",
-        txnId: isPaid ? `pay_${String(d._id).slice(-8)}` : null,
+        method: null,
+        txnId: null,
       },
       status: orderStage,
       rawStatus: d.status,
@@ -307,25 +307,25 @@ export const getAdminOrderById = async (dealId) => {
   const pickupLoc = d.pickup?.location || product.pickup_address_snapshot || {};
   const deliveryAddress = [pickupLoc.address_line, pickupLoc.city, campusName]
     .filter(Boolean)
-    .join(", ") || `${campusName} Campus Meetup Spot`;
+    .join(", ") || null;
 
   return {
     id: d._id.toString(),
     orderId: formatOrderId(d._id),
     buyer: {
-      id: buyer._id ? buyer._id.toString() : `USR${String(d._id).slice(-4)}`,
+      id: buyer._id ? buyer._id.toString() : null,
       name: buyer.name || "Student Buyer",
-      email: buyer.email || "buyer@college.edu",
+      email: buyer.email || null,
       avatar: buyer.avatar?.url || (typeof buyer.avatar === "string" ? buyer.avatar : null),
-      phone: buyer.mobile || "+91 98765 43210",
+      phone: buyer.mobile || null,
       campus: campusName,
     },
     seller: {
       id: seller._id ? seller._id.toString() : null,
       name: seller.name || "Student Seller",
-      email: seller.email || "seller@college.edu",
+      email: seller.email || null,
       avatar: seller.avatar?.url || (typeof seller.avatar === "string" ? seller.avatar : null),
-      phone: seller.mobile || "+91 98123 45678",
+      phone: seller.mobile || null,
     },
     product: {
       id: product._id ? product._id.toString() : null,
@@ -340,8 +340,8 @@ export const getAdminOrderById = async (dealId) => {
     originalAmount: d.original_price || d.current_price || 0,
     payment: {
       status: isPaid ? "Paid" : d.status === DEAL_STATUS.CANCELLED ? "Refunded" : "Pending",
-      method: isPaid ? "Razorpay (UPI)" : "Cash on Meetup",
-      txnId: isPaid ? `pay_${String(d._id).slice(-8)}` : null,
+      method: null,
+      txnId: null,
     },
     status: orderStage,
     rawStatus: d.status,
