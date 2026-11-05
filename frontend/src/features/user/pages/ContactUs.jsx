@@ -1,430 +1,748 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useUser } from "../../../context/useUserContext.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import emailjs from "@emailjs/browser";
-import { Toaster, toast } from "react-hot-toast";
-import Loading from "../../../Components/ui/ContactLoader.jsx";
-import { useUser } from "../../../context/useUserContext.jsx";
+import toast from "react-hot-toast";
 import {
-  MdAccessTime,
-  MdEmail,
-  MdHelp,
-  MdOutlineArrowForward,
-  MdOutlineLocalOffer,
-  MdOutlineSubject,
-} from "react-icons/md";
+  Search,
+  MessageSquare,
+  ShieldAlert,
+  Lightbulb,
+  Clock,
+  Mail,
+  Headphones,
+  ChevronDown,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 
-const EMAILJS_SERVICE_ID = (
-  import.meta.env.VITE_EMAILJS_SERVICE_ID ||
-  import.meta.env.VITE_SERVICE_ID ||
-  ""
-).trim();
-const EMAILJS_TEMPLATE_ID = (
-  import.meta.env.VITE_EMAILJS_TEMPLATE_ID ||
-  import.meta.env.VITE_TEMPLATE_ID ||
-  ""
-).trim();
-const EMAILJS_PUBLIC_KEY = (
-  import.meta.env.VITE_EMAILJS_PUBLIC_KEY ||
-  import.meta.env.VITE_PUBLIC_KEY ||
-  ""
-).trim();
-const SUPPORT_EMAIL =
-  import.meta.env.VITE_SUPPORT_EMAIL?.trim() || "imaginum.org@gmail.com";
-
-if (EMAILJS_PUBLIC_KEY) {
-  emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-}
-
-const contactTypes = [
-  { value: "order", label: "Order issue" },
-  { value: "payment", label: "Payment issue" },
-  { value: "account", label: "Account help" },
-  { value: "listing", label: "Product listing" },
-  { value: "deal", label: "Deal or chat help" },
-  { value: "safety", label: "Safety report" },
-  { value: "other", label: "Other" },
-];
-
-const priorityOptions = [
-  { value: "low", label: "Low", hint: "General question" },
-  { value: "normal", label: "Normal", hint: "Need help soon" },
-  { value: "urgent", label: "Urgent", hint: "Blocking issue" },
-];
-
-const replyMethods = [
-  { value: "email", label: "Email" },
-  { value: "chat", label: "Unideals chat" },
-  { value: "either", label: "Either works" },
-];
-
-const faqs = [
+// FAQ Data Structure
+const faqData = [
   {
-    question: "How do I track my order?",
-    answer:
-      "Open My Orders from your profile menu. If the seller has shared status updates, they will appear inside the order card.",
+    id: "transactions",
+    title: "TRANSACTIONS",
+    questions: [
+      {
+        q: "How do I track the status of a deal?",
+        a: 'Go to Orders in your profile — each deal shows a live progress tracker from "Enquired" through "Meetup Confirmed" and "Completed". You and the seller both get notifications at each stage.',
+      },
+      {
+        q: "Can I return an item after buying it?",
+        a: "UniDeals connects students directly — there is no platform-level returns system. We strongly recommend inspecting all items before completing a deal. Once marked as done, transactions cannot be reversed.",
+      },
+      {
+        q: "What if I got scammed or the item is not as described?",
+        a: "Report the listing immediately using the flag icon on the product page or seller profile. Our safety team reviews every report within 24 hours and will contact you via email.",
+      },
+    ],
   },
   {
-    question: "What should I include for payment issues?",
-    answer:
-      "Share the order or product reference, payment time, amount, and a short description. Do not send passwords or card details.",
+    id: "safety",
+    title: "SAFETY",
+    questions: [
+      {
+        q: "Is it safe to meet a seller on campus?",
+        a: "All users on UniDeals are verified students. Always meet in public, well-lit campus areas — the canteen, library lobby, or main gate. Never share home addresses or pay before inspecting the item.",
+      },
+      {
+        q: "What if a seller stops responding?",
+        a: "If a seller stops responding, we recommend canceling the deal and looking for alternative listings.",
+      },
+    ],
   },
   {
-    question: "How fast will support reply?",
-    answer:
-      "Most messages are reviewed within 24 hours. Urgent safety or payment issues are prioritized first.",
+    id: "account",
+    title: "ACCOUNT & VERIFICATION",
+    questions: [
+      {
+        q: "How does Campus Verification Works ?",
+        a: "Go to Settings → Verification and enter your official university email (e.g. name@vitstudent.ac.in). We send a one-click confirmation link. Once verified, your profile shows a blue badge which increases buyer trust",
+      },
+      {
+        q: "How do I delete my account ?",
+        a: 'Go to Settings → Profile and scroll to the Account section. Click "Delete account". This is permanent and cannot be undone. All your listings will be removed.',
+      },
+      {
+        q: "Can I change my campus or pickup location ?",
+        a: "Yes — go to Settings → Pickup Spots to update your preferred campus meetup locations. To change your campus, update it under Settings → Profile.",
+      },
+    ],
   },
   {
-    question: "Can I report a suspicious listing?",
-    answer:
-      "Yes. Choose Safety report or Product listing, include the product reference if you have it, and describe what looked wrong.",
+    id: "listings",
+    title: "LISTINGS",
+    questions: [
+      {
+        q: "How do I create a listing",
+        a: 'Tap "Sell" in the navigation bar. Add photos, set a price, write a clear description, and choose a category. Your listing goes live immediately after submission.',
+      },
+      {
+        q: "How does Boost work",
+        a: "Boosting a listing promotes it to the top of search results and category feeds for 48 hours. You can boost any active listing from My Listings → Boost.",
+      },
+    ],
   },
 ];
-
-const getOptionLabel = (options, value) =>
-  options.find((option) => option.value === value)?.label || "";
 
 function ContactUs() {
   const { userDetails } = useUser();
-  const [contactType, setContactType] = useState("");
-  const [priority, setPriority] = useState("");
-  const [replyMethod, setReplyMethod] = useState("email");
-  const [subject, setSubject] = useState("");
-  const [reference, setReference] = useState("");
-  const [message, setMessage] = useState("");
-  const [activeIndex, setActiveIndex] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [activeForm, setActiveForm] = useState(null); // 'contact', 'report', 'suggest'
+  const [openCategory, setOpenCategory] = useState(null);
+  const [openQuestion, setOpenQuestion] = useState(null);
 
-  const selectedContactType = getOptionLabel(contactTypes, contactType);
-  const selectedPriority = getOptionLabel(priorityOptions, priority);
-  const selectedReplyMethod = getOptionLabel(replyMethods, replyMethod);
-  const senderName = userDetails?.name?.trim() || "Campus Mart user";
-  const senderEmail = userDetails?.email?.trim() || "";
+  // Unified Form States
+  const [contactForm, setContactForm] = useState({ topic: "", message: "" });
+  const [reportForm, setReportForm] = useState({
+    category: "",
+    link: "",
+    description: "",
+  });
+  const [suggestForm, setSuggestForm] = useState({
+    title: "",
+    description: "",
+    whyUseful: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const resetForm = () => {
-    setContactType("");
-    setPriority("normal");
-    setReplyMethod("email");
-    setSubject("");
-    setReference("");
-    setMessage("");
+  const toggleCategory = (id) => {
+    setOpenCategory(openCategory === id ? null : id);
+    setOpenQuestion(null);
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const toggleQuestion = (q) => {
+    setOpenQuestion(openQuestion === q ? null : q);
+  };
 
-    if (!contactType || !subject.trim() || !message.trim()) {
-      toast("Please complete the required fields.");
-      return;
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    // Base template parameters mapped to your HTML template
+    let templateParams = {
+      sender_name: userDetails?.name || "Unregistered User",
+      sender_email: userDetails?.email || "No email provided",
+      preferred_reply: "Email",
+      reference: "N/A",
+    };
+
+    // Dynamically update parameters based on the active form
+    if (activeForm === "contact") {
+      if (!contactForm.topic || !contactForm.message.trim()) {
+        toast.error("Please fill in all fields.");
+        setIsSubmitting(false);
+        return;
+      }
+      templateParams = {
+        ...templateParams,
+        contact_type: "Support Request",
+        priority: "Normal",
+        user_subject: contactForm.topic,
+        user_message: contactForm.message,
+      };
+    } else if (activeForm === "report") {
+      if (!reportForm.category || !reportForm.description.trim()) {
+        toast.error("Please select a category and provide a description.");
+        setIsSubmitting(false);
+        return;
+      }
+      templateParams = {
+        ...templateParams,
+        contact_type: "Issue / Bug Report",
+        priority: "High",
+        reference: reportForm.link || "N/A",
+        user_subject: reportForm.category,
+        user_message: reportForm.description,
+      };
+    } else if (activeForm === "suggest") {
+      if (!suggestForm.title || !suggestForm.description.trim()) {
+        toast.error("Please provide a title and description.");
+        setIsSubmitting(false);
+        return;
+      }
+      templateParams = {
+        ...templateParams,
+        contact_type: "Feature Suggestion",
+        priority: "Low",
+        user_subject: suggestForm.title,
+        user_message: `Description:\n${suggestForm.description}\n\nWhy it is useful:\n${suggestForm.whyUseful || "Not provided"}`,
+      };
     }
-
-    if (!senderEmail) {
-      toast.error("We could not read your account email. Please log in again.");
-      return;
-    }
-
-    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
-      toast.error("Contact service is not configured. Please try again later.");
-      return;
-    }
-
-    const cleanReference = reference.trim() || "Not provided";
-    const cleanSubject = subject.trim();
-    const cleanMessage = message.trim();
-
-    const fullMessage = [
-      `Sender name: ${senderName}`,
-      `Sender email: ${senderEmail}`,
-      `Contact type: ${selectedContactType}`,
-      `Priority: ${selectedPriority}`,
-      `Preferred reply: ${selectedReplyMethod}`,
-      `Reference: ${cleanReference}`,
-      "",
-      "Message:",
-      cleanMessage,
-    ].join("\n");
-
-    setLoading(true);
 
     try {
       await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        {
-          to_email: SUPPORT_EMAIL,
-          from_name: senderName,
-          sender_name: senderName,
-          user_name: senderName,
-          from_email: senderEmail,
-          sender_email: senderEmail,
-          reply_to: senderEmail,
-          contact_type: selectedContactType,
-          priority: selectedPriority,
-          preferred_reply: selectedReplyMethod,
-          reference: cleanReference,
-          subject: `Unideals Support: ${cleanSubject}`,
-          user_subject: cleanSubject,
-          message: fullMessage,
-          user_message: cleanMessage,
-        },
-        { publicKey: EMAILJS_PUBLIC_KEY },
+        import.meta.env.VITE_EMAILJS_SERVICE_ID,
+        import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+        templateParams,
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
       );
 
-      toast.success("Message sent successfully!");
-      resetForm();
+      toast.success("Message sent successfully! We'll be in touch soon.");
+
+      // Clear forms and reset view
+      setContactForm({ topic: "", message: "" });
+      setReportForm({ category: "", link: "", description: "" });
+      setSuggestForm({ title: "", description: "", whyUseful: "" });
+      setActiveForm(null);
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to send message. Try again.");
+      console.error("EmailJS Error:", error);
+      toast.error("Failed to send message. Please try again.");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const toggleFAQ = (index) => {
-    setActiveIndex((prev) => (prev === index ? null : index));
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
   };
 
   return (
-    <>
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          duration: 1800,
-          maxToasts: 1,
-        }}
-      />
-      {loading && <Loading />}
-
-      <div className="min-h-screen bg-[#FBFBFB] dark:bg-[#131313]">
-        <div className="flex min-h-[calc(100vh-70px)]">
-          <aside className="hidden bg-[#FBFBFB] pb-[2vh] pl-[2vw] pr-[1.75vw] pt-[3.5vh] dark:bg-[#131313] md:block md:w-[37%] lg:w-[28%] xl:-mr-4 xl:w-[26%] xl:pb-0 xl:pt-[2.5vh]">
+    <div className="h-screen w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree text-black dark:text-white">
+      <div className="flex-1 lg:flex md:flex overflow-hidden">
+        {/* LEFT PANEL */}
+        {userDetails?._id ? (
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
-          </aside>
+          </div>
+        ) : null}
 
-          <main className="w-full overflow-y-auto bg-[#FBFBFB] px-4 py-6 dark:bg-[#131313] md:w-[63%] md:px-7 lg:w-[72%] xl:w-[73.5%] xl:px-10">
-            <div className="mx-auto max-w-6xl">
-              <section className="overflow-hidden rounded-3xl border border-[#E7E9FF] bg-white shadow-[0_18px_45px_rgba(36,49,148,0.08)] dark:border-[#282A2C] dark:bg-[#1A1D20]">
-                <div className="relative bg-gradient-to-r from-[#364EF2] via-[#4545F4] to-[#2367E8] px-5 py-6 text-white sm:px-7 lg:px-8">
-                  <div className="absolute right-[-3rem] top-[-3rem] h-36 w-36 rounded-full bg-white/10" />
-                  <div className="absolute bottom-[-4rem] left-[32%] h-32 w-32 rounded-full bg-white/10" />
-
-                  <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                        <MdEmail className="text-base" />
-                        Unideals Support
-                      </div>
-                      <h1 className="font-poppins text-2xl font-semibold tracking-normal sm:text-3xl">
-                        How can we help?
-                      </h1>
-                      <p className="mt-2 max-w-2xl font-inter text-sm leading-6 text-white/85 sm:text-base">
-                        Send us the details and we&apos;ll route your message
-                        with the right context.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-8">
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <AuthLikeField
-                        label="Contact type"
-                        required
-                        icon={<MdHelp />}
-                        active={Boolean(contactType)}
-                      >
-                        <select
-                          value={contactType}
-                          onChange={(event) =>
-                            setContactType(event.target.value)
-                          }
-                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
-                        >
-                          {/* This empty, disabled, hidden option prevents the text overlap */}
-                          <option value="" disabled hidden></option>
-
-                          {contactTypes.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </AuthLikeField>
-                      <AuthLikeField
-                        label="Priority"
-                        icon={<MdAccessTime />}
-                        active={Boolean(priority)}
-                      >
-                        <select
-                          value={priority}
-                          onChange={(event) => setPriority(event.target.value)}
-                          className="h-[6.3vh] min-h-12 w-full appearance-none rounded-xl border border-transparent bg-slate-50 pl-10 pr-9 text-[0.8125rem] text-[#111827] outline-none transition focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
-                        >
-                          {/* This empty, disabled, hidden option prevents the text overlap */}
-                          <option value="" disabled hidden></option>
-
-                          {priorityOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label} - {option.hint}
-                            </option>
-                          ))}
-                        </select>
-                      </AuthLikeField>
-                    </div>
-
-                    <AuthLikeField
-                      label="Subject"
-                      required
-                      icon={<MdOutlineSubject />}
-                      active={Boolean(subject)}
-                    >
-                      <input
-                        value={subject}
-                        onChange={(event) => setSubject(event.target.value)}
-                        className="h-[6.3vh] min-h-12 w-full rounded-xl border border-transparent bg-slate-50 pl-10 pr-3 text-[0.8125rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
-                        placeholder=" "
-                      />
-                    </AuthLikeField>
-
-                    <AuthLikeField
-                      label="Message"
-                      required
-                      icon={<MdOutlineLocalOffer />}
-                      active={Boolean(message)}
-                      multiline
-                    >
-                      <textarea
-                        rows="6"
-                        value={message}
-                        onChange={(event) => setMessage(event.target.value)}
-                        className="min-h-[9rem] w-full resize-none rounded-xl border border-transparent bg-slate-50 pb-3 pl-10 pr-4 pt-8 text-[0.8125rem] leading-6 text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]"
-                        placeholder=" "
-                      />
-                    </AuthLikeField>
-
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-                        Please do not include passwords, OTPs, or card details.
-                      </p>
-                      <button
-                        disabled={loading}
-                        type="submit"
-                        className="inline-flex h-[6.3vh] items-center justify-center gap-2 rounded-xl bg-[#364EF2] px-7 font-poppins text-sm font-semibold text-white shadow-[0_12px_24px_rgba(54,78,242,0.25)] transition hover:bg-[#2d44dd] disabled:cursor-not-allowed disabled:opacity-60 xl:text-xs"
-                      >
-                        {loading ? "Sending..." : "Send "}
-                        <MdOutlineArrowForward className="text-lg xl:text-base" />
-                      </button>
-                    </div>
-                  </form>
-
-                  <aside className="space-y-4">
-                    <div className="rounded-2xl border border-[#E7E9FF] bg-white p-5 dark:border-[#2A2D35] dark:bg-[#131313]">
-                      <h2 className="font-poppins text-lg font-semibold text-slate-950 dark:text-white">
-                        Quick tips
-                      </h2>
-                      <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                        <li>
-                          Include an order or product reference when possible.
-                        </li>
-                        <li>
-                          Use urgent only for blocked payments or safety issues.
-                        </li>
-                        <li>Tell us what result would solve the problem.</li>
-                      </ul>
-                    </div>
-                  </aside>
-                </div>
-              </section>
-
-              <section className="mt-6 rounded-3xl border border-[#E7E9FF] bg-white p-5 shadow-[0_18px_45px_rgba(36,49,148,0.06)] dark:border-[#282A2C] dark:bg-[#1A1D20] sm:p-7">
-                <h2 className="font-poppins text-xl font-semibold text-gray-950 dark:text-white">
-                  Frequently Asked Questions
-                </h2>
-
-                {/* Changed from 'grid lg:grid-cols-2' to 'flex flex-col' for 1 row per question */}
-                <div className="mt-5 flex flex-col gap-3">
-                  {faqs.map((item, index) => {
-                    const isOpen = activeIndex === index;
-                    return (
-                      <div
-                        key={item.question}
-                        className="rounded-2xl border border-gray-200 bg-white dark:border-[#2A2D35] dark:bg-[#131313]"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleFAQ(index)}
-                          className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left"
-                        >
-                          <span className="font-poppins text-sm font-medium text-gray-900 dark:text-white">
-                            {item.question}
-                          </span>
-                          <span
-                            className={`text-lg text-[#364EF2] transition-transform duration-200 ${
-                              isOpen ? "rotate-45" : ""
-                            }`}
-                          >
-                            +
-                          </span>
-                        </button>
-
-                        <div
-                          className={`grid transition-all duration-300 ease-out ${
-                            isOpen
-                              ? "grid-rows-[1fr] opacity-100"
-                              : "grid-rows-[0fr] opacity-0"
-                          }`}
-                        >
-                          <div className="overflow-hidden">
-                            <p className="px-4 pb-4 text-sm leading-6 text-gray-600 dark:text-gray-400">
-                              {item.answer}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            </div>
-          </main>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function AuthLikeField({
-  label,
-  required = false,
-  icon,
-  active,
-  multiline = false,
-  children,
-}) {
-  return (
-    <label className="block">
-      <span className="relative block group">
-        <span
-          className={`absolute left-3 z-10 text-lg text-gray-500 transition group-focus-within:text-[#393AF2] ${
-            multiline ? "top-6" : "top-1/2 -translate-y-1/2"
+        {/* RIGHT PANEL */}
+        <div
+          className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-4 xl:px-[5.7rem] xl:py-6 ${
+            userDetails?._id
+              ? "w-full md:flex-1"
+              : "mx-auto w-full max-w-5xl"
           }`}
         >
-          {icon}
-        </span>
-        <span
-          className={`pointer-events-none absolute left-10 z-10 px-1 font-figtree transition-all duration-200 ${
-            active
-              ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-[#131313] dark:text-[#818cf8]"
-              : `${multiline ? "top-7" : "top-1/2 -translate-y-1/2"} text-[0.75rem] text-gray-500/80`
-          } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-[#131313] dark:group-focus-within:text-[#818cf8]`}
-        >
-          {label}
-          {required ? " *" : ""}
-        </span>
-        {children}
-      </span>
-    </label>
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="max-w-3xl mx-auto pb-10"
+          >
+            {/* Header */}
+            <motion.div variants={itemVariants} className="mb-6">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                Help & Support
+              </h1>
+              <p className="text-sm text-gray-500">
+                Find answers, report issues, or reach our team.
+              </p>
+            </motion.div>
+
+            {/* Search Bar */}
+            <motion.div variants={itemVariants} className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search help articles..."
+                className="w-full pl-9 pr-4 py-2 text-sm border bg-white border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white transition-all"
+              />
+            </motion.div>
+
+            {/* Action Cards */}
+            <motion.div
+              variants={itemVariants}
+              className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6"
+            >
+              <button
+                onClick={() => setActiveForm("contact")}
+                className={`group p-4 text-left border rounded-2xl transition-all duration-300 ${
+                  activeForm === "contact"
+                    ? "border-indigo-500 shadow-sm"
+                    : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#4F46E5] group-hover:scale-105 group-hover:shadow-md">
+                  <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400 transition-colors duration-300 group-hover:text-white" />
+                </div>
+                <h3 className="text-sm font-bold  text-gray-900 dark:text-white transition-colors">
+                  Contact support
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">Reach our team</p>
+              </button>
+
+              <button
+                onClick={() => setActiveForm("report")}
+                className={`group p-4 text-left border rounded-2xl transition-all duration-300 ${
+                  activeForm === "report"
+                    ? "border-red-500 shadow-sm"
+                    : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#EF4444] group-hover:scale-105 group-hover:shadow-md">
+                  <ShieldAlert className="w-4 h-4 text-red-500 transition-colors duration-300 group-hover:text-white" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white transition-colors">
+                  Report an issue
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Safety, fraud or bugs
+                </p>
+              </button>
+
+              <button
+                onClick={() => setActiveForm("suggest")}
+                className={`group p-4 text-left border rounded-2xl transition-all duration-300 ${
+                  activeForm === "suggest"
+                    ? "border-green-500 shadow-sm"
+                    : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#22C55E] group-hover:scale-105 group-hover:shadow-md">
+                  <Lightbulb className="w-4 h-4 text-green-600 dark:text-green-400 transition-colors duration-300 group-hover:text-white" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white transition-colors">
+                  Suggest a feature
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">Share your ideas</p>
+              </button>
+            </motion.div>
+
+            {/* Dynamic Content Area */}
+            <AnimatePresence mode="wait">
+              {activeForm ? (
+                <motion.div
+                  key="form-view"
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-[#1f1f1f] p-5 relative mb-6"
+                >
+                  <button
+                    onClick={() => setActiveForm(null)}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  {/* CONTACT FORM */}
+                  {activeForm === "contact" && (
+                    <motion.form
+                      onSubmit={handleEmailSubmit}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      <h2 className="text-base font-semibold mb-1 dark:text-white">
+                        Contact support
+                      </h2>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Fill in the details below and we will follow up.
+                      </p>
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Topic
+                      </label>
+                      <select
+                        value={contactForm.topic}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            topic: e.target.value,
+                          })
+                        }
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                        required
+                      >
+                        <option value="">Select a topic</option>
+                        <option value="Account assistance">
+                          Account assistance
+                        </option>
+                        <option value="Deal inquiries">Deal inquiries</option>
+                        <option value="Other">Other</option>
+                      </select>
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Message
+                      </label>
+                      <textarea
+                        rows="3"
+                        value={contactForm.message}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            message: e.target.value,
+                          })
+                        }
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                        placeholder="Describe your issue in as much detail as possible..."
+                        required
+                      ></textarea>
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveForm(null)}
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
+                        >
+                          <MessageSquare className="w-4 h-4" />{" "}
+                          {isSubmitting ? "Sending..." : "Send message"}
+                        </button>
+                      </div>
+                    </motion.form>
+                  )}
+
+                  {/* REPORT FORM */}
+                  {activeForm === "report" && (
+                    <motion.form
+                      onSubmit={handleEmailSubmit}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      <h2 className="text-base font-semibold mb-1 dark:text-white">
+                        Report an issue or bug
+                      </h2>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Let us know what's wrong so we can fix it.
+                      </p>
+
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-3 mb-4 flex gap-2">
+                        <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-yellow-800 dark:text-yellow-500">
+                          For immediate safety emergencies on campus, contact
+                          campus security first. UniDeals reports are reviewed
+                          within 24 hours.
+                        </p>
+                      </div>
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        What are you reporting?
+                      </label>
+                      <select
+                        value={reportForm.category}
+                        onChange={(e) =>
+                          setReportForm({
+                            ...reportForm,
+                            category: e.target.value,
+                          })
+                        }
+                        required
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                      >
+                        <option value="">Select category...</option>
+                        <option value="Fraud or Scam Seller">
+                          Fraud or Scam Seller
+                        </option>
+                        <option value="Safety Concern">Safety Concern</option>
+                        <option value="App Bug / Glitch">
+                          App Bug / Glitch
+                        </option>
+                        <option value="Harassment or abuse">
+                          Harassment or abuse
+                        </option>
+                        <option value="Spam or Bot account">
+                          Spam or Bot account
+                        </option>
+                        <option value="Inappropriate Content">
+                          Inappropriate Content
+                        </option>
+                      </select>
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Link, User ID, or Page Section (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={reportForm.link}
+                        onChange={(e) =>
+                          setReportForm({ ...reportForm, link: e.target.value })
+                        }
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                        placeholder="e.g. Paste a link, user ID, or type 'My Listings'"
+                      />
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Tell us what happened / Steps to reproduce
+                      </label>
+                      <textarea
+                        rows="3"
+                        value={reportForm.description}
+                        onChange={(e) =>
+                          setReportForm({
+                            ...reportForm,
+                            description: e.target.value,
+                          })
+                        }
+                        required
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                        placeholder="Be as specific as possible. Include dates, messages, or steps to trigger the bug..."
+                      ></textarea>
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveForm(null)}
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="flex-1 flex items-center justify-center gap-2 bg-[#EF4444] hover:bg-red-600 disabled:bg-red-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
+                        >
+                          <ShieldAlert className="w-4 h-4" />{" "}
+                          {isSubmitting ? "Submitting..." : "Submit report"}
+                        </button>
+                      </div>
+                    </motion.form>
+                  )}
+
+                  {/* SUGGEST FEATURE FORM */}
+                  {activeForm === "suggest" && (
+                    <motion.form
+                      onSubmit={handleEmailSubmit}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      <h2 className="text-base font-semibold mb-1 dark:text-white">
+                        Suggest a feature
+                      </h2>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Fill in the details below and we will review your idea.
+                      </p>
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Feature title
+                      </label>
+                      <input
+                        type="text"
+                        value={suggestForm.title}
+                        onChange={(e) =>
+                          setSuggestForm({
+                            ...suggestForm,
+                            title: e.target.value,
+                          })
+                        }
+                        required
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        placeholder="e.g. Filter by hostel block"
+                      />
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Describe the feature
+                      </label>
+                      <textarea
+                        rows="2"
+                        value={suggestForm.description}
+                        onChange={(e) =>
+                          setSuggestForm({
+                            ...suggestForm,
+                            description: e.target.value,
+                          })
+                        }
+                        required
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        placeholder="What should it do? How would it work?"
+                      ></textarea>
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Why is it useful? (optional)
+                      </label>
+                      <textarea
+                        rows="2"
+                        value={suggestForm.whyUseful}
+                        onChange={(e) =>
+                          setSuggestForm({
+                            ...suggestForm,
+                            whyUseful: e.target.value,
+                          })
+                        }
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        placeholder="Who benefits and how?"
+                      ></textarea>
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveForm(null)}
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="flex-1 flex items-center justify-center gap-2 bg-[#22C55E] hover:bg-green-600 disabled:bg-green-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
+                        >
+                          <Lightbulb className="w-4 h-4" />{" "}
+                          {isSubmitting ? "Submitting..." : "Submit idea"}
+                        </button>
+                      </div>
+                    </motion.form>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="faq-view"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* Response Time Banner */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 mb-6 bg-white shadow-sm border border-gray-100 rounded-xl dark:bg-[#1a1a1a] dark:border-gray-800">
+                    <div className="flex items-center text-xs text-gray-600 dark:text-gray-300">
+                      <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg mr-3">
+                        <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      </div>
+                      <span>
+                        Avg response:{" "}
+                        <strong className="text-gray-900 dark:text-white font-semibold">
+                          under 2 hours
+                        </strong>{" "}
+                        during campus hours (9 AM – 9 PM)
+                      </span>
+                    </div>
+                    <a
+                      href="mailto:hi@unideals.in"
+                      className="flex items-center mt-3 sm:mt-0 px-3 py-1.5 bg-gray-50 dark:bg-[#252525] rounded-lg text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors font-medium"
+                    >
+                      <Mail className="w-3.5 h-3.5 mr-1.5" /> hi@unideals.in
+                    </a>
+                  </div>
+
+                  {/* FAQ Section */}
+                  <div className="bg-white border border-gray-200 rounded-2xl dark:bg-[#1f1f1f] dark:border-gray-700 p-4 lg:p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
+                      <h3 className="text-xs font-bold text-gray-400 tracking-wider">
+                        FREQUENTLY ASKED
+                      </h3>
+                      <Headphones className="w-4 h-4 text-gray-400" />
+                    </div>
+
+                    <div className="">
+                      {faqData.map((category) => (
+                        <div
+                          key={category.id}
+                          className="border-b border-gray-50 last:border-0 dark:border-gray-800/50 pb-1"
+                        >
+                          <button
+                            onClick={() => toggleCategory(category.id)}
+                            className="w-full flex items-center justify-between py-3 text-left focus:outline-none group"
+                          >
+                            <span className="text-[13px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                              {category.title}
+                            </span>
+                            <motion.div
+                              animate={{
+                                rotate: openCategory === category.id ? 180 : 0,
+                              }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+                            </motion.div>
+                          </button>
+
+                          {/* Nested Questions */}
+                          <AnimatePresence>
+                            {openCategory === category.id && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{
+                                  duration: 0.25,
+                                  ease: "easeInOut",
+                                }}
+                                className="overflow-hidden"
+                              >
+                                <div className="pl-1 pb-4 space-y-2 pt-1">
+                                  {category.questions.length > 0 ? (
+                                    category.questions.map((item, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="bg-gray-50/80 dark:bg-[#171717] rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 transition-all"
+                                      >
+                                        <button
+                                          onClick={() => toggleQuestion(item.q)}
+                                          className="w-full flex items-center justify-between p-3.5 text-left focus:outline-none group"
+                                        >
+                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                            {item.q}
+                                          </span>
+                                          <motion.div
+                                            animate={{
+                                              rotate:
+                                                openQuestion === item.q
+                                                  ? 180
+                                                  : 0,
+                                            }}
+                                            transition={{ duration: 0.2 }}
+                                          >
+                                            <ChevronDown
+                                              className={`w-4 h-4 flex-shrink-0 ml-2 transition-colors ${
+                                                openQuestion === item.q
+                                                  ? "text-indigo-500"
+                                                  : "text-gray-400 group-hover:text-gray-600"
+                                              }`}
+                                            />
+                                          </motion.div>
+                                        </button>
+
+                                        <AnimatePresence>
+                                          {openQuestion === item.q && (
+                                            <motion.div
+                                              initial={{
+                                                height: 0,
+                                                opacity: 0,
+                                              }}
+                                              animate={{
+                                                height: "auto",
+                                                opacity: 1,
+                                              }}
+                                              exit={{ height: 0, opacity: 0 }}
+                                              transition={{ duration: 0.2 }}
+                                              className="overflow-hidden"
+                                            >
+                                              <div className="p-3.5 pt-0 text-[13px] text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-100/50 dark:border-gray-800/50 mt-1">
+                                                {item.a}
+                                              </div>
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <p className="text-xs text-gray-400 p-2 italic">
+                                      No articles in this category yet.
+                                    </p>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default ContactUs;
+

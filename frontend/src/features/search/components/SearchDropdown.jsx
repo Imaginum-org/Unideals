@@ -1,6 +1,16 @@
 import { Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
 
-const SearchDropdown = ({ results, loading, query, mobile = false }) => {
+const SearchDropdown = ({
+  results,
+  loading,
+  query,
+  mobile = false,
+  hasSearched,
+  onSelect,
+  selectedIndex,
+  setSelectedIndex,
+}) => {
   if (!query) return null;
 
   const highlightText = (text, query) => {
@@ -19,6 +29,17 @@ const SearchDropdown = ({ results, loading, query, mobile = false }) => {
       ),
     );
   };
+
+  const itemRefs = useRef([]);
+
+  useEffect(() => {
+    if (selectedIndex >= 0) {
+      itemRefs.current[selectedIndex]?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
+  }, [selectedIndex]);
 
   return (
     <div
@@ -58,7 +79,7 @@ const SearchDropdown = ({ results, loading, query, mobile = false }) => {
         )}
 
         {/* Empty State */}
-        {!loading && results.length === 0 && (
+        {!loading && hasSearched && results.length === 0 && (
           <div className="p-4 text-sm text-gray-500 dark:text-neutral-400">
             No results found for "{query}"
           </div>
@@ -66,35 +87,33 @@ const SearchDropdown = ({ results, loading, query, mobile = false }) => {
 
         {/* Results */}
         {!loading &&
-          (mobile ? results : results.slice(0, 5)).map((item) => (
+          (mobile ? results : results.slice(0, 5)).map((item, index) => (
             <Link
+              ref={(el) => (itemRefs.current[index] = el)}
               key={item._id}
               to={`/product/${item._id}`}
+              onClick={() => onSelect?.()}
+              onMouseEnter={() => setSelectedIndex(index)}
               className={`
-                flex
-                items-center
-                gap-3
-                transition-colors
-                duration-200
-                ${
-                  mobile
-                    ? `
-                      px-4
-                      py-4
-                      active:bg-neutral-100
-                      dark:active:bg-neutral-800
-                    `
-                    : `
-                      px-3
-                      py-3
-                      hover:bg-neutral-100
-                      dark:hover:bg-neutral-800
-                    `
-                }
-              `}
+flex
+items-center
+gap-3
+transition-colors
+duration-150
+
+${
+  selectedIndex === index
+    ? "bg-blue-100 dark:bg-blue-950/30"
+    : mobile
+      ? "active:bg-neutral-100 dark:active:bg-neutral-800"
+      : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
+}
+
+${mobile ? "px-4 py-4" : "px-3 py-3"}
+`}
             >
               <img
-                src={item.images?.[0] || "/placeholder.png"}
+                src={item.images?.[0]?.url || "/placeholder.png"}
                 alt={item.title}
                 className={
                   mobile
@@ -108,7 +127,7 @@ const SearchDropdown = ({ results, loading, query, mobile = false }) => {
                   {highlightText(item.title, query)}
                 </span>
 
-                <span className="text-xs text-gray-500 dark:text-neutral-400">
+                <span className="text-xs text-gray-500 capitalize dark:text-neutral-400">
                   {highlightText(item.category, query)}
                 </span>
               </div>
@@ -119,6 +138,7 @@ const SearchDropdown = ({ results, loading, query, mobile = false }) => {
         {!loading && results.length > 0 && (
           <Link
             to={`/search?q=${query}`}
+            onClick={() => onSelect?.()}
             className={`
               block
               text-center

@@ -1,6 +1,16 @@
-import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  FiEye,
+  FiHeart,
+  FiMessageSquare,
+  FiEdit2,
+  FiEyeOff,
+  FiTrash2,
+  FiRefreshCw,
+} from "react-icons/fi";
+import { IoRocketOutline } from "react-icons/io5";
+
 import DeleteProductModal from "../../product/components/DeleteProductModal.jsx";
 import UnlistProductModal from "../../product/components/UnlistProductModal.jsx";
 import RelistProductModal from "../../product/components/RelistProductModal.jsx";
@@ -20,30 +30,84 @@ const OrderCard = ({
   attr,
   status,
   price,
+  viewsCount = 0,
+  wishlistedCount = 0,
   onProductDeleted,
   onProductUnlisted,
   onProductRelisted,
+  onBoostProduct,
+  isBoosted = false,
+  boostExpiresAt,
+  boostTier,
 }) => {
   const navigate = useNavigate();
+  const handleCardClick = () => {
+    navigate(`/product/${orderId}`);
+  };
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [relistModalOpen, setRelistModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnlisting, setIsUnlisting] = useState(false);
   const [isRelisting, setIsRelisting] = useState(false);
+  const [isBoosting, setIsBoosting] = useState(false);
 
   const normalized = (status || "").toLowerCase().trim();
-
-  const handleArrowClick = () => {
-    navigate(`/product/${orderId}`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const isActive =
+    normalized === "listed" ||
+    normalized === "active" ||
+    normalized === "in progress";
+  const isUnlisted = normalized === "unlisted";
+  const isDelivered = normalized === "delivered" || normalized === "sold";
+  const boostActive = isBoosted && new Date(boostExpiresAt || 0) > new Date();
+  const boostLabel = boostActive
+    ? `Boosted until ${new Date(boostExpiresAt).toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`
+    : "Boost Visibility";
+  const normalizedBoostTier = (boostTier || "").toLowerCase();
+  const isProPlusBoost = normalizedBoostTier === "pro_plus";
+  const isProBoost = normalizedBoostTier === "pro";
+  const boostTone = isProPlusBoost
+    ? {
+        card:
+          "border-amber-300 ring-2 ring-amber-400/30 shadow-[0_12px_30px_rgba(245,158,11,0.16)] dark:border-amber-400/70 dark:ring-amber-300/20",
+        strip: "bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-600",
+        header:
+          "bg-gradient-to-r from-amber-50 via-yellow-50 to-white border-amber-100 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-[#1c1c1c]",
+        badge:
+          "bg-amber-400 text-amber-950 shadow-sm shadow-amber-500/25 ring-1 ring-amber-200",
+        button:
+          "bg-amber-500 text-amber-950 shadow-amber-500/20 disabled:opacity-95",
+        image: "ring-2 ring-amber-300/70 shadow-md shadow-amber-500/10",
+      }
+    : isProBoost
+      ? {
+          card:
+            "border-blue-300 ring-2 ring-blue-500/20 shadow-[0_12px_30px_rgba(37,99,235,0.12)] dark:border-blue-500/70 dark:ring-blue-400/20",
+          strip: "bg-gradient-to-r from-blue-700 via-[#3838EC] to-cyan-400",
+          header:
+            "bg-gradient-to-r from-blue-50 via-indigo-50 to-white border-blue-100 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-[#1c1c1c]",
+          badge:
+            "bg-blue-600 text-white shadow-sm shadow-blue-500/25 ring-1 ring-blue-300",
+          button: "bg-blue-600 text-white shadow-blue-500/20 disabled:opacity-95",
+          image: "ring-2 ring-blue-300/70 shadow-md shadow-blue-500/10",
+        }
+      : {
+          card:
+            "border-indigo-300 ring-2 ring-indigo-500/20 shadow-indigo-500/10 dark:border-indigo-500/60 dark:ring-indigo-400/20",
+          strip: "bg-gradient-to-r from-[#3838EC] via-violet-500 to-indigo-400",
+          header: "bg-indigo-50 border-indigo-100 dark:bg-indigo-950/20",
+          badge: "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20",
+          button: "bg-emerald-600 text-white disabled:opacity-90",
+          image: "ring-2 ring-indigo-300/60 shadow-md shadow-indigo-500/10",
+        };
 
   const handleDeleteProduct = async () => {
     try {
       setIsDeleting(true);
       const res = await deleteProduct(orderId);
-
       if (res.data.success) {
         toast.success("Product deleted successfully");
         if (onProductDeleted) onProductDeleted(orderId);
@@ -59,7 +123,6 @@ const OrderCard = ({
     try {
       setIsUnlisting(true);
       const res = await unlistProduct(orderId);
-
       if (res.data.success) {
         toast.success("Product unlisted successfully");
         if (onProductUnlisted) onProductUnlisted(orderId);
@@ -75,7 +138,6 @@ const OrderCard = ({
     try {
       setIsRelisting(true);
       const res = await relistProduct(orderId);
-
       if (res.data.success) {
         toast.success("Product relisted successfully");
         if (onProductRelisted) onProductRelisted(orderId);
@@ -87,135 +149,247 @@ const OrderCard = ({
     }
   };
 
-  const statusClasses =
-    normalized === "delivered"
-      ? "bg-[#E6FFEB] text-[#008526]"
-      : normalized === "cancelled" || normalized === "canceled"
-        ? "bg-[#FFECEC] text-[#D12929]"
-        : "bg-[#E5E8FF] dark:bg-[#E5E8FF] text-[#534FF2] dark:text-[#534FF2]";
+  const handleBoostProduct = async (e) => {
+    e.stopPropagation();
+
+    if (isBoosting || boostActive) return;
+
+    try {
+      setIsBoosting(true);
+      const res = await onBoostProduct?.(orderId);
+
+      if (res?.data?.success) {
+        toast.success(res.data.message || "Product boosted successfully");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to boost product");
+    } finally {
+      setIsBoosting(false);
+    }
+  };
 
   return (
-    <div className="bg-white dark:bg-[#1A1D20] rounded-[15px] lg:rounded-[20px] shadow-md overflow-hidden pl-[3.4vw] pr-[3.5vw] pt-[1.8vh] pb-[1.8vh] lg:px-[1.8vw] lg:py-[1.9vh] xl:py-8 font-poppins mb-6">
-      <div className="flex justify-between items-center">
-        <div className="text-[#2d3339] dark:text-[#F1F1F1] text-[13px] lg:text-lg lg:font-medium">
-          #Order id : {orderId}
+    <div
+      onClick={handleCardClick}
+      className={`relative bg-white dark:bg-[#1c1c1c] rounded-2xl border shadow-sm overflow-hidden font-figtree cursor-pointer transition-all hover:shadow-md ${
+        boostActive ? boostTone.card : "border-gray-100 dark:border-gray-800"
+      }`}
+    >
+      {boostActive && (
+        <div
+          className={`pointer-events-none absolute inset-x-0 top-0 h-1.5 ${boostTone.strip}`}
+        />
+      )}
+
+      {/* 1. HEADER */}
+      <div
+        className={`px-4 sm:px-6 py-3.5 border-b dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-3 ${
+          boostActive ? boostTone.header : "bg-gray-100 border-gray-50"
+        }`}
+      >
+        <div className="text-[12px] sm:text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate flex-1 pr-2">
+          {isActive ? `#product id : ${orderId}` : `#Order id : ${orderId}`}
         </div>
-        <div className="text-[#646464] dark:text-[#D6D6D6] text-[12px] lg:text-[16px] font-light">
-          Placed on : {placedOn}
-        </div>
+
+        {isActive ? (
+          <div className="flex items-center gap-2 shrink-0">
+            {boostActive && (
+              <div
+                className={`${boostTone.badge} px-3 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase`}
+              >
+                {isProPlusBoost ? "PRO+ BOOSTED" : isProBoost ? "PRO BOOSTED" : "BOOSTED"}
+              </div>
+            )}
+            <div className="bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400 px-3 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase">
+              ACTIVE
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 shrink-0">
+            Listed on : {placedOn}
+          </div>
+        )}
       </div>
 
-      <div className="w-full h-[0px] border lg:border-1 border-[#ECEEFF] mt-[2vh] mb-[2.4vh] lg:my-[1.5vh] xl:my-[2vh]" />
-
-      <div className="lg:flex lg:justify-between lg:mt-[2vh] xl:mt-[3vh]">
-        <div className="flex ml-[4vw] lg:ml-[0vw]">
+      {/* 2. BODY */}
+      <div className="p-4 sm:p-6 pb-4 sm:pb-5 flex flex-col sm:flex-row justify-between gap-4">
+        <div className="flex items-start gap-3 sm:gap-4 w-full sm:w-auto">
           <img
-            className="w-[90px] h-[90px] lg:w-[88px] lg:h-[88px] rounded-[9.06px]"
+            className={`w-[72px] h-[72px] sm:w-[84px] sm:h-[84px] shrink-0 rounded-xl object-cover bg-gray-100 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 ${
+              boostActive ? boostTone.image : ""
+            }`}
             src={imageUrl}
-            alt={name || "product image"}
+            alt={name || "product"}
           />
-          <div className="flex flex-col ml-[4vw] lg:ml-[1.5vw] max-sm:mt-[1.2vh]">
-            <div className="text-[#2d3339] dark:text-[#F1F1F1] text-[15px] font-medium lg:text-[19px]">
+          <div className="flex flex-col justify-center flex-1">
+            <h3 className="text-[15px] sm:text-base font-bold text-gray-900 dark:text-white leading-tight">
               {name}
-            </div>
-            <div className="text-[#64707d] dark:text-[#848484] text-[13px] lg:text-[15px] font-light mt-[-0.6vh]">
+            </h3>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {color} | {attr}
             </div>
 
-            <div className="lg:mt-[1.2vh]">
-              {/* status badge */}
-              <div
-                className={`rounded-[5px] lg:rounded-[7px] inline-block px-[2vw] py-[0.2vh] lg:py-[0.3vh] lg:px-[1vw] ${statusClasses} xl:py-1 xl:px-4`}
-              >
-                <div className="text-[12px] font-normal lg:text-[14px]">
-                  {status}
-                </div>
+            {/* Dynamic Status Row below title */}
+            {isActive ? (
+              <div className="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 mt-2 sm:mt-3 font-medium">
+                <span className="flex items-center gap-1 sm:gap-1.5">
+                  <FiEye size={14} /> {viewsCount || 0}
+                </span>
+                <span className="flex items-center gap-1 sm:gap-1.5">
+                  <FiHeart size={14} /> {wishlistedCount || 0}
+                </span>
+                <span className="flex items-center gap-1 sm:gap-1.5">
+                  <FiMessageSquare size={14} /> 3
+                </span>
               </div>
+            ) : (
+              <div className="mt-2 sm:mt-3">
+                <span
+                  className={`px-3 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold ${
+                    isDelivered
+                      ? "bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400"
+                      : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                  }`}
+                >
+                  {isDelivered ? "Delivered" : "Unlisted"}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* NEW PRICE LAYOUT: 
+          On mobile -> flex-row with split ends and a top border to separate it cleanly.
+          On desktop -> stacks vertically aligned to the right. 
+        */}
+        <div className="flex sm:block flex-row items-center justify-between w-full sm:w-auto mt-1 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-gray-100 dark:border-gray-800/50">
+          <div className="text-left sm:text-right">
+            <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5 sm:mb-1">
+              Total Price
             </div>
+            {isActive && (
+              <div className="text-[10px] text-gray-400 dark:text-gray-500 block sm:hidden mt-0.5">
+                1 week ago
+              </div>
+            )}
+          </div>
+
+          <div className="text-right sm:text-right">
+            <div className="text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white">
+              ₹{price}
+            </div>
+            {isActive && (
+              <div className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block mt-1">
+                1 week ago
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
-        <div className="lg:hidden mt-[2.4vh] w-full h-0 border border-[#cacaca]" />
-
-        <div className="flex lg:flex lg:flex-col lg:justify-center lg:items-end mt-[3vh] lg:mt-[0px]">
-          <div className="text-[#555555] dark:text-[#BBC2C9] mr-[3vw] lg:mr-[0] text-[0.95rem] lg:text-[1.1rem] font-normal">
-            Total
-          </div>
-          <div className="text-black dark:text-[#F1F1F1] text-[0.9rem] lg:text-[18px] md:mb-[1.7vh] lg:font-medium lg:mt-[-0.7vh]">
-            ₹{price}
-          </div>
-
-          <button
-            onClick={handleArrowClick}
-            data-svg-wrapper
-            className="max-sm:absolute bottom-[1.5vh] right-[4vw] lg:static md:absolute md:bottom-[1.5vh] md:right-[3.3vw] cursor-pointer hover:opacity-80 transition-opacity"
-            aria-label="View product details"
-            title="View product details"
-          >
-            <svg
-              className="max-sm:h-[25px] max-sm:w-[25px]"
-              width="30"
-              height="31"
-              viewBox="0 0 30 31"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
+      {/* 3. FOOTER ACTIONS */}
+      <div
+        className={`px-4 sm:px-6 py-4 bg-gray-50/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row items-center gap-3 ${
+          isActive || isDelivered ? "sm:justify-between" : "sm:justify-end"
+        }`}
+      >
+        {isActive && (
+          <>
+            {/* Boost button full width on mobile, normal on desktop */}
+            <button
+              onClick={handleBoostProduct}
+              disabled={isBoosting || boostActive}
+              className={`w-full sm:w-auto px-4 py-2.5 sm:py-2 text-white rounded-lg text-[13px] font-medium transition-colors shadow-sm shadow-blue-500/20 flex justify-center items-center gap-2 shrink-0 disabled:cursor-not-allowed ${
+                boostActive
+                  ? boostTone.button
+                  : "bg-[#3838EC] hover:bg-blue-700 disabled:opacity-60"
+              }`}
             >
-              <rect
-                width="30"
-                height="30"
-                rx="15"
-                transform="matrix(-1 0 0 1 30 0.253723)"
-                fill="#534FF2"
-              />
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M11.2636 7.53034C11.6151 7.16152 12.1849 7.16152 12.5364 7.53034L19.7364 15.0859C20.0879 15.4547 20.0879 16.0527 19.7364 16.4215L12.5364 23.9771C12.1849 24.3459 11.6151 24.3459 11.2636 23.9771C10.9121 23.6083 10.9121 23.0103 11.2636 22.6415L17.8272 15.7537L11.2636 8.86599C10.9121 8.49716 10.9121 7.89917 11.2636 7.53034Z"
-                fill="white"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
+              <IoRocketOutline size={16} />
+              <span>{isBoosting ? "Boosting..." : boostLabel}</span>
+            </button>
 
-      {/* Action Buttons Section */}
-      <div className="w-full h-[0px] border lg:border-1 border-[#ECEEFF] mt-[2vh] mb-[2vh] lg:my-[1.5vh] xl:my-[2vh]" />
+            {/* Secondary actions span evenly on mobile, group right on desktop */}
+            <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2"
+              >
+                <FiEdit2 size={14} />
+                <span className="sm:hidden text-xs">Edit</span>
+                <span className="hidden sm:inline">Edit Details</span>
+              </button>
 
-      <div className="flex flex-wrap gap-[2vw] lg:gap-[1vw] lg:justify-end items-center">
-        <button className="px-[3vw] py-[0.8vh] lg:px-[1.2vw] lg:py-[0.6vh] bg-[#534FF2] text-white rounded-[8px] text-[13px] lg:text-[14px] font-medium hover:bg-[#4239D4] transition-colors whitespace-nowrap">
-          Boost Visibility
-        </button>
-        <button className="px-[3vw] py-[0.8vh] lg:px-[1.2vw] lg:py-[0.6vh] bg-white dark:bg-[#2A2D31] border border-[#D0D0D0] dark:border-[#444] text-[#333] dark:text-[#E1E1E1] rounded-[8px] text-[13px] lg:text-[14px] font-medium hover:bg-[#F5F5F5] dark:hover:bg-[#333] transition-colors whitespace-nowrap">
-          Edit Details
-        </button>
-        {normalized === "unlisted" ? (
-          <button
-            onClick={() => setRelistModalOpen(true)}
-            disabled={isRelisting}
-            className="px-[3vw] py-[0.8vh] lg:px-[1.2vw] lg:py-[0.6vh] bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 rounded-[8px] text-[13px] lg:text-[14px] font-medium hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isRelisting ? "Listing..." : "List"}
-          </button>
-        ) : (
-          <button
-            onClick={() => setUnlistModalOpen(true)}
-            disabled={isUnlisting}
-            className="px-[3vw] py-[0.8vh] lg:px-[1.2vw] lg:py-[0.6vh] bg-white dark:bg-[#2A2D31] border border-[#D0D0D0] dark:border-[#444] text-[#333] dark:text-[#E1E1E1] rounded-[8px] text-[13px] lg:text-[14px] font-medium hover:bg-[#F5F5F5] dark:hover:bg-[#333] transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isUnlisting ? "Unlisting..." : "Unlist"}
-          </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUnlistModalOpen(true);
+                }}
+                disabled={isUnlisting}
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
+              >
+                <FiEyeOff size={14} />
+                <span className="text-xs sm:text-[13px]">
+                  {isUnlisting ? "..." : "Unlist"}
+                </span>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteModalOpen(true);
+                }}
+                disabled={isDeleting}
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
+              >
+                <FiTrash2 size={14} />
+                <span className="text-xs sm:text-[13px]">Delete</span>
+              </button>
+            </div>
+          </>
         )}
-        <button
-          onClick={() => setDeleteModalOpen(true)}
-          disabled={isDeleting}
-          className="p-[0.8vh] lg:p-[0.6vh] bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-[8px] hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Trash2 size={18} strokeWidth={2.5} />
-        </button>
+
+        {isUnlisted && (
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setRelistModalOpen(true);
+              }}
+              disabled={isRelisting}
+              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <FiRefreshCw size={14} />
+              {isRelisting ? "..." : "Relist Product"}
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteModalOpen(true);
+              }}
+              disabled={isDeleting}
+              className="w-full sm:w-auto justify-center py-2.5 sm:p-2.5 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <FiTrash2 size={16} />
+              <span className="sm:hidden text-[13px]">Delete</span>
+            </button>
+          </div>
+        )}
+
+        {isDelivered && (
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:justify-between">
+            <div className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 italic text-center sm:text-left w-full sm:w-auto">
+              This order is completed. Actions are limited.
+            </div>
+            <button className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2">
+              View Delivery Details
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Delete Product Modal */}
+      {/* MODALS */}
       <DeleteProductModal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
@@ -223,8 +397,6 @@ const OrderCard = ({
         productName={name}
         isLoading={isDeleting}
       />
-
-      {/* Unlist Product Modal */}
       <UnlistProductModal
         isOpen={unlistModalOpen}
         onClose={() => setUnlistModalOpen(false)}
@@ -232,8 +404,6 @@ const OrderCard = ({
         productName={name}
         isLoading={isUnlisting}
       />
-
-      {/* Relist Product Modal */}
       <RelistProductModal
         isOpen={relistModalOpen}
         onClose={() => setRelistModalOpen(false)}

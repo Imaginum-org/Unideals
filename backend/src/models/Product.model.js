@@ -21,7 +21,9 @@ const productSchema = new Schema(
 
     title: {
       type: String,
-      required: true,
+      required: function () {
+        return this.status !== PRODUCT_STATUS.DRAFT;
+      },
       trim: true,
       maxlength: 120,
     },
@@ -35,7 +37,9 @@ const productSchema = new Schema(
 
     description: {
       type: String,
-      required: true,
+      required: function () {
+        return this.status !== PRODUCT_STATUS.DRAFT;
+      },
       trim: true,
       maxlength: 2000,
     },
@@ -43,14 +47,19 @@ const productSchema = new Schema(
     category: {
       type: String,
       enum: Object.values(PRODUCT_CATEGORIES),
-      required: true,
+      required: function () {
+        return this.status !== PRODUCT_STATUS.DRAFT;
+      },
       index: true,
     },
 
     condition: {
       type: String,
       enum: Object.values(PRODUCT_CONDITION),
-      required: true,
+      required: function () {
+        return this.status !== PRODUCT_STATUS.DRAFT;
+      },
+      index: true,
     },
 
     attributes: {
@@ -77,21 +86,40 @@ const productSchema = new Schema(
     images: {
       type: [
         {
-          type: String,
-          validate: {
-            validator: (url) => /^https?:\/\/.+/.test(url),
-            message: "Invalid image URL",
+          url: {
+            type: String,
+            required: true,
+            validate: {
+              validator: (url) => /^https?:\/\/.+/.test(url),
+              message: "Invalid image URL",
+            },
+          },
+
+          fileId: {
+            type: String,
+            required: true,
           },
         },
       ],
-      required: true,
+
+      default: [],
+
       validate: [
         {
-          validator: (arr) => arr.length > 0,
+          validator: function (arr) {
+            if (this.status === PRODUCT_STATUS.DRAFT) {
+              return true;
+            }
+
+            return arr.length > 0;
+          },
+
           message: "At least one image is required",
         },
+
         {
           validator: (arr) => arr.length <= 3,
+
           message: "Maximum 3 images allowed",
         },
       ],
@@ -104,7 +132,9 @@ const productSchema = new Schema(
 
     selling_price: {
       type: Number,
-      required: true,
+      required: function () {
+        return this.status !== PRODUCT_STATUS.DRAFT;
+      },
       min: 0,
       index: true,
     },
@@ -117,17 +147,39 @@ const productSchema = new Schema(
     payment_preference: {
       type: String,
       enum: Object.values(PRODUCT_PAYMENT),
-      required: true,
+      required: function () {
+        return this.status !== PRODUCT_STATUS.DRAFT;
+      },
     },
 
     pickup_address_snapshot: {
-      address_line: { type: String, trim: true, required: true },
-      city: { type: String, trim: true, required: true },
-      state: { type: String, trim: true, required: true },
+      address_line: {
+        type: String,
+        trim: true,
+        required: function () {
+          return this.status !== PRODUCT_STATUS.DRAFT;
+        },
+      },
+      city: {
+        type: String,
+        trim: true,
+        required: function () {
+          return this.status !== PRODUCT_STATUS.DRAFT;
+        },
+      },
+      state: {
+        type: String,
+        trim: true,
+        required: function () {
+          return this.status !== PRODUCT_STATUS.DRAFT;
+        },
+      },
       pincode: {
         type: String,
         trim: true,
-        required: true,
+        required: function () {
+          return this.status !== PRODUCT_STATUS.DRAFT;
+        },
         match: [/^\d{6}$/, "Invalid pincode"],
       },
       mobile: {
@@ -173,6 +225,10 @@ const productSchema = new Schema(
       type: Date,
     },
 
+    boost_tier: {
+      type: String,
+    },
+
     views_count: {
       type: Number,
       default: 0,
@@ -214,7 +270,7 @@ productSchema.index({
   status: 1,
 });
 
-productSchema.index({ is_boosted: 1, boost_expires_at: -1 });
+productSchema.index({ is_boosted: 1, boost_expires_at: -1, boost_tier: 1 });
 productSchema.index(
   { seller_id: 1, title: 1, selling_price: 1 },
   { unique: false },

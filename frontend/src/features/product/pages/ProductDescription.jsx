@@ -1,414 +1,1137 @@
-import { useState, useEffect } from "react";
-import { IoMdShareAlt } from "react-icons/io";
-import { EllipsisVertical, IndianRupee } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { MessageSquareMore } from "lucide-react";
-import { FaRegHeart, FaHeart } from "react-icons/fa";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { getProducts } from "../api/productApi";
+import { Share2, MessageSquare, Eye, ShieldCheck, Clock3, Bot, Sparkles, Expand, Minimize2 } from "lucide-react";
+import { FaHeart, FaRegHeart } from "react-icons/fa";
+import ProductCard from "../../../features/product/components/ProductCard.jsx";
+import toast from "react-hot-toast";
+import { LuMessageSquareText } from "react-icons/lu";
+import { useParams, Link } from "react-router-dom";
+import { IoIosArrowForward } from "react-icons/io";
 import { getProductById } from "../api/productApi";
-import { useWishlist } from "../../../context/useWishlist.js";
+import { HiOutlineBuildingLibrary } from "react-icons/hi2";
+import { MdLocationPin } from "react-icons/md";
+import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
+import { motion } from "framer-motion";
+import { FaWhatsapp, FaTelegram, FaLink } from "react-icons/fa";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { IoClose } from "react-icons/io5";
+// condition
+import { GoChecklist } from "react-icons/go";
+// color
+import { IoColorPaletteOutline } from "react-icons/io5";
+import { useWishlist } from "../../../context/WishlistContext";
+// date of purchase
+import { IoCalendarOutline } from "react-icons/io5";
+import { FaArrowRight } from "react-icons/fa6";
 
 const FALLBACK_IMAGE = "/image10.png";
 
 const ProductDescription = () => {
+  const { toggleWishlist, isInWishlist } = useWishlist();
   const { id } = useParams();
+  const [product, setProduct] = useState(null);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [activeImage, setActiveImage] = useState("");
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [isContainMode, setIsContainMode] = useState(false);
+
+  const staticCTARef = useRef(null);
+  const floatingCTARef = useRef(null);
+  const productId = product?._id;
+  const inWishlist = isInWishlist(productId);
   const navigate = useNavigate();
 
-  const [report, setReport] = useState(false);
-
-  // Wishlist state
-  const [inWishlist, setInWishlist] = useState(false);
-  const [wishlistLoading, setWishlistLoading] = useState(false);
-
-  const { toggleWishlist, checkProductInWishlist } = useWishlist();
-
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const images =
-    product?.images?.length > 0 ? product.images : [FALLBACK_IMAGE];
-
-  const [activeImage, setActiveImage] = useState("");
-
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, [id]);
 
   useEffect(() => {
-    if (product?.images?.length > 0) {
-      setActiveImage(product.images[0]);
-    }
-  }, [product]);
-
-  // Wishlist check
-  useEffect(() => {
-    const checkWishlistStatus = async () => {
-      try {
-        const isInWish = await checkProductInWishlist(id);
-        setInWishlist(isInWish);
-      } catch (error) {
-        console.error("Error checking wishlist:", error);
-      }
-    };
-
-    if (id) {
-      checkWishlistStatus();
-    }
-  }, [id, checkProductInWishlist]);
-
-  //Fetch product
-  useEffect(() => {
-    let isMounted = true;
-
     const fetchProduct = async () => {
       try {
-        setLoading(true);
-
         const res = await getProductById(id);
 
-        if (isMounted) {
-          setProduct(res.data?.data);
+        const fetchedProduct = res?.data?.data;
+
+        setProduct(fetchedProduct);
+
+        if (fetchedProduct?.images?.length > 0) {
+          setActiveImage(fetchedProduct.images[0].url);
         }
-      } catch (err) {
-        console.error("Product fetch error:", err);
-        setError("Failed to load product");
+      } catch (error) {
+        console.log(error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) fetchProduct();
-
-    return () => {
-      isMounted = false;
-    };
+    fetchProduct();
   }, [id]);
 
-  const handleReport = () => setReport((prev) => !prev);
+  // useEffect(() => {
+  //   let isMounted = true;
 
-  const reportIssue = () => {
-    toast.success("Product Reported");
-    setReport(false);
-    setTimeout(() => navigate("/"), 800);
+  //   const checkWishlist = async () => {
+  //     if (!productId) return;
+
+  //     try {
+  //       const inWish = await checkProductInWishlist(productId);
+
+  //       if (isMounted) {
+  //         setInWishlist(inWish);
+  //       }
+  //     } catch (error) {
+  //       console.error("Wishlist check failed:", error);
+  //     }
+  //   };
+
+  //   checkWishlist();
+
+  //   return () => {
+  //     isMounted = false;
+  //   };
+  // }, [productId, checkProductInWishlist]);
+
+  useEffect(() => {
+    const fetchSimilarProducts = async () => {
+      if (!product?.category) return;
+
+      try {
+        setSimilarLoading(true);
+
+        const res = await getProducts({
+          category: product.category,
+        });
+
+        const filteredProducts = (res?.data?.data || [])
+          .filter((item) => item._id !== product._id)
+          .slice(0, 4);
+
+        setSimilarProducts(filteredProducts);
+      } catch (error) {
+        console.log("Failed to fetch similar products", error);
+      } finally {
+        setSimilarLoading(false);
+      }
+    };
+
+    fetchSimilarProducts();
+  }, [product]);
+
+  useEffect(() => {
+    let rafId;
+    let wasVisible = false;
+
+    const check = () => {
+      if (staticCTARef.current && floatingCTARef.current) {
+        const rect = staticCTARef.current.getBoundingClientRect();
+        const isStaticVisible = rect.top < window.innerHeight;
+
+        if (isStaticVisible && !wasVisible) {
+          // Static CTA just came into view — animate floating bar TO that position
+          wasVisible = true;
+          const floating = floatingCTARef.current;
+
+          const targetBottom = window.innerHeight - rect.bottom;
+          const targetLeft = rect.left;
+          const targetRight = window.innerWidth - rect.right;
+
+          // Set destination position directly on DOM (no React re-render)
+          floating.style.bottom = `${targetBottom}px`;
+          floating.style.left = `${targetLeft}px`;
+          floating.style.right = `${targetRight}px`;
+          floating.style.opacity = "0";
+          floating.style.pointerEvents = "none";
+        } else if (!isStaticVisible && wasVisible) {
+          // Scrolled back up — snap floating bar back to bottom instantly (no transition)
+          wasVisible = false;
+          const floating = floatingCTARef.current;
+
+          floating.style.transition = "none";
+          floating.style.bottom = "16px";
+          floating.style.left = "16px";
+          floating.style.right = "16px";
+          floating.style.opacity = "1";
+          floating.style.pointerEvents = "auto";
+
+          // Re-enable transition after snap
+          requestAnimationFrame(() => {
+            floating.style.transition =
+              "bottom 450ms cubic-bezier(0.4, 0, 0.2, 1), left 450ms cubic-bezier(0.4, 0, 0.2, 1), right 450ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease";
+          });
+        }
+      }
+      rafId = requestAnimationFrame(check);
+    };
+
+    rafId = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  const getShareData = () => {
+    const shareUrl = `${window.location.origin}/product/${product._id}`;
+
+    const title = product?.title || "Product";
+
+    const text = `🎓 Found this on Unideals
+
+${title}
+₹${product?.selling_price}
+
+Available on campus.
+
+${shareUrl}`;
+
+    return {
+      title,
+      text,
+      url: shareUrl,
+    };
   };
 
-  // Wishlist handler
-  const handleWishlist = async () => {
-    if (wishlistLoading) return;
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "ArrowLeft") {
+        goToPreviousImage();
+      }
+
+      if (e.key === "ArrowRight") {
+        goToNextImage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeImage]);
+
+  // const handleShare = async () => {
+  //   const shareData = getShareData();
+
+  //   try {
+  //     if (navigator.share) {
+  //       await navigator.share(shareData);
+
+  //       toast.success("Shared successfully");
+
+  //       return;
+  //     }
+
+  //     await navigator.clipboard.writeText(shareData.url);
+
+  //     toast.success("Link copied to clipboard");
+  //   } catch (error) {
+  //     if (error?.name !== "AbortError") {
+  //       toast.error("Unable to share product");
+  //     }
+  //   }
+  // };
+
+  const shareUrl = `${window.location.origin}/product/${product?._id}`;
+
+  const shareText = `🎓 Found this on Unideals
+
+📦 ${product?.title}
+💰 ₹${product?.selling_price}
+
+Available for pickup on campus.
+
+${shareUrl}`;
+
+  const original = Number(product?.original_price || 0);
+  const selling = Number(product?.selling_price || 0);
+
+  const savedPricedPercentage =
+    original > 0 ? Math.round(((original - selling) / original) * 100) : 0;
+
+  const handleWishlistClick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!product?._id || wishlistLoading) return;
 
     setWishlistLoading(true);
 
     try {
-      const result = await toggleWishlist(id);
-      setInWishlist(result);
-
-      toast.success(result ? "Added to Wishlist" : "Removed from Wishlist");
+      const result = await toggleWishlist(product._id, product);
+      toast.success(result ? "Added to Wishlist" : "Removed from Wishlist", {
+        id: "wishlist-toast",
+      });
     } catch (error) {
-      toast.error("Failed to update wishlist");
-      console.error("Wishlist error:", error);
+      toast.error("Failed to update wishlist", {
+        id: "wishlist-error",
+      });
     } finally {
       setWishlistLoading(false);
     }
   };
 
-  const handleShare = async () => {
-    try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(window.location.href);
-        toast.success("Link Copied!");
-      } else {
-        throw new Error("Clipboard not supported");
-      }
-    } catch {
-      toast.error("Copy failed");
-    }
-  };
-
   if (loading) {
-    return <div className="p-10 text-center">Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="p-10 text-center text-red-500">{error}</div>;
+    return (
+      <div className="min-h-screen bg-[#F7F9FD] animate-pulse">
+        <div className="max-w-[1380px] mx-auto px-6 py-8">
+          <div className="h-8 w-48 bg-gray-200 rounded" />
+          <div className="mt-6 grid lg:grid-cols-[530px_1fr] gap-6">
+            <div className="aspect-square rounded-xl bg-gray-200" />
+            <div className="space-y-4">
+              <div className="h-10 bg-gray-200 rounded" />
+              <div className="h-6 w-40 bg-gray-200 rounded" />
+              <div className="h-32 bg-gray-200 rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!product) {
-    return <div className="p-10 text-center">Product not found</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA]">
+        Product not found
+      </div>
+    );
   }
 
+  const getRelativeTime = (date) => {
+    const now = new Date();
+
+    const created = new Date(date);
+
+    const diffInSeconds = Math.floor((now - created) / 1000);
+
+    const minutes = Math.floor(diffInSeconds / 60);
+
+    const hours = Math.floor(minutes / 60);
+
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days} day${days > 1 ? "s" : ""} ago`;
+    }
+
+    if (hours > 0) {
+      return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    }
+
+    if (minutes > 0) {
+      return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+    }
+
+    return "Just now";
+  };
+
+  const images =
+    product?.images?.length > 0
+      ? product.images.map((image) => image.url)
+      : [FALLBACK_IMAGE];
+
+  const currentImageIndex = images.findIndex((img) => img === activeImage);
+
+  const goToPreviousImage = () => {
+    if (currentImageIndex > 0) {
+      setActiveImage(images[currentImageIndex - 1]);
+    }
+  };
+
+  const goToNextImage = () => {
+    if (currentImageIndex < images.length - 1) {
+      setActiveImage(images[currentImageIndex + 1]);
+    }
+  };
+
   return (
-    <div className="w-full min-h-screen">
-      <div className="flex flex-col w-full xl:flex-row 2xl:min-h-screen dark:bg-[#131313] xl:pt-2">
-        <Toaster
-          position="top-center"
-          reverseOrder={false}
-          toastOptions={{
-            duration: 1500,
-            maxToasts: 1,
-          }}
-        />
+    <motion.div
+      initial={{
+        opacity: 0,
+        y: 16,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      transition={{
+        duration: 0.35,
+        ease: "easeOut",
+      }}
+      className="w-full min-h-screen bg-[#F7F9FD] font-figtree dark:bg-[#131313]"
+    >
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 12,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+          delay: 0.1,
+          ease: "easeOut",
+        }}
+        className="pt-4 text-[#454655] mx-auto w-full max-w-[1380px] px-6 sm:px-8 md:px-11 lg:px-14 2xl:px-0"
+      >
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1 text-sm text-[#454655] mb-4 overflow-x-auto whitespace-nowrap font-semibold">
+          <button
+            onClick={() => navigate("/")}
+            className="hover:text-[#3838EC] dark:text-slate-300 transition-colors"
+          >
+            Home
+          </button>
 
-        {/* Left side */}
-        <div className="w-full mt-3 flex flex-col items-center xl:items-start gap-4 xl:w-1/3 xl:ml-5">
-          {/* Left top - images */}
-          <div className="rounded-2xl shadow-[0px_3.691620111465454px_12px_0px_rgba(102,102,102,0.10)] border pb-1 bg-white w-[93vw] xl:flex flex-col justify-center md:items-center xl:items-start xl:w-[28vw] dark:bg-[#1A1D20] dark:border-0 dark:shadow-xl">
-            {/* FIXED IMAGE VIEWPORT (ADDED) */}
-            <div className="w-full h-[360px] md:h-[420px] xl:h-[460px] flex items-center justify-center overflow-hidden">
-              <img
-                className="max-w-full max-h-full object-contain pl-5 pr-5 pt-3 rounded-xl md:mx-auto lg:mx-auto xl:mx-0"
-                src={activeImage || FALLBACK_IMAGE}
-                alt="Product"
-              />
-            </div>
+          <IoIosArrowForward size={12} />
 
-            {/* Thumbnails + share */}
-            <div className="flex pl-5 pb-3 pt-1 justify-between xl:w-full">
+          <button
+            onClick={() => navigate(`/category/${product?.category}`)}
+            className="capitalize font-semibold text-[#454655] dark:text-slate-300 hover:text-[#3838EC] transition-colors"
+          >
+            {product?.category.replaceAll("_", " ")}
+          </button>
+
+          <IoIosArrowForward size={12} />
+
+          <span className="font-bold text-black dark:text-white">
+            {product?.title}
+          </span>
+        </div>
+
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-[530px_1fr] gap-6 xl:gap-5">
+          {/* LEFT */}
+          <div className="flex flex-col gap-4">
+            {/* Image Card */}
+            <div className="bg-[#FFFFFF] dark:bg-[#1A1D20] dark:border-0 rounded-xl border border-[#C9D1DC] p-3 md:p-4 xl:p-4">
+              {/* Main Image */}
+              <div className="relative group overflow-hidden rounded-2xl bg-[#F8FAFC]">
+                <motion.img
+                  key={activeImage}
+                  src={activeImage}
+                  initial={{
+                    opacity: 0,
+                    scale: 1.02,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                  }}
+                  transition={{
+                    duration: 0.25,
+                  }}
+                  alt="Product"
+                  className={`w-full aspect-[1/0.93] transition-all duration-300 ${
+                    isContainMode ? "object-contain" : "object-cover"
+                  }`}
+                />
+
+                {images.length > 1 && currentImageIndex > 0 && (
+                  <button
+                    onClick={goToPreviousImage}
+                    className="
+      absolute
+      left-4
+      top-1/2
+      -translate-y-1/2
+      h-11
+      w-11
+      rounded-full
+      bg-white/90
+      backdrop-blur-md
+      shadow-lg
+      flex
+      items-center
+      justify-center
+      z-20
+      transition-all
+      duration-200
+      opacity-100
+      md:opacity-0
+      md:group-hover:opacity-100
+      hover:scale-105
+    "
+                  >
+                    <FiChevronLeft size={24} />
+                  </button>
+                )}
+
+                {images.length > 1 && currentImageIndex < images.length - 1 && (
+                  <button
+                    onClick={goToNextImage}
+                    className="
+      absolute
+      right-4
+      top-1/2
+      -translate-y-1/2
+      h-11
+      w-11
+      rounded-full
+      bg-white/90
+      backdrop-blur-md
+      shadow-lg
+      flex
+      items-center
+      justify-center
+      z-20
+      transition-all
+      duration-200
+      opacity-100
+      md:opacity-0
+      md:group-hover:opacity-100
+      hover:scale-105
+    "
+                  >
+                    <FiChevronRight size={24} />
+                  </button>
+                )}
+
+                {/* Image Fit Toggle */}
+                <button
+                  onClick={() => setIsContainMode((prev) => !prev)}
+                  className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center hover:scale-105 transition-all duration-200"
+                >
+                  {isContainMode ? (
+                    <Minimize2 size={18} className="text-[#181C1F]" />
+                  ) : (
+                    <Expand size={18} className="text-[#181C1F]" />
+                  )}
+                </button>
+                {/* Top Actions */}
+                <div className="absolute top-3 right-3 flex items-center gap-2">
+                  <button
+                    onClick={() => setShowShareMenu(true)}
+                    className="w-10 h-10 md:w-11 md:h-11 lg:w-9 lg:h-9 rounded-full bg-white shadow-md flex items-center justify-center"
+                  >
+                    <Share2 size={18} className="text-[#181C1F]" />
+                  </button>
+                </div>
+              </div>
+
               {/* Thumbnails */}
-              <div className="flex gap-3 mt-2 md:mx-auto lg:mx-auto xl:mx-0">
+              <div className="mt-3 flex gap-3 overflow-x-auto scrollbar-hide">
                 {images.map((img, index) => (
                   <button
                     key={index}
-                    type="button"
                     onClick={() => setActiveImage(img)}
-                    className={`size-16 rounded-md overflow-hidden border-2 transition-all duration-200 
-            ${
-              activeImage === img
-                ? "border-indigo-500"
-                : "border-transparent hover:border-indigo-300"
-            }`}
+                    className={`min-w-[74px] sm:min-w-[84px] w-[74px] sm:w-[90px] h-[74px] sm:h-[90px] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
+                      activeImage === img
+                        ? "border-[#4F46E5]"
+                        : "border-[#ECECEC]"
+                    }`}
                   >
                     <img
                       src={img}
-                      alt={`Thumbnail ${index + 1}`}
+                      alt={`Preview ${index}`}
                       className="w-full h-full object-cover"
                     />
                   </button>
                 ))}
               </div>
 
-              {/* Share */}
-              <div className="flex justify-end items-end pr-6 pt-5">
-                <button onClick={handleShare} aria-label="Share product">
-                  <IoMdShareAlt className="text-[#848484] hover:text-blue-500 lg:size-6 md:size-4 size-6" />
-                </button>
+              {/* Stats */}
+              <div className="mt-4 border border-[#E2E8F0] rounded-xl px-3 bg-[#FFFFFF] dark:bg-[#131313] dark:border-0 py-3 flex flex-wrap items-center justify-between gap-3 text-[12px] md:text-sm text-[#6B7280]">
+                <div className="flex items-center gap-2 text-[#475569] dark:text-white font-medium">
+                  <Eye size={16} className="text-[#2563EB]" />
+
+                  <span>{product?.views_count || 0} views</span>
+                </div>
+
+                <div className="flex items-center dark:text-white gap-2 text-[#475569] font-medium">
+                  <MessageSquare size={16} />
+
+                  <span>18 users chatted</span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[#394FF1] font-medium">
+                  <Clock3 size={16} />
+
+                  <span>5 chats in last hour</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Key Details */}
+            <div className="bg-white dark:bg-[#1A1D20] dark:border-0 shadow-sm rounded-xl border border-[#E2E8F0] p-5 md:p-6">
+              <h2 className="text-lg dark:text-white md:text-xl lg:text-xl xl:text-xl font-bold text-[#0F172A] mb-5">
+                Key Details
+              </h2>
+
+              <div className="space-y-7">
+                {[
+                  {
+                    icon: <GoChecklist size={17} className="text-[#3838EC]" />,
+                    label: "Usage Duration",
+                    value: product?.attributes?.usage_duration || "<2 months",
+                  },
+
+                  {
+                    icon: <GoChecklist size={17} className="text-[#3838EC]" />,
+                    label: "Brand",
+                    value: product?.attributes?.brand || "N/A",
+                  },
+
+                  {
+                    icon: <GoChecklist size={17} className="text-[#3838EC]" />,
+                    label: "Model",
+                    value: product?.title,
+                  },
+                  {
+                    icon: (
+                      <IoColorPaletteOutline
+                        size={17}
+                        className="text-[#3838EC]"
+                      />
+                    ),
+                    label: "Color",
+                    value: product?.attributes?.color || "N/A",
+                  },
+                  {
+                    icon: (
+                      <IoCalendarOutline size={17} className="text-[#3838EC]" />
+                    ),
+                    label: "Purchase Date",
+                    value: product?.attributes?.purchase_date || "N/A",
+                  },
+                ].map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start justify-between text-sm"
+                  >
+                    <div className="flex items-center gap-3 text-[#6B7280] dark:text-white">
+                      <div className="flex items-center justify-center">
+                        {item.icon}
+                      </div>
+
+                      <span className="text-[#64748B] text-sm lg:text-base dark:text-slate-300">
+                        {item.label}
+                      </span>
+                    </div>
+
+                    <span className="capitalize max-w-[180px] text-start text-sm lg:text-base font-medium text-[#0F172A] dark:text-slate-300">
+                      {item.value.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Left side bottom - seller info (desktop) */}
-          <div className="hidden xl:block ml-1 w-[37vw] p-5 rounded-2xl shadow-lg shadow-slate-200 border xl:w-[28vw] dark:bg-[#1A1D20] dark:border-0 dark:shadow-none">
-            <h1 className="text-base text-zinc-700 font-bold font-robotoFlex dark:text-[#D7D7D7]">
-              Seller Information
-            </h1>
-            <div className="flex pt-2 pb-1 items-center gap-2">
-              <img
-                className="size-8 rounded-md object-cover"
-                src="/assets/user_img.png"
-                alt="Seller"
-              />
-              <h1 className="font-semibold font-robotoFlex dark:text-[#848484]">
-                {product.seller_id?.name}
-              </h1>
-            </div>
-
-            <div className="flex flex-col pt-1">
-              <div className="pl-1 leading-tight">
-                <h1 className="text-[#979797] font-medium font-robotoFlex dark:text-[#979797]">
-                  {product.pickup_address_snapshot?.address_line}
-                </h1>
+          {/* RIGHT */}
+          <div className="flex flex-col gap-4">
+            {/* Product Info */}
+            <div className="bg-white rounded-xl border border-[#C9D1DC] p-5 md:p-7 xl:px-7 xl:py-5 dark:bg-[#1A1D20] dark:border-0 dark:text-white">
+              {/* Tags */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="bg-[#EAECFB] text-[#3838EC] text-sm font-medium px-4 py-1 rounded-full capitalize">
+                  {product?.category?.replaceAll("_", " ")}
+                </div>
+                <div className="bg-[#E9F9EE] text-[#319F43] text-sm font-medium px-4 py-1 rounded-full">
+                  Available
+                </div>
               </div>
 
-              <div className="flex justify-end items-end pr-3 pt-3 font-medium font-poppins text-sm dark:text-[#D7D7D7]">
-                <h1>Listed 10 days ago</h1>
+              {/* Title */}
+              <h1 className="mt-4 md:mt-5 text-2xl sm:text-2xl md:text-2xl lg:text-3xl xl:text-3xl 2xl:text-4xl leading-[1.1] tracking-[-1px] font-bold text-[#0F172A] dark:text-white">
+                {product?.title}
+              </h1>
+
+              {/* Price */}
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <div className="text-[#3838EC] flex items-center">
+                  <span className="text-2xl sm:text-2xl md:text-2xl lg:text-2xl xl:text-2xl 2xl:text-3xl font-extrabold leading-none">
+                    ₹{product?.selling_price}
+                  </span>
+                </div>
+
+                {product?.original_price && (
+                  <span className="line-through text-[#94A3B8] text-lg md:text-2xl xl:text-xl font-medium">
+                    ₹{product?.original_price}
+                  </span>
+                )}
+                {savedPricedPercentage > 0 && (
+                  <div className="bg-[#EEF0FF] text-[#3838EC] text-xs font-semibold px-3 py-1 rounded-md">
+                    Save {savedPricedPercentage}%
+                  </div>
+                )}
+              </div>
+
+              {/* Seller */}
+              <div className="mt-5 flex flex-wrap items-center gap-5">
+                <div className="flex items-center gap-3">
+                  <AvatarComponent
+                    name={product?.seller_id?.name || "Seller"}
+                    imageUrl={product?.seller_id?.avatar?.url}
+                    plan={product?.seller_id?.subscription} // Shows the seller's badge to buyers!
+                    size="small"
+                    className="lg:scale-125 origin-left" // This keeps your responsive sizing (w-7 to w-9)
+                  />
+
+                  <span className="font-semibold text-[#181C1F] text-sm dark:text-white">
+                    {product?.seller_id?.name}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 text-[#181C1F] text-xs dark:text-slate-300">
+                  <Clock3 size={16} />
+
+                  <span> Listed {getRelativeTime(product?.createdAt)}</span>
+                </div>
+              </div>
+
+              {/* About */}
+              <div className="mt-9">
+                <h2 className="text-lg md:text-xl font-bold text-[#181C1F] dark:text-white">
+                  About This Product
+                </h2>
+
+                <p className="max-w-[820px] mt-3 text-[#454655] text-[14px] sm:text-[15px] md:text-base leading-[1.9] whitespace-pre-line dark:text-slate-300">
+                  {product?.description}
+                </p>
+              </div>
+
+              {/* CTA */}
+              <div
+                ref={staticCTARef}
+                className="mt-10 flex flex-row items-stretch gap-3"
+              >
+                {/* Wishlist */}
+                <button
+                  onClick={handleWishlistClick}
+                  disabled={wishlistLoading}
+                  aria-label={
+                    inWishlist ? "Remove from wishlist" : "Add to wishlist"
+                  }
+                  className={`h-[55px] w-[60px] rounded-2xl border flex items-center justify-center transition-all duration-300 ${
+                    loading ? "opacity-50 cursor-not-allowed" : ""
+                  } ${
+                    inWishlist
+                      ? "bg-[#FFF1F4] border-pink-200"
+                      : "bg-white dark:bg-[#1A1D20] border-[#D6DCE5] dark:border-zinc-700 hover:border-[#3838EC]"
+                  }`}
+                >
+                  {inWishlist ? (
+                    <FaHeart className="text-pink-500 text-lg transition-colors duration-300" />
+                  ) : (
+                    <FaRegHeart className="text-gray-400 hover:text-pink-500 text-lg transition-colors duration-300" />
+                  )}
+                </button>
+
+                {/* Chat */}
+                <Link
+                  to={`/chat?seller=${product?.seller_id?._id}`}
+                  className="flex-1 h-[55px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] flex items-center justify-center gap-3 text-white font-semibold text-base tracking-wide shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  <LuMessageSquareText size={20} />
+                  Chat with Seller
+                </Link>
+              </div>
+
+              {/* Ask AI About Deal */}
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("open-unideals-assistant", {
+                      detail: {
+                        message: `Is ₹${product?.selling_price} a fair price for "${product?.title}"? What should I inspect before buying?`,
+                      },
+                    })
+                  );
+                }}
+                className="mt-3 w-full h-[48px] rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 flex items-center justify-center gap-2 text-[#394ff1] dark:text-indigo-400 font-semibold text-sm transition-all duration-300 shadow-sm"
+              >
+                <Sparkles size={16} className="text-[#394ff1] dark:text-indigo-400" />
+                Ask AI: Fair Price & Inspection Tips
+              </button>
+            </div>
+
+            {/* Pickup & Safety */}
+            <div className="bg-white dark:bg-[#1A1D20] dark:border-0 rounded-xl shadow-sm border border-[#E2E8F0] p-5 md:p-7 xl:px-7 xl:py-5">
+              <h2 className="text-lg md:text-xl font-bold text-[#111827] dark:text-white mb-7">
+                Pickup & Safety
+              </h2>
+
+              <div className="grid md:grid-cols-2 gap-7">
+                <div className="flex gap-4">
+                  <div className="w-11 h-11 rounded-full bg-[#F3F4FF] flex items-center justify-center">
+                    <HiOutlineBuildingLibrary
+                      size={22}
+                      className="text-[#3838EC]"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="text-[#64748B] text-sm dark:text-slate-300">
+                      Campus Location
+                    </p>
+
+                    <h4 className="mt-1 font-semibold text-[#0F172A] text-base dark:text-white">
+                      VIT Vellore
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="w-11 h-11 rounded-full bg-[#F3F4FF] flex items-center justify-center">
+                    <MdLocationPin size={22} className="text-[#3838EC]" />
+                  </div>
+
+                  <div>
+                    <p className="text-[#64748B] text-sm dark:text-slate-300">
+                      Meetup Point
+                    </p>
+
+                    <h4 className="mt-1 font-semibold text-[#0F172A] text-base dark:text-white">
+                      {product.pickup_address_snapshot?.address_line} <br />
+                      {product.pickup_address_snapshot?.city}
+                      <br />
+                      {product.pickup_address_snapshot?.pincode}
+                      {product.pickup_address_snapshot?.state}
+                      <br />
+                    </h4>
+                  </div>
+                </div>
+              </div>
+
+              {/* Safety Box */}
+              <div className="mt-7 rounded-2xl bg-[#F5F6FF] dark:bg-[#131313] dark:border-0 border border-[#F1F5F9] p-5 flex gap-4">
+                <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center">
+                  <ShieldCheck size={22} className="text-[#3838EC]" />
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-[#3838EC] text-base">
+                    Safe campus-only exchange
+                  </h4>
+
+                  <p className="mt-1 text-[#666] leading-7 dark:text-slate-300">
+                    Meet in public places. Avoid sharing personal details.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right side */}
-        <div className="flex flex-col justify-between w-[93vw] ml-3 lg:ml-9 md:ml-7 mt-4 lg:mt-3 xl:ml-1 xl:mr-5 xl:w-3/4 dark:bg-[#131313] rounded-2xl">
-          {/* Right top side */}
-          <div className="flex flex-col rounded-2xl shadow-lg shadow-slate-200 border pl-6 pr-6 pb-6 pt-5 w-full xl:pl-12 dark:shadow-none dark:border-0 dark:bg-[#1A1D20]">
-            <div className="flex justify-between items-center pr-4">
-              <div className=" text-blue-600/80 bg-zinc-100 rounded-md w-28 md:w-36 md:py-2 py-[1vh] flex justify-center items-center font-semibold md:text-base text-sm font-robotoFlex dark:bg-[#131313] dark:text-[#BBC2C9]">
-                {product.category}
-              </div>
+        {/* Similar Products */}
+        <div className="w-full mt-12 mb-12">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <h2 className="text-lg md:text-xl font-bold text-[#0F172A] dark:text-white">
+              You might also like
+            </h2>
 
-              {/* Animated report dropdown */}
-              <div className="relative flex flex-col items-center gap-2">
-                <button onClick={handleReport}>
-                  <EllipsisVertical className="size-5 md:size-6 dark:text-white hover:text-blue-500 transition" />
-                </button>
-
-                <AnimatePresence>
-                  {report && (
-                    <motion.div
-                      key="report-menu"
-                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                      transition={{ duration: 0.25, ease: "easeInOut" }}
-                      className="absolute top-7 right-0 z-30 bg-white dark:bg-[#1F1F1F] dark:text-white 
-                                 border border-gray-200 dark:border-[#555] 
-                                 rounded-xl shadow-lg w-40 sm:w-44 overflow-hidden"
-                    >
-                      {[
-                        "Report Product",
-                        "Report a user",
-                        "Raise an issue",
-                      ].map((label, index) => (
-                        <button
-                          key={index}
-                          onClick={reportIssue}
-                          className="w-full text-left px-4 py-3 text-sm 
-                                     hover:bg-gray-100 dark:hover:bg-[#2A2A2A] transition-all"
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-
-            {/* Product text content */}
-            <div className="flex flex-col">
-              <h1 className="text-[5.5vw] text-neutral-900 font-bold mt-5 md:text-[3vw] lg:text-[2.7vw] xl:text-[1.8vw] font-robotoFlex dark:text-white">
-                {product.title}
-              </h1>
-              <div className="text-[8vw] flex items-center mt-1 md:text-[5vw] lg:text-[3.8vw] xl:text-[2.8vw]">
-                <IndianRupee className="size-6 dark:text-white" />
-                <h1 className="text-neutral-900 font-tiltWarp dark:text-white">
-                  {product.selling_price}
-                </h1>
-                <div className="text-zinc-600 flex items-center text-xl md:text-2xl justify-end ml-3 mt-3 font-normal line-through font-poppins leading-none dark:text-[#626262]">
-                  <IndianRupee className="size-4" />
-                  {product.original_price && <h1>{product.original_price}</h1>}
-                </div>
-              </div>
-
-              <h1 className="font-semibold md:font-medium mt-4 text-base md:text-lg xl:mt-7 font-poppins dark:text-[#D7D7D7]">
-                Product Details
-              </h1>
-              <p className="text-[#848484] xl:mr-20 font-poppins leading-5 dark:text-[#848484]">
-                {product.description}{" "}
-                <button className="text-black">more</button>
-              </p>
-            </div>
-
-            {/* Condition & usage */}
-            <div className="flex flex-col mt-8 gap-6 md:flex-row md:gap-36 lg:gap-32 xl:gap-64">
-              <div className="flex flex-col gap-2">
-                <h1 className="font-medium text-[#828F9B] text-base md:text-base dark:text-[#828F9B]">
-                  Condition
-                </h1>
-                <div className="flex flex-col gap-2">
-                  <div className="bg-gradient-to-r from-indigo-600 to-indigo-600 rounded-md text-white w-48 py-2 flex px-4 items-center font-medium text-sm md:w-52 md:text-base xl:py-3 xl:w-64 font-robotoFlex lg:px-6">
-                    {product.condition}
-                  </div>
-                  <div className="bg-[#09C712] rounded-md text-white w-48 py-2 flex px-3 items-center font-medium text-sm md:w-52 md:text-base xl:py-3 xl:w-64 font-robotoFlex lg:px-6">
-                    Price Negotiable : {product.is_negotiable ? "Yes" : "No"}
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <h1 className="font-medium text-[#828F9B] text-base md:text-base dark:text-[#828F9B]">
-                  Usage Duration
-                </h1>
-                <div className="flex flex-col gap-3">
-                  <div className="bg-gradient-to-r from-indigo-600 to-indigo-600 rounded-md text-white w-48 py-2 flex px-4 items-center font-medium text-sm md:w-52 md:text-base xl:py-3 xl:w-64 font-robotoFlex lg:px-6">
-                    {product.attributes?.usage_duration || "N/A"}
-                  </div>
-                  <div className="bg-[#09C712] rounded-md text-white w-48 py-2 flex px-3 items-center font-medium text-sm md:w-52 md:text-base xl:py-3 xl:w-64 font-robotoFlex lg:px-6">
-                    {product.attributes?.color || "N/A"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment & pickup */}
-            <div className="bg-[#f5faff] pt-4 pb-4 mt-6 rounded-md md:mt-3 xl:pl-5 pl-4 dark:bg-[#25272A]">
-              <h1 className="font-semibold text-base md:text-lg font-robotoFlex leading-7 dark:text-[#D7D7D7]">
-                Payment & Pickup
-              </h1>
-              <div className="flex items-center gap-4 mt-1">
-                <h1 className="text-zinc-500 text-sm md:text-base font-robotoFlex dark:text-[#848484]">
-                  Payment Mode (Cash/UPI):
-                </h1>
-                <div className="bg-white border border-gray-200 px-5 py-2 xl:px-8 rounded text-sm font-robotoFlex dark:bg-[#131313] dark:border-0 dark:text-white">
-                  {product.payment_preference}
-                </div>
-              </div>
-              <h1 className="text-[#848484] mt-2 text-sm md:text-base font-robotoFlex dark:text-[#848484]">
-                Pickup Location
-              </h1>
-              <p className="w-52 text-[#2D3339] font-medium text-sm leading-5 xl:leading-5 md:leading-7 md:text-base md:w-64 font-robotoFlex dark:text-[#848484]">
-                {product.pickup_address_snapshot?.address_line}
-              </p>
-            </div>
-          </div>
-
-          {/* Right bottom side */}
-          <div className="flex flex-col w-full justify-between items-center mt-4 mb-6 gap-3 lg:flex-row xl:gap-96 dark:bg-[#131313]">
             <button
-              onClick={handleWishlist}
-              disabled={wishlistLoading}
-              className={`outline outline-2 outline-offset-[-2px] outline-neutral-200 rounded-md text-black w-full py-3 flex justify-center items-center font-semibold text-sm md:text-base font-robotoFlex gap-2 dark:border-[#DDDDDD] dark:text-[#F1F1F1] dark:outline-[#DDDDDD] dark:outline-1 hover:bg-gray-50 dark:hover:bg-[#1A1D20] transition-colors disabled:opacity-50 ${
-                wishlistLoading
-                  ? "cursor-not-allowed opacity-50"
-                  : "cursor-pointer"
-              }`}
+              onClick={() => navigate(`/category/${product?.category}`)}
+              className="text-[#2563EB] text-sm md:text-base font-semibold whitespace-nowrap capitalize flex items-center gap-2"
             >
-              {inWishlist ? (
-                <FaHeart className="lg:size-4 text-pink-500" />
-              ) : (
-                <FaRegHeart className="lg:size-4 hover:text-pink-500 transition-colors" />
-              )}
-              {inWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
+              Browse all {product?.category?.replaceAll("_", " ")}{" "}
+              <FaArrowRight />
             </button>
-            <Link
-              to={`/chat?seller=${product.seller_id?._id}`}
-              className="bg-gradient-to-r from-indigo-600 to-blue-600 shadow-[0px_4px_12px_0px_rgba(0,0,0,0.17)] rounded-md text-white w-full py-3 flex justify-center items-center font-semibold gap-1 text-sm md:text-base"
-            >
-              <MessageSquareMore className="pt-1 size-6 block font-robotoFlex" />
-              Chat with seller
-            </Link>
           </div>
 
-          {/* Mobile Seller Info */}
-          <div className="lg:hidden w-full p-5 rounded-2xl shadow-xl dark:bg-[#1A1D20] mb-4">
-            <h1 className="text-base text-[#494949] font-medium md:text-lg dark:text-[#D7D7D7]">
-              Seller Information
-            </h1>
-            <div className="flex pt-2 pb-1 items-center gap-2">
-              <img
-                className="size-7 md:size-8 rounded-md object-cover"
-                src="/assets/user_img.png"
-                alt="Seller"
-              />
-              <h1 className="font-semibold dark:text-[#848484]">
-                {product.seller_id?.name}
-              </h1>
+          {!similarLoading && similarProducts.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-zinc-500">No similar products available</p>
             </div>
+          )}
 
-            <div className="flex flex-col pt-1">
-              <div className="leading-tight">
-                <h1 className="text-[#979797] dark:text-[#979797] text-sm md:text-base">
-                  {product.pickup_address_snapshot?.address_line}
-                </h1>
-              </div>
-
-              <div className="flex justify-end items-end pr-3 pt-4 font-medium text-sm md:text-base dark:text-[#D7D7D7]">
-                <h1>Listed 10 days ago</h1>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
+            {similarProducts.map((product) => (
+              <ProductCard key={product._id} product={product} />
+            ))}
           </div>
+        </div>
+      </motion.div>
+
+      <div
+        ref={floatingCTARef}
+        className="sm:hidden"
+        style={{
+          position: "fixed",
+          bottom: "16px",
+          left: "16px",
+          right: "16px",
+          zIndex: 50,
+          opacity: 1,
+          pointerEvents: "auto",
+          transition:
+            "bottom 450ms cubic-bezier(0.4, 0, 0.2, 1), left 450ms cubic-bezier(0.4, 0, 0.2, 1), right 450ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease",
+        }}
+      >
+        <div className="flex gap-3">
+          <button
+            onClick={handleWishlistClick}
+            disabled={wishlistLoading}
+            className={`h-[56px] w-[60px] rounded-2xl backdrop-blur-xl border shadow-xl flex items-center justify-center ${
+              inWishlist
+                ? "bg-[#FFF1F4] border-pink-200"
+                : "bg-white/95 border-white/50"
+            }`}
+          >
+            {inWishlist ? (
+              <FaHeart className="text-pink-500 text-lg" />
+            ) : (
+              <FaRegHeart className="text-gray-500 text-lg" />
+            )}
+          </button>
+
+          <Link
+            to={`/chat?seller=${product?.seller_id?._id}`}
+            className="flex-1 h-[56px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] shadow-[0_12px_30px_rgba(46,63,220,0.35)] flex items-center justify-center gap-3 text-white font-semibold"
+          >
+            <LuMessageSquareText size={20} />
+            Chat with Seller
+          </Link>
         </div>
       </div>
-    </div>
+      {showShareMenu && (
+        <div className="fixed inset-0 z-[999] flex items-end md:items-center justify-center">
+          {/* Overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowShareMenu(false)}
+            className="absolute
+    inset-0
+    bg-black/50
+    backdrop-blur-lg"
+          />
+
+          {/* Modal */}
+          <motion.div
+            initial={{
+              y: 80,
+              opacity: 0,
+              scale: 0.98,
+              backdropFilter: "blur(0px)",
+            }}
+            drag="y"
+            dragConstraints={{
+              top: 0,
+              bottom: 100,
+            }}
+            onDragEnd={(e, info) => {
+              if (info.offset.y > 120) {
+                setShowShareMenu(false);
+              }
+            }}
+            animate={{
+              y: 0,
+              opacity: 1,
+              scale: 1,
+              backdropFilter: "blur(12px)",
+            }}
+            exit={{
+              y: 120,
+              opacity: 0,
+              backdropFilter: "blur(0px)",
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 350,
+              damping: 28,
+            }}
+            className="
+  relative
+  w-full
+  md:w-[520px]
+  mx-4
+  bg-white/95
+dark:bg-[#16181B]/95
+border
+border-white/40
+dark:border-white/5
+  backdrop-blur-2xl
+  rounded-t-[32px]
+  md:rounded-[32px]
+  p-6
+  shadow-[0_-8px_40px_rgba(0,0,0,0.12),0_24px_80px_rgba(0,0,0,0.18)]
+"
+          >
+            {/* Header */}
+            <div className="flex justify-center mb-4">
+              <div
+                className="
+      w-12
+      h-1.5
+      rounded-full
+      bg-gray-300
+    "
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="text-black">
+                <h3 className="text-xl font-bold">Share Product</h3>
+
+                <p className="text-sm text-zinc-500 mt-1">
+                  Share this listing with your classmates
+                </p>
+              </div>
+
+              <button onClick={() => setShowShareMenu(false)}>
+                <IoClose className="text-black dark:text-white" size={24} />
+              </button>
+            </div>
+
+            {/* Product Preview */}
+
+            <div
+              className="
+mt-5
+flex
+items-center
+gap-4
+p-4
+rounded-3xl
+bg-white
+dark:bg-zinc-900
+border
+border-zinc-200
+dark:border-zinc-800
+"
+            >
+              <img
+                src={product?.images?.[0]?.url || FALLBACK_IMAGE}
+                className="
+    w-20
+    h-20
+    rounded-2xl
+    object-cover
+    shadow-md
+  "
+              />
+
+              <div>
+                <h4 className="font-semibold text-black dark:text-white">
+                  {product?.title}
+                </h4>
+
+                <p className="text-[#3838EC] font-bold text-lg">
+                  ₹{product?.selling_price}
+                </p>
+              </div>
+            </div>
+
+            {/* Share Buttons */}
+
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <motion.button
+                onClick={() => {
+                  window.open(
+                    `https://wa.me/?text=${encodeURIComponent(shareText)}`,
+                    "_blank",
+                  );
+
+                  setShowShareMenu(false);
+                }}
+                whileHover={{
+                  y: -1,
+                  scale: 1.01,
+                }}
+                whileTap={{
+                  scale: 0.94,
+                }}
+                className="h-14 rounded-xl text-white transition-all shadow-sm hover:shadow-xl bg-[#25D366] flex items-center justify-center gap-3"
+              >
+                <FaWhatsapp size={24} />
+                <span className="font-medium">WhatsApp</span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => {
+                  window.open(
+                    `https://t.me/share/url?url=${encodeURIComponent(
+                      shareUrl,
+                    )}&text=${encodeURIComponent(product?.title)}`,
+                    "_blank",
+                  );
+
+                  setShowShareMenu(false);
+                }}
+                whileHover={{
+                  y: -1,
+                  scale: 1,
+                }}
+                whileTap={{
+                  scale: 0.94,
+                }}
+                className="h-14 rounded-xl text-white transition-all shadow-sm hover:shadow-xl bg-[#3390EC] flex items-center justify-center gap-3"
+              >
+                <FaTelegram size={24} />
+                Telegram
+              </motion.button>
+
+              <motion.button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(shareUrl);
+
+                  setCopied(true);
+
+                  setTimeout(() => {
+                    setCopied(false);
+                  }, 2000);
+
+                  toast.success("Link copied");
+
+                  setShowShareMenu(false);
+                }}
+                whileHover={{
+                  y: -1,
+                  scale: 1,
+                }}
+                whileTap={{
+                  scale: 0.97,
+                }}
+                className="hover:brightness-110 col-span-2 h-14 rounded-xl text-white bg-[#4556F0] flex items-center justify-center gap-3 font-semibold"
+              >
+                {copied ? (
+                  <>✓ Copied</>
+                ) : (
+                  <>
+                    <FaLink />
+                    Copy Link
+                  </>
+                )}
+              </motion.button>
+            </div>
+
+            <div
+              className="
+mt-6
+rounded-2xl
+bg-[#EEF2FF]
+border
+border-[#DDE4FF]
+p-4
+"
+            >
+              <p className="font-semibold text-[#3838EC]">
+                🎓 Share with classmates
+              </p>
+
+              <p className="text-sm text-slate-600 mt-1">
+                Listings shared in hostel groups usually get more views and
+                responses.
+              </p>
+            </div>
+
+            {/* URL Preview */}
+
+            <div className="mt-6 p-3 rounded-xl border text-black bg-[#FAFAFA] text-sm truncate">
+              {shareUrl}
+            </div>
+
+            <p className="mt-4 text-center text-xs text-zinc-500">
+              Anyone with this link can view this listing.
+            </p>
+          </motion.div>
+        </div>
+      )}
+    </motion.div>
   );
 };
 

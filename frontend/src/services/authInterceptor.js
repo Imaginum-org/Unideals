@@ -22,7 +22,7 @@ const clearStoredAuth = () => {
 
 const notifyAccountBlocked = (payload = {}) => {
   window.dispatchEvent(
-    new CustomEvent("campus-mart:account-blocked", {
+    new CustomEvent("unideals:account-blocked", {
       detail: {
         message:
           payload.message ||

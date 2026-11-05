@@ -1,200 +1,220 @@
-import React from "react";
-import { FaInstagram, FaLinkedin, FaHeart } from "react-icons/fa";
-import { FaXTwitter } from "react-icons/fa6";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { FiArrowRight } from "react-icons/fi";
+import { FaInstagram, FaLinkedinIn } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
+import footerBg from "/footer_bg.webp";
+import "../common/ShareButton.css";
+import ShareButton from "../common/ShareButton.jsx";
+
+const FOOTER_LINKS = [
+  {
+    title: "Marketplace",
+    links: [
+      { label: "Sell Now", href: "/upload" },
+      { label: "Chats", href: "/chat" },
+      { label: "My Orders", href: "/myorders" },
+      { label: "Settings", href: "/settings" },
+      { label: "My Listings", href: "/productlisted" },
+    ],
+  },
+
+  {
+    title: "Company",
+    links: [
+      { label: "Imaginum", href: "https://imaginumorg.vercel.app/" },
+      { label: "LinkedIn", href: "/linkedin" },
+      { label: "Careers", href: "/careers" },
+      { label: "Blogs", href: "/blogs" },
+      { label: "New Releases", href: "/releases" },
+    ],
+  },
+
+  {
+    title: "Support",
+    links: [
+      { label: "Contact Us", href: "/contact" },
+      { label: "Report a Bug", href: "/contact" },
+      { label: "Suggest a Feature", href: "/contact" },
+      { label: "FAQ", href: "/contact" },
+    ],
+  },
+];
+
+const SOCIAL_LINKS = [
+  {
+    icon: FaXTwitter,
+    href: "https://x.com",
+    label: "X",
+  },
+  {
+    icon: FaInstagram,
+    href: "https://instagram.com",
+    label: "Instagram",
+  },
+  {
+    icon: FaLinkedinIn,
+    href: "https://linkedin.com",
+    label: "LinkedIn",
+  },
+];
 
 const Footer = () => {
   return (
-    <footer className="w-full bg-gradient-to-bl from-indigo-600 to-blue-600 dark:bg-none dark:bg-zinc-900 px-[4.5vw] pt-10 lg:pt-[2vw] relative text-white font-poppins overflow-hidden">
-      {/* Decorative Circles */}
-      <img
-        src="/assets/circle45.png"
-        alt="circle"
-        className="absolute hidden md:block bottom-[-2vh] left-60 w-[250px]"
-      />
-      <img
-        src="/assets/footer_circle.png"
-        alt="circle"
-        className="absolute hidden md:block top-[-2vh] right-[-3vh] w-[250px]"
-      />
-
-      {/* Top Section */}
-      <div className="flex flex-col md:flex-row justify-between gap-10 md:pt-4 pt-2">
-        {/* Left */}
-        <div className="w-full md:w-1/2 flex flex-col gap-3">
-          <div className="flex flex-col lg:gap-2 gap-1">
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-xl font-bold lg:text-2xl"
+    <div className="bg-white p-3 md:p-6 dark:bg-[#131313]">
+      <div className="mx-auto w-full max-w-[1600px]">
+        <footer
+          style={{
+            backgroundImage: `url(${footerBg})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+          className="w-full overflow-hidden rounded-[30px] px-5 pt-5 font-figtree"
+        >
+          <div
+            className="rounded-[30px] bg-white dark:bg-[#131313] dark:text-white px-6
+py-8
+sm:px-8
+md:px-12
+lg:px-16 text-[#5d6068] shadow-2xl"
+          >
+            <div
+              className="grid grid-cols-1
+sm:grid-cols-2
+lg:grid-cols-[1.5fr_1fr_1fr_1fr]
+gap-8"
             >
-              <img src="/whitebag.png" alt="logo" className="w-5 h-5" />
-              <h1> Unideals</h1>
-            </Link>
+              <div>
+                <Link
+                  to="/"
+                  className="mb-6 flex flex-col items-start text-xl font-semibold text-black dark:text-white"
+                >
+                  <div className="flex items-center justify-center">
+                    <img
+                      src="/logo.svg"
+                      alt="image"
+                      className="h-12 w-12 object-cover"
+                    />
+                    <div className="flex flex-col leading-6">
+                      <h1>Unideals</h1>
+                      <h5 className="text-xs font-medium text-slate-600">
+                        By Imaginum
+                      </h5>
+                    </div>
+                  </div>
+                </Link>
 
-            <h1 className="flex items-center gap-2 md:text-xl text-sm lg:text-lg font-poppins">
-              <span className="font-extralight">~ platform build by</span>{" "}
-              <a
-                href="https://imaginumorg.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-white font-poppins font-extrabold hover:text-black duration-300 ease-in-out"
-              >
-                Imaginum
-              </a>
-            </h1>
+                <p className="mb-8 max-w-[230px] leading-6 text-base text-[#2D3339] dark:text-slate-500">
+                  Your campus connection for buying, selling, and trading.
+                </p>
+
+                <h3 className="mb-4 font-semibold text-base text-[#2D3339]">
+                  STAY IN THE LOOP
+                </h3>
+                <form className="mb-6 flex max-w-[330px] gap-3">
+                  <input
+                    type="email"
+                    placeholder="Drop you mail"
+                    className="min-w-0 flex-1 rounded-xl outline-none text-black select-none bg-[#F3F4F8] px-5 py-3 border border-[#E8EAF0] placeholder:text-[#7A8697]"
+                  />
+                  <button
+                    type="submit"
+                    className="grid h-12 w-12 place-items-center rounded-2xl bg-[#3838EC] text-xl text-white"
+                  >
+                    <FiArrowRight />
+                  </button>
+                </form>
+
+                <div className="flex gap-3">
+                  {SOCIAL_LINKS.map(({ icon: Icon, href, label }) => (
+                    <a
+                      key={label}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={label}
+                      className="
+      grid
+      h-11
+      w-11
+      place-items-center
+      rounded-lg
+      bg-[#F3F4F8]
+      text-lg
+      text-[#4A5565]
+      transition-all
+      duration-300
+      hover:bg-indigo-600
+      hover:text-white
+    "
+                    >
+                      <Icon />
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {FOOTER_LINKS.map(({ title, links }) => (
+                <div key={title}>
+                  <h3 className="mb-6 font-bold uppercase text-[#313131]">
+                    {title}
+                  </h3>
+
+                  <ul className="space-y-3">
+                    {links.map(({ label, href }) => (
+                      <li key={label}>
+                        <Link
+                          to={href}
+                          className="
+                          text-[#2D3339]
+              transition-colors
+              duration-200
+              hover:text-indigo-600
+            "
+                        >
+                          {label}
+                        </Link>
+                      </li>
+                    ))}
+
+                    {title === "Support" && (
+                      <li>
+                        <a
+                          href="mailto:unideals@gmail.com"
+                          className="font-medium text-[#3838EC]"
+                        >
+                          unideals@gmail.com
+                        </a>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-16 flex flex-col gap-8 border-t border-[#e7e8e9] pt-6 text-sm text-[#9CA3AF] md:flex-row md:items-center md:justify-between">
+              <p>© {new Date().getFullYear()} Unideals All rights reserved.</p>
+
+              <div className="flex items-center gap-7 text-[#9CA3AF]">
+                <Link to="/termscondition">Terms and Privacy</Link>
+                <ShareButton />
+              </div>
+            </div>
           </div>
 
-          <p className="text-[4vw] md:text-[2vw] lg:text-[1.5vw] leading-snug">
-            The Ultimate Marketplace for <br />
-            Students to Buy, Sell, and Trade with Ease!
-          </p>
-        </div>
-
-        {/* Right */}
-        <div className="hidden md:flex flex-col items-end gap-4 w-full md:w-1/2 md:mt-8 lg:mt-6">
-          <h2 className="text-[1.2vw] flex items-center gap-2 font-medium md:text-[2.3vw] lg:text-[1.5vw] font-poppins">
-            Feedback? We're Listening!
-            <FaHeart className="text-white" />
-          </h2>
-
-          <div className="relative md:w-2/3 lg:w-1/2">
-            <Link
-              to={"/contact"}
-              className="z-10 absolute inset-x-0 top-0 py-3 px-10 text-black bg-white rounded-3xl text-lg font-semibold text-center"
-            >
-              Send Us
-            </Link>
-            <div className="border border-slate-200 bg-transparent rounded-3xl py-6 px-20 md:mt-3 md:ml-[-0.5vw] md:mr-2"></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Middle Section */}
-      <div className="flex justify-between items-center my-10 relative">
-        <button className="z-10 py-2 px-7 lg:py-3 lg:px-10 text-black bg-white rounded-3xl font-semibold hover:scale-105 transition-transform duration-200 md:text-base text-sm">
-          Share with friends
-        </button>
-
-        <img
-          src="/assets/Line_11.png"
-          alt="decorative line"
-          className="absolute right-0 w-[60%] lg:w-auto"
-        />
-      </div>
-
-      {/* Mobile Feedback */}
-      <div className="md:hidden flex flex-col gap-2 mb-10">
-        <h2 className="text-[4.3vw] mb-1">Feedback? We're Listening!</h2>
-
-        <div className="relative w-2/3">
-          <a
-            href="mailto:sarthakkrishak1234@gmail.com"
-            className="z-10 absolute inset-x-0 top-0 py-3 px-10 text-black bg-white rounded-3xl text-sm font-semibold text-center"
+          <motion.h2
+            initial={{ y: 70, opacity: 0.85 }}
+            whileInView={{ y: 50, opacity: 0.9 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            viewport={{ amount: 0.45 }}
+            className="pointer-events-none mt-[-1.2vh] select-none text-center text-[clamp(4rem,15vw,15rem)] font-bold leading-none text-white"
           >
-            Send Us
-          </a>
-
-          <div className="border border-slate-200 bg-transparent rounded-3xl py-6 px-20 ml-[-0.8vw] mr-2"></div>
-        </div>
+            unideals
+          </motion.h2>
+        </footer>
       </div>
-
-      {/* Bottom Links */}
-      <div className="flex flex-col-reverse md:flex-row justify-between gap-10 mt-8">
-        {/* Social Icons */}
-        <div className="flex gap-4 items-end">
-          {[
-            { Icon: FaInstagram, link: "#" },
-            { Icon: FaLinkedin, link: "#" },
-            { Icon: FaXTwitter, link: "#" },
-          ].map(({ Icon, link }, idx) => (
-            <a
-              key={idx}
-              href={link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-3 text-2xl bg-blue-700 shadow-[2px_4px_18px_0px_rgba(0,0,0,0.20)] border border-white/50 rounded-full hover:shadow-lg transition-shadow duration-300"
-            >
-              <Icon />
-            </a>
-          ))}
-        </div>
-
-        {/* Navigation Links */}
-        <div className="flex gap-16 pl-2">
-          <ul className="space-y-3 text-sm md:text-lg">
-            {["Orders", "Chats", "Dev team"].map((text, i) => (
-              <li
-                key={i}
-                className="hover:text-black transition-colors duration-300"
-              >
-                <Link to="/">{text}</Link>
-              </li>
-            ))}
-          </ul>
-
-          <ul className="space-y-3 text-sm md:text-lg">
-            {["Sell a product", "Notification", "Contact us"].map((text, i) => (
-              <li
-                key={i}
-                className="hover:text-black transition-colors duration-300"
-              >
-                <Link to="/">{text}</Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* Footer Bottom */}
-      <div className="border-t border-white/30 mt-10 pt-4 md:text-sm text-sm pb-4 text-white flex flex-col md:flex-row md:items-center justify-between">
-        <p className="hover:underline cursor-default">
-          © 2026 All rights reserved
-        </p>
-
-        <p className="text-[3.5vw] hidden md:block sm:text-base mt-1">
-          Designed and developed by{" "}
-          <a
-            href="https://www.linkedin.com/in/sarthakkrishak/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold hover:text-black transition"
-          >
-            Sarthak
-          </a>
-          ,{" "}
-          <a href="#" className="font-semibold hover:text-black transition">
-            Kamal
-          </a>
-          , and{" "}
-          <a href="#" className="font-semibold hover:text-black transition">
-            Anurag
-          </a>
-          .
-        </p>
-
-        {/* Mobile */}
-        <p className="text-xs md:hidden sm:text-base mt-1">
-          Developed by{" "}
-          <a
-            href="https://www.linkedin.com/in/sarthakkrishak/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold hover:text-black transition"
-          >
-            Sarthak
-          </a>
-          ,{" "}
-          <a href="#" className="font-semibold hover:text-black transition">
-            Kamal
-          </a>
-          , and{" "}
-          <a href="#" className="font-semibold hover:text-black transition">
-            Anurag
-          </a>
-          .
-        </p>
-      </div>
-    </footer>
+    </div>
   );
 };
 

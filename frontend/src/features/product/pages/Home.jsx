@@ -1,130 +1,227 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-
 import Category from "../../../features/product/components/Category.jsx";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
-import Footer from "../../../Components/layout/Footer.jsx";
-
-import { getProducts } from "../api/productApi";
-
+import { getBoostedProducts, getProducts } from "../api/productApi";
+import { FaPlus } from "react-icons/fa6";
 import { IoIosArrowForward } from "react-icons/io";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination, A11y, Autoplay } from "swiper/modules";
-
 import { motion } from "framer-motion";
-
+import { useLocation, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import "swiper/css";
 import "swiper/css/pagination";
-
-import bannerRight from "/bannerRight.png";
+import FirstListingCelebration from "../../../Components/FirstListingCelebration.jsx";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { CATEGORY_ITEMS } from "../constants/categories";
+import { FiArrowRight } from "react-icons/fi";
 
 const Home = () => {
-  const sliderRef = useRef(null);
-
-  //drag state using refs (no re-render bugs)
-  const isDownRef = useRef(false);
-  const startXRef = useRef(0);
-  const scrollLeftRef = useRef(0);
-  const isDraggingRef = useRef(false);
-
-  const onMouseDown = (e) => {
-    if (!sliderRef.current) return;
-    isDownRef.current = true;
-    isDraggingRef.current = false;
-    startXRef.current = e.pageX - sliderRef.current.offsetLeft;
-    scrollLeftRef.current = sliderRef.current.scrollLeft;
-  };
-
-  const onMouseUp = () => {
-    isDownRef.current = false;
-  };
-
-  const onMouseLeave = () => {
-    isDownRef.current = false;
-  };
-
-  const onMouseMove = (e) => {
-    if (!isDownRef.current || !sliderRef.current) return;
-
-    const x = e.pageX - sliderRef.current.offsetLeft;
-    const walk = (x - startXRef.current) * 2;
-
-    if (Math.abs(walk) > 5) isDraggingRef.current = true;
-
-    sliderRef.current.scrollLeft = scrollLeftRef.current - walk;
-  };
+  const location = useLocation();
+  const navigate = useNavigate();
 
   //STATE
-  const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
+  const [boostedProducts, setBoostedProducts] = useState([]);
   const [page, setPage] = useState(1);
-
+  const [showCelebration, setShowCelebration] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
-
   const [error, setError] = useState(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const sliderRef = useRef(null);
+  const fetchingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
+
+  useEffect(() => {
+    const listingCreated = location.state?.listingCreated;
+    const isFirstListing = location.state?.isFirstListing;
+
+    if (!listingCreated) return;
+
+    if (isFirstListing) {
+      setShowCelebration(true);
+    } else {
+      toast.success("Listing published successfully");
+    }
+
+    navigate(location.pathname, {
+      replace: true,
+      state: {},
+    });
+  }, [location, navigate]);
+
+  const categoryCards = useMemo(
+    () =>
+      CATEGORY_ITEMS.map((category) => (
+        <div key={category.value} className="flex-shrink-0 snap-start">
+          <Category title={category.label} imageSrc={category.icon} />
+        </div>
+      )),
+    [],
+  );
+
+  const updateScrollButtons = () => {
+    const slider = sliderRef.current;
+
+    if (!slider) return;
+
+    setCanScrollLeft(slider.scrollLeft > 5);
+
+    setCanScrollRight(
+      slider.scrollLeft < slider.scrollWidth - slider.clientWidth - 5,
+    );
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!sliderRef.current) return;
+
+      // Ignore when typing in inputs/textareas
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft") {
+        scrollLeft();
+      }
+
+      if (e.key === "ArrowRight") {
+        scrollRight();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   //FETCH
-  const fetchProducts = useCallback(
-    async (pageNumber = 1) => {
-      if (loading || !hasMore) return;
+  const fetchProducts = useCallback(async (pageNumber = 1) => {
+    if (fetchingRef.current) return;
+    if (!hasMoreRef.current) return;
 
-      try {
-        setLoading(true);
-        if (pageNumber === 1) setInitialLoading(true);
+    try {
+      fetchingRef.current = true;
 
-        const res = await getProducts({
-          page: pageNumber,
-          limit: 10,
-        });
+      setLoading(true);
 
-        const newProducts = res.data?.data || [];
-        const pagination = res.data?.pagination || {};
+      const res = await getProducts({
+        page: pageNumber,
+        limit: 10,
+      });
 
-        setProducts((prev) => {
-          const existing = new Set(prev.map((p) => p._id));
-          const filtered = newProducts.filter((p) => !existing.has(p._id));
-          return [...prev, ...filtered];
-        });
+      const newProducts = res.data?.data || [];
+      const pagination = res.data?.pagination || {};
 
-        if (!pagination.totalPages || pageNumber >= pagination.totalPages) {
-          setHasMore(false);
-        }
+      setProducts((prev) => {
+        const existing = new Set(prev.map((p) => p._id));
 
-        setPage(pageNumber);
-      } catch (err) {
-        setError("Failed to load products");
-      } finally {
-        setLoading(false);
-        setInitialLoading(false);
-      }
-    },
-    [loading, hasMore],
-  );
+        const filtered = newProducts.filter((p) => !existing.has(p._id));
+
+        return [...prev, ...filtered];
+      });
+
+      setHasMore(
+        pagination.totalPages ? pageNumber < pagination.totalPages : false,
+      );
+
+      setPage(pageNumber);
+    } catch (err) {
+      setError("Failed to load products");
+      console.log(err);
+    } finally {
+      fetchingRef.current = false;
+      setLoading(false);
+      setInitialLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const slider = sliderRef.current;
+
+    if (!slider) return;
+
+    updateScrollButtons();
+
+    slider.addEventListener("scroll", updateScrollButtons);
+
+    window.addEventListener("resize", updateScrollButtons);
+
+    return () => {
+      slider.removeEventListener("scroll", updateScrollButtons);
+      window.removeEventListener("resize", updateScrollButtons);
+    };
+  }, []);
 
   useEffect(() => {
     fetchProducts(1);
   }, [fetchProducts]);
+
+  useEffect(() => {
+    const fetchBoostedProducts = async () => {
+      try {
+        const res = await getBoostedProducts();
+        setBoostedProducts(res.data?.data || []);
+      } catch (err) {
+        console.error("Failed to load boosted products", err);
+      }
+    };
+
+    fetchBoostedProducts();
+  }, []);
+
+  const scrollLeft = () => {
+    sliderRef.current?.scrollBy({
+      left: -(sliderRef.current.clientWidth * 0.8),
+      behavior: "smooth",
+    });
+  };
+
+  const scrollRight = () => {
+    sliderRef.current?.scrollBy({
+      left: sliderRef.current.clientWidth * 0.8,
+      behavior: "smooth",
+    });
+  };
 
   // INFINITE SCROLL
   const observerRef = useRef();
 
   const lastProductRef = useCallback(
     (node) => {
-      if (loading || !hasMore) return;
+      if (!hasMore) return;
 
       if (observerRef.current) observerRef.current.disconnect();
 
-      observerRef.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-          fetchProducts(page + 1);
-        }
-      });
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (
+            entries[0].isIntersecting &&
+            !loading &&
+            hasMore &&
+            !fetchingRef.current
+          ) {
+            fetchProducts(page + 1);
+          }
+        },
+        {
+          rootMargin: "300px",
+        },
+      );
 
       if (node) observerRef.current.observe(node);
     },
-    [loading, hasMore, page, fetchProducts],
+    [hasMore, page, fetchProducts],
   );
 
   return (
@@ -143,169 +240,91 @@ const Home = () => {
     xl:h-[44vh]
     2xl:min-h-[40vh]
     shadow-[0_8px_20px_rgba(0,0,0,0.15)]
-  "
+    overflow-hidden
+    bg-cover
+    bg-center
+    bg-no-repeat"
+          style={{
+            backgroundImage: "url('/banner_bg.webp')",
+          }}
         >
-          <Swiper
-            modules={[Pagination, A11y, Autoplay]}
-            spaceBetween={30}
-            slidesPerView={1}
-            pagination={{ clickable: true }}
-            autoplay={{
-              delay: 4000,
-              disableOnInteraction: false,
-            }}
-            loop={true}
-            speed={900}
-            className="dark:bg-zinc-900 rounded-md md:rounded-xl"
+          {/* Black Overlay for text */}
+          {/* <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-black/10 z-0" /> */}
+
+          {/* <img
+            width={170}
+            src="\assets\circle.png"
+            alt="image"
+            className="absolute bottom-0 xl:left-72 lg:left-48 md:left-40 md:bottom-[-1.3vh] lg:bottom-0 hidden md:block "
+          /> */}
+
+          {/* Left Image */}
+          <div
+            className="absolute left-6 lg:left-12 xl:left-20 top-72 -translate-y-1/2
+   w-24 md:w-36 lg:w-44 xl:w-80
+   z-10 pointer-events-none -scale-x-100 -rotate-12"
           >
-            {/* Slide 1 */}
-            <SwiperSlide>
-              <img
-                width={170}
-                src="\assets\circle.png"
-                alt="image"
-                className="absolute bottom-0 xl:left-72 lg:left-48 md:left-40 md:bottom-[-1.3vh] lg:bottom-0 hidden md:block "
-              />
-              <div className="flex h-full w-full items-center justify-between xl:px-20 lg:px-14 md:px-10 px-5 relative">
-                {/* Left Content */}
-                <motion.div className="text-white w-[70%]">
-                  <h1 className="hidden md:block lg:text-[2.5vw] xl:text-[2.2vw] md:text-[2.7vw] text-[0.85rem] font-extrabold leading-tight font-figtree">
-                    Unlock Deals, Share Essentials,{" "}
-                    <br className="hidden md:block" />
-                    Simplify Campus Living!
-                  </h1>
-                  <h1 className="md:hidden lg:text-[2.5vw] xl:text-[2.2vw] md:text-[2.7vw] text-[0.85rem] font-extrabold leading-tight font-figtree">
-                    Unlock Deals, Essentials, <br className="hidden md:block" />
-                    Simplify Campus Living!
-                  </h1>
+            <motion.img
+              src="/fan.webp"
+              alt="Left Decoration"
+              className="w-full h-auto block"
+              animate={{ y: [0, -14, 0] }}
+              transition={{
+                duration: 4,
+                ease: "easeInOut",
+                repeat: Infinity,
+                repeatType: "loop",
+              }}
+            />
+          </div>
 
-                  <p className="hidden md:block lg:text-[1.7vw] xl:text-[1.4vw] md:text-[2vw] text-[0.7rem] lg:leading-7 md:leading-5  text-gray-200 font-medium mt-2 font-figtree">
-                    Your trusted platform to simplify student life
-                    <br className="hidden sm:block" /> Buy, sell & connect
-                    easily.
-                  </p>
-                  <p className="md:hidden text-[clamp(0.7rem,1.5vw,1.2rem)] lg:leading-7 md:leading-5  text-gray-200 font-medium mt-2 font-figtree">
-                    Your trusted platform to simplify
-                    <br className="hidden sm:block" /> Buying, selling & connect
-                    easily.
-                  </p>
-                  <Link
-                    to="/upload"
-                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.7vh] px-4 font-figtree duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
-                  >
-                    Sell Now
-                  </Link>
-                </motion.div>
+          {/* Right Image */}
+          <div
+            className="absolute right-6 lg:right-12 xl:right-20 top-72 -translate-y-1/2
+   w-24 md:w-36 lg:w-44 xl:w-96
+   z-10 pointer-events-none -rotate-12"
+          >
+            <motion.img
+              src="/bag_banner.webp"
+              alt="Right Decoration"
+              className="w-full h-auto block"
+              animate={{ y: [0, -16, 0] }}
+              transition={{
+                duration: 4.6,
+                ease: "easeInOut",
+                repeat: Infinity,
+                repeatType: "loop",
+                delay: 0.6,
+              }}
+            />
+          </div>
 
-                {/* Right Image Section */}
-                <div className="relative w-[50%] flex justify-center items-center">
-                  <motion.img
-                    src="/assets/Group_115.png"
-                    alt="Background Shape"
-                    className="absolute md:size-[32vw] xl:size-[25vw] lg:size-[25vw] size-[30vw] md:h-80 lg:h-[28vh] h-56 z-0"
-                  />
-                  <motion.img
-                    src={bannerRight}
-                    alt="Main Visual"
-                    className="absolute xl:size-[26vw] lg:size-[33vw] md:size-[35vw] xl:mt-20 lg:mt-16 size-[45vw] z-10 mt-10"
-                  />
-                </div>
-              </div>
-            </SwiperSlide>
+          <div className="relative z-10 flex h-full w-full items-center justify-center px-5">
+            {/* Left Content */}
+            <div className="text-white max-w-4xl text-center flex flex-col items-center font-figtree">
+              <h1 className="hidden md:block lg:text-[2.5vw] xl:text-4xl md:text-[2.7vw] text-[0.85rem] font-extrabold leading-tight font-figtree tracking-wider">
+                Unlock Deals, Share Essentials,{" "}
+                <br className="hidden md:block" />
+                Simplify Campus Living!
+              </h1>
+              <h1 className="md:hidden lg:text-[2.5vw] xl:text-[2.2vw] md:text-[2.7vw] text-[0.85rem] font-extrabold leading-tight font-figtree">
+                Unlock Deals, Essentials, <br className="hidden md:block" />
+                Simplify Campus Living!
+              </h1>
 
-            {/* Slide 2 */}
-            <SwiperSlide>
-              <img
-                width={170}
-                src="\assets\circle.png"
-                alt="image"
-                className="absolute bottom-0 xl:left-72 lg:left-48 md:left-40 md:bottom-[-1.3vh] lg:bottom-0 hidden md:block"
-              />
-
-              <div className="flex h-full w-full items-center justify-between xl:px-20 lg:px-14 md:px-10 px-5 relative">
-                {/* Left Content */}
-                <motion.div className="text-white w-1/2">
-                  <h1 className="lg:text-[2.5vw] xl:text-[2.2vw] md:text-[2.7vw] text-[0.85rem] font-bold leading-tight font-figtree">
-                    Find What You Need, <br />
-                    Sell What You Dont!
-                  </h1>
-                  <p className="hidden md:block lg:text-[1.7vw] xl:text-[1.4vw] md:text-[2vw] text-[0.7rem] lg:leading-7 md:leading-5  text-gray-200 font-medium mt-2 font-figtree">
-                    The perfect place to buy, sell, and discover
-                    <br className="hidden sm:block" /> amazing deals all in one
-                    spot!
-                  </p>
-                  <p className="md:hidden lg:text-[1.7vw] xl:text-[1.4vw] md:text-[2vw] text-[0.7rem] lg:leading-7 md:leading-5  text-gray-200 font-medium mt-2 font-figtree">
-                    One place to buy, sell, and discover
-                    <br className="hidden sm:block" /> great deals.
-                  </p>
-                  <Link
-                    to="/upload"
-                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.8vh] px-5 font-figtree duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
-                  >
-                    Explore Now
-                  </Link>
-                </motion.div>
-
-                {/* Right Image Section */}
-                <div className="relative w-[50%] flex justify-center items-center">
-                  <motion.img
-                    src="/assets/Group_115.png"
-                    alt="Background Shape"
-                    className="absolute md:size-[32vw] xl:size-[25vw] lg:size-[25vw] size-[30vw] md:h-80 lg:h-[28vh] h-56 z-0"
-                  />
-                  <motion.img
-                    src={bannerRight}
-                    alt="Main Visual"
-                    className="absolute xl:size-[26vw] lg:size-[33vw] md:size-[35vw] xl:mt-20 lg:mt-16 size-[45vw] z-10 mt-10"
-                  />
-                </div>
-              </div>
-            </SwiperSlide>
-
-            {/* Slide 3 */}
-            <SwiperSlide>
-              <img
-                width={170}
-                src="\assets\circle.png"
-                alt="image"
-                className="absolute bottom-0 xl:left-72 lg:left-48 md:left-40 md:bottom-[-1.3vh] lg:bottom-0 hidden md:block"
-              />
-
-              <div className="flex h-full w-full items-center justify-between xl:px-20 lg:px-14 md:px-10 px-5 relative">
-                {/* Left Content */}
-                <motion.div className="text-white w-1/2">
-                  <h1 className="lg:text-[2.5vw] xl:text-[2.2vw] md:text-[2.7vw] text-[0.8rem] font-bold leading-tight font-figtree">
-                    Buy Smart, Share Freely <br />
-                    Simplified Campus Life!
-                  </h1>
-                  <p className="lg:text-[1.7vw] xl:text-[1.4vw] md:text-[2vw] text-[0.7rem] lg:leading-7 md:leading-5  text-gray-200 font-medium mt-2 font-figtree">
-                    Where Students Connect
-                    <br className="hidden sm:block" /> Trade & Save Together
-                  </p>
-                  <Link
-                    to="/upload"
-                    className="bg-white text-[#364EF2] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-11 lg:px-7 xl:text-xl lg:text-lg md:text-base text-xs inline-flex lg:mt-4 xl:mt-6 md:mt-4 mt-3 shadow-md transition-transform transform lg:hover:scale-105 py-[0.8vh] px-5 font-figtree duration-500 ease-in-out dark:bg-gradient-to-r from-blue-600 to-indigo-600 dark:text-white"
-                  >
-                    Trade Now
-                  </Link>
-                </motion.div>
-
-                {/* Right Image Section */}
-                <div className="relative w-[50%] flex justify-center items-center">
-                  <motion.img
-                    src="/assets/Group_115.png"
-                    alt="Background Shape"
-                    className="absolute md:size-[32vw] xl:size-[25vw] lg:size-[25vw] size-[30vw] md:h-80 lg:h-[28vh] h-56 z-0"
-                  />
-                  <motion.img
-                    src={bannerRight}
-                    alt="Main Visual"
-                    className="absolute xl:size-[26vw] lg:size-[33vw] md:size-[35vw] xl:mt-20 lg:mt-16 size-[45vw] z-10 mt-10"
-                  />
-                </div>
-              </div>
-            </SwiperSlide>
-          </Swiper>
+              <p className="hidden text-center md:block lg:text-[1.7vw] tracking-wide xl:text-lg md:text-[2vw] text-[0.7rem] lg:leading-7 md:leading-5  text-gray-200 font-medium mt-4 font-figtree">
+                Your trusted platform to simplify student life
+                <br className="hidden sm:block" /> Buy, sell and connect easily!
+              </p>
+              <Link
+                to="/upload"
+                className="bg-white text-[#2D3339] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-7 lg:px-7 xl:text-lg lg:text-lg md:text-base text-xs lg:mt-4 xl:mt-8 md:mt-4 mt-3 shadow-md py-[0.7vh] px-4 font-figtree duration-500 ease-in-out flex items-center justify-center gap-2"
+              >
+                <span>Sell Now</span>
+                <FiArrowRight />
+              </Link>
+            </div>
+          </div>
         </motion.div>
 
         {/* White banner*/}
@@ -360,43 +379,191 @@ const Home = () => {
         </motion.div>
       </div>
 
-      <div className="w-full min-h-screen bg-white flex flex-col items-center pl-[4.5vw] pr-[4.5vw] dark:bg-[#131313]">
+      <div className="w-full min-h-screen bg-white flex flex-col items-center pl-[4.5vw] pr-[4.5vw] pb-24 lg:pb-0 dark:bg-[#131313]">
         {/* Category section */}
-        <div className="flex w-[90vw] flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-12 mt-5">
-          <div className="lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
-            <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white">
-              Categories
-            </h1>
+        <div className="flex w-full max-w-[1380px] mx-auto flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-12 mt-5">
+          <div>
+            <h2 className="font-semibold text-black dark:text-white text-lg md:text-2xl font-figtree">
+              Shop by Category
+            </h2>
           </div>
-          <div
-            ref={sliderRef}
-            className="flex w-full gap-2 md:gap-4 lg:gap-6 items-center overflow-x-auto no-scrollbar cursor-grab select-none"
-            onMouseDown={onMouseDown}
-            onMouseLeave={onMouseLeave}
-            onMouseUp={onMouseUp}
-            onMouseMove={onMouseMove}
-          >
-            <Category
-              title="Electronics"
-              imageSrc="/assets/icons8-electronics-961.png"
+          {/* <div
+            className="relative flex w-full gap-2 md:gap-4 lg:gap-6 items-center overflow-x-auto no-scrollbar cursor-grab select-none"
+          > */}
+          <div className="relative w-full">
+            {canScrollLeft && (
+              <button
+                onClick={scrollLeft}
+                aria-label="Scroll categories left"
+                className="
+            hidden
+            lg:flex
+            absolute
+            left-2
+            top-1/2
+            -translate-y-1/2
+            z-20
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-full
+            bg-white/95
+            dark:bg-neutral-900/95
+            border
+            border-gray-200
+            dark:border-neutral-700
+            shadow-lg
+            backdrop-blur
+            transition-all
+            duration-300
+            hover:scale-105
+            hover:shadow-xl
+        "
+              >
+                <FiChevronLeft className="text-xl text-black dark:text-white" />
+              </button>
+            )}
+            <div
+              ref={sliderRef}
+              className="
+              select-none
+        flex
+        gap-3
+        md:gap-5
+        lg:gap-6
+        overflow-x-auto
+        scroll-smooth
+        snap-x
+        snap-mandatory
+        overscroll-x-contain
+        no-scrollbar
+        py-2
+    "
+              aria-label="Browse product categories"
+            >
+              {categoryCards}
+            </div>
+
+            {canScrollRight && (
+              <button
+                onClick={scrollRight}
+                aria-label="Scroll categories right"
+                className="
+            hidden
+            lg:flex
+            absolute
+            right-2
+            top-1/2
+            -translate-y-1/2
+            z-20
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-full
+            bg-white/95
+            dark:bg-neutral-900/95
+            border
+            border-gray-200
+            dark:border-neutral-700
+            shadow-lg
+            backdrop-blur
+            transition-all
+            duration-300
+            hover:scale-105
+            hover:shadow-xl
+        "
+              >
+                <FiChevronRight className="text-xl text-black dark:text-white" />
+              </button>
+            )}
+            <div
+              className="
+        hidden
+        lg:block
+        absolute
+        right-0
+        top-0
+        bottom-0
+        w-12
+        bg-gradient-to-l
+        from-white
+        dark:from-[#131313]
+        to-transparent
+        pointer-events-none
+        z-10
+    "
             />
-            <Category title="Books" imageSrc="/assets/icons8-books-961.png" />
-            <Category title="Essentials" imageSrc="/assets/Group_116.png" />
-            <Category
-              title="Cycles"
-              imageSrc="/assets/icons8-bicycle-961.png"
-            />
-            <Category title="Matress" imageSrc="/assets/icons8-bed-961.png" />
-            <Category title="Others" imageSrc={"/others.png"} />
           </div>
         </div>
 
+        {boostedProducts.length > 0 && (
+          <div className="w-full max-w-[1380px] mx-auto lg:mt-12 mt-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-amber-50/70 px-3 py-4 md:px-5 md:py-6 dark:border-indigo-900/50 dark:from-indigo-950/25 dark:via-[#18181B] dark:to-amber-950/10">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] md:text-xs font-semibold uppercase tracking-wide text-[#394FF1] dark:text-blue-400">
+                  Featured
+                </p>
+                <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
+                  Boosted Products
+                </h1>
+              </div>
+
+              <Link
+                to="/category/boosted-products"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#394FF1]/20 bg-white px-3 py-2 text-[11px] font-semibold text-[#394FF1] shadow-sm transition hover:border-[#394FF1]/40 hover:bg-indigo-50 md:text-sm dark:bg-zinc-900 dark:text-blue-300 dark:hover:bg-zinc-800"
+              >
+                View all
+                <IoIosArrowForward className="text-sm" />
+              </Link>
+            </div>
+
+            <div
+              className="
+    mt-4
+    grid
+    w-full
+    grid-cols-2
+    md:grid-cols-3
+    lg:grid-cols-4
+    2xl:grid-cols-4
+    gap-2
+    sm:gap-3
+    md:gap-4
+    lg:gap-4
+    xl:gap-5
+  "
+            >
+              {boostedProducts.map((product) => (
+                <ProductCard key={product._id} product={product} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Products section */}
-        <div className="w-full lg:mt-12 mt-6 flex flex-col lg:gap-4 xl:gap-6 gap-2">
-          <h1 className="font-semibold xl:font-medium font-figtree md:tracking-wide dark:text-white lg:text-[2vw] xl:text-[1.7vw] md:text-[2.1vw] text-sm">
-            Popular Products
+        <div className="w-full max-w-[1380px] mx-auto lg:mt-12 mt-6 flex flex-col gap-4 lg:mb-6">
+          <h1 className="font-semibold text-[#000000] font-figtree dark:text-white lg:text-[2vw] xl:text-2xl md:text-[2.1vw] text-sm">
+            Trending Items
           </h1>
-          <div className="w-full flex flex-wrap lg:shrink-0 mt-1 lg:gap-4 xl:gap-6 md:gap-3 gap-1">
+
+          <div
+            className="
+      mt-2
+      grid
+      w-full
+      grid-cols-2
+      md:grid-cols-3
+      lg:grid-cols-4
+      2xl:grid-cols-4
+      gap-2
+      sm:gap-3
+      md:gap-4
+      lg:gap-4
+      xl:gap-5
+    "
+          >
             {/* EMPTY STATE */}
             {!initialLoading && products.length === 0 && (
               <div className="w-full text-center mt-10 text-gray-500">
@@ -427,28 +594,44 @@ const Home = () => {
 
           {!hasMore && products.length > 0 && (
             <p className="w-full text-center mt-4 text-gray-400">
-              No more products
+              {/* No more products */}
             </p>
           )}
         </div>
       </div>
 
-      {/* More section
-      <div className="w-full lg:text-[1.1vw] text-sm flex justify-center items-center lg:p-10 p-6 font-semibold font-poppins dark:text-white">
-        <button>More</button>
-        <IoIosArrowDown className="size-4" />
-      </div> */}
+      {/* Mobile Floating Sell Button */}
+      <Link
+        to="/upload"
+        aria-label="Sell Product"
+        className="
+          sm:hidden
+          fixed
+          left-1/2
+          -translate-x-1/2
+          bottom-[max(1rem,env(safe-area-inset-bottom))]
+          z-50
+          flex
+          items-center
+          gap-2 rounded-lg bg-[#3838EC]
+          px-5
+          py-3
+          text-base
+          font-semibold
+          text-white
+          shadow-[0_8px_30px_rgba(0,0,0,0.18)]
+          transition-all
+          duration-200
+          active:scale-95
+        "
+      >
+        <span>Sell</span>
+        <FaPlus className="size-3" />
+      </Link>
 
-      {/* {hasMore && !loading && (
-        <button
-          onClick={() => fetchProducts(page + 1)}
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
-        >
-          Load More
-        </button>
-      )} */}
-
-      <Footer />
+      {showCelebration && (
+        <FirstListingCelebration onClose={() => setShowCelebration(false)} />
+      )}
     </motion.div>
   );
 };

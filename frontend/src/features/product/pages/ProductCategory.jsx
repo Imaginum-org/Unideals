@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ReactSlider from "react-slider";
-
+import {PRODUCT_CATEGORY_OPTIONS} from "../constants/productOptions.js"
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
-import { getProducts } from "../api/productApi";
+import { getBoostedProducts, getProducts } from "../api/productApi";
 
 import { FaFilter, FaTimes } from "react-icons/fa";
 
 const CategoryPage = () => {
   const { categoryName } = useParams();
   const navigate = useNavigate();
+  const isBoostedPage = categoryName === "boosted-products";
 
   const [open, setOpen] = useState(false);
 
@@ -21,26 +22,36 @@ const CategoryPage = () => {
   const [selectedCondition, setSelectedCondition] = useState("Excellent");
   const [sortBy, setSortBy] = useState("Latest");
 
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }, []);
+
   // FETCH PRODUCTS
   useEffect(() => {
     const fetchCategoryProducts = async () => {
       try {
         setLoading(true);
 
-        const res = await getProducts({
-          category: categoryName,
-        });
+        const res = isBoostedPage
+          ? await getBoostedProducts()
+          : await getProducts({
+              category: categoryName,
+            });
 
         setProducts(res.data?.data || []);
       } catch (err) {
         setError("Failed to load products");
+        console.log(err.message);
       } finally {
         setLoading(false);
       }
     };
 
     fetchCategoryProducts();
-  }, [categoryName]);
+  }, [categoryName, isBoostedPage]);
 
   //HANDLER
   const handleClear = () => {
@@ -67,12 +78,14 @@ const CategoryPage = () => {
           onChange={handleCategoryChange}
           className="w-full p-2 border rounded-lg bg-transparent dark:border-zinc-700 dark:text-zinc-300 outline-none appearance-none cursor-pointer"
         >
-          <option value="electronics">Electronics</option>
-          <option value="books">Books</option>
-          <option value="essentials">Essentials</option>
-          <option value="cycles">Cycles</option>
-          <option value="matress">Matress</option>
-          <option value="others">Others</option>
+          {isBoostedPage && (
+            <option value="boosted-products">Boosted Products</option>
+          )}
+          {PRODUCT_CATEGORY_OPTIONS.map((category) => (
+            <option key={category.value} value={category.value}>
+              {category.label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -86,7 +99,7 @@ const CategoryPage = () => {
             min={0}
             max={1000}
             value={priceRange}
-            onChange={(value) => setPriceRange(value)}
+            onAfterChange={(value) => setPriceRange(value)}
             minDistance={50}
           />
         </div>
@@ -164,9 +177,7 @@ const CategoryPage = () => {
   );
 
   return (
-    <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#121212] overflow-hidden">
-      {/* <Header bagUrl={bag} darkUrl={bluebag} /> */}
-
+    <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#121212] overflow-hidden text-black dark:text-white">
       <div className="flex flex-1 overflow-hidden px-4 lg:px-11">
         <aside className="hidden lg:block w-[340px] flex-shrink-0 my-6 rounded-3xl bg-white dark:bg-[#131313] px-8 py-9 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-zinc-100 dark:border-zinc-800/50 h-[calc(100vh-140px)] sticky top-6 self-start overflow-y-auto no-scrollbar">
           <h2 className="text-2xl font-bold mb-8 dark:text-white font-robotoFlex">
@@ -179,16 +190,20 @@ const CategoryPage = () => {
           <div className="max-w-[1100px] mx-auto">
             <div className="mb-6">
               <h1 className="text-lg lg:text-xl xl:text-3xl font-bold capitalize text-[#121417] dark:text-white font-manrope">
-                {categoryName}
+                {isBoostedPage
+                  ? "Boosted Products"
+                  : categoryName.replace("_", " ")}
               </h1>
 
               {loading && <p>Loading...</p>}
               {error && <p className="text-red-500">{error}</p>}
 
               <p className="text-xs xl:text-base font-manrope text-zinc-400 mt-1">
-                Showing 24 products in{" "}
+                Showing {products.length} products in{" "}
                 <span className="text-[#394FF1] font-semibold capitalize">
-                  {categoryName}
+                  {isBoostedPage
+                    ? "boosted products"
+                    : categoryName.replace("_", " ")}
                 </span>
               </p>
             </div>

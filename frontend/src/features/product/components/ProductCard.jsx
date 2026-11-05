@@ -1,79 +1,150 @@
-import { memo, forwardRef, useState, useEffect, useCallback } from "react";
+import { memo, forwardRef, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { FaStar } from "react-icons/fa";
-import { MdOutlineCurrencyRupee } from "react-icons/md";
-import { FaHeart, FaRegHeart } from "react-icons/fa";
-import { useWishlist } from "../../../context/useWishlist.js";
+import { FaStar, FaHeart, FaRegHeart, FaCrown } from "react-icons/fa";
+import { useWishlist } from "../../../context/WishlistContext.jsx";
 import toast from "react-hot-toast";
+import { IoLocationOutline } from "react-icons/io5";
+import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
+import { MdOutlineChatBubbleOutline } from "react-icons/md";
+import { useNavigate } from "react-router-dom";
 
 const FALLBACK_IMAGE = "/image10.png";
+const INR_FORMATTER = new Intl.NumberFormat("en-IN");
+
+// Helper function to get tier-specific styles (retained for your logic)
+const getTierStyles = (tier) => {
+  switch (tier) {
+    case "pro_plus":
+      return {
+        cardBg: "bg-white dark:bg-[#18181B]",
+        cardBorder: "border-2 border-[#FFD700]/80",
+        cardShadow:
+          "shadow-[0_4px_20px_rgba(255,215,0,0.15)] hover:shadow-[0_8px_30px_rgba(255,215,0,0.3)] z-10",
+        badgeBg:
+          "bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black shadow-lg shadow-[#FFD700]/40",
+        icon: <FaCrown className="animate-pulse" size={12} />,
+      };
+    case "pro":
+      return {
+        cardBg: "bg-white dark:bg-[#18181B]",
+        cardBorder: "border-2 border-[#3838EC]/80",
+        cardShadow:
+          "shadow-[0_4px_20px_rgba(56,56,236,0.15)] hover:shadow-[0_8px_30px_rgba(56,56,236,0.3)] z-10",
+        badgeBg:
+          "bg-gradient-to-r from-[#3838EC] to-[#5C6DFF] text-white shadow-lg shadow-[#3838EC]/40",
+        icon: <FaStar className="animate-pulse" size={10} />,
+      };
+    default:
+      return {
+        cardBg: "bg-white dark:bg-[#18181B]",
+        cardBorder: "border border-zinc-200 dark:border-zinc-800",
+        cardShadow:
+          "shadow-[0_4px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)]",
+        badgeBg: "bg-zinc-800 text-white",
+        icon: null,
+      };
+  }
+};
 
 const ProductCard = memo(
   forwardRef(
     ({ product, showRemoveButton = false, onRemove, onRemoveError }, ref) => {
-      const { toggleWishlist, removeFromWishlist, checkProductInWishlist } =
+      const { toggleWishlist, removeFromWishlist, isInWishlist } =
         useWishlist();
-
-      const [inWishlist, setInWishlist] = useState(false);
       const [loading, setLoading] = useState(false);
+      const navigate = useNavigate();
 
       if (!product) return null;
 
-      const { _id, title, images, category, selling_price, original_price } =
-        product;
+      const {
+        _id,
+        title,
+        images,
+        category,
+        selling_price,
+        original_price,
+        location,
+        seller_id,
+        seller,
+      } = product;
 
-      useEffect(() => {
-        let isMounted = true;
+      console.log(product);
 
-        const checkWishlist = async () => {
-          try {
-            const inWish = await checkProductInWishlist(_id);
-            if (isMounted) setInWishlist(inWish);
-          } catch (err) {
-            console.error("Wishlist check failed:", err);
-          }
-        };
+      const inWishlist = isInWishlist(_id);
 
-        if (_id) checkWishlist();
+      const isBoosted =
+        product.is_boosted &&
+        (!product.boost_expires_at ||
+          new Date(product.boost_expires_at) > new Date());
 
-        return () => {
-          isMounted = false;
-        };
-      }, [_id, checkProductInWishlist]);
+      const sellerInfo =
+        typeof seller_id === "object" && seller_id !== null
+          ? seller_id
+          : seller;
 
-      const imageUrl = images && images.length > 0 ? images[0] : FALLBACK_IMAGE;
+      const currentTier = isBoosted ? product.boost_tier || "pro" : "regular";
 
-      const discount =
-        original_price && original_price > selling_price
-          ? original_price - selling_price
-          : 0;
+      const tierStyles = getTierStyles(currentTier);
+
+      const sellerAvatarUrl =
+        sellerInfo?.avatar?.url ||
+        sellerInfo?.profile_image ||
+        sellerInfo?.image;
+
+      const sellerPlan =
+        sellerInfo?.subscription ||
+        (currentTier === "regular" ? "base_user" : currentTier);
+
+      // Fallback seller rating for design match (can be replaced with dynamic data: sellerInfo?.rating)
+      const sellerRating = sellerInfo?.rating ?? 4.9;
+
+      const imageUrl = useMemo(() => {
+        if (!images?.length) return FALLBACK_IMAGE;
+
+        const firstImage = images[0];
+
+        // Support both old and new schema during migration
+        if (typeof firstImage === "string") {
+          return firstImage;
+        }
+
+        return firstImage?.url || FALLBACK_IMAGE;
+      }, [images]);
+
+      const savings = useMemo(
+        () =>
+          original_price && original_price > selling_price
+            ? original_price - selling_price
+            : 0,
+        [original_price, selling_price],
+      );
+
+      const formattedPrice = useMemo(
+        () => ({
+          selling: INR_FORMATTER.format(selling_price || 0),
+          original: INR_FORMATTER.format(original_price || 0),
+          savings: INR_FORMATTER.format(savings),
+        }),
+        [selling_price, original_price, savings],
+      );
 
       const handleClick = useCallback(() => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "instant" });
       }, []);
 
-      // ✅ Fixed wishlist handler (no spam clicks + safe)
       const handleWishlistClick = async (e) => {
         e.preventDefault();
         e.stopPropagation();
-
         if (loading || !_id) return;
-
         setLoading(true);
-
         try {
-          const result = await toggleWishlist(_id, product);
-          setInWishlist(result);
+          const updatedWishlist = await toggleWishlist(_id, product);
 
           toast.success(
-            result ? "Added to Wishlist" : "Removed from Wishlist",
-            { id: "wishlist-toast" },
+            updatedWishlist ? "Added to Wishlist" : "Removed from Wishlist",
           );
         } catch (error) {
-          toast.error("Failed to update wishlist", {
-            id: "wishlist-error",
-          });
-          console.error("Wishlist error:", error);
+          toast.error("Please login to add wishlist");
         } finally {
           setLoading(false);
         }
@@ -83,14 +154,14 @@ const ProductCard = memo(
         e.preventDefault();
         e.stopPropagation();
 
-        setInWishlist(false);
         onRemove?.(_id);
-        toast.success("Removed from Wishlist", { id: "wishlist-remove" });
+        toast.success("Removed from Wishlist", {
+          id: "wishlist-remove",
+        });
 
         try {
           await removeFromWishlist(_id);
         } catch (error) {
-          setInWishlist(true);
           onRemoveError?.(_id);
           toast.error("Failed to remove from wishlist", {
             id: "wishlist-error",
@@ -99,93 +170,253 @@ const ProductCard = memo(
         }
       };
 
+      const formattedCategory = category?.replaceAll("_", " ") ?? "Category";
+
+      const sellerName = sellerInfo?.name || "Seller";
+
+      const handleImageError = useCallback((e) => {
+        e.currentTarget.onerror = null;
+        e.currentTarget.src = FALLBACK_IMAGE;
+      }, []);
+
+      const formattedLocation = location || "VIT Vellore";
+
       return (
         <Link
           ref={ref}
           to={`/product/${_id}`}
           onClick={handleClick}
-          aria-label={`View product ${title}`}
-          className="lg:w-[28vw] xl:w-[21vw] w-[44.7vw] md:w-[29vw] rounded-xl overflow-hidden shadow-[0px_4.115523815155029px_28.808666229248047px_0px_rgba(0,0,0,0.10)] outline outline-1 outline-offset-[-1.03px] outline-zinc-300 hover:shadow-sm animation duration-300 ease-linear hover:scale-105 dark:bg-[#121212] dark:shadow-[0px_4.115523815155029px_28.808666229248047px_0px_rgba(0,0,0,0.10)] dark:outline dark:outline-1 dark:outline-offset-[-1.03px] dark:outline-zinc-600"
+          className={`
+group
+relative
+w-full
+overflow-hidden
+rounded-2xl
+bg-white
+font-figtree
+select-none
+transform-gpu
+will-change-transform
+transition-all
+duration-300
+ease-[cubic-bezier(0.22,1,0.36,1)]
+${tierStyles.cardBg}
+${tierStyles.cardBorder}
+${tierStyles.cardShadow}
+`}
         >
-          {/* IMAGE */}
-          <div className="md:p-3 p-2 w-full h-[22vh] md:h-[21vh] lg:h-[19vh] xl:h-[40vh] object-contain relative">
-            {showRemoveButton ? (
-              <button
-                onClick={handleRemoveClick}
-                disabled={loading}
-                className={`absolute flex items-center justify-center lg:w-10 w-7 lg:h-10 h-7 right-5 top-5 bg-white rounded-full shadow-md transition-all duration-300 ${
-                  loading ? "opacity-50 cursor-not-allowed" : "hover:shadow-lg"
-                }`}
-                aria-label="Remove from wishlist"
-                title="Remove from wishlist"
+          {/* PADDED WRAPPER FOR EVERYTHING AS PER DESIGN */}
+          <div className="p-3 flex flex-col h-full">
+            {/* IMAGE SECTION */}
+            <div className="relative w-full aspect-[6/5] overflow-hidden rounded-xl">
+              <img
+                loading="lazy"
+                decoding="async"
+                fetchPriority="low"
+                src={imageUrl}
+                alt={title}
+                onError={handleImageError}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500
+ease-[cubic-bezier(0.22,1,0.36,1)]
+group-hover:scale-[1.05]"
+              />
+
+              {/* Chat Now Button */}
+              <div
+                className="
+absolute
+bottom-3
+left-1/2
+z-20
+
+-translate-x-1/2
+
+translate-y-8
+opacity-0
+scale-95
+
+pointer-events-none
+
+transition-all
+duration-300
+ease-out
+
+group-hover:translate-y-0
+group-hover:opacity-100
+group-hover:scale-100
+group-hover:pointer-events-auto
+"
               >
-                <FaHeart className="lg:w-4 w-3 lg:h-4 h-3 text-pink-500 group-hover:scale-110 transition-transform duration-300" />
-              </button>
-            ) : (
-              <button
-                onClick={handleWishlistClick}
-                disabled={loading}
-                className="absolute flex items-center justify-center lg:w-10 w-7 lg:h-10 h-7 right-5 top-5 bg-white rounded-full shadow-md hover:shadow-lg transition-all duration-300"
-                aria-label="Add to wishlist"
-              >
-                {inWishlist ? (
-                  <FaHeart className="lg:w-4 w-3 lg:h-4 h-3 text-pink-500 transition-colors duration-300" />
-                ) : (
-                  <FaRegHeart className="lg:w-4 w-3 lg:h-4 h-3 text-gray-400 hover:text-pink-500 transition-colors duration-300" />
-                )}
-              </button>
-            )}
-
-            {/* CATEGORY */}
-            <div className="bg-[#394FF1] text-white px-2 py-1 rounded md:text-sm text-[2.9vw] font-medium absolute md:bottom-6 md:left-6 bottom-4 left-4">
-              {category}
-            </div>
-
-            <img
-              src={imageUrl}
-              alt={title || "Product image"}
-              className="rounded-lg w-full h-full object-contain"
-              loading="lazy"
-            />
-          </div>
-
-          {/* TITLE */}
-          <h1 className="md:pb-2 xl:pb-3 pb-1 pl-4 lg:text-[1.6vw] xl:text-[1.3vw] text-xs font-semibold text-[#313131] xl:mt-1 dark:text-white">
-            {title}
-          </h1>
-
-          {/* RATING */}
-          <div className="flex md:gap-2 gap-5 pl-4">
-            <div className="bg-[#E5FDDF] dark:bg-[#0D3804] px-2 py-1 rounded text-[#319F43] font-semibold flex items-center gap-1">
-              <span>4.0</span>
-              <FaStar />
-            </div>
-          </div>
-
-          {/* PRICE */}
-          <div className="pl-3 pr-3 mt-3 pb-3 flex flex-col">
-            <div className="flex items-center gap-2">
-              <h2 className="text-zinc-800 font-bold flex items-center dark:text-white">
-                <MdOutlineCurrencyRupee />
-                {selling_price}
-              </h2>
-
-              {original_price && (
-                <h2 className="text-neutral-400 line-through flex items-center">
-                  <MdOutlineCurrencyRupee />
-                  {original_price}
-                </h2>
-              )}
-            </div>
-
-            {/* DISCOUNT */}
-            {discount > 0 && (
-              <div className="flex items-center pl-1">
-                <h2 className="text-[#06981E] font-bold flex items-center">
-                  Save <MdOutlineCurrencyRupee /> {discount}
-                </h2>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate("/chat");
+                  }}
+                  className="
+      rounded-lg
+      bg-[#3838EC]
+      px-5
+      py-2.5
+      text-xs
+      xl:text-base
+      2xl:text-sm
+      font-semibold
+      text-white
+      shadow-lg
+      transition-all
+      duration-200
+      hover:bg-[#2f2fd9]
+      hover:scale-[1.04]
+                  flex items-center justify-center gap-2
+      active:scale-95
+    "
+                >
+                  <MdOutlineChatBubbleOutline size={18} />
+                  <span>Chat Now</span>
+                </button>
               </div>
-            )}
+
+              {/* DYNAMIC BOOSTED BADGE (Retained functionality, subtly styled) */}
+              {isBoosted && (
+                <div
+                  className={`absolute top-2 left-2 rounded-md px-2 py-1 text-[9px] md:text-[10px] font-bold uppercase tracking-wider border border-white/20 backdrop-blur-sm flex items-center gap-1 z-10 ${tierStyles.badgeBg}`}
+                >
+                  {tierStyles.icon}
+                  <span>{currentTier === "pro_plus" ? "Pro+" : "Boosted"}</span>
+                </div>
+              )}
+
+              {/* WISHLIST BUTTON (Retained for functionality, placed top right) */}
+              <div
+                className="
+absolute
+top-3
+right-3
+z-20
+
+translate-x-6
+opacity-0
+scale-90
+
+pointer-events-none
+
+transition-all
+duration-300
+ease-out
+
+group-hover:translate-x-0
+group-hover:opacity-100
+group-hover:scale-100
+group-hover:pointer-events-auto
+"
+              >
+                <button
+                  onClick={
+                    showRemoveButton ? handleRemoveClick : handleWishlistClick
+                  }
+                  disabled={loading}
+                  aria-label={
+                    inWishlist ? "Remove from Wishlist" : "Add to Wishlist"
+                  }
+                  className="
+      flex
+      h-10
+      w-10
+      items-center
+      justify-center
+
+      rounded-full
+
+      bg-[#FFFFFF]
+      backdrop-blur-xl
+
+      shadow-lg
+
+      transition-all
+      duration-200
+
+      hover:scale-110
+      active:scale-95
+    "
+                >
+                  {inWishlist ? (
+                    <FaHeart className="text-[#ef4444] text-lg" />
+                  ) : (
+                    <FaRegHeart className="text-zinc-500 text-lg" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* CONTENT SECTION */}
+            <div className="mt-3 flex flex-col flex-grow">
+              {/* CATEGORY (Plain text style matching image) */}
+              <div className="text-[13px] md:text-base font-semibold text-[#3838EC] dark:text-[#5C6DFF] capitalize">
+                {formattedCategory}
+              </div>
+
+              {/* TITLE */}
+              <h3 className="mt-2 text-[16px] md:text-lg font-bold text-[#2D3339] dark:text-white min-h-[32px]  line-clamp-2">
+                {title}
+              </h3>
+
+              {/* PRICE & DISCOUNT */}
+              <div className="mt-2 flex items-end gap-2">
+                <span className="text-[20px] md:text-lg xl:text-xl font-bold text-[#2A2A2A] dark:text-white">
+                  ₹{formattedPrice.selling}
+                </span>
+
+                {savings > 0 && (
+                  <>
+                    <span className="text-[14px] md:text-[15px] font-medium text-[#ACACAC] line-through">
+                      ₹{formattedPrice.original}
+                    </span>
+                    <div className="bg-[#008000] text-white text-[11px] md:text-[12px] font-medium px-2 py-0.5 md:py-1 rounded-md ml-1">
+                      Save ₹{formattedPrice.savings}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* DIVIDER */}
+              <div className="my-3.5 h-px bg-[#EEF1F5] dark:bg-zinc-800" />
+
+              {/* FOOTER (Avatar, Rating & Location) */}
+              <div className="flex items-center justify-between mt-auto">
+                {/* Left Side: Avatar & Name */}
+                <div className="flex items-center gap-2">
+                  <AvatarComponent
+                    name={sellerName}
+                    imageUrl={sellerAvatarUrl}
+                    size="small"
+                    // plan={sellerPlan}
+                    className="shrink-0 h-6 w-6 md:h-7 md:w-7"
+                  />
+                  <span className="capitalize text-[13px] md:text-[14px] font-medium text-zinc-500 dark:text-zinc-400 line-clamp-1 max-w-[80px]">
+                    {sellerName}
+                  </span>
+
+                  {/* Rating Badge */}
+                  <div className="flex items-center gap-1 border border-[#E1E1E1] dark:border-zinc-700 rounded-full px-2 py-1 ml-1">
+                    <FaStar className="text-yellow-400 text-[13px]" />
+                    <span className="text-[13px] font-medium text-zinc-400">
+                      {sellerRating}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Side: Location */}
+                {formattedLocation && (
+                  <div className="flex items-center justify-center gap-1 text-[#A2ACB8] shrink-0">
+                    <IoLocationOutline size={18} className="text-[#4A5565]" />
+                    <span className="text-[12px] md:text-[14px] font-medium truncate max-w-[110px]">
+                      {formattedLocation}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </Link>
       );

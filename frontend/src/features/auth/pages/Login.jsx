@@ -6,7 +6,7 @@ import { exchangeGoogleOAuthCode, loginUser } from "../api/authApi.js";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
-import AuthBrandLogo from "../components/AuthBrandLogo";
+import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import SignInwithGoogle from "../components/signinWithGoogle";
 import { useUser } from "../../../context/useUserContext.jsx";
 
@@ -147,24 +147,32 @@ function Login() {
     }
   };
 
+  // Smart Error Parsing Logic
+  const isError = formMessage?.variant === "error";
+  const errorText = formMessage?.text?.toLowerCase() || "";
+  
+  // Highlight email if the error explicitly mentions 'email' or is a generic invalid error
+  const hasEmailError = isError && (errorText.includes("email") || errorText.includes("invalid"));
+  
+  // Highlight password if the error explicitly mentions 'password' or is a generic invalid error
+  const hasPasswordError = isError && (errorText.includes("password") || errorText.includes("invalid"));
+
   return (
     <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-white dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden font-figtree">
-      {/* ── LEFT PANEL ── */}
       <div className="relative flex min-h-[100dvh] w-full flex-col bg-white dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
         <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-white dark:md:bg-[#131313] md:text-[#111827]">
-          {/* Logo — centered on mobile, and top left on desktop */}
+          {/* Logo */}
           <div className="flex shrink-0 items-center justify-center mt-[3.5vh] sm:mt-[4vh] md:justify-start md:mt-2 md:pl-4 xl:mt-4 xl:pl-7">
             <AuthBrandLogo />
           </div>
 
           <AuthMobileBanner />
 
-          {/* Form card — slides up on mobile, centred on desktop */}
+          {/* Form card */}
           <div className="flex min-h-0 flex-1 items-end justify-center md:items-center font-figtree">
             <form
               onSubmit={handleLogin}
-              className=" w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none
-"
+              className=" w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none"
             >
               {/* Heading */}
               <div className="mb-4 md:mb-[2vh] lg:mb-4 xl:mb-[2.5vh] 2xl:mb-[2.6vh]">
@@ -198,6 +206,7 @@ function Login() {
 
               {/* Fields */}
               <div className="space-y-[2.7vh] sm:space-y-3.5 md:space-y-[2.1vh]  lg:space-y-2.5 xl:space-y-[2.2vh] 2xl:space-y-[2.3vh]">
+                
                 {/* Email */}
                 <label className="block">
                   <span className="relative block group">
@@ -212,7 +221,11 @@ function Login() {
                       Email
                     </span>
                     <input
-                      className="h-[6.3vh] w-full rounded-xl border border-transparent bg-slate-50 pl-10 pr-3 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20] sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh]"
+                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
+                        hasEmailError
+                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
+                          : "border-transparent bg-slate-50 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                      }`}
                       type="email"
                       value={email}
                       placeholder=" "
@@ -239,7 +252,11 @@ function Login() {
                       Password
                     </span>
                     <input
-                      className="h-[6.3vh] w-full rounded-xl border border-transparent bg-slate-50 pl-10 pr-10 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20] sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:pr-12 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh]"
+                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-10 text-[0.6875rem] text-[#111827] outline-none transition placeholder:text-gray-500/60 dark:text-white sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:pr-12 md:text-xs lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
+                        hasPasswordError
+                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
+                          : "border-transparent bg-slate-50 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                      }`}
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => {

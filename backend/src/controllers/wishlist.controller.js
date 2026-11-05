@@ -94,7 +94,12 @@ export const getWishlist = async (req, res) => {
         path: "wishlist",
         model: "Product",
         select:
-          "_id title images category selling_price original_price seller_id",
+          "_id title images category selling_price original_price seller_id location is_boosted boost_tier boost_expires_at",
+        populate: {
+          path: "seller_id",
+          model: "User",
+          select: "name avatar subscription rating",
+        },
       })
       .select("wishlist");
 

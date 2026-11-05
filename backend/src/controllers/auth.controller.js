@@ -29,23 +29,23 @@ export const registerUserController = async (req, res) => {
 
     if (!name || !email || !password) {
       return res.status(400).json({
-        message: "Provide name, email and password",
+        message: "Please provide your name, email, and password.",
         error: true,
         success: false,
       });
     }
 
     email = email.trim().toLowerCase();
-
     const existingUser = await userModel.findOne({ email });
 
     if (existingUser && existingUser.is_email_verified) {
       return res.status(400).json({
-        message: "User already registered. Please log in.",
+        message: "This email is already registered. Please log in.",
         error: true,
         success: false,
       });
     }
+
     const verifyToken = crypto.randomBytes(32).toString("hex");
     const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
 
@@ -53,29 +53,26 @@ export const registerUserController = async (req, res) => {
     let statusCode = 201;
 
     if (existingUser) {
-      const newHashedPassword = await bcrypt.hash(password, 10);
-
       await userModel.findByIdAndUpdate(existingUser._id, {
         verifyTokenEmail: verifyToken,
-        password: newHashedPassword,
       });
 
       responseMessage =
         "Account exists but is unverified. We just resent your verification email!";
       statusCode = 200;
     } else {
-      const hashpassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 10);
 
       await userModel.create({
         name,
         email,
-        password: hashpassword,
+        password: hashedPassword,
         verifyTokenEmail: verifyToken,
         is_email_verified: false,
       });
 
       responseMessage =
-        "User registered successfully. Please check your email.";
+        "Account created successfully. Please check your email to verify.";
       statusCode = 201;
     }
 
@@ -94,6 +91,7 @@ export const registerUserController = async (req, res) => {
       success: true,
     });
   } catch (err) {
+    console.error("Registration Error:", err);
     return res.status(500).json({
       message: err.message || "Internal server error",
       error: true,
@@ -474,8 +472,8 @@ export const forgotPasswordController = async (req, res) => {
       sendTo: email,
       subject: "Reset your Unideals password",
       html: forgotPaswordTemplate({
-        user: user.name,
-        resetUrl: resetUrl, // Pass the URL instead of the OTP
+        name: user.name,
+        resetUrl,
       }),
     });
 

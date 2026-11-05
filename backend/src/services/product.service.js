@@ -1,8 +1,12 @@
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
+import { deleteImage } from "../utils/imagekit.js";
 
 export const createProduct = async (data, user) => {
-  if (!data.images || data.images.length === 0) {
+  if (
+    data.status !== PRODUCT_STATUS.DRAFT &&
+    (!data.images || data.images.length === 0)
+  ) {
     throw new Error("Images are required");
   }
 
@@ -15,13 +19,19 @@ export const createProduct = async (data, user) => {
 
   const existingProduct = await Product.findOne({
     seller_id: user._id,
+    status: PRODUCT_STATUS.LISTED,
     category: data.category,
-    title: { $regex: `^${safeTitle}$`, $options: "i" },
+    title: {
+      $regex: `^${safeTitle}$`,
+      $options: "i",
+    },
     selling_price: {
       $gte: data.selling_price * 0.9,
       $lte: data.selling_price * 1.1,
     },
-    createdAt: { $gte: FIVE_MINUTES_AGO },
+    createdAt: {
+      $gte: FIVE_MINUTES_AGO,
+    },
     is_deleted: false,
   });
 
@@ -30,7 +40,7 @@ export const createProduct = async (data, user) => {
   }
 
   data.seller_id = user._id;
-  data.status = PRODUCT_STATUS.LISTED;
+  data.status = data.status || PRODUCT_STATUS.LISTED;
   data.is_deleted = false;
 
   if (user.current_lat != null && user.current_long != null) {
@@ -62,7 +72,10 @@ export const getBoostedProducts = async () => {
   })
     .sort({ boost_expires_at: -1 })
     .limit(10)
-    .select("title images selling_price createdAt")
+    .select(
+      "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier",
+    )
+    .populate("seller_id", "name avatar subscription")
     .lean();
 };
 
@@ -209,13 +222,21 @@ export const getAllProducts = async (query) => {
         description: 1,
         images: 1,
         selling_price: 1,
+        original_price: 1,
         category: 1,
+        location: 1,
+        attributes: 1,
         createdAt: 1,
         views_count: 1,
+        is_boosted: 1,
+        boost_expires_at: 1,
+        boost_tier: 1,
         score: 1,
+
         "seller._id": 1,
         "seller.name": 1,
         "seller.avatar": 1,
+        "seller.subscription": 1,
       },
     },
   );
@@ -335,7 +356,7 @@ export const searchProducts = async (query) => {
       },
     },
 
-    // ⏱️ RECENCY
+    // RECENCY
     {
       $addFields: {
         hoursSinceCreated: {
@@ -409,9 +430,18 @@ export const deleteProduct = async (productId, userId) => {
     throw new Error("Product is already deleted");
   }
 
+  // Delete all uploaded images from ImageKit
+  await Promise.all(
+    product.images
+      .filter((image) => image.fileId)
+      .map((image) => deleteImage(image.fileId)),
+  );
+
+  // Soft delete product
   product.is_deleted = true;
+
   return await product.save();
-};
+};;
 
 // UNLIST PRODUCT
 export const unlistProduct = async (productId, userId) => {
@@ -445,4 +475,16 @@ export const relistProduct = async (productId, userId) => {
 
   product.status = PRODUCT_STATUS.LISTED;
   return await product.save();
+};
+
+export const getMyDraftProducts = async (userId) => {
+  return await Product.find({
+    seller_id: userId,
+
+    status: PRODUCT_STATUS.DRAFT,
+
+    is_deleted: false,
+  })
+    .sort({ updatedAt: -1 })
+    .lean();
 };

@@ -1,11 +1,10 @@
 import * as productService from "../services/product.service.js";
 import { deleteImage } from "../utils/imagekit.js";
-
+import Product from "../models/Product.model.js";
+import { PRODUCT_STATUS } from "../config/constants.js";
 // CREATE PRODUCT
 export const createProduct = async (req, res) => {
-  const fileIds = Array.isArray(req.body.image_file_ids)
-    ? req.body.image_file_ids
-    : [];
+  const fileIds = req.body.images?.map((image) => image.fileId) || [];
 
   try {
     const user = req.user;
@@ -13,10 +12,19 @@ export const createProduct = async (req, res) => {
 
     const product = await productService.createProduct(data, user);
 
+    const productCount = await Product.countDocuments({
+      seller_id: user._id,
+      status: PRODUCT_STATUS.LISTED,
+      is_deleted: false,
+    });
+
+    const isFirstListing = productCount === 1;
+
     return res.status(201).json({
       success: true,
       message: "Product created successfully",
       data: product,
+      isFirstListing,
     });
   } catch (error) {
     // Cleanup uploaded images if product fails
@@ -182,6 +190,24 @@ export const relistProduct = async (req, res, next) => {
       success: true,
       message: "Product relisted successfully",
       data: product,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyDraftProducts = async (req, res, next) => {
+  try {
+    const userId = req.userId;
+
+    const drafts = await productService.getMyDraftProducts(userId);
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Draft products fetched successfully",
+
+      data: drafts,
     });
   } catch (error) {
     next(error);

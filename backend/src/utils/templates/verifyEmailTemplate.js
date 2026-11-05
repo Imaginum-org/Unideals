@@ -1,99 +1,96 @@
 const verifyEmailTemplate = ({ name, url }) => {
   return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Verify Your Email</title>
-      <style>
-        /* Basic reset for email clients */
-        body { margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #F8FAFC; }
-        img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-        table { border-collapse: collapse !important; }
-        
-        @media screen and (max-width: 600px) {
-          .container { width: 100% !important; border-radius: 0 !important; }
-          .content-padding { padding-left: 20px !important; padding-right: 20px !important; }
-        }
-      </style>
-    </head>
-    <body style="background-color: #F8FAFC; padding: 20px 0;">
-      <center>
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" class="container" style="background-color: #ffffff; border: 1px solid #F1F5F9; border-radius: 12px; overflow: hidden; font-family: 'Inter', Arial, sans-serif;">
-          
-          <tr>
-            <td align="center" style="padding: 32px; background-color: #ffffff; border-bottom: 1px solid #F8FAFC;">
-              <table border="0" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="color: #364EF2; font-size: 28px; font-weight: 600; font-family: 'Poppins', Arial, sans-serif;">
-                    Unideals
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F1F5F9; padding: 40px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Arial, sans-serif;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width: 480px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0px 8px 24px rgba(15, 23, 42, 0.06); border: 1px solid #EAECF0;">
 
-          <tr>
-            <td align="center" class="content-padding" style="padding: 40px 48px;">
-              <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
-                <tr>
-                  <td align="center" bgcolor="#E9F2FE" style="width: 80px; height: 80px; border-radius: 50%; font-size: 40px; line-height: 80px;">
-                    ✉️
-                  </td>
-                </tr>
-              </table>
+            <!-- Header -->
+            <tr>
+              <td align="center" style="background-color: #3838EC; padding: 28px 24px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="vertical-align: middle; padding-right: 8px;">
+                      <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Group%2014.png" alt="" width="22" height="22" style="display: block; filter: brightness(0) invert(1);" />
+                    </td>
+                    <td style="vertical-align: middle;">
+                      <span style="color: #ffffff; font-size: 19px; font-weight: 700; letter-spacing: -0.2px;">Unideals</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
 
-              <h1 style="margin: 0 0 24px 0; color: #0F172A; font-size: 28px; font-weight: 700; line-height: 36px; text-align: center;">
-                Verify Your Email Address
-              </h1>
+            <!-- Body -->
+            <tr>
+              <td style="padding: 40px 32px 32px 32px;">
 
-              <p style="margin: 0 0 32px 0; color: #64748B; font-size: 16px; line-height: 26px; text-align: center;">
-                Dear ${name}, thanks for signing up for our platform! We're excited to have you on board. Please click the button below to verify your email address and activate your account.
-              </p>
+                <!-- Icon badge -->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 24px auto;">
+                  <tr>
+                    <td width="64" height="64" align="center" valign="middle" style="background-color: #EEF0FF; border-radius: 50%; position: relative;">
+                      <img src="https://ik.imagekit.io/mspoxwn8v/Backend/Email%20Template%20Images/Icon.svg" alt="" width="28" height="28" style="display: block;" />
+                    </td>
+                  </tr>
+                </table>
 
-              <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
-                <tr>
-                  <td align="center" bgcolor="#394FF1" style="border-radius: 8px;">
-                    <a href="${url}" target="_blank" style="display: inline-block; padding: 14px 40px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">
-                      Verify Email
-                    </a>
-                  </td>
-                </tr>
-              </table>
+                <h1 style="color: #0F172A; font-size: 21px; font-weight: 700; margin: 0 0 10px 0; text-align: center; letter-spacing: -0.3px;">
+                  Verify your email address
+                </h1>
 
-              <table width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#F8FAFC" style="border-radius: 8px; margin-bottom: 24px;">
-                <tr>
-                  <td align="center" style="padding: 16px; font-size: 12px; color: #64748B;">
-                    If the button doesn't work, you can also 
-                    <a href="${url}" style="color: #394FF1; font-weight: 700; text-decoration: underline;">verify your email here.</a>
-                  </td>
-                </tr>
-              </table>
+                <p style="color: #64748B; font-size: 14.5px; line-height: 1.65; margin: 0 0 28px 0; text-align: center;">
+                  Hi <strong style="color: #334155;">${name}</strong>, thanks for signing up. Please confirm this is your email address to activate your Unideals account.
+                </p>
 
-              <p style="margin: 0; color: #94A3B8; font-size: 12px; line-height: 18px; text-align: center;">
-                This link will expire in 24 hours. If you didn't create an account with Unideals, you can safely delete this email.
-              </p>
-            </td>
-          </tr>
+                <!-- Button -->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 28px auto;">
+                  <tr>
+                    <td align="center" bgcolor="#3838EC" style="border-radius: 8px;">
+                      <a href="${url}" target="_blank" style="display: inline-block; padding: 13px 36px; font-size: 14.5px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">
+                        Verify Email
+                      </a>
+                    </td>
+                  </tr>
+                </table>
 
-          <tr>
-            <td align="center" bgcolor="#F8FAFC" style="padding: 32px; border-top: 1px solid #F1F5F9;">
-              <p style="margin: 0 0 16px 0; color: #94A3B8; font-size: 12px; line-height: 16px; text-align: center;">
-                © 2026 Unideals Inc. All rights reserved.<br/>
-                Vellore, India
-              </p>
-              <p style="margin: 0; color: #94A3B8; font-size: 12px; font-weight: 500; text-align: center;">
-                <a href="#" style="color: #94A3B8; text-decoration: none;">Privacy Policy</a>
-                &nbsp; • &nbsp;
-                <a href="#" style="color: #94A3B8; text-decoration: none;">Terms of Service</a>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </center>
-    </body>
-    </html>
+                <!-- Fallback link -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8FAFC; border: 1px solid #EEF0F4; border-radius: 10px; margin-bottom: 24px;">
+                  <tr>
+                    <td style="padding: 14px 16px;">
+                      <p style="color: #94A3B8; font-size: 11.5px; margin: 0 0 6px 0;">
+                        Button not working? Paste this link into your browser:
+                      </p>
+                      <a href="${url}" style="color: #3838EC; font-size: 11.5px; font-weight: 600; text-decoration: underline; word-break: break-all;">${url}</a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="color: #94A3B8; font-size: 11.5px; line-height: 1.6; margin: 0; text-align: center;">
+                  This link expires in 24 hours. If you didn't create an account with Unideals, you can safely ignore this email.
+                </p>
+
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="background-color: #F8FAFC; border-top: 1px solid #EEF0F4; padding: 22px 24px; text-align: center;">
+                <p style="color: #94A3B8; font-size: 11px; line-height: 1.6; margin: 0 0 10px 0;">
+                  © 2026 Unideals Inc. All rights reserved.<br/>
+                  Vellore, India
+                </p>
+                <p style="color: #94A3B8; font-size: 11px; margin: 0;">
+                  <a href="#" style="color: #94A3B8; text-decoration: none; font-weight: 500;">Privacy Policy</a>
+                  <span style="margin: 0 8px; color: #CBD5E1;">•</span>
+                  <a href="#" style="color: #94A3B8; text-decoration: none; font-weight: 500;">Terms of Service</a>
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
   `;
 };
 

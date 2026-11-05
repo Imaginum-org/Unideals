@@ -1,25 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { forgotPassword } from "../api/authApi";
 import AuthPageRightPart from "../components/AuthPageRightPart";
 import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
-import AuthBrandLogo from "../components/AuthBrandLogo";
+import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 
-/* ─── Main component ─── */
 function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [formMessage, setFormMessage] = useState(null);
 
   const clearFormMessage = () => setFormMessage(null);
 
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setResendCooldown((prev) => Math.max(prev - 1, 0));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!email) {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
       setFormMessage({
         variant: "error",
         text: "Please enter your email address.",
@@ -31,7 +49,7 @@ function ForgotPassword() {
     setIsSubmitting(true);
 
     try {
-      const response = await forgotPassword({ email });
+      const response = await forgotPassword({ email: cleanEmail });
 
       if (response.data.success) {
         setFormMessage({
@@ -40,6 +58,7 @@ function ForgotPassword() {
             response.data.message ||
             "If an account exists for this email, we’ve sent a reset link. Check your inbox.",
         });
+        setResendCooldown(120);
         window.setTimeout(() => setIsSubmitted(true), 900);
       }
     } catch (error) {
@@ -54,11 +73,16 @@ function ForgotPassword() {
     }
   };
 
+  const isError = formMessage?.variant === "error";
+  const errorText = formMessage?.text?.toLowerCase() || "";
+
+  // Highlight email if the error explicitly mentions 'email'
+  const hasEmailError = isError && errorText.includes("email");
+
   return (
     <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-white dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden font-figtree">
-      {/* ══════════════ LEFT PANEL ══════════════ */}
       <div className="relative flex min-h-[100dvh] w-full flex-col bg-white  dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
-        {/* Gradient wrapper — visible on mobile, transparent on md+ */}
+        {/* Gradient wrapper */}
         <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-white dark:md:bg-[#131313] md:text-[#111827]">
           {/* Logo */}
           <div className="flex shrink-0 items-center justify-center mt-[3.5vh] sm:mt-[4vh] md:justify-start md:mt-2 md:pl-4 xl:mt-4 xl:pl-7">
@@ -67,9 +91,7 @@ function ForgotPassword() {
 
           <AuthMobileBanner />
 
-          {/* ── Form / Success card ── */}
           <div className="flex min-h-0 flex-1 items-end justify-center md:items-center">
-            {/* -------- FORM STATE -------- */}
             {!isSubmitted ? (
               <form
                 onSubmit={handleSubmit}
@@ -118,17 +140,11 @@ function ForgotPassword() {
                         clearFormMessage();
                       }}
                       required
-                      className="
-                        h-[6.3vh] sm:h-11 md:h-10 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh]
-                        w-full rounded-xl border border-transparent
-                        bg-slate-50 pl-10 pr-4
-                        text-[#111827] text-[0.6875rem] md:text-xs
-                        outline-none transition
-                        placeholder:text-gray-400/70
-                        focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10
-                        dark:bg-[#1A1D20] dark:text-white dark:focus:bg-[#1A1D20]
-                        md:rounded-xl md:pl-11
-                      "
+                      className={`h-[6.3vh] sm:h-11 md:h-10 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] w-full border pl-10 pr-4 text-[#111827] text-[0.6875rem] md:text-xs outline-none transition placeholder:text-gray-400/70 dark:text-white md:rounded-xl md:pl-11 ${
+                        hasEmailError
+                          ? "border-red-500 bg-red-50 text-red-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/20 dark:border-red-500/80 dark:bg-[#1A1D20]"
+                          : "border-transparent bg-slate-50 focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1A1D20] dark:focus:bg-[#1A1D20]"
+                      }`}
                     />
                   </span>
                 </label>
@@ -163,7 +179,6 @@ function ForgotPassword() {
                 </div>
               </form>
             ) : (
-              /* -------- SUCCESS STATE -------- */
               <div
                 className="w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-white px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none
   "
@@ -201,11 +216,18 @@ function ForgotPassword() {
                       setFormMessage(null);
                       setIsSubmitted(false);
                     }}
-                    className="font-semibold text-[#393AF2] transition hover:text-[#2426C7]"
+                    disabled={resendCooldown > 0}
+                    className="font-semibold text-[#393AF2] transition hover:text-[#2426C7] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Try again
                   </button>
                 </p>
+                {resendCooldown > 0 ? (
+                  <p className="mt-2 text-center text-[0.7rem] text-gray-500 dark:text-gray-400">
+                    You can request another reset link in{" "}
+                    {formatTimer(resendCooldown)}.
+                  </p>
+                ) : null}
 
                 {/* Back to login */}
                 <div className="mt-5 md:mt-4 flex justify-center w-full xl:mt-[3vh]">
@@ -220,13 +242,9 @@ function ForgotPassword() {
               </div>
             )}
           </div>
-          {/* ── end form/success card ── */}
         </div>
-        {/* ── end gradient wrapper ── */}
       </div>
-      {/* ══════════════ END LEFT PANEL ══════════════ */}
 
-      {/* ══════════════ RIGHT PANEL ══════════════ */}
       <AuthPageRightPart />
     </div>
   );

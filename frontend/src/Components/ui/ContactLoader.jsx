@@ -3,10 +3,10 @@ import React from "react";
 const ContactLoader = () => {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      {/* 🔹 Blurred background overlay */}
+      {/* Blurred background overlay */}
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm"></div>
 
-      {/* 🔹 Centered loader */}
+      {/* Centered loader */}
       <div className="relative z-10 flex items-center justify-center">
         <svg
           width="100"
@@ -14,7 +14,6 @@ const ContactLoader = () => {
           viewBox="0 0 240 240"
           className="scale-110"
         >
-          {/* Shopping Cart - Premium Design with bounce */}
           <g transform="translate(40, 60)">
             <g>
               <animate

@@ -6,23 +6,26 @@ function Termscondition() {
   const { userDetails } = useUser();
 
   return (
-    <div className="min-h-[calc(100vh-70px)] overflow-hidden bg-white dark:bg-[#131313]">
-      <div className="flex min-h-[calc(100vh-70px)]">
+    <div className="h-screen w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree">
+      <div className="flex-1 lg:flex md:flex overflow-hidden">
+        {/* LEFT PANEL - Only render if user exists */}
         {userDetails?._id ? (
-          <div className="hidden bg-[#FBFBFB] pb-[2vh] pl-[2vw] pr-[1.75vw] pt-[3.5vh] dark:bg-[#131313] md:block md:w-[37%] lg:w-[28%] xl:-mr-4 xl:w-[26%] xl:pb-0 xl:pt-[2.5vh]">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0">
             <Profile_left_part />
           </div>
         ) : null}
 
+        {/* RIGHT PANEL (Main Content Area) */}
         <div
-          className={`relative overflow-y-auto bg-white dark:bg-[#131313] ${
+          className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:px-[5.7rem] lg:py-6 ${
             userDetails?._id
-              ? "md:w-[65%] lg:w-[72%]"
-              : "mx-auto w-full max-w-6xl"
+              ? "w-full md:flex-1"
+              : "mx-auto w-full max-w-5xl"
           }`}
         >
-          <div className="mx-[5.5vw] md:ml-[2vw] md:mr-[3vw] md:mt-[4vh] lg:ml-[1.8vw] lg:mr-[3.6vw]">
-            <LegalDocument type="terms" />
+          {/* Centered container to match other pages */}
+          <div className="max-w-4xl mx-auto  ">
+            <LegalDocument initialType="privacy" />
           </div>
         </div>
       </div>
@@ -31,3 +34,4 @@ function Termscondition() {
 }
 
 export default Termscondition;
+

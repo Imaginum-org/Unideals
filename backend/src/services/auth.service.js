@@ -50,8 +50,13 @@ export const loginWithPassword = async ({
   password,
   allowedRoles = null,
 }) => {
-  if (!email || !password) {
-    const error = new Error("Please provide email and password");
+  if (!email) {
+    const error = new Error("Please provide Email");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!password) {
+    const error = new Error("Please provide Password");
     error.statusCode = 400;
     throw error;
   }
@@ -62,7 +67,7 @@ export const loginWithPassword = async ({
     .select("+password");
 
   if (!user) {
-    const error = new Error("Invalid email or password");
+    const error = new Error("No account found with this email");
     error.statusCode = 400;
     throw error;
   }
@@ -96,7 +101,7 @@ export const loginWithPassword = async ({
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
-    const error = new Error("Invalid email or password");
+    const error = new Error("Incorrect password");
     error.statusCode = 400;
     throw error;
   }
@@ -115,17 +120,17 @@ export const loginWithPassword = async ({
   };
 };
 
-export const refreshSession = async ({
-  refreshToken,
-  allowedRoles = null,
-}) => {
+export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
   if (!refreshToken) {
     const error = new Error("Refresh token required");
     error.statusCode = 401;
     throw error;
   }
 
-  const decoded = jwt.verify(refreshToken, process.env.SECRET_KEY_REFRESH_TOKEN);
+  const decoded = jwt.verify(
+    refreshToken,
+    process.env.SECRET_KEY_REFRESH_TOKEN,
+  );
   const user = await userModel.findById(decoded.id).select("+refresh_token");
 
   if (!user || user.refresh_token !== refreshToken) {
