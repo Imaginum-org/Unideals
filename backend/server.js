@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ override: true });
 
 import app from "./src/app.js";
 import { connectDB } from "./src/config/db.js";

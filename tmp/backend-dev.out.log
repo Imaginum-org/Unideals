@@ -1,0 +1,282 @@
+
+> unideals-backend@1.0.0 dev
+> nodemon server.js
+
+[33m[nodemon] 3.1.11[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node server.js`[39m
+◇ injected env (14) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+MongoDB connected: ac-x3esxnf-shard-00-02.rgsu7ds.mongodb.net
+[Job] Product cleanup scheduler initialized (runs daily at 2 AM UTC)
+Server running on port 5000
+[0mGET /health [32m200[0m 7.044 ms - 74[0m
+[0mPOST /api/chat/assistant [32m200[0m 13.291 ms - 407[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 142.311 ms - 4911[0m
+[0mGET /api/product/boosted [36m304[0m 90.932 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 51.777 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 3.648 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 1.049 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.647 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.796 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.718 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 1.013 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 1.494 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.712 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.637 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.519 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 8.461 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 59.920 ms - 4909[0m
+[0mGET /api/product/boosted [36m304[0m 61.416 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 52.636 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.601 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.450 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.618 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.448 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.534 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.562 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.537 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.522 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.577 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.464 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 1.518 ms - 65[0m
+[0mGET /api/product/boosted [32m200[0m 79.036 ms - 76[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 93.361 ms - 4908[0m
+[0mGET /api/product/boosted [36m304[0m 49.125 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.361 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.444 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.629 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.481 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.493 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.630 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.527 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.546 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.426 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.460 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 0.903 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 52.268 ms - 4910[0m
+[0mGET /api/product/boosted [32m200[0m 54.292 ms - 76[0m
+[0mGET /api/product/boosted [36m304[0m 64.635 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.586 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.582 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.610 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.481 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.528 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.848 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.541 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.445 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.510 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.529 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 0.825 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 61.317 ms - 4911[0m
+[0mGET /api/product/boosted [36m304[0m 69.928 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 50.298 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.444 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.586 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.452 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.368 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.456 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.396 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.816 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.744 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 9.185 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.431 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 1.865 ms - 65[0m
+[0mPOST /api/auth/login [33m400[0m 64.216 ms - 127[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 52.171 ms - 4910[0m
+[0mGET /api/product/boosted [36m304[0m 47.865 ms - -[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.478 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.516 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.567 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.496 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.430 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.419 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.502 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.496 ms - 64[0m
+[0mGET /api/product/boosted [36m304[0m 69.122 ms - -[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.478 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.509 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 0.754 ms - 65[0m
+[0mPOST /api/chat/assistant [32m200[0m 17.955 ms - 390[0m
+[0mPOST /api/chat/assistant [32m200[0m 2.692 ms - 390[0m
+[0mPOST /api/chat/assistant [32m200[0m 64.421 ms - 2298[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 61.432 ms - 4912[0m
+[0mGET /api/product/boosted [36m304[0m 61.565 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 49.585 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.776 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.583 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 1.096 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.723 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 1.339 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 1.024 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.968 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.450 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.397 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.475 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 0.858 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 53.129 ms - 4911[0m
+[0mGET /api/product/boosted [36m304[0m 60.288 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 58.192 ms - -[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 94.491 ms - 4910[0m
+[0mGET /api/product/boosted [36m304[0m 90.799 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.551 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.792 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.468 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.496 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 1.273 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.426 ms - 64[0m
+[0mGET /api/product/boosted [36m304[0m 93.923 ms - -[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.701 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 4.548 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.764 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.922 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 0.707 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 55.081 ms - 4912[0m
+[0mGET /api/product/boosted [36m304[0m 54.350 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 51.486 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.530 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.418 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.900 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.657 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.467 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.479 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.510 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.530 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.438 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.397 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 0.794 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 70.932 ms - 4912[0m
+[0mGET /api/product/boosted [36m304[0m 77.444 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 47.905 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 8.082 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.674 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.619 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.833 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.518 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 10.050 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.522 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 1.473 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.550 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.420 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 1.440 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 52.043 ms - 4911[0m
+[0mGET /api/product/boosted [36m304[0m 56.467 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 78.035 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 5.879 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.502 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.660 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.601 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.465 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.668 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 1.311 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 1.100 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 3.892 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 1.728 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 13.044 ms - 65[0m
+[0mPOST /api/chat/assistant [32m200[0m 11.893 ms - 956[0m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+◇ injected env (14) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+MongoDB connected: ac-x3esxnf-shard-00-02.rgsu7ds.mongodb.net
+[Job] Product cleanup scheduler initialized (runs daily at 2 AM UTC)
+Server running on port 5000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+◇ injected env (14) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+MongoDB connected: ac-x3esxnf-shard-00-02.rgsu7ds.mongodb.net
+[Job] Product cleanup scheduler initialized (runs daily at 2 AM UTC)
+Server running on port 5000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+◇ injected env (14) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+MongoDB connected: ac-x3esxnf-shard-00-02.rgsu7ds.mongodb.net
+[Job] Product cleanup scheduler initialized (runs daily at 2 AM UTC)
+Server running on port 5000
+[0mPOST /api/chat/assistant [32m200[0m 17.110 ms - 425[0m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+◇ injected env (14) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+MongoDB connected: ac-x3esxnf-shard-00-02.rgsu7ds.mongodb.net
+[Job] Product cleanup scheduler initialized (runs daily at 2 AM UTC)
+Server running on port 5000
+[0mGET /api/product?page=1&limit=10 [32m200[0m 183.193 ms - 4910[0m
+[0mGET /api/product/boosted [36m304[0m 145.718 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 51.771 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 7.767 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 1.460 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 1.819 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 3.811 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 3.078 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 9.151 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 1.123 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.618 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.713 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 1.317 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 4.923 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 154.867 ms - 4912[0m
+[0mGET /api/product/boosted [36m304[0m 59.341 ms - -[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.692 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 1.964 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.420 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 1.534 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.715 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.436 ms - 64[0m
+[0mGET /api/product/boosted [36m304[0m 170.805 ms - -[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.487 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.476 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.602 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.870 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 5.778 ms - 65[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 65.027 ms - 4911[0m
+[0mGET /api/product/boosted [36m304[0m 46.691 ms - -[0m
+[0mGET /api/product/boosted [36m304[0m 43.620 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.462 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.627 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.534 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.539 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.493 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.394 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.499 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.361 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 1.321 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.542 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 0.789 ms - 65[0m
+[0mGET /api/product/boosted [36m304[0m 171.051 ms - -[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 72.971 ms - 4911[0m
+[0mGET /api/product/boosted [36m304[0m 48.735 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.960 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 1.411 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.498 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.633 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 7.583 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.749 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 1.259 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.862 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 3.800 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.401 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 6.683 ms - 65[0m
+[0mPOST /api/chat/assistant [32m200[0m 54.067 ms - 408[0m
+[0mPOST /api/chat/assistant [32m200[0m 1.638 ms - 408[0m
+[0mPOST /api/chat/assistant [32m200[0m 39.922 ms - 469[0m
+[0mPOST /api/chat/assistant [32m200[0m 1.732 ms - 408[0m
+[0mGET /api/product?page=1&limit=10 [32m200[0m 62.039 ms - 4912[0m
+[0mGET /api/product/boosted [36m304[0m 53.717 ms - -[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.715 ms - 64[0m
+[0mGET /api/product/boosted [36m304[0m 43.280 ms - -[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 0.345 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.359 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.432 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.646 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c226c201467160046e619 [33m401[0m 1.197 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c21832e535f7cf1a2028e [33m401[0m 0.408 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c26b2e2c99a6b173921be [33m401[0m 0.302 ms - 64[0m
+[0mGET /api/wishlist/check/6a5c2548e2c99a6b17392151 [33m401[0m 0.478 ms - 64[0m
+[0mGET /api/wishlist/check/6a5d0e0a3937c5db5788b612 [33m401[0m 0.448 ms - 64[0m
+[0mPOST /api/auth/refresh-token [33m401[0m 1.541 ms - 65[0m

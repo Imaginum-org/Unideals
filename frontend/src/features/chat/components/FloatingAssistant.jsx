@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  Bot,
   Camera,
-  ChevronDown,
   ExternalLink,
   Mic,
   MessageCircle,
@@ -516,30 +514,22 @@ const FloatingAssistant = () => {
         </section>
       )}
 
-      {isOpen && isMinimized && (
-        <button
-          onClick={() => setIsMinimized(false)}
-          className="mb-3 flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-bold text-zinc-800 shadow-xl transition hover:-translate-y-0.5 dark:border-zinc-800 dark:bg-[#1A1D20] dark:text-white"
-        >
-          <Bot className="h-4 w-4 text-[#394ff1]" />
-          UniDeals
-          <ChevronDown className="h-4 w-4 rotate-180 text-zinc-400" />
-        </button>
-      )}
-
-      {!isOpen && (
+      {(!isOpen || isMinimized) && (
         <div className="relative flex h-16 w-16 items-center justify-center">
-          <span className="absolute inset-0 rounded-full bg-blue-600/30 blur-xl" />
+          {/* Glowing aura layers */}
+          <span className="absolute -inset-3 rounded-full bg-blue-500/35 blur-xl animate-pulse pointer-events-none" />
+          <span className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-blue-600/50 via-indigo-500/40 to-cyan-400/30 blur-lg pointer-events-none" />
+
           <button
             onClick={() => {
               setIsOpen(true);
               setIsMinimized(false);
             }}
-            className="group relative flex h-14 w-14 items-center justify-center rounded-full border border-white/60 bg-gradient-to-tr from-blue-800 via-blue-700 to-blue-600 text-white shadow-[0_16px_36px_-6px_rgba(29,78,216,0.5)] transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-200 sm:h-16 sm:w-16"
-            aria-label="Open UniDeals"
+            className="group relative flex h-14 w-14 items-center justify-center rounded-full border border-white/50 bg-gradient-to-tr from-blue-700 via-blue-600 to-blue-500 text-white shadow-[0_12px_32px_-4px_rgba(37,99,235,0.65),0_0_24px_rgba(59,130,246,0.45)] transition-all duration-300 hover:scale-110 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300/60 sm:h-16 sm:w-16"
+            aria-label={isMinimized ? "Restore UniDeals Copilot" : "Open UniDeals Copilot"}
             title="UniDeals"
           >
-            <MessageCircle className="h-6 w-6 transition group-hover:scale-110" />
+            <MessageCircle className="h-6 w-6 text-white transition-transform duration-300 group-hover:scale-110" />
           </button>
         </div>
       )}

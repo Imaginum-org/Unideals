@@ -1,4 +1,4 @@
-import ai, { GEMINI_MODEL } from "../config/gemini.js";
+﻿import ai, { GEMINI_MODEL } from "../config/gemini.js";
 import { toolDeclarations, toolHandlers } from "./assistant.tools.js";
 import {
   findKnowledgeBaseAnswer,
@@ -406,6 +406,13 @@ GRACEFUL FALLBACK RULE:
 If after exhausting all knowledge base context and tool results you still cannot provide a confident, grounded answer to a policy or procedure question, ALWAYS respond with:
 "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but don't worry, our team is continuously expanding my knowledge and I'll soon be able to answer it fully! In the meantime: 📧 Email us at support@campusmart.in (24-48h response) or 🎫 Submit a ticket at /contact. Thanks for your patience! 🙌"
 
+PLATFORM CORE GROUNDING:
+- Eligibility: 18+ currently enrolled Indian university students with verified college email. Strict 1 account per person.
+- Role: Intermediary under Section 79 IT Act. UniDeals does NOT hold funds, manage escrow, or arrange delivery. Liability capped at ₹1,000.
+- Safety: Meet in public campus spots during daylight (Library Gate, Canteen). Inspect before paying. UPI or cash only at meetup. NEVER pay advance or token money. Beware reverse QR scams.
+- Listing Rules: Selling price cannot exceed original MRP. Max 3 real photos (no stock images). Condition disclosed honestly.
+- Plans: Free (10 listings, 25 wishlist), Pro (₹99 lifetime, 25 listings, 2 boosts/month), Pro+ (₹199 lifetime, unlimited listings, 5 boosts/month). Boost add-ons: ₹29 (3-day), ₹49 (7-day). No boost stacking, no credit rollover.
+
 RESPONSE FORMAT:
 Always suggest 3-4 relevant follow-up prompts.
 Return ONLY a valid JSON object with this structure:
@@ -414,34 +421,64 @@ Return ONLY a valid JSON object with this structure:
   "intent": "knowledge_base | marketplace_overview | product_search | price_estimation | listing_creation | comparison | budget_planning | advice | policy | conversation",
   "suggestions": ["short follow-up", "short follow-up", "short follow-up"]
 }
-
-=== UNIDEALS PLATFORM KNOWLEDGE (ground truth — always prefer this over general knowledge) ===
-${getFullKnowledgeText()}
-===
 `;
 
 const CANDIDATE_MODELS = [
-  GEMINI_MODEL,
-  "gemini-flash-latest",
-  "gemini-3.6-flash",
-  "gemini-3-flash-preview",
-];
+  GEMINI_MODEL || "gemini-flash-latest",
+].filter(Boolean);
+
+let geminiRateLimitedUntil = 0;
+
+export const isGeminiAvailable = () => {
+  return Boolean(process.env.GEMINI_API_KEY) && Date.now() > geminiRateLimitedUntil;
+};
+
+const withTimeout = (promise, timeoutMs = 6000, label = "Gemini API") =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ]);
 
 const callGeminiWithFallback = async (params) => {
+  if (!isGeminiAvailable()) {
+    throw new Error("Gemini API is temporarily in cooldown due to rate limit.");
+  }
+
   let lastError = null;
   const uniqueModels = [...new Set(CANDIDATE_MODELS)];
 
   for (const model of uniqueModels) {
     try {
-      const response = await ai.models.generateContent({
-        ...params,
-        model,
-      });
+      const response = await withTimeout(
+        ai.models.generateContent({
+          ...params,
+          model,
+        }),
+        6000,
+        `Model ${model}`
+      );
       return { response, model };
     } catch (err) {
       lastError = err;
       const status = err.status || err.statusCode;
-      if (status !== 404 && status !== 429 && status !== 503) {
+      const isRateLimited =
+        status === 429 ||
+        err.code === 429 ||
+        status === "RESOURCE_EXHAUSTED" ||
+        String(err.message || "").includes("429") ||
+        String(err.message || "").includes("RESOURCE_EXHAUSTED");
+
+      // If quota exceeded (429), activate circuit breaker for 60 seconds and stop retrying immediately
+      if (isRateLimited) {
+        geminiRateLimitedUntil = Date.now() + 60000;
+        console.warn("[Assistant] Gemini quota/rate limit detected (429). Circuit breaker enabled for 60s.");
+        break;
+      }
+
+      // If client-side error (bad request, auth), do not retry
+      if (status === 400 || status === 401 || status === 403) {
         break;
       }
     }
@@ -596,9 +633,9 @@ const fallbackLocalSearch = async (message) => {
     }
 
     // 1. Safety / Scam / Meetup / UPI questions
-    if (/\b(safe|safety|scam|fraud|meet|meetup|upi|advance|spot|location|night|payment)\b/i.test(text)) {
-      const topic = /\b(upi|advance|payment|money|qr)\b/i.test(text) ? "payment" :
-                    /\b(scam|fraud|fake|cheat)\b/i.test(text) ? "scam" : "meetup";
+    if (/\b(safe|safety|scam|scams|fraud|frauds|fake|cheat|cheats|meet|meetup|meetups|upi|advance|spot|location|night|payment|payments)\b/i.test(text)) {
+      const topic = /\b(upi|advance|payment|payments|money|qr)\b/i.test(text) ? "payment" :
+                    /\b(scam|scams|fraud|frauds|fake|cheat|cheats)\b/i.test(text) ? "scam" : "meetup";
       const tipsRes = await toolHandlers.getSafetyTips({ topic });
       return {
         reply: "🛡️ Here are important campus safety and transaction guidelines:\n• Never send advance payments on UPI before inspecting the item in person.\n• Always meet at well-lit, populated campus hubs (e.g. Library Gate, Main Canteen, Student Center).\n• Test and inspect the item thoroughly before making the final payment.",
@@ -709,22 +746,38 @@ const fallbackLocalSearch = async (message) => {
       };
     }
 
-    // 7. Product Search / Default
-    const cleanedQuery = text.replace(/\b(find|show|search|need|want|buy|looking|for|me|please|best|cheap|affordable|recommend|suggest|are|there|any)\b/gi, "").trim();
-    const searchRes = await toolHandlers.searchProducts({ query: cleanedQuery || text, limit: 4 });
-    const products = searchRes.products?.length ? searchRes.products : (await toolHandlers.getTrendingProducts({ limit: 4 })).products;
+    // 7. Product Search — only when query indicates intent to find, buy, or browse items
+    const isProductIntent = /\b(find|show|search|need|want|buy|looking for|cheap|under|below|price|laptop|cycle|bike|bicycle|book|books|phone|mobile|monitor|keyboard|kettle|mattress|cooler|calculator|headphones|earphones|clothes|shoes|bag|backpack|sports|fitness|available|in stock|recommend|suggest|product|products|item|items|listing|listings)\b/i.test(text);
 
+    if (isProductIntent) {
+      const cleanedQuery = text.replace(/\b(find|show|search|need|want|buy|looking|for|me|please|best|cheap|affordable|recommend|suggest|are|there|any)\b/gi, "").trim();
+      const searchRes = await toolHandlers.searchProducts({ query: cleanedQuery || text, limit: 4 });
+      const products = searchRes.products?.length ? searchRes.products : (await toolHandlers.getTrendingProducts({ limit: 4 })).products;
+
+      return {
+        reply: searchRes.products?.length
+          ? `Here are active campus listings matching "${cleanedQuery || text}":`
+          : "Here are some popular active listings on campus:",
+        intent: "product_search",
+        products: products || [],
+        suggestions: [
+          "Find electronics under 5000",
+          "Estimate price for my cycle",
+          "Help me sell my books",
+          "Safety tips for meetups",
+        ],
+      };
+    }
+
+    // 8. General conversational / Helpful redirect (Never return random product cards for general queries!)
     return {
-      reply: searchRes.products?.length
-        ? `Here are active campus listings matching "${cleanedQuery || text}":`
-        : "Here are some popular active listings on campus:",
-      intent: "product_search",
-      products: products || [],
+      reply: "I'm UniDeals AI — your campus marketplace assistant! 🎓\n\nI can help you with:\n• 🔍 Finding campus products, electronics, cycles, and books\n• 💰 Estimating fair selling prices\n• 📝 Writing product listings\n• 🛡️ Campus safety tips and scam avoidance\n• 📖 Platform rules, policies, and procedures\n\nHow can I help you today?",
+      intent: "conversation",
       suggestions: [
-        "Find electronics under 5000",
-        "Estimate price for my cycle",
-        "Help me sell my books",
-        "Safety tips for meetups",
+        "How do I avoid scams?",
+        "What are the platform rules?",
+        "Find a cycle under ₹3000",
+        "How do I sell an item?",
       ],
     };
   } catch (err) {
@@ -870,9 +923,9 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
     return result;
   }
 
-  // ── FAST PATH: high-confidence KB match → skip Gemini entirely ──
+  // ── FAST PATH: high or medium confidence KB match → skip Gemini entirely (serves in ~3ms) ──
   const fastKB = findKnowledgeBaseAnswer(message);
-  if (fastKB && fastKB.confidence === "high") {
+  if (fastKB && (fastKB.confidence === "high" || fastKB.confidence === "medium" || (fastKB.score && fastKB.score >= 8))) {
     const fastResult = {
       reply: formatKnowledgeReply(fastKB),
       intent: "knowledge_base",
@@ -883,6 +936,14 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
     };
     setCachedReply(message, fastResult);
     return fastResult;
+  }
+
+  // ── CIRCUIT BREAKER: If Gemini is in rate-limit cooldown, serve local search instantly ──
+  if (!isGeminiAvailable()) {
+    console.log("[Assistant] Gemini API is in rate-limit cooldown. Serving immediate local fallback.");
+    const localFallback = await fallbackLocalSearch(message);
+    setCachedReply(message, localFallback);
+    return localFallback;
   }
 
   const formattedHistory = history.map((msg) => ({

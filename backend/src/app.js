@@ -41,47 +41,6 @@ app.use(
   }),
 );
 
-// Prevent NoSQL injection
-app.use((req, res, next) => {
-  const sanitize = (obj) => {
-    if (!obj) return;
-
-    for (let key in obj) {
-      if (key.includes("$") || key.includes(".")) {
-        delete obj[key];
-      } else if (typeof obj[key] === "object") {
-        sanitize(obj[key]);
-      }
-    }
-  };
-
-  sanitize(req.body);
-  sanitize(req.params);
-
-  next();
-});
-
-// Prevent XSS attacks
-app.use((req, res, next) => {
-  if (req.body) {
-    for (const key in req.body) {
-      if (typeof req.body[key] === "string") {
-        req.body[key] = xss(req.body[key]);
-      }
-    }
-  }
-
-  if (req.params) {
-    for (const key in req.params) {
-      if (typeof req.params[key] === "string") {
-        req.params[key] = xss(req.params[key]);
-      }
-    }
-  }
-
-  next();
-});
-
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -100,9 +59,53 @@ app.use(
   }),
 );
 
-app.use(express.json({ limit: "12mb" })); // Supports compressed assistant image/audio questions
-app.use(express.urlencoded({ extended: true })); // Handles form data from frontend
+// Body parsing with 25mb limit for images/attachments
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 app.use(cookieParser());
+
+// Prevent NoSQL injection
+app.use((req, res, next) => {
+  const sanitize = (obj) => {
+    if (!obj || typeof obj !== "object") return;
+
+    for (let key in obj) {
+      if (key === "attachments" || key === "data") continue;
+      if (key.includes("$") || key.includes(".")) {
+        delete obj[key];
+      } else if (typeof obj[key] === "object") {
+        sanitize(obj[key]);
+      }
+    }
+  };
+
+  if (req.body) sanitize(req.body);
+  if (req.params) sanitize(req.params);
+
+  next();
+});
+
+// Prevent XSS attacks
+app.use((req, res, next) => {
+  if (req.body) {
+    for (const key in req.body) {
+      if (key === "attachments" || key === "data") continue;
+      if (typeof req.body[key] === "string" && !req.body[key].startsWith("data:image/")) {
+        req.body[key] = xss(req.body[key]);
+      }
+    }
+  }
+
+  if (req.params) {
+    for (const key in req.params) {
+      if (typeof req.params[key] === "string") {
+        req.params[key] = xss(req.params[key]);
+      }
+    }
+  }
+
+  next();
+});
 
 // Logging in Development mode only
 if (process.env.NODE_ENV !== "production") {

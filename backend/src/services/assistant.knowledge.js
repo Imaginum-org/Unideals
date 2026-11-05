@@ -1,4 +1,4 @@
-/**
+﻿/**
  * UniDeals AI Assistant Knowledge Base — COMPREHENSIVE EDITION v3.0
  * 40+ dense structured entries covering every aspect of the platform,
  * from extreme basics to extreme advanced policies and procedures.
@@ -202,6 +202,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "close account", "deactivate", "account delete kaise kare",
       "privacy delete", "mera data hatao", "gdpr", "data removal",
       "30 days deletion", "how long to delete", "data purge",
+      "account deletion", "how long does account deletion take", "deletion take",
     ],
     answer:
       "To delete your UniDeals account and associated data, email privacy@campusmart.in with your registered email and a deletion request. Your account, listings, chat history, and personal data will be permanently removed within 30 days. Some records may be retained if required by Indian law (e.g., fraud investigations). This action is irreversible — all your listings, wishlist, and chat history will be permanently lost.",
@@ -320,6 +321,8 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "prohibited items", "banned items", "not allowed", "what can i sell",
       "restricted items", "illegal items", "kya nahi bech sakte", "banned products",
       "prohibited list", "not permitted", "contraband", "restricted",
+      "prohibited", "banned", "items are prohibited", "what items are prohibited",
+      "prohibited on unideals", "what items are banned", "what is prohibited",
       "can i sell alcohol", "can i sell medicines", "can i sell weapons",
       "can i sell exam papers", "can i sell services", "can i resell commercially",
       "counterfeit goods", "stolen goods", "adult content", "drugs", "tobacco",
@@ -580,6 +583,8 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "listing cap", "can i list more", "limit reached", "maximum products",
       "free listing limit", "pro listing limit", "pro plus unlimited",
       "listing quota", "exceeded limit", "cant create listing",
+      "how many items can i list", "how many items", "items can i list",
+      "list on the free plan", "list on free plan", "how many products",
     ],
     answer:
       "Active listing limits by plan: Free = 10 active listings. Pro = 25 active listings. Pro+ = Unlimited listings. If you've reached your limit, either upgrade your plan or remove old/sold listings to make room. Listing limits are per active listing — sold or deleted listings don't count against your limit.",
@@ -702,6 +707,37 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
   // ═══════════════════════════════════════════════════
   //  SAFETY & SCAMS
   // ═══════════════════════════════════════════════════
+
+  makeEntry({
+    id: "how_to_avoid_scams",
+    title: "How to Avoid Scams & Stay Safe on UniDeals",
+    keywords: [
+      "avoid scams", "avoid scam", "how to avoid scams", "how to avoid scam",
+      "how do i avoid scams", "how to stay safe", "stay safe", "safety tips",
+      "safety rules", "scam se kaise bache", "common scams", "scam signs",
+      "fraud prevention", "safe dealing", "safe trading", "red flags",
+      "scammer", "suspicious seller", "suspicious buyer", "scams",
+      "what are common scam signs", "how do i stay safe", "campus safety",
+    ],
+    answer:
+      "To avoid scams and trade safely on UniDeals, follow these core safety rules: 1. NEVER pay in advance — no token amounts, booking deposits, or advance UPI before inspecting the item in person. 2. Always meet in public, busy campus spots during daylight (Library Gate, Main Canteen, Student Activity Center). 3. Always inspect and test the item thoroughly before paying (power on electronics, check condition). 4. Beware of Reverse QR scams — NEVER scan a QR code sent by a buyer or seller to 'receive' money. 5. Confirm payments only on YOUR OWN registered banking app, not via screenshots from others. 6. Bring a friend for deals over ₹5,000. 7. Report any suspicious behavior using the flag/report button on the listing or user profile.",
+    steps: [
+      "Rule 1 (Golden Rule): NEVER send advance payments or token money online before meeting.",
+      "Rule 2: Always meet in public, well-lit campus hubs during daylight hours.",
+      "Rule 3: Test and inspect the item thoroughly before transferring any money.",
+      "Rule 4: Watch out for Reverse QR scams — scanning a QR code SENDS money, never receives it.",
+      "Rule 5: Verify payments directly inside your own banking app (GPay/PhonePe/Paytm).",
+      "Rule 6: If an offer looks too good to be true, it is almost certainly a scam.",
+      "Rule 7: Report any suspicious seller or listing via the Report (⚑) button on their listing or profile.",
+    ],
+    route: "/contact",
+    suggestions: [
+      "Is advance UPI payment safe?",
+      "What is the reverse QR scam?",
+      "Where should I meet a seller on campus?",
+      "How do I report a suspicious user?",
+    ],
+  }),
 
   makeEntry({
     id: "report_safety_steps",
@@ -1403,40 +1439,71 @@ export const getFullKnowledgeText = () =>
 //  KNOWLEDGE BASE LOOKUP — MULTI-TIER SCORING
 // ═══════════════════════════════════════════════════
 
+const STOP_WORDS = new Set([
+  "what", "is", "are", "the", "this", "that", "how", "for", "can", "and", "you",
+  "your", "tell", "about", "have", "has", "does", "kya", "hai", "ye", "yeh", "ko",
+  "ka", "ki", "ke", "se", "me", "mein", "on", "in", "at", "to", "do", "it", "my",
+  "or", "an", "a", "there", "any", "some", "i", "we", "they", "he", "she"
+]);
+
+const stem = (w) => {
+  if (w.endsWith("ies") && w.length > 4) return w.slice(0, -3) + "y";
+  if (w.endsWith("es") && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith("s") && w.length > 3 && !w.endsWith("ss")) return w.slice(0, -1);
+  return w;
+};
+
 export const findKnowledgeBaseAnswer = (message = "") => {
   const query = normalize(message);
   if (!query) return null;
 
-  const queryTerms = new Set(splitTerms(query));
-
-  // Build bigrams from query for phrase matching
   const queryWords = query.split(" ").filter(Boolean);
-  const queryBigrams = new Set();
-  for (let i = 0; i < queryWords.length - 1; i++) {
-    queryBigrams.add(`${queryWords[i]} ${queryWords[i + 1]}`);
-  }
+  const queryWordsSet = new Set(queryWords);
+  const queryStemsSet = new Set(queryWords.map(stem));
+  const paddedQuery = ` ${query} `;
+  const stemmedQuery = ` ${queryWords.map(stem).join(" ")} `;
 
   const scored = ASSISTANT_KNOWLEDGE_BASE.map((entry) => {
     let score = 0;
 
     for (const keyword of entry.keywords) {
-      // Exact phrase match: highest score
-      if (query.includes(keyword)) {
-        score += keyword.includes(" ") ? 8 : 4;
-      }
-      // Bigram match: high score
-      if (keyword.includes(" ") && queryBigrams.has(keyword)) {
-        score += 5;
-      }
-      // Term overlap: low score
-      for (const term of splitTerms(keyword)) {
-        if (queryTerms.has(term) && term.length > 2) score += 1;
+      if (keyword.includes(" ")) {
+        // Multi-word phrase: match with word boundaries on exact or stemmed query
+        const stemmedKeyword = keyword.split(" ").map(stem).join(" ");
+        if (paddedQuery.includes(` ${keyword} `) || stemmedQuery.includes(` ${stemmedKeyword} `)) {
+          score += 10;
+        }
+      } else {
+        // Single word: MUST be a whole word match or stemmed match
+        const stemmedKeyword = stem(keyword);
+        if ((queryWordsSet.has(keyword) || queryStemsSet.has(stemmedKeyword)) && !STOP_WORDS.has(keyword)) {
+          score += 6;
+        }
       }
     }
 
+    // Unique non-stopword term overlap across the whole entry
+    const entryUniqueTerms = new Set();
+    for (const kw of entry.keywords) {
+      for (const t of splitTerms(kw)) {
+        if (t.length > 2 && !STOP_WORDS.has(t)) {
+          entryUniqueTerms.add(t);
+        }
+      }
+    }
+
+    let termOverlap = 0;
+    for (const term of entryUniqueTerms) {
+      const stemmedTerm = stem(term);
+      if (queryWordsSet.has(term) || queryStemsSet.has(stemmedTerm)) {
+        termOverlap += 2;
+      }
+    }
+    score += termOverlap;
+
     return { entry, score };
   })
-    .filter(({ score }) => score > 0)
+    .filter(({ score }) => score >= 6)
     .sort((a, b) => b.score - a.score);
 
   if (!scored.length) return null;
@@ -1455,9 +1522,9 @@ export const findKnowledgeBaseAnswer = (message = "") => {
     };
   }
 
-  // Confidence: high (>=8), medium (>=4), low (<4)
+  // Confidence: high (>=12), medium (>=8), low (<8)
   const topScore = scored[0].score;
-  return { ...best, confidence: topScore >= 8 ? "high" : topScore >= 4 ? "medium" : "low" };
+  return { ...best, confidence: topScore >= 12 ? "high" : topScore >= 8 ? "medium" : "low" };
 };
 
 // ═══════════════════════════════════════════════════
