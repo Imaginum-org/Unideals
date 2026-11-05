@@ -29,6 +29,10 @@ export const getProducts = async (query = {}) => {
     match.status = query.status;
   }
 
+  if (query.category?.trim() && !query.category.includes("All")) {
+    match.category = { $regex: new RegExp(`^${escapeRegex(query.category.trim())}$`, "i") };
+  }
+
   const pipeline = [
     { $match: match },
     {
@@ -76,7 +80,12 @@ export const getProducts = async (query = {}) => {
         pipeline: [
           {
             $match: {
-              $expr: { $eq: ["$product_id", "$$productId"] },
+              $expr: {
+                $and: [
+                  { $eq: ["$target_id", "$$productId"] },
+                  { $eq: ["$target_model", "Product"] },
+                ],
+              },
               status: "pending",
             },
           },
@@ -188,9 +197,16 @@ export const hardDeleteProduct = async (productId) => {
     throw new Error("Product not found");
   }
 
+  // Best-effort ImageKit cleanup (never fails hard delete)
+  const { deleteImage } = await import("../utils/imagekit.js");
+  const fileIds = Array.isArray(product.images)
+    ? product.images.map((i) => i?.fileId).filter(Boolean)
+    : [];
+  await Promise.allSettled(fileIds.map((id) => deleteImage(id)));
+
   await Promise.all([
     Product.deleteOne({ _id: productId }),
-    Report.deleteMany({ product_id: productId }),
+    Report.deleteMany({ target_id: new ObjectId(productId), target_model: "Product" }),
     User.updateMany(
       { wishlist: productId },
       {

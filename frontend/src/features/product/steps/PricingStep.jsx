@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { toast } from "../../../components/ui/toast.js";
 import { HiOutlineLocationMarker, HiOutlineCash } from "react-icons/hi";
 import { FaRupeeSign } from "react-icons/fa";
 import axios from "../../../services/axiosInstance";
@@ -10,39 +12,122 @@ import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
 import { validatePricing } from "../validations";
 import FormError from "../components/shared/FormError";
 import LegalAgreementModal from "../../auth/components/LegalAgreementModal";
+import PickupSpotModal from "../../user/components/PickupSpotModal.jsx";
+import { createPickupSpot } from "../../user/api/userApi.js";
+import { useCampus } from "../../../context/CampusContext.jsx";
+import { FiPlus } from "react-icons/fi";
+
+const MAX_SPOTS = 3;
 
 const PricingStep = () => {
   const { formData, updateField, nextStep, errors, validateAndProceed } =
     useProductListing();
+  const { campus } = useCampus();
 const [legalTab, setLegalTab] = useState(null);
-  const [loadingAddress, setLoadingAddress] = useState(false);
+  const [loadingPickupSpot, setLoadingPickupSpot] = useState(false);
+  const [pickupSpots, setPickupSpots] = useState([]);
+  const [showSpotModal, setShowSpotModal] = useState(false);
+  const [isSavingSpot, setIsSavingSpot] = useState(false);
 
-  // FETCH ADDRESS
+  // FETCH PICKUP SPOTS
   useEffect(() => {
-    const fetchAddress = async () => {
+    const fetchPickupSpot = async () => {
       try {
-        setLoadingAddress(true);
+        setLoadingPickupSpot(true);
 
-        const res = await axios.get("/api/address");
+        const res = await axios.get("/api/pickup-spots");
 
-        const addresses = res.data?.addresses || [];
+        const spots = res.data?.pickupSpots || [];
+        setPickupSpots(spots);
 
-        const defaultAddress =
-          addresses.find((addr) => addr.isDefault) || addresses[0];
+        const primaryPickupSpot =
+          spots.find((spot) => spot.isPrimary) || spots[0];
 
-        updateField("address", defaultAddress || null);
-      } catch (error) {
-        toast.error("Failed to fetch address");
-        console.log(error.message);
+        updateField("address", primaryPickupSpot || null);
+      } catch {
+        toast.error("Failed to fetch pickup spot");
       } finally {
-        setLoadingAddress(false);
+        setLoadingPickupSpot(false);
       }
     };
 
     if (!formData.address) {
-      fetchAddress();
+      fetchPickupSpot();
+    } else {
+      // Keep the dropdown in sync when returning to this step; fall back
+      // to primary/first if the saved address is no longer in the list.
+      axios
+        .get("/api/pickup-spots")
+        .then((res) => {
+          const spots = res.data?.pickupSpots || [];
+          setPickupSpots(spots);
+          const stillThere =
+            formData.address?._id &&
+            spots.some((s) => String(s._id) === String(formData.address._id));
+          if (!stillThere) {
+            updateField(
+              "address",
+              spots.find((s) => s.isPrimary) || spots[0] || null,
+            );
+          }
+        })
+        .catch(() => {});
     }
   }, []);
+
+  const handleSelectSpot = (spotId) => {
+    const spot = pickupSpots.find((s) => String(s._id) === String(spotId));
+    if (spot) updateField("address", spot);
+  };
+
+  // Inline creation: same modal as Settings, saved without leaving the flow.
+  const handleCreateSpot = async (spotData) => {
+    if (pickupSpots.length >= MAX_SPOTS) {
+      toast.error(`Maximum ${MAX_SPOTS} pickup spots allowed`);
+      return;
+    }
+    setIsSavingSpot(true);
+    try {
+      const res = await createPickupSpot(spotData);
+      const created =
+        res.data?.pickupSpot || res.data?.data || { ...spotData };
+      // Never trust a fake _id-less object: refetch the list so the new
+      // spot has a real id for select + publish snapshot.
+      if (!created?._id) {
+        const refetch = await axios.get("/api/pickup-spots");
+        const spots = refetch.data?.pickupSpots || [];
+        setPickupSpots(spots);
+        const newest =
+          spots.find((s) => s.isPrimary) || spots[spots.length - 1] || spots[0];
+        if (newest) updateField("address", newest);
+        toast.success("Pickup spot added");
+        return;
+      }
+      if (pickupSpots.length + 1 > MAX_SPOTS) {
+        toast.error(`Maximum ${MAX_SPOTS} pickup spots allowed`);
+        return;
+      }
+      setPickupSpots((prev) => [...prev, created]);
+      updateField("address", created);
+      toast.success("Pickup spot added");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to add pickup spot");
+      // Swallow here (already toasted) so the modal stays open for retry.
+      throw err;
+    } finally {
+      setIsSavingSpot(false);
+    }
+  };
+
+  const handleTermsChange = (checked) => {
+    updateField("termsAccepted", checked);
+    if (checked) {
+      updateField("termsVersion", "v1");
+      updateField("termsAcceptedAt", new Date().toISOString());
+    } else {
+      updateField("termsAcceptedAt", null);
+    }
+  };
 
   return (
     <>
@@ -51,9 +136,15 @@ const [legalTab, setLegalTab] = useState(null);
           activeTab={legalTab}
           onTabChange={setLegalTab}
           onClose={() => setLegalTab(null)}
+          onAccept={() => {
+            // Accept ticks the consent box (recording version + timestamp)
+            // when unticked; when already ticked it simply closes the popup.
+            if (!formData.termsAccepted) handleTermsChange(true);
+            setLegalTab(null);
+          }}
         />
       )}
-      <div className="w-full text-black dark:texxt-white rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
+      <div className="w-full text-black dark:text-white rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8">
         {/* Header */}
         <div>
           <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
@@ -95,7 +186,7 @@ const [legalTab, setLegalTab] = useState(null);
                     )
                   }
                   placeholder="999"
-                  className="flex-1 bg-white -ml-2 h-full outline-none text-lg xl:text-xl font-semibold"
+                  className="flex-1 bg-[#F7F8FA] -ml-2 h-full outline-none text-lg xl:text-xl font-semibold"
                 />
               </div>
               {errors.sellingPrice && <FormError error={errors.sellingPrice} />}
@@ -123,7 +214,7 @@ const [legalTab, setLegalTab] = useState(null);
                     )
                   }
                   placeholder="1499"
-                  className="flex-1 bg-white h-full -ml-2 outline-none text-lg xl:text-xl font-semibold"
+                  className="flex-1 bg-[#F7F8FA] h-full -ml-2 outline-none text-lg xl:text-xl font-semibold"
                 />
               </div>
               {errors.originalPrice && (
@@ -146,16 +237,49 @@ const [legalTab, setLegalTab] = useState(null);
 
             <button
               onClick={() => updateField("negotiable", !formData.negotiable)}
+              aria-label="Allow negotiation"
               className={`relative w-[56px] h-[32px] rounded-full transition-all duration-300
       
       ${formData.negotiable ? "bg-[#2E3FDC]" : "bg-[#D1D5DB]"}`}
             >
               <div
-                className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all duration-300
+                className={`absolute top-1 w-6 h-6 rounded-full bg-[#F7F8FA] transition-all duration-300
           
           ${formData.negotiable ? "translate-x-7" : "translate-x-1"}`}
               />
             </button>
+          </div>
+
+          {/* Negotiation nudge — fixed-height slot so swapping messages never
+              shifts the layout below. */}
+          <div className="mt-2 min-h-[34px] sm:min-h-[22px]" aria-live="polite">
+            <AnimatePresence mode="wait" initial={false}>
+              {formData.negotiable ? (
+                <motion.p
+                  key="nego-on"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                >
+                  <CheckCircle2 size={14} className="shrink-0" />
+                  Nice, negotiable listings get more chats and usually sell faster.
+                </motion.p>
+              ) : (
+                <motion.p
+                  key="nego-off"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-red-500"
+                >
+                  <AlertTriangle size={14} className="shrink-0" />
+                  Heads up, turning this off can slow down your sale. Most buyers love to negotiate.
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Payment Method */}
@@ -233,64 +357,100 @@ const [legalTab, setLegalTab] = useState(null);
                   <RequiredAsterisk />
                 </label>
 
-                <div className="mt-2 min-h-[110px] rounded-xl border bg-white p-4 flex flex-col justify-between">
+                <div className="mt-2 min-h-[110px] rounded-xl border bg-[#F7F8FA] p-4 flex flex-col justify-between">
                   <div>
-                    <p className="font-medium text-[#111827]">VIT Vellore</p>
+                    <p className="font-medium text-[#111827]">
+                      {campus?.name || "Your campus"}
+                    </p>
 
                     <p className="mt-2 text-sm text-[#6B7280] leading-6">
-                      Main campus location for product pickup and meetup.
+                      Your listing goes live on your campus marketplace.
                     </p>
                   </div>
 
-                  <button className="mt-4 text-sm font-semibold text-[#4F46E5] self-start">
-                    Change
-                  </button>
+                  <p className="mt-4 text-sm font-semibold text-[#4F46E5]">
+                    Locked to your campus
+                  </p>
                 </div>
               </div>
 
-              {/* Pickup Address */}
+              {/* Pickup Spot */}
               <div>
                 <label className="text-sm font-semibold text-[#374151]">
-                  Pickup Address
+                  Pickup Spot
                   <RequiredAsterisk />
                 </label>
 
-                <div className="mt-2 min-h-[110px] rounded-xl border bg-white p-4 flex flex-col justify-between">
+                <div className="mt-2 min-h-[110px] rounded-xl border bg-[#F7F8FA] p-4 flex flex-col justify-between">
                   <div>
-                    {loadingAddress ? (
+                    {loadingPickupSpot ? (
                       <p className="text-sm text-[#6B7280]">
-                        Loading address...
+                        Loading pickup spot...
                       </p>
-                    ) : formData.address ? (
+                    ) : pickupSpots.length > 0 ? (
                       <>
-                        <p className="font-medium text-[#111827] leading-6">
-                          {formData.address.address_line ||
-                            formData.address.line1}
-                        </p>
+                        <select
+                          value={formData.address?._id || ""}
+                          onChange={(e) => handleSelectSpot(e.target.value)}
+                          className="w-full rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2.5 text-sm font-semibold text-[#111827] outline-none transition focus:border-[#4F46E5] focus:ring-4 focus:ring-[#4F46E5]/10"
+                          aria-label="Choose pickup spot"
+                        >
+                          {pickupSpots.map((spot) => (
+                            <option key={spot._id} value={spot._id}>
+                              {spot.name}
+                              {spot.isPrimary ? " (Primary)" : ""},{" "}
+                              {spot.detail}
+                            </option>
+                          ))}
+                        </select>
 
                         <p className="mt-2 text-sm text-[#6B7280] leading-6">
-                          {formData.address.city}, {formData.address.state}
+                          {formData.address?.detail ||
+                            formData.address?.city ||
+                            "Select a spot above"}
                         </p>
 
-                        <p className="text-sm text-[#6B7280]">
-                          {formData.address.pincode}
-                        </p>
+                        {formData.address?.pincode && (
+                          <p className="text-sm text-[#6B7280]">
+                            {formData.address.pincode}
+                          </p>
+                        )}
                       </>
                     ) : (
-                      <p className="text-sm text-red-500">No address found</p>
+                      <p className="text-sm text-red-500">
+                        No pickup spot found. Add one to continue
+                      </p>
                     )}
                   </div>
 
-                  <button className="mt-4 text-sm font-semibold text-[#4F46E5] self-start">
-                    <a href="/settings">Change</a>
-                  </button>
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowSpotModal(true)}
+                      disabled={
+                        isSavingSpot || pickupSpots.length >= MAX_SPOTS
+                      }
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#4F46E5] hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FiPlus size={16} />
+                      {pickupSpots.length === 0
+                        ? "Add pickup spot"
+                        : "Add another spot"}
+                    </button>
+                    <a
+                      href="/settings"
+                      className="text-sm font-medium text-[#9CA3AF] hover:text-[#4B5563]"
+                    >
+                      Manage in Settings
+                    </a>
+                  </div>
                 </div>
                 {errors.address && <FormError error={errors.address} />}
               </div>
             </div>
 
             {/* Bottom Warning */}
-            <div className="mt-5 inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-3 text-sm text-[#4F46E5]">
+            <div className="mt-5 inline-flex items-center gap-2 rounded-xl border bg-[#F7F8FA] px-4 py-3 text-sm text-[#4F46E5]">
               <span>🛡️</span>
 
               <span>For safety, choose a public place inside campus.</span>
@@ -306,7 +466,7 @@ const [legalTab, setLegalTab] = useState(null);
               <input
                 type="checkbox"
                 checked={formData.termsAccepted}
-                onChange={(e) => updateField("termsAccepted", e.target.checked)}
+                onChange={(e) => handleTermsChange(e.target.checked)}
                 className="mt-1 h-4 w-4 accent-[#2E3FDC] bg-wh cursor-pointer"
               />
 
@@ -337,6 +497,9 @@ const [legalTab, setLegalTab] = useState(null);
                 <RequiredAsterisk />
               </p>
             </label>
+            <p className="mt-2 text-[11px] leading-5 text-[#9CA3AF]">
+              Terms v1 · accepted at publish time is recorded with your listing.
+            </p>
             {errors.termsAccepted && <FormError error={errors.termsAccepted} />}
           </div>
         </div>
@@ -372,6 +535,14 @@ const [legalTab, setLegalTab] = useState(null);
           </div>
         </div>
       </div>
+
+      {/* Inline add-spot modal: same popup as Settings, no page switch */}
+      <PickupSpotModal
+        isOpen={showSpotModal}
+        onClose={() => setShowSpotModal(false)}
+        onSave={handleCreateSpot}
+        mode="create"
+      />
     </>
   );
 };

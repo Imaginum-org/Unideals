@@ -1,25 +1,138 @@
-import { useState } from "react";
-import toast from "react-hot-toast";
+import { useEffect, useState } from "react";
+import { toast } from "../../../components/ui/toast.js";
 import { HiOutlinePencil } from "react-icons/hi";
 import { GoRocket } from "react-icons/go";
 import { FaRupeeSign } from "react-icons/fa";
 import { MdVerified } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import axios from "../../../services/axiosInstance";
-import { uploadImage } from "../../../services/Utils/imageUpload";
+import { uploadImage, deleteImage } from "../../../utils/imageUpload.js";
 import { compressImage } from "../utils/imageCompression";
 import useProductListing from "../hooks/useProductListing";
-import { saveDraftProduct } from "../api/productApi.js";
+import { saveDraftProduct, updateProduct, getUserProducts } from "../api/productApi.js";
+import { getBilling } from "../../payment/api/paymentApi.js";
+import { removeDraftFromLocal } from "../utils/draftStorage";
+import {
+  validateBasicInfo,
+  validateImages,
+  validatePricing,
+} from "../validations";
+import LimitModal from "../../../components/ui/LimitModal.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { RiGraduationCapLine } from "react-icons/ri";
 import { MdOutlineLocationOn } from "react-icons/md";
+import { useCampus } from "../../../context/CampusContext.jsx";
+import { useUser } from "../../../context/useUserContext.jsx";
 
 const PreviewStep = () => {
   const navigate = useNavigate();
+  const { campus } = useCampus();
+  const { updateUserDetails } = useUser();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [publishStage, setPublishStage] = useState("");
+  const [limitInfo, setLimitInfo] = useState(null);
 
-  const { formData, goToStep, loading, setLoading, resetForm } =
+  const { formData, goToStep, loading, setLoading, setErrors, resetForm, isEditMode, editProductId } =
     useProductListing();
+
+  // Warn on accidental tab close/refresh while a publish is in-flight.
+  useEffect(() => {
+    if (!loading) return;
+    const handler = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [loading]);
+
+  // Pre-check plan cap BEFORE any upload bytes leave the device. Fail-open:
+  // backend still enforces; this just saves wasted uploads + shows LimitModal.
+  const precheckListingLimit = async () => {
+    if (isEditMode) return true;
+    try {
+      const [billingRes, productsRes] = await Promise.allSettled([
+        getBilling(),
+        getUserProducts(),
+      ]);
+      const billing =
+        billingRes.status === "fulfilled" ? billingRes.value?.data?.data : null;
+      const products =
+        productsRes.status === "fulfilled"
+          ? productsRes.value?.data?.data || []
+          : null;
+      const limit = billing?.limits?.activeListings ?? null; // null = unlimited/unknown
+      if (limit == null || products == null) return true;
+      const active = products.filter((p) =>
+        ["listed", "active"].includes((p.status || "").toLowerCase()),
+      ).length;
+      if (active >= limit) {
+        setLimitInfo({
+          message: `You've reached your plan's listing limit (${limit} active). Upgrade to list more.`,
+        });
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  };
+
+  // Re-run all step validators on publish; jump to the first failing step.
+  const revalidateAll = () => {
+    const basic = validateBasicInfo(formData);
+    if (Object.keys(basic).length > 0) {
+      setErrors(basic);
+      goToStep(1);
+      toast.error("Please fix the highlighted details in Step 1");
+      return false;
+    }
+    const images = validateImages(formData);
+    if (Object.keys(images).length > 0) {
+      setErrors(images);
+      goToStep(2);
+      toast.error("Please add at least one product image");
+      return false;
+    }
+    const pricing = validatePricing(formData);
+    if (Object.keys(pricing).length > 0) {
+      setErrors(pricing);
+      goToStep(3);
+      toast.error("Please fix pricing and pickup details");
+      return false;
+    }
+    return true;
+  };
+
+  // Free every local blob URL once photos are safely uploaded. Runs only
+  // on success — failures keep previews alive for retry. Remote (existing)
+  // URLs are skipped.
+  const revokeAllPreviewBlobs = () => {
+    (formData.imagePreviews || []).forEach((p) => {
+      const url = p?.preview;
+      if (typeof url === "string" && url.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore
+        }
+      }
+    });
+  };
+
+  // Order uploads to match the cover-first preview order, so the selected
+  // cover photo is always images[0] for mixed existing+new sets.
+  const buildOrderedImages = (uploads) => {
+    const queue = [...uploads];
+    return (formData.imagePreviews || [])
+      .map((item) => {
+        if (item?.isExisting) {
+          return { url: item.url, fileId: item.fileId };
+        }
+        return queue.shift() || null;
+      })
+      .filter(Boolean);
+  };
 
   // DISCOUNT
   // const discountPercentage = useMemo(() => {
@@ -49,6 +162,7 @@ const PreviewStep = () => {
         condition: formData.condition,
 
         selling_price: Number(formData.sellingPrice),
+        isGirlsOnly: Boolean(formData.isGirlsOnly),
 
         original_price: Number(formData.originalPrice),
 
@@ -69,20 +183,122 @@ const PreviewStep = () => {
       });
 
       toast.success("Draft saved successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to save draft");
-      console.log(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // SUBMIT
-  const handlePublish = async () => {
+  // SAVE CHANGES (edit mode)
+  const handleSaveChanges = async () => {
     if (loading) return;
+    if (!revalidateAll()) return;
 
     try {
       setLoading(true);
+
+      // New File blobs only (existing images are already uploaded).
+      const newFileBlobs = formData.images; // these are File objects
+
+      let newUploads = [];
+      if (newFileBlobs.length > 0) {
+        setPublishStage("Preparing New Images...");
+        const compressed = await Promise.all(
+          newFileBlobs.map((file) => compressImage(file)),
+        );
+        setPublishStage("Uploading New Images...");
+        const results = await Promise.allSettled(
+          compressed.map((file) => uploadImage(file)),
+        );
+        const failed = results.filter((r) => r.status === "rejected");
+        newUploads = results
+          .filter((r) => r.status === "fulfilled")
+          .map((r) => r.value);
+        if (failed.length > 0) {
+          // Best-effort cleanup so successes don't orphan on abort.
+          await Promise.allSettled(
+            newUploads.map((u) => (u?.fileId ? deleteImage(u.fileId) : Promise.resolve())),
+          );
+          toast.error(
+            `${failed.length} image${failed.length > 1 ? "s" : ""} failed to upload. Nothing was saved. Please retry.`,
+          );
+          setPublishStage("");
+          setLoading(false);
+          return;
+        }
+      }
+
+      setPublishStage("Saving Changes...");
+
+      // Merge in cover-first preview order (mixed existing + new).
+      const mergedImages = buildOrderedImages(newUploads);
+
+      await updateProduct(editProductId, {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        condition: formData.condition,
+        selling_price: Number(formData.sellingPrice),
+        isGirlsOnly: Boolean(formData.isGirlsOnly),
+        original_price: Number(formData.originalPrice),
+        is_negotiable: formData.negotiable,
+        payment_preference: formData.paymentMethod,
+        images: mergedImages,
+        // Quantity is editable server-side (1–99); pass through when present.
+        ...(formData.quantity != null && formData.quantity !== ""
+          ? { quantity: Number(formData.quantity) }
+          : {}),
+        pickup_address_snapshot: {
+          address_line:
+            formData.address?.name ||
+            formData.address?.address_line ||
+            formData.address?.line1,
+          city: formData.address?.detail || formData.address?.city,
+        },
+        meetup_location: formData.meetupLocation,
+        terms_version: formData.termsVersion || "v1",
+        terms_accepted_at: formData.termsAcceptedAt || null,
+        attributes: {
+          brand: String(formData.brand || "").trim().slice(0, 100),
+          color: String(formData.color || "").trim().slice(0, 50),
+          usage_duration: formData.usageDuration,
+          purchase_date: formData.purchaseDate || null,
+        },
+      });
+
+      setPublishStage("");
+      toast.success("Product updated successfully!");
+      revokeAllPreviewBlobs();
+      removeDraftFromLocal();
+      navigate("/productlisted");
+    } catch (error) {
+      setPublishStage("");
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to save changes";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+      setPublishStage("");
+    }
+  };
+
+  // SUBMIT (create new product)
+  const handlePublish = async () => {
+    if (loading) return;
+    if (!revalidateAll()) return;
+
+    try {
+      setLoading(true);
+      // Plan-cap pre-check before any upload bytes.
+      const allowed = await precheckListingLimit();
+      if (!allowed) {
+        setLoading(false);
+        setPublishStage("");
+        return;
+      }
       // Compress + Upload Images
       setPublishStage("Preparing Images...");
 
@@ -95,13 +311,29 @@ const PreviewStep = () => {
 
       setPublishStage("Uploading Images...");
 
-      const uploads = await Promise.all(
+      const results = await Promise.allSettled(
         compressedImages.map((file) => uploadImage(file)),
       );
+      const failed = results.filter((r) => r.status === "rejected");
+      const uploads = results
+        .filter((r) => r.status === "fulfilled")
+        .map((r) => r.value);
 
-      const uploadedUrls = uploads.map((img) => img.url);
+      if (failed.length > 0) {
+        // Best-effort cleanup of partial successes — no silent orphans.
+        await Promise.allSettled(
+          uploads.map((u) => (u?.fileId ? deleteImage(u.fileId) : Promise.resolve())),
+        );
+        toast.error(
+          `${failed.length} of ${results.length} images failed to upload. Please retry. Nothing was published.`,
+        );
+        setPublishStage("");
+        setLoading(false);
+        return;
+      }
 
-      const uploadedFileIds = uploads.map((img) => img.fileId);
+      // Cover-first order for mixed existing+new (new listings: all new).
+      const orderedUploads = buildOrderedImages(uploads);
 
       setPublishStage("Publishing Listing...");
 
@@ -116,6 +348,7 @@ const PreviewStep = () => {
         condition: formData.condition,
 
         selling_price: Number(formData.sellingPrice),
+        isGirlsOnly: Boolean(formData.isGirlsOnly),
 
         original_price: Number(formData.originalPrice),
 
@@ -123,39 +356,44 @@ const PreviewStep = () => {
 
         payment_preference: formData.paymentMethod,
 
-        images: uploads,
+        images: orderedUploads,
 
+        // Campus pickup-spot model: snapshot carries only the spot
+        // (name -> address_line, detail -> city). No state/pincode needed
+        // since buyer and seller meet on the same campus.
         pickup_address_snapshot: {
           address_line:
-            formData.address?.address_line || formData.address?.line1,
+            formData.address?.name ||
+            formData.address?.address_line ||
+            formData.address?.line1,
 
-          city: formData.address?.city,
-
-          state: formData.address?.state,
-
-          pincode: formData.address?.pincode,
+          city: formData.address?.detail || formData.address?.city,
         },
 
         meetup_location: formData.meetupLocation,
 
-        attributes: {
-          brand: formData.brand,
+        terms_version: formData.termsVersion || "v1",
+        terms_accepted_at: formData.termsAcceptedAt || null,
 
-          color: formData.color,
+        attributes: {
+          brand: String(formData.brand || "").trim().slice(0, 100),
+
+          color: String(formData.color || "").trim().slice(0, 50),
 
           usage_duration: formData.usageDuration,
           purchase_date: formData.purchaseDate || null,
         },
       });
 
-      console.log("FULL RESPONSE", response.data);
-
-      console.log("IS FIRST LISTING", response.data.isFirstListing);
-
       const isFirstListing = Boolean(response?.data?.isFirstListing);
+      if (response?.data?.gamification) {
+        updateUserDetails({ gamification: response.data.gamification });
+      }
 
       setPublishStage("");
+      revokeAllPreviewBlobs();
       resetForm();
+      removeDraftFromLocal();
       setSelectedImageIndex(0);
 
       navigate("/", {
@@ -166,11 +404,18 @@ const PreviewStep = () => {
       });
     } catch (error) {
       setPublishStage("");
-      toast.error(
+      const code = error?.response?.data?.code;
+      const message =
         error?.response?.data?.message ||
-          error?.message ||
-          "Something went wrong",
-      );
+        error?.message ||
+        "Something went wrong";
+      // Plan cap hit after the full form + uploads: show the upgrade
+      // modal instead of a dead-end toast.
+      if (code === "LISTING_LIMIT" || /listing limit/i.test(message)) {
+        setLimitInfo({ message });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
       setPublishStage("");
@@ -189,7 +434,7 @@ const PreviewStep = () => {
     <div className="w-full min-w-0 shadow-sm font-figtree">
       {/* Success Banner */}
       <div className="rounded-xl bg-[#F0F9F4] border border-[#D7F0DE] px-4 py-4 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full bg-[#F7F8FA] flex items-center justify-center">
           <MdVerified className="text-[#16A34A]" size={24} />
         </div>
 
@@ -205,23 +450,31 @@ const PreviewStep = () => {
       </div>
 
       {/* Main Product Card */}
-      <div className="mt-5 shadow-sm rounded-xl border bg-white p-4 md:p-8">
+      <div className="mt-5 shadow-sm rounded-xl border bg-[#F7F8FA] p-4 md:p-8">
         <div className="grid grid-cols-1 xl:grid-cols-[520px_minmax(0,1fr)] gap-9">
           {/* LEFT */}
           <div>
-            {/* Main Image */}
+            {/* Main Image (index clamped: removing photos never strands the viewer on a missing slot) */}
             <div className="overflow-hidden rounded-2xl border border-[#ECECEC]">
-              {formData.imagePreviews?.[0] ? (
-                <img
-                  src={formData.imagePreviews?.[selectedImageIndex]?.preview}
-                  alt="Product"
-                  className="w-full aspect-square object-cover transition-all duration-300"
-                />
-              ) : (
-                <div className="w-full aspect-square bg-[#F9FAFB] flex items-center justify-center text-[#9CA3AF]">
-                  No Image
-                </div>
-              )}
+              {(() => {
+                const previews = formData.imagePreviews || [];
+                const safeIndex = Math.min(
+                  selectedImageIndex,
+                  Math.max(0, previews.length - 1),
+                );
+                const current = previews[safeIndex];
+                return current?.preview ? (
+                  <img
+                    src={current.preview}
+                    alt="Product"
+                    className="w-full aspect-square object-cover transition-all duration-300"
+                  />
+                ) : (
+                  <div className="w-full aspect-square bg-[#F9FAFB] flex items-center justify-center text-[#9CA3AF]">
+                    No Image
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Thumbnails */}
@@ -296,7 +549,7 @@ const PreviewStep = () => {
                 <p className="text-[15px] text-[#454655]">
                   Campus:{" "}
                   <span className="font-semibold text-[#111827]">
-                    VIT Vellore
+                    {campus?.name || "Your campus"}
                   </span>
                 </p>
               </div>
@@ -389,7 +642,7 @@ const PreviewStep = () => {
         <div className="mt-14 flex flex-col items-center">
           {/* Publish */}
           <button
-            onClick={handlePublish}
+            onClick={isEditMode ? handleSaveChanges : handlePublish}
             disabled={loading}
             className={`w-full max-w-[360px] h-[62px] rounded-2xl font-bold text-lg transition-all duration-200
               
@@ -401,13 +654,13 @@ const PreviewStep = () => {
           >
             {loading ? (
               <div className="flex items-center justify-center gap-3">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <BrandLoader size="xs" tone="white" />
                 <span>{publishStage}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 justify-center">
-                <span>Publish Now</span>
-                <GoRocket />
+                <span>{isEditMode ? "Save Changes" : "Publish Now"}</span>
+                {!isEditMode && <GoRocket />}
               </div>
             )}
           </button>
@@ -419,21 +672,33 @@ const PreviewStep = () => {
               className="flex items-center gap-2 text-[#4B5563] hover:text-[#111827]"
             >
               <HiOutlinePencil size={16} />
-              Edit Listing
+              {isEditMode ? "Back to Edit" : "Edit Listing"}
             </button>
 
-            <div className="w-[4px] h-[4px] rounded-full bg-[#D1D5DB]" />
-
-            <button
-              disabled={loading}
-              onClick={handleSaveDraft}
-              className="text-[#4B5563] hover:text-[#111827]"
-            >
-              Save as Draft
-            </button>
+            {/* Only show Save as Draft for new listings (not edit mode) */}
+            {!isEditMode && (
+              <>
+                <div className="w-[4px] h-[4px] rounded-full bg-[#D1D5DB]" />
+                <button
+                  disabled={loading}
+                  onClick={handleSaveDraft}
+                  className="text-[#4B5563] hover:text-[#111827]"
+                >
+                  Save as Draft
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {limitInfo && (
+        <LimitModal
+          title="You're out of listings"
+          message={limitInfo.message}
+          onClose={() => setLimitInfo(null)}
+        />
+      )}
     </div>
   );
 };

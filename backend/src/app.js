@@ -1,38 +1,58 @@
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import helmet from "helmet";
 
 import xss from "xss";
+import rateLimit from "express-rate-limit";
 
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
 import productRouter from "./routes/product.routes.js";
 import reportRouter from "./routes/report.routes.js";
-import addressRouter from "./routes/address.routes.js";
+import pickupSpotRouter from "./routes/pickupSpot.routes.js";
 import imagekitRouter from "./routes/imagekit.routes.js";
 import wishlistRouter from "./routes/wishlist.routes.js";
+import campusRouter from "./routes/campus.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import boostRouter from "./routes/boost.routes.js";
 import chatRouter from "./routes/chat.routes.js";
+import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js";
+import badgeRouter from "./routes/badgeRoutes.js";
+import rewardRouter from "./routes/rewardRoutes.js";
+import handoffRouter from "./routes/handoff.routes.js";
+import conversationRouter from "./routes/conversation.route.js";
+import dealRouter from "./routes/deal.route.js";
+import orderRouter from "./routes/order.routes.js";
+import notificationRouter from "./routes/notification.routes.js";
+// [SITE-LOCK] testing gate — delete these 2 imports to remove the lock
+import siteGateRouter from "./routes/siteGate.routes.js";
+import { requireSiteGate } from "./middlewares/siteGate.middleware.js";
+import { verifyOrigin } from "./middlewares/csrf.middleware.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
 
+// Behind Render/ELB the client IP comes from X-Forwarded-For — required
+// for express-rate-limit to key per client instead of per proxy.
+app.set("trust proxy", 1);
+
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.ADMIN_FRONTEND_URL,
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:5174",
-  "http://192.168.0.104:5173",
 ]
   .filter(Boolean)
   .flatMap((origin) => origin.split(","))
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+// In non-production, allow local dev origins alongside configured ones.
+const isProduction = process.env.NODE_ENV === "production";
+const devOrigins = isProduction
+  ? []
+  : ["http://localhost:5173", "http://127.0.0.1:5173"];
 
 // Protection against XSS attacks, clickjacking, malicious headers
 app.use(
@@ -41,13 +61,86 @@ app.use(
   }),
 );
 
+
+// Prevent NoSQL injection - deep sanitize body, params, query, cookies
+app.use((req, res, next) => {
+  const sanitize = (obj, seen = new WeakSet()) => {
+    if (!obj || typeof obj !== "object" || seen.has(obj)) return;
+    seen.add(obj);
+
+    for (const key of Object.keys(obj)) {
+      if (key.includes("$") || key.includes(".")) {
+        delete obj[key];
+        continue;
+      }
+      const val = obj[key];
+      if (typeof val === "object" && val !== null) {
+        sanitize(val, seen);
+      }
+    }
+  };
+
+  sanitize(req.body);
+  sanitize(req.params);
+  // req.query is a getter in Express 5 - sanitize in place when possible,
+  // otherwise replace with a cleaned copy.
+  try {
+    if (req.query && typeof req.query === "object") {
+      sanitize(req.query);
+    }
+  } catch {
+    // ignore - query validation happens downstream
+  }
+  if (req.cookies && typeof req.cookies === "object") {
+    sanitize(req.cookies);
+  }
+
+  next();
+});
+
+// Prevent XSS attacks - deep sanitize strings in body/params/query
+app.use((req, res, next) => {
+  const sanitizeStrings = (obj, seen = new WeakSet()) => {
+    if (!obj || typeof obj !== "object" || seen.has(obj)) return;
+    seen.add(obj);
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (typeof val === "string") {
+        obj[key] = xss(val);
+      } else if (Array.isArray(val)) {
+        for (let i = 0; i < val.length; i++) {
+          if (typeof val[i] === "string") val[i] = xss(val[i]);
+          else if (typeof val[i] === "object" && val[i] !== null)
+            sanitizeStrings(val[i], seen);
+        }
+      } else if (typeof val === "object" && val !== null) {
+        sanitizeStrings(val, seen);
+      }
+    }
+  };
+
+  if (req.body) sanitizeStrings(req.body);
+  if (req.params) sanitizeStrings(req.params);
+  try {
+    if (req.query) sanitizeStrings(req.query);
+  } catch {
+    // ignore
+  }
+
+  next();
+});
+
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Non-browser clients (curl, Postman, health checks) send no Origin.
+      // Allow them without credentials risk since CSRF requires a browser Origin.
+      if (!origin) {
+        return callback(null, true);
+      }
       if (
-        !origin ||
-        allowedOrigins.length === 0 ||
-        allowedOrigins.includes(origin)
+        allowedOrigins.includes(origin) ||
+        devOrigins.includes(origin)
       ) {
         return callback(null, true);
       }
@@ -59,79 +152,102 @@ app.use(
   }),
 );
 
-// Body parsing with 25mb limit for images/attachments
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ limit: "25mb", extended: true }));
+// Additive route guards (no behavior change to existing handlers):
+// - Razorpay retries legitimately burst, so the webhook gets a high 100/min
+//   ceiling that only blocks floods.
+// - Admin reads across all /api/admin GETs get a shared 60/min ceiling
+//   (writes/mutations untouched).
+const paymentWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many webhook deliveries, try later" },
+});
+
+const adminReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests, try later" },
+});
+
+// Razorpay webhook needs the RAW body for HMAC verification. It MUST be
+// registered BEFORE express.json(): json() would otherwise consume the
+// request stream, leaving express.raw with an empty body and every
+// legitimate webhook failing signature check. Sanitizers above safely skip
+// the unparsed body (req.body is undefined at that point).
+// (POST /api/payments/webhook, no auth — the HMAC signature is the auth.)
+app.post(
+  "/api/payments/webhook",
+  paymentWebhookLimiter,
+  express.raw({ type: "application/json", limit: "1mb" }),
+  paymentWebhookHandler,
+);
+
+app.use(express.json({ limit: "10kb" })); // To prevent large payload attacks
+app.use(express.urlencoded({ extended: true, limit: "10kb" })); // Handles form data from frontend
 app.use(cookieParser());
 
-// Prevent NoSQL injection
-app.use((req, res, next) => {
-  const sanitize = (obj) => {
-    if (!obj || typeof obj !== "object") return;
-
-    for (let key in obj) {
-      if (key === "attachments" || key === "data") continue;
-      if (key.includes("$") || key.includes(".")) {
-        delete obj[key];
-      } else if (typeof obj[key] === "object") {
-        sanitize(obj[key]);
-      }
-    }
-  };
-
-  if (req.body) sanitize(req.body);
-  if (req.params) sanitize(req.params);
-
-  next();
-});
-
-// Prevent XSS attacks
-app.use((req, res, next) => {
-  if (req.body) {
-    for (const key in req.body) {
-      if (key === "attachments" || key === "data") continue;
-      if (typeof req.body[key] === "string" && !req.body[key].startsWith("data:image/")) {
-        req.body[key] = xss(req.body[key]);
-      }
-    }
-  }
-
-  if (req.params) {
-    for (const key in req.params) {
-      if (typeof req.params[key] === "string") {
-        req.params[key] = xss(req.params[key]);
-      }
-    }
-  }
-
-  next();
-});
-
-// Logging in Development mode only
+// Logging in Development mode only - redact secrets from URLs
 if (process.env.NODE_ENV !== "production") {
-  app.use(morgan("dev"));
+  morgan.token("redacted-url", (req) => {
+    try {
+      const url = req.originalUrl || req.url || "";
+      return url
+        .replace(/(oauth_code|code|token)=[^&]*/gi, "$1=[REDACTED]")
+        .replace(/([?&]k=)[^&]*/gi, "$1[REDACTED]")
+        .replace(/\/reset-password\/[^/\s?]+/gi, "/reset-password/[REDACTED]");
+    } catch {
+      return req.url;
+    }
+  });
+  app.use(morgan(":method :redacted-url :status :response-time ms"));
 }
 
-// Health check route
+// Health check route (minimal — no uptime/internals for fingerprinting)
 app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "OK",
-    uptime: process.uptime(),
-    timestamp: new Date(),
-  });
+  res.status(200).json({ status: "OK" });
 });
 
+// Gzip JSON + thumbs metadata (threshold keeps tiny auth payloads fast).
+app.use(compression({ threshold: 1024 }));
+
+// [SITE-LOCK] testing gate — delete this block to remove the lock
+// (must run after cookieParser, before every router).
+// Exempts itself, /health, and the Razorpay webhook. Kill-switch via
+// SITE_GATE_ENABLED=false.
+app.use("/api/site-gate", siteGateRouter);
+app.use(requireSiteGate);
+// [/SITE-LOCK]
+
 // Routes
+app.use(verifyOrigin);
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
 app.use("/api/product", productRouter);
 app.use("/api/report", reportRouter);
-app.use("/api/address", addressRouter);
+app.use("/api/pickup-spots", pickupSpotRouter);
 app.use("/api/imagekit", imagekitRouter);
 app.use("/api/wishlist", wishlistRouter);
-app.use("/api/admin", adminRouter);
+app.use("/api/campuses", campusRouter);
+app.use(
+  "/api/admin",
+  (req, res, next) =>
+    req.method === "GET" ? adminReadLimiter(req, res, next) : next(),
+  adminRouter,
+);
 app.use("/api/boost", boostRouter);
 app.use("/api/chat", chatRouter);
+app.use("/api/payments", paymentRouter);
+app.use("/api/badges", badgeRouter);
+app.use("/api/rewards", rewardRouter);
+app.use("/api/handoff", handoffRouter);
+app.use("/api/conversations", conversationRouter);
+app.use("/api/deals", dealRouter);
+app.use("/api/orders", orderRouter);
+app.use("/api/notifications", notificationRouter);
 
 // If no route matches
 app.use((req, res) => {
@@ -141,13 +257,41 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler
+// Global error handler - never leak internals, preserve status codes
 app.use((err, req, res, next) => {
-  const statusCode = err.statusCode || 400;
+  // CORS origin rejection: blocked before any route logic — no stack needed.
+  if (err && /not allowed by cors/i.test(err.message || "")) {
+    return res.status(403).json({ success: false, message: "Origin not allowed" });
+  }
+
+  const statusCode = err.statusCode || err.status || 500;
+
+  // Log full error server-side only
+  console.error(err);
+
+  // Map known DB/driver errors to safe messages without leaking details
+  let message = err.message || "Something went wrong";
+  if (err.name === "CastError") {
+    return res.status(400).json({ success: false, message: "Invalid ID format" });
+  }
+  if (err.code === 11000) {
+    return res.status(409).json({ success: false, message: "Duplicate entry" });
+  }
+  if (err.name === "ValidationError") {
+    return res.status(400).json({ success: false, message: "Validation failed" });
+  }
+  // Don't expose 5xx internals to clients
+  if (statusCode >= 500) {
+    message = "Internal server error";
+  }
 
   return res.status(statusCode).json({
     success: false,
-    message: err.message || "Something went wrong",
+    message,
+    ...(err.code ? { code: err.code } : {}),
+    ...(typeof err.retryAfterMs === "number"
+      ? { retryAfterMs: err.retryAfterMs }
+      : {}),
   });
 });
 

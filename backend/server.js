@@ -1,10 +1,19 @@
 import dotenv from "dotenv";
 dotenv.config({ override: true });
 
+if (!process.env.SECRET_KEY_ACCESS_TOKEN || !process.env.SECRET_KEY_REFRESH_TOKEN) {
+  console.error("Missing JWT secrets (SECRET_KEY_ACCESS_TOKEN / SECRET_KEY_REFRESH_TOKEN)");
+  process.exit(1);
+}
+
+import http from "http";
 import app from "./src/app.js";
 import { connectDB } from "./src/config/db.js";
 import { scheduleCleanupDeletedProducts } from "./src/jobs/cleanupDeletedProducts.job.js";
 import { scheduleExpireBoosts } from "./src/jobs/expireBoosts.job.js";
+import { scheduleExpireSubscriptions } from "./src/jobs/expireSubscriptions.job.js";
+import { scheduleDispatchNotifications } from "./src/jobs/dispatchScheduledNotifications.job.js";
+import { initSockets } from "./src/sockets/index.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -14,8 +23,13 @@ const startServer = async () => {
 
     scheduleCleanupDeletedProducts();
     scheduleExpireBoosts();
+    scheduleExpireSubscriptions();
+    scheduleDispatchNotifications();
 
-    app.listen(PORT, () => {
+    const httpServer = http.createServer(app);
+    initSockets(httpServer);
+
+    httpServer.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
   } catch (error) {

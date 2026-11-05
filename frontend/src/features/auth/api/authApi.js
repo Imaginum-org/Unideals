@@ -17,8 +17,13 @@ export const exchangeGoogleOAuthCode = (data) => {
   return axios.post(`${AUTH_BASE_PATH}/google/exchange`, data);
 };
 
-export const logoutUser = () => {
-  return axios.get(`${AUTH_BASE_PATH}/logoutUser`);
+export const loginWithGoogleOneTap = (data) => {
+  return axios.post(`${AUTH_BASE_PATH}/google/one-tap`, data);
+};
+
+export const logoutUser = async () => {
+  // Backend contract is POST-only (GET would be a logout-CSRF vector).
+  return axios.post(`${AUTH_BASE_PATH}/logoutUser`);
 };
 
 export const forgotPassword = (data) =>

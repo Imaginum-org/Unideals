@@ -7,8 +7,8 @@ import {
   getBoostSummary,
   getUserProducts,
 } from "../api/productApi.js";
-import toast from "react-hot-toast";
-import Loader from "../../../Components/ui/Loader.jsx";
+import { toast } from "../../../components/ui/toast.js";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { FiPlus } from "react-icons/fi";
 import {
   EyeIcon,
@@ -135,11 +135,22 @@ function ProductListed() {
     return res;
   };
 
+  // Merges a listing updated by a one-time paid boost purchase.
+  const handleBoostApplied = (updatedProduct) => {
+    if (!updatedProduct?._id) return;
+    setProducts((prev) =>
+      prev.map((p) =>
+        p._id === updatedProduct._id ? { ...p, ...updatedProduct } : p,
+      ),
+    );
+    fetchBoostSummary();
+  };
+
   return (
-    <div className="w-full h-screen overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
+    <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
       <div className="flex h-[calc(100vh-70px)] ">
         {/* LEFT PANEL */}
-        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
+        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
           <Profile_left_part />
         </div>
 
@@ -176,7 +187,7 @@ function ProductListed() {
 
             {/* 2. Stats Grid */}
             <div className="grid grid-cols-3 gap-2 md:grid-cols-4 md:gap-5 mb-5">
-              <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+              <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                 <div className="text-gray-400 dark:text-gray-500">
                   <EyeIcon size={20} className="text-black" />
                 </div>
@@ -189,7 +200,7 @@ function ProductListed() {
                   </div>
                 </div>
               </div>
-              <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+              <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                 <div className="text-gray-400 dark:text-gray-500">
                   <HeartIcon size={20} className="text-pink-600" />
                 </div>
@@ -202,20 +213,20 @@ function ProductListed() {
                   </div>
                 </div>
               </div>
-              <div className="bg-white dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+              <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                 <div className="text-gray-400 dark:text-gray-500">
                   <MessageCircleIcon size={20} className="text-blue-600" />
                 </div>
                 <div>
                   <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                    17
+                    -
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     Chats
                   </div>
                 </div>
               </div>
-              <div className="col-span-3 md:col-span-1 bg-white dark:bg-[#1c1c1c] border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-4 flex items-center justify-between md:block shadow-sm">
+              <div className="col-span-3 md:col-span-1 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-4 flex items-center justify-between md:block shadow-sm">
                 <div>
                   <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
                     {boostSummary
@@ -255,14 +266,14 @@ function ProductListed() {
             <div className="flex flex-col gap-5 pb-10">
               {loading ? (
                 <div className="flex justify-center items-center py-12">
-                  <Loader />
+                  <BrandLoader size="md" />
                 </div>
               ) : error ? (
-                <div className="py-8 text-center text-red-500 dark:text-red-400 bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
+                <div className="py-8 text-center text-red-500 dark:text-red-400 bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
                   {error}
                 </div>
               ) : filteredProducts.length === 0 ? (
-                <div className="py-12 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
+                <div className="py-12 text-center text-gray-500 dark:text-gray-400 bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
                   No products found for "{activeTab}"
                 </div>
               ) : (
@@ -296,6 +307,7 @@ function ProductListed() {
                     boostExpiresAt={p.boost_expires_at}
                     boostTier={p.boost_tier}
                     onBoostProduct={handleBoostProduct}
+                    onBoostApplied={handleBoostApplied}
                   />
                 ))
               )}

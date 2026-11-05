@@ -5,19 +5,30 @@ export const getUserProfile = () => axios.get("/api/user/userProfile");
 export const updateProfile = (data) =>
   axios.put("/api/user/updateProfile", data);
 
+export const requestGenderChange = (requestedGender) =>
+  axios.post("/api/user/requestGenderChange", { requestedGender });
+
+export const getGenderChangeStatus = () =>
+  axios.get("/api/user/genderChangeStatus");
+
+export const updateChatSettings = (data) =>
+  axios.put("/api/user/chatSettings", data);
+
 export const updateAvatar = (data) => axios.put("/api/user/updateAvatar", data);
 
 export const removeAvatar = () => axios.delete("/api/user/removeAvatar");
 
-export const deleteAccount = () => axios.delete("/api/user/deleteAccount");
+export const deleteAccount = (data = {}) =>
+  axios.delete("/api/user/deleteAccount", { data });
 
-export const createAddress = (data) => axios.post("/api/address", data);
+export const createPickupSpot = (data) => axios.post("/api/pickup-spots", data);
 
-export const getUserAddresses = () => axios.get("/api/address");
+export const getUserPickupSpots = () => axios.get("/api/pickup-spots");
 
-export const updateAddress = (id, data) =>
-  axios.put(`/api/address/${id}`, data);
+export const updatePickupSpot = (id, data) =>
+  axios.put(`/api/pickup-spots/${id}`, data);
 
-export const deleteAddress = (id) => axios.delete(`/api/address/${id}`);
+export const deletePickupSpot = (id) => axios.delete(`/api/pickup-spots/${id}`);
 
-export const setDefaultAddress = (id) => axios.patch(`/api/address/${id}`);
+export const setPrimaryPickupSpot = (id) =>
+  axios.patch(`/api/pickup-spots/${id}/primary`);

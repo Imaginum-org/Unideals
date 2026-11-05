@@ -1,12 +1,17 @@
-import { useRef, useState, useEffect } from "react";
-import toast from "react-hot-toast";
+import { useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "../../../components/ui/toast.js";
 import { HiOutlineTrash } from "react-icons/hi";
 import useProductListing from "../hooks/useProductListing";
+import PhoneHandoffCard from "../../handoff/components/PhoneHandoffCard.jsx";
 import { RiCameraAiLine } from "react-icons/ri";
 import { IoArrowForward } from "react-icons/io5";
+import { FaDesktop, FaMobileAlt } from "react-icons/fa";
 import { validateImages } from "../validations";
 
 const MAX_IMAGES = 3;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_TOTAL_SIZE = 30 * 1024 * 1024;
 
 const ImagesStep = () => {
   const fileInputRef = useRef(null);
@@ -15,25 +20,46 @@ const ImagesStep = () => {
     useProductListing();
 
   const [isDragging, setIsDragging] = useState(false);
-
-  useEffect(() => {
-    return () => {
-      formData.imagePreviews?.forEach((item) => {
-        if (item?.preview?.startsWith("blob:")) {
-          URL.revokeObjectURL(item.preview);
-        }
-      });
-    };
-  }, []);
+  const [fileErrors, setFileErrors] = useState([]);
+  // Tabbed upload source: "pc" | "mobile". Single dashed box below swaps
+  // its inner content based on this (per final UI).
+  const [uploadSource, setUploadSource] = useState("pc");
+  // Tracks phone-delivered fileIds so repeat polls never re-add them.
+  const phoneFileIds = useRef(new Set());
+  // Live mirror of blob URLs so removing a photo frees its memory.
+  // NOTE: never revoke on unmount — the Preview step renders these same
+  // blob URLs after this step unmounts. Revoke-all happens once after a
+  // successful publish/save (see PreviewStep).
+  const blobUrlsRef = useRef(new Set());
+  const previewsRef = useRef([]);
+  previewsRef.current = formData.imagePreviews || [];
+  const trackBlob = (url) => {
+    if (url?.startsWith("blob:")) blobUrlsRef.current.add(url);
+  };
+  const untrackBlob = (url) => {
+    if (url?.startsWith("blob:")) {
+      blobUrlsRef.current.delete(url);
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   // PROCESS FILES
-  const processFiles = async (files) => {
-    const fileArray = Array.from(files);
+  // Builds a combined [existing..., new...] array, validates, then splits back
+  // into images[] (File blobs) + imagePreviews[] (UI). Duplicate detection via
+  // size+name Set; total payload capped at 30MB across all new files.
+  const processFiles = async (files) => {    const fileArray = Array.from(files);
+    setFileErrors([]);
 
-    const remainingSlots = MAX_IMAGES - formData.images.length;
+    const remainingSlots = MAX_IMAGES - (formData.imagePreviews?.length || 0);
 
     if (remainingSlots <= 0) {
-      toast.error(`Maximum ${MAX_IMAGES} images allowed`);
+      const msg = `Maximum ${MAX_IMAGES} images allowed`;
+      setFileErrors([msg]);
+      toast.error(msg);
 
       return;
     }
@@ -43,41 +69,68 @@ const ImagesStep = () => {
     const validFiles = [];
 
     const previewItems = [];
+    const issues = [];
+
+    // Dedup keys for already-attached blobs (name+size is enough for UX dupes).
+    const seen = new Set(
+      (formData.images || []).map((f) => `${f?.name || ""}__${f?.size || 0}`),
+    );
+    const currentTotal = (formData.images || []).reduce(
+      (sum, f) => sum + (Number(f?.size) || 0),
+      0,
+    );
+    let pendingTotal = currentTotal;
 
     for (const file of selectedFiles) {
       // File Validation
       if (!(file instanceof File)) {
-        console.warn("Skipping invalid file:", file);
         continue;
       }
 
-      // File Type Validation
-      if (
-        !["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(
-          file.type,
-        )
-      ) {
+      // Duplicate-byte heuristic: same name + same byte size as an attached file.
+      const dupeKey = `${file.name || ""}__${file.size || 0}`;
+      if (seen.has(dupeKey)) {
+        issues.push(`${file.name}: duplicate image already added`);
+        continue;
+      }
+
+      // File Type Validation - MIME + extension double-check (prevents spoofing)
+      // Note: image/svg+xml deliberately excluded to prevent stored XSS
+      const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+      const allowedExts = ["png", "jpg", "jpeg", "webp"];
+      const ext = String(file.name || "").split(".").pop()?.toLowerCase() || "";
+      if (!allowedTypes.includes(file.type) || !allowedExts.includes(ext)) {
+        issues.push(`${file.name}: not a supported image format`);
         toast.error(`${file.name} is not a supported image format`);
         continue;
       }
 
-      // File Size Validation
-      const MAX_SIZE = 10 * 1024 * 1024;
-
-      if (file.size > MAX_SIZE) {
+      // File Size Validation (per-file 10MB, total 30MB across new files)
+      if (file.size > MAX_FILE_SIZE) {
+        issues.push(`${file.name}: exceeds 10MB limit`);
         toast.error(`${file.name} exceeds 10MB limit`);
         continue;
       }
+      if (pendingTotal + file.size > MAX_TOTAL_SIZE) {
+        issues.push(`${file.name}: total images exceed 30MB cap`);
+        toast.error(`${file.name} would exceed the 30MB total cap`);
+        continue;
+      }
 
+      seen.add(dupeKey);
+      pendingTotal += file.size;
       validFiles.push(file);
 
+      const previewUrl = URL.createObjectURL(file);
+      trackBlob(previewUrl);
       previewItems.push({
         id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
 
-        preview: URL.createObjectURL(file),
+        preview: previewUrl,
       });
     }
 
+    if (issues.length > 0) setFileErrors(issues);
     if (validFiles.length === 0) return;
 
     updateField("images", [...formData.images, ...validFiles]);
@@ -92,51 +145,101 @@ const ImagesStep = () => {
     e.target.value = null;
   };
 
-  // REMOVE IMAGE
+  // PHONE HANDOFF: convert freshly uploaded ImageKit URLs back into File
+  // objects so the rest of the flow (validation, previews, compression,
+  // publish upload) treats them exactly like laptop-picked files.
+  // Stable ref pattern: polls fire seconds after render, so the handler
+  // must always see the LATEST formData, never a stale closure.
+  const processFilesRef = useRef(null);
+  processFilesRef.current = (files) => processFiles(files);
+  // Live mirror of attached-preview count for the same reason.
+  const previewsCountRef = useRef(0);
+  previewsCountRef.current = formData.imagePreviews?.length || 0;
+
+  const handlePhonePhotos = useCallback(async (images) => {
+    const fresh = (images || []).filter((img) => {
+      if (!img?.url || phoneFileIds.current.has(img.fileId)) return false;
+      phoneFileIds.current.add(img.fileId);
+      return true;
+    });
+    if (fresh.length === 0) return;
+
+    // Enforce hybrid slots at attach time too: laptop picks made after the
+    // QR was generated can otherwise overflow the 3-photo cap silently.
+    const room = MAX_IMAGES - previewsCountRef.current;
+    if (room <= 0) {
+      toast.error("All 3 photo slots are full. Remove one first.");
+      return;
+    }
+    if (fresh.length > room) {
+      toast(`Only ${room} more fit, attaching the first ${room}.`);
+      fresh.splice(room);
+    }
+
+    try {
+      const files = await Promise.all(
+        fresh.map(async (img, index) => {
+          const res = await fetch(img.url);
+          if (!res.ok) throw new Error(`Download failed (${res.status})`);
+          const blob = await res.blob();
+          const ext = (blob.type.split("/")[1] || "jpg").replace(/[^a-z]/g, "");
+          return new File([blob], `phone-photo-${Date.now()}-${index}.${ext}`, {
+            type: blob.type || "image/jpeg",
+          });
+        }),
+      );
+      processFilesRef.current(files);
+    } catch {
+      toast.error("Could not attach phone photos. Please try again.");
+    }
+  }, []);
+
+  // REMOVE IMAGE — operate on the combined [preview+file] array (existing
+  // and new interleaved by cover order), then split back into images[] +
+  // imagePreviews[]. This keeps blob indexes correct after cover reorders.
+  const splitCombined = (combined) => ({
+    previews: combined.map((c) => c.preview),
+    files: combined.filter((c) => !c.preview?.isExisting).map((c) => c.file),
+  });
+
+  const buildCombined = () => {
+    let cursor = 0;
+    return (formData.imagePreviews || []).map((p) => {
+      if (p?.isExisting) return { preview: p, file: null };
+      const file = formData.images?.[cursor] || null;
+      cursor += 1;
+      return { preview: p, file };
+    });
+  };
+
   const handleRemoveImage = (index) => {
-    const updatedImages = [...formData.images];
-
-    const updatedPreviews = [...formData.imagePreviews];
-
-    updatedImages.splice(index, 1);
-
-    URL.revokeObjectURL(updatedPreviews[index].preview);
-
-    updatedPreviews.splice(index, 1);
-
-    updateField("images", updatedImages);
-
-    updateField("imagePreviews", updatedPreviews);
+    const combined = buildCombined();
+    const [removed] = combined.splice(index, 1);
+    if (!removed) return;
+    // Revoke blob URL for locally-picked files.
+    if (!removed.preview?.isExisting && removed.preview?.preview) {
+      untrackBlob(removed.preview.preview);
+    }
+    const { previews, files } = splitCombined(combined);
+    updateField("imagePreviews", previews);
+    updateField("images", files);
   };
 
   const handleSetCover = (index) => {
     if (index === 0) return;
-
-    const updatedPreviews = [...formData.imagePreviews];
-
-    const selectedPreview = updatedPreviews[index];
-
-    updatedPreviews.splice(index, 1);
-
-    updatedPreviews.unshift(selectedPreview);
-
-    const updatedImages = [...formData.images];
-
-    const selectedImage = updatedImages[index];
-
-    updatedImages.splice(index, 1);
-
-    updatedImages.unshift(selectedImage);
-
-    updateField("imagePreviews", updatedPreviews);
-
-    updateField("images", updatedImages);
+    const combined = buildCombined();
+    const [selected] = combined.splice(index, 1);
+    if (!selected) return;
+    combined.unshift(selected);
+    const { previews, files } = splitCombined(combined);
+    updateField("imagePreviews", previews);
+    updateField("images", files);
   };
 
-  // DRAG EVENTS
+  // DRAG EVENTS (PC tab only — mobile tab owns its own clicks for QR)
   const handleDragOver = (e) => {
     e.preventDefault();
-
+    if (uploadSource !== "pc") return;
     setIsDragging(true);
   };
 
@@ -146,14 +249,18 @@ const ImagesStep = () => {
 
   const handleDrop = (e) => {
     e.preventDefault();
-
     setIsDragging(false);
-
+    if (uploadSource !== "pc") return;
     processFiles(e.dataTransfer.files);
   };
 
+  const handleBoxClick = () => {
+    if (uploadSource !== "pc") return;
+    fileInputRef.current?.click();
+  };
+
   return (
-    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-white shadow-sm p-5 sm:p-7 md:p-8">
+    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8">
       {/* Header */}
       <div>
         <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
@@ -166,20 +273,178 @@ const ImagesStep = () => {
       </div>
 
       <div data-field="images">
-        {/* Upload Area */}
+        {/* Source tabs — Sell-button language, single dashed box below */}
+        <div className="mt-4 flex flex-wrap items-end gap-3 pl-2" role="tablist" aria-label="Choose how to upload photos">
+          {/* PC tab — active tab sits flush on the box (folder-tab joint) */}
+          <div className={`relative transition-all duration-200 ${uploadSource === "pc" ? "" : "mb-[6px]"}`}>
+            <motion.button
+              type="button"
+              role="tab"
+              aria-selected={uploadSource === "pc"}
+              onClick={() => setUploadSource("pc")}
+              initial={false}
+              animate={{
+                borderBottomLeftRadius: uploadSource === "pc" ? 0 : 8,
+                borderBottomRightRadius: uploadSource === "pc" ? 0 : 8,
+              }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className={`flex shrink-0 items-center gap-2 rounded-t-lg px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:scale-[1.02] active:scale-[0.98] md:px-5 md:text-base ${
+                uploadSource === "pc"
+                  ? "bg-[#3838EC] text-[#FCFCFC] shadow-lg shadow-indigo-200"
+                  : "rounded-b-lg border border-[#3838EC]/25 bg-white text-[#3838EC] hover:border-[#3838EC]/60 hover:bg-[#EEF2FF] dark:border-[#6366F1]/40 dark:bg-transparent dark:text-[#A5B0FF] dark:hover:bg-[#6366F1]/10"
+              }`}
+            >
+              <FaDesktop className="size-4" />
+              <span>Browse files</span>
+            </motion.button>
+            {/* Concave corner notches: ease the tab's bottom corners into
+                the box's top dashed border so both read as one closed shape. */}
+            <AnimatePresence>
+              {uploadSource === "pc" && (
+                <>
+                  <motion.svg
+                    key="pc-notch-l"
+                    viewBox="0 0 10 10"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="pointer-events-none absolute -left-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <motion.path
+                      d="M10 0 Q10 10 0 10"
+                      fill="none"
+                      stroke="#3838EC"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </motion.svg>
+                  <motion.svg
+                    key="pc-notch-r"
+                    viewBox="0 0 10 10"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="pointer-events-none absolute -right-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <motion.path
+                      d="M0 0 Q0 10 10 10"
+                      fill="none"
+                      stroke="#3838EC"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </motion.svg>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Mobile tab — active tab sits flush on the box (folder-tab joint) */}
+          <div className={`relative transition-all duration-200 ${uploadSource === "mobile" ? "" : "mb-[6px]"}`}>
+            <motion.button
+              type="button"
+              role="tab"
+              aria-selected={uploadSource === "mobile"}
+              onClick={() => setUploadSource("mobile")}
+              initial={false}
+              animate={{
+                borderBottomLeftRadius: uploadSource === "mobile" ? 0 : 8,
+                borderBottomRightRadius: uploadSource === "mobile" ? 0 : 8,
+              }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className={`flex shrink-0 items-center gap-2 rounded-t-lg px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:scale-[1.02] active:scale-[0.98] md:px-5 md:text-base ${
+                uploadSource === "mobile"
+                  ? "bg-[#3838EC] text-[#FCFCFC] shadow-lg shadow-indigo-200"
+                  : "rounded-b-lg border border-[#3838EC]/25 bg-white text-[#3838EC] hover:border-[#3838EC]/60 hover:bg-[#EEF2FF] dark:border-[#6366F1]/40 dark:bg-transparent dark:text-[#A5B0FF] dark:hover:bg-[#6366F1]/10"
+              }`}
+            >
+              <FaMobileAlt className="size-4" />
+              <span>Scan with phone</span>
+            </motion.button>
+            {/* Concave corner notches: ease the tab's bottom corners into
+                the box's top dashed border so both read as one closed shape. */}
+            <AnimatePresence>
+              {uploadSource === "mobile" && (
+                <>
+                  <motion.svg
+                    key="mobile-notch-l"
+                    viewBox="0 0 10 10"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="pointer-events-none absolute -left-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <motion.path
+                      d="M10 0 Q10 10 0 10"
+                      fill="none"
+                      stroke="#3838EC"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </motion.svg>
+                  <motion.svg
+                    key="mobile-notch-r"
+                    viewBox="0 0 10 10"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="pointer-events-none absolute -right-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <motion.path
+                      d="M0 0 Q0 10 10 10"
+                      fill="none"
+                      stroke="#3838EC"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </motion.svg>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Single dashed box — content swaps by tab */}
         <div
+          role="tabpanel"
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`mt-4 rounded-[28px] border-2 bg-[#F8FAFC] border-dashed p-8 md:p-10 transition-all duration-200 cursor-pointer
-        
+          onClick={handleBoxClick}
+          className={`mt-0 rounded-[28px] border-2 bg-[#F8FAFC] border-dashed p-8 transition-all duration-200 md:p-10 dark:bg-neutral-900/40
+        ${
+          uploadSource === "pc" ? "cursor-pointer" : "cursor-default"
+        }
         ${
           errors.images
             ? "border-red-500"
-            : isDragging
+            : isDragging && uploadSource === "pc"
               ? "border-[#4F46E5]"
-              : "border-[#D1D5DB]"
+              : "border-[#D1D5DB] dark:border-neutral-700"
         }`}
         >
           <input
@@ -187,37 +452,79 @@ const ImagesStep = () => {
             type="file"
             hidden
             multiple
-            accept="image/*"
+            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
             onChange={handleInputChange}
           />
 
-          <div className="flex flex-col items-center justify-center text-center">
-            {/* Icon */}
-            <div className="w-14 h-14 rounded-3xl bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5]">
-              <RiCameraAiLine size={25} />
-            </div>
-
-            {/* Heading */}
-            <h3 className="mt-2 text-base xl:text-lg font-bold text-[#181C1F]">
-              Drag & drop or click to browse
-            </h3>
-
-            {/* Description */}
-            <p className="mt-1 max-w-md text-sm md:text-base text-[#6B7280] leading-7">
-              Supports JPG, PNG and WEBP up to 10MB
-            </p>
-
-            {/* Info */}
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              <div className="rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-semibold text-[#4F46E5]">
-                Max {MAX_IMAGES} images
+          {/* PC pane */}
+          {uploadSource === "pc" && (
+            <motion.div
+              key="pc-pane"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col items-center justify-center text-center"
+            >
+              {/* Icon */}
+              <div className="w-14 h-14 rounded-3xl bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5]">
+                <RiCameraAiLine size={25} />
               </div>
-            </div>
+
+              {/* Heading */}
+              <h3 className="mt-2 text-base xl:text-lg font-bold text-[#181C1F] dark:text-white">
+                Drag & drop or click to browse
+              </h3>
+
+              {/* Description */}
+              <p className="mt-1 max-w-md text-sm md:text-base text-[#6B7280] leading-7">
+                Supports JPG, PNG and WEBP up to 10MB each · 30MB total
+              </p>
+
+              {/* Info */}
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <div className="rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-semibold text-[#4F46E5]">
+                  Max {MAX_IMAGES} images
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Mobile pane — always mounted so the QR session / polling
+              survives tab switches; only hidden with display:none. */}
+          <div
+            className={uploadSource === "mobile" ? "block" : "hidden"}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <motion.div
+              initial={false}
+              animate={
+                uploadSource === "mobile"
+                  ? { opacity: 1, y: 0 }
+                  : { opacity: 0, y: 12 }
+              }
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <PhoneHandoffCard
+                bare
+                onPhotos={handlePhonePhotos}
+                attachedCount={formData.imagePreviews?.length || 0}
+                remainingSlots={MAX_IMAGES - (formData.imagePreviews?.length || 0)}
+              />
+            </motion.div>
           </div>
         </div>
 
         {errors.images && (
           <p className="mt-3 text-sm text-red-500">{errors.images}</p>
+        )}
+        {fileErrors.length > 0 && (
+          <ul className="mt-3 space-y-1.5 rounded-xl border border-red-200 bg-red-50 p-3">
+            {fileErrors.map((msg, i) => (
+              <li key={i} className="text-xs font-medium leading-5 text-red-600">
+                • {msg}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
@@ -263,17 +570,24 @@ const ImagesStep = () => {
                   </button>
                 )}
 
-                {/* Image */}
-                <img
-                  src={imageItem.preview}
-                  alt={`Preview ${index}`}
-                  loading="lazy"
-                  draggable={false}
-                  onError={(e) => {
-                    e.currentTarget.src = "/images/placeholder-image.png";
-                  }}
-                  className="w-full aspect-square object-cover select-none"
-                />
+                {/* Image (guarded: a missing URL renders a tile, never the logo fallback) */}
+                {imageItem?.preview ? (
+                  <img
+                    src={imageItem.preview}
+                    alt={`Preview ${index}`}
+                    loading="lazy"
+                    draggable={false}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "/logo.svg";
+                    }}
+                    className="w-full aspect-square object-cover select-none"
+                  />
+                ) : (
+                  <div className="w-full aspect-square bg-[#F1F3F6] dark:bg-zinc-800 flex items-center justify-center text-xs font-semibold text-[#9CA3AF] select-none">
+                    No preview
+                  </div>
+                )}
 
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">
@@ -283,7 +597,7 @@ const ImagesStep = () => {
 
                       handleRemoveImage(index);
                     }}
-                    className="w-12 h-12 rounded-full bg-white text-red-500 flex items-center justify-center shadow-lg"
+                    className="w-12 h-12 rounded-full bg-[#F7F8FA] text-red-500 flex items-center justify-center shadow-lg"
                   >
                     <HiOutlineTrash size={22} />
                   </button>

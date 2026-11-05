@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiEye,
@@ -18,8 +18,20 @@ import {
   deleteProduct,
   unlistProduct,
   relistProduct,
+  getProductById,
 } from "../../product/api/productApi.js";
-import toast from "react-hot-toast";
+import {
+  createPaymentOrder,
+  verifyPayment,
+} from "../../payment/api/paymentApi.js";
+import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
+import LimitModal from "../../../components/ui/LimitModal.jsx";
+import { toast } from "../../../components/ui/toast.js";
+
+const BOOST_ADDONS = [
+  { id: "boost_3day", label: "3-day", price: 29 },
+  { id: "boost_7day", label: "7-day", price: 49 },
+];
 
 const OrderCard = ({
   orderId,
@@ -36,6 +48,7 @@ const OrderCard = ({
   onProductUnlisted,
   onProductRelisted,
   onBoostProduct,
+  onBoostApplied,
   isBoosted = false,
   boostExpiresAt,
   boostTier,
@@ -51,6 +64,22 @@ const OrderCard = ({
   const [isUnlisting, setIsUnlisting] = useState(false);
   const [isRelisting, setIsRelisting] = useState(false);
   const [isBoosting, setIsBoosting] = useState(false);
+  const [buyingAddon, setBuyingAddon] = useState(null);
+  const [limitInfo, setLimitInfo] = useState(null);
+  // Local paint guarantee: set on purchase success so the boosted visuals
+  // appear instantly even if the parent list merge is delayed or skipped.
+  // Cleared automatically once parent props reflect the boost.
+  const [localBoost, setLocalBoost] = useState(null);
+  const { openCheckout } = useRazorpayCheckout();
+
+  // Parent caught up (or boost lapsed): drop the local override.
+  useEffect(() => {
+    if (!localBoost) return;
+    const parentBoosted =
+      isBoosted && new Date(boostExpiresAt || 0) > new Date();
+    const lapsed = new Date(localBoost.expires_at || 0) <= new Date();
+    if (parentBoosted || lapsed) setLocalBoost(null);
+  }, [localBoost, isBoosted, boostExpiresAt]);
 
   const normalized = (status || "").toLowerCase().trim();
   const isActive =
@@ -59,14 +88,25 @@ const OrderCard = ({
     normalized === "in progress";
   const isUnlisted = normalized === "unlisted";
   const isDelivered = normalized === "delivered" || normalized === "sold";
-  const boostActive = isBoosted && new Date(boostExpiresAt || 0) > new Date();
-  const boostLabel = boostActive
-    ? `Boosted until ${new Date(boostExpiresAt).toLocaleTimeString("en-IN", {
+  // Parent props are the source of truth; localBoost (set at purchase)
+  // paints instantly and yields once props catch up or the boost lapses.
+  const effBoosted = isBoosted || Boolean(localBoost);
+  const effExpiresAt = localBoost?.expires_at || boostExpiresAt;
+  const effTier = localBoost?.tier || boostTier;
+  const boostActive =
+    effBoosted && new Date(effExpiresAt || 0) > new Date();
+  const boostEndText = boostActive
+    ? new Date(effExpiresAt).toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
         hour: "2-digit",
         minute: "2-digit",
-      })}`
+      })
+    : "";
+  const boostLabel = boostActive
+    ? `Boosted till ${boostEndText}`
     : "Boost Visibility";
-  const normalizedBoostTier = (boostTier || "").toLowerCase();
+  const normalizedBoostTier = (effTier || "").toLowerCase();
   const isProPlusBoost = normalizedBoostTier === "pro_plus";
   const isProBoost = normalizedBoostTier === "pro";
   const boostTone = isProPlusBoost
@@ -75,7 +115,7 @@ const OrderCard = ({
           "border-amber-300 ring-2 ring-amber-400/30 shadow-[0_12px_30px_rgba(245,158,11,0.16)] dark:border-amber-400/70 dark:ring-amber-300/20",
         strip: "bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-600",
         header:
-          "bg-gradient-to-r from-amber-50 via-yellow-50 to-white border-amber-100 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-[#1c1c1c]",
+          "bg-gradient-to-r from-amber-50 via-yellow-50 to-[#F7F8FA] border-amber-100 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-[#1c1c1c]",
         badge:
           "bg-amber-400 text-amber-950 shadow-sm shadow-amber-500/25 ring-1 ring-amber-200",
         button:
@@ -88,7 +128,7 @@ const OrderCard = ({
             "border-blue-300 ring-2 ring-blue-500/20 shadow-[0_12px_30px_rgba(37,99,235,0.12)] dark:border-blue-500/70 dark:ring-blue-400/20",
           strip: "bg-gradient-to-r from-blue-700 via-[#3838EC] to-cyan-400",
           header:
-            "bg-gradient-to-r from-blue-50 via-indigo-50 to-white border-blue-100 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-[#1c1c1c]",
+            "bg-gradient-to-r from-blue-50 via-indigo-50 to-[#F7F8FA] border-blue-100 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-[#1c1c1c]",
           badge:
             "bg-blue-600 text-white shadow-sm shadow-blue-500/25 ring-1 ring-blue-300",
           button: "bg-blue-600 text-white shadow-blue-500/20 disabled:opacity-95",
@@ -143,7 +183,15 @@ const OrderCard = ({
         if (onProductRelisted) onProductRelisted(orderId);
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to relist product");
+      const code = error?.response?.data?.code;
+      const message =
+        error?.response?.data?.message || "Failed to relist product";
+      // Relisting reactivates against the plan cap: show upgrade modal.
+      if (code === "LISTING_LIMIT" || /listing limit/i.test(message)) {
+        setLimitInfo({ message });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsRelisting(false);
     }
@@ -162,16 +210,86 @@ const OrderCard = ({
         toast.success(res.data.message || "Product boosted successfully");
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to boost product");
+      const status = error?.response?.status;
+      const msg = error?.response?.data?.message || "Failed to boost product";
+      // Quota exhausted (403): paid options are visible below + upgrade link.
+      if (status === 403 || /limit reached/i.test(msg)) {
+        toast.error("Boost quota exhausted. Buy an extra boost or upgrade below");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsBoosting(false);
+    }
+  };
+
+  // One-time paid boost (₹29/₹49): server order -> Checkout -> verify.
+  // buyingAddon guards double orders from double clicks.
+  const handleBuyAddon = async (e, addon) => {
+    e.stopPropagation();
+
+    if (buyingAddon || boostActive) return;
+    setBuyingAddon(addon.id);
+    try {
+      const orderRes = await createPaymentOrder({
+        plan: addon.id,
+        productId: orderId,
+      });
+      const { orderId: rzpOrderId, amount, currency } = orderRes.data?.data || {};
+      if (!rzpOrderId) throw new Error("Unable to initiate payment");
+
+      const paymentRes = await openCheckout({
+        orderId: rzpOrderId,
+        amount,
+        currency,
+        planName: `${addon.label} Boost`,
+      });
+
+      const verifyRes = await verifyPayment({
+        razorpay_order_id: paymentRes.razorpay_order_id,
+        razorpay_payment_id: paymentRes.razorpay_payment_id,
+        razorpay_signature: paymentRes.razorpay_signature,
+      });
+
+      if (verifyRes.data?.success) {
+        toast.success("Boost purchased! Your listing is now boosted.");
+        // Prefer the product in the verify response; fall back to a fresh
+        // fetch so the boosted border paints immediately even if the
+        // response shape ever drifts.
+        let updated = verifyRes.data?.data?.product;
+        if (!updated?._id) {
+          try {
+            const fresh = await getProductById(orderId);
+            updated = fresh.data?.data || fresh.data?.product;
+          } catch {
+            updated = null;
+          }
+        }
+        if (updated?.boost_expires_at) {
+          setLocalBoost({
+            expires_at: updated.boost_expires_at,
+            tier: updated.boost_tier,
+          });
+        }
+        if (updated && onBoostApplied) onBoostApplied(updated);
+      }
+    } catch (error) {
+      if (error?.message !== "Payment cancelled") {
+        toast.error(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Boost purchase failed. Please try again.",
+        );
+      }
+    } finally {
+      setBuyingAddon(null);
     }
   };
 
   return (
     <div
       onClick={handleCardClick}
-      className={`relative bg-white dark:bg-[#1c1c1c] rounded-2xl border shadow-sm overflow-hidden font-figtree cursor-pointer transition-all hover:shadow-md ${
+      className={`relative bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border shadow-sm overflow-hidden font-figtree cursor-pointer transition-all hover:shadow-md ${
         boostActive ? boostTone.card : "border-gray-100 dark:border-gray-800"
       }`}
     >
@@ -184,7 +302,7 @@ const OrderCard = ({
       {/* 1. HEADER */}
       <div
         className={`px-4 sm:px-6 py-3.5 border-b dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-3 ${
-          boostActive ? boostTone.header : "bg-gray-100 border-gray-50"
+          boostActive ? boostTone.header : "bg-gray-100 border-gray-50 dark:bg-[#242424] dark:border-gray-800/50"
         }`}
       >
         <div className="text-[12px] sm:text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate flex-1 pr-2">
@@ -238,9 +356,6 @@ const OrderCard = ({
                 <span className="flex items-center gap-1 sm:gap-1.5">
                   <FiHeart size={14} /> {wishlistedCount || 0}
                 </span>
-                <span className="flex items-center gap-1 sm:gap-1.5">
-                  <FiMessageSquare size={14} /> 3
-                </span>
               </div>
             ) : (
               <div className="mt-2 sm:mt-3">
@@ -289,7 +404,7 @@ const OrderCard = ({
 
       {/* 3. FOOTER ACTIONS */}
       <div
-        className={`px-4 sm:px-6 py-4 bg-gray-50/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row items-center gap-3 ${
+        className={`px-4 sm:px-6 py-4 bg-[#F7F8FA]/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row items-center gap-3 ${
           isActive || isDelivered ? "sm:justify-between" : "sm:justify-end"
         }`}
       >
@@ -309,11 +424,45 @@ const OrderCard = ({
               <span>{isBoosting ? "Boosting..." : boostLabel}</span>
             </button>
 
+            {/* One-time paid boosts: always visible so buyers never hunt
+                for them; quota errors also reveal this block. */}
+            {!boostActive && (
+              <div className="flex w-full sm:w-auto flex-col gap-2">
+                <div className="flex w-full sm:w-auto items-center gap-2">
+                  {BOOST_ADDONS.map((addon) => (
+                    <button
+                      key={addon.id}
+                      onClick={(e) => handleBuyAddon(e, addon)}
+                      disabled={buyingAddon !== null}
+                      className="flex-1 sm:flex-none justify-center px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <IoRocketOutline size={14} />
+                      {buyingAddon === addon.id
+                        ? "..."
+                        : `${addon.label} · ₹${addon.price}`}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/price");
+                  }}
+                  className="text-[11px] font-semibold text-[#4A3CFF] hover:underline self-start"
+                >
+                  or get monthly boosts with Pro →
+                </button>
+              </div>
+            )}
+
             {/* Secondary actions span evenly on mobile, group right on desktop */}
             <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
               <button
-                onClick={(e) => e.stopPropagation()}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/upload/${orderId}`);
+                }}
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2"
               >
                 <FiEdit2 size={14} />
                 <span className="sm:hidden text-xs">Edit</span>
@@ -326,7 +475,7 @@ const OrderCard = ({
                   setUnlistModalOpen(true);
                 }}
                 disabled={isUnlisting}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
               >
                 <FiEyeOff size={14} />
                 <span className="text-xs sm:text-[13px]">
@@ -340,7 +489,7 @@ const OrderCard = ({
                   setDeleteModalOpen(true);
                 }}
                 disabled={isDeleting}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
+                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
               >
                 <FiTrash2 size={14} />
                 <span className="text-xs sm:text-[13px]">Delete</span>
@@ -354,10 +503,21 @@ const OrderCard = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                navigate(`/upload/${orderId}`);
+              }}
+              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-2"
+            >
+              <FiEdit2 size={14} />
+              Edit Details
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 setRelistModalOpen(true);
               }}
               disabled={isRelisting}
-              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <FiRefreshCw size={14} />
               {isRelisting ? "..." : "Relist Product"}
@@ -369,7 +529,7 @@ const OrderCard = ({
                 setDeleteModalOpen(true);
               }}
               disabled={isDeleting}
-              className="w-full sm:w-auto justify-center py-2.5 sm:p-2.5 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full sm:w-auto justify-center py-2.5 sm:p-2.5 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <FiTrash2 size={16} />
               <span className="sm:hidden text-[13px]">Delete</span>
@@ -382,7 +542,7 @@ const OrderCard = ({
             <div className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 italic text-center sm:text-left w-full sm:w-auto">
               This order is completed. Actions are limited.
             </div>
-            <button className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-white dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2">
+            <button className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2">
               View Delivery Details
             </button>
           </div>
@@ -411,6 +571,13 @@ const OrderCard = ({
         productName={name}
         isLoading={isRelisting}
       />
+      {limitInfo && (
+        <LimitModal
+          title="You're out of listings"
+          message={limitInfo.message}
+          onClose={() => setLimitInfo(null)}
+        />
+      )}
     </div>
   );
 };

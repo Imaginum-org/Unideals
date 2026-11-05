@@ -1,19 +1,26 @@
-import { useState } from "react";
-import Select from "react-select";
+import { Suspense, lazy } from "react";
 import { IoArrowForward } from "react-icons/io5";
-import { Sparkles, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
-import axiosInstance from "../../../services/axiosInstance";
 import useProductListing from "../hooks/useProductListing";
 import {
   PRODUCT_CATEGORY_OPTIONS,
   PRODUCT_CONDITION_OPTIONS,
   PRODUCT_USAGE_OPTIONS,
+  GIRLS_ONLY_CATEGORIES,
+  orderCategoriesForGirls,
 } from "../constants/productOptions";
+import { useUser } from "../../../context/useUserContext.jsx";
 import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
 import { validateBasicInfo } from "../validations";
 import FormError from "../components/shared/FormError";
+import VisibilitySelector from "../components/VisibilitySelector.jsx";
 import { motion } from "framer-motion";
+
+// react-select loads only with the listing flow (never in Home/search).
+const LazySelect = lazy(() => import("react-select"));
+
+const SelectFallback = (
+  <div className="h-[38px] animate-pulse rounded-lg border border-zinc-200 bg-[#F7F8FA]" />
+);
 
 const CategoryOption = (props) => {
   const { data, innerRef, innerProps, isFocused, isSelected } = props;
@@ -28,7 +35,7 @@ const CategoryOption = (props) => {
       className={`
         px-4 py-4 cursor-pointer transition-all duration-200
         border-b border-[#F1F5F9]
-        ${isSelected ? "bg-[#EEF2FF]" : isFocused ? "bg-[#F8FAFF]" : "bg-white"}
+        ${isSelected ? "bg-[#EEF2FF]" : isFocused ? "bg-[#F8FAFF]" : "bg-[#F7F8FA]"}
       `}
     >
       <div className="flex flex-col">
@@ -68,37 +75,24 @@ const CategorySingleValue = ({ data }) => {
 const BasicInfoStep = () => {
   const { formData, updateField, nextStep, errors, validateAndProceed } =
     useProductListing();
-  const [isEnhancing, setIsEnhancing] = useState(false);
+  const { userDetails, isLoggedIn } = useUser();
 
-  const handleAIEnhance = async () => {
-    const rawInput = (formData.title + " " + formData.description).trim();
-    if (!rawInput) {
-      toast.error("Please enter a rough title or brief description first!");
-      return;
-    }
-
-    setIsEnhancing(true);
-    const toastId = toast.loading("AI is crafting your listing...");
-
-    try {
-      const res = await axiosInstance.post("/api/chat/enhance-listing", {
-        itemDescription: rawInput,
-        condition: formData.condition,
-        category: formData.category,
-      });
-
-      const data = res?.data?.data;
-      if (data && !data.error) {
-        if (data.title) updateField("title", data.title);
-        if (data.description) updateField("description", data.description);
-        toast.success("Listing enhanced by AI!", { id: toastId });
-      } else {
-        toast.error("Could not enhance listing. Please try again.", { id: toastId });
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to reach AI assistant", { id: toastId });
-    } finally {
-      setIsEnhancing(false);
+  // Girls-only categories are offered only to eligible sellers — picking one
+  // auto-enables Girl-only (backend enforces the same). Eligible sellers get
+  // the most → least suitable girls order; everyone else keeps classic order.
+  const sellerRole = userDetails?.role ?? null;
+  const girlsEligible =
+    isLoggedIn &&
+    (userDetails?.gender === "female" || sellerRole === "admin");
+  const categoryOptions = girlsEligible
+    ? orderCategoriesForGirls(PRODUCT_CATEGORY_OPTIONS)
+    : PRODUCT_CATEGORY_OPTIONS.filter((o) => !o.girlsOnly);
+  const isGirlsCategory = GIRLS_ONLY_CATEGORIES.includes(formData.category);
+  const handleCategoryChange = (selected) => {
+    const value = selected?.value || "";
+    updateField("category", value);
+    if (GIRLS_ONLY_CATEGORIES.includes(value)) {
+      updateField("isGirlsOnly", true);
     }
   };
 
@@ -220,7 +214,7 @@ const BasicInfoStep = () => {
         duration: 0.35,
         ease: "easeOut",
       }}
-      className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-white shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 dark:bg-[#1A1D20] dark:text-white dark:border-0"
+      className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 dark:bg-[#1A1D20] dark:text-white dark:border-0"
     >
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
@@ -261,11 +255,12 @@ const BasicInfoStep = () => {
             </label>
 
             <div className="mt-2">
-              <Select
+              <Suspense fallback={SelectFallback}>
+              <LazySelect
                 name="category"
                 menuPlacement="auto"
                 menuShouldScrollIntoView={false}
-                options={PRODUCT_CATEGORY_OPTIONS}
+                options={categoryOptions}
                 styles={selectStyles}
                 isSearchable={false}
                 placeholder="Select category"
@@ -278,47 +273,35 @@ const BasicInfoStep = () => {
                     (item) => item.value === formData.category,
                   ) || null
                 }
-                onChange={(selected) =>
-                  updateField("category", selected?.value || "")
-                }
+                onChange={handleCategoryChange}
               />
+              </Suspense>
 
               <p className="mt-2 text-sm text-[#94A3B8]">
                 Choose the category that best matches your product.
               </p>
+              {isGirlsCategory && (
+                <p className="mt-2 rounded-xl bg-pink-50 px-4 py-3 text-xs font-medium leading-5 text-[#9D174D] ring-1 ring-pink-200 dark:bg-pink-950/30 dark:text-pink-200 dark:ring-pink-900/50">
+                  🌸 This is a Girls-only category — Girl-only is auto ON. Only
+                  girls in your campus can see this listing.
+                </p>
+              )}
               <FormError error={errors.category} />
             </div>
           </div>
 
           {/* Description */}
           <div data-field="description">
-            <div className="flex items-center justify-between">
-              <label className="text-base font-semibold text-[#111827] dark:text-white">
-                Short Description
-                <RequiredAsterisk />
-              </label>
-
-              <button
-                type="button"
-                onClick={handleAIEnhance}
-                disabled={isEnhancing}
-                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-[#394ff1] dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-[#394ff1] hover:text-white transition-all disabled:opacity-50"
-                title="Automatically generate title & polished description using Gemini AI"
-              >
-                {isEnhancing ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                {isEnhancing ? "Enhancing..." : "✨ AI Polish"}
-              </button>
-            </div>
+            <label className="text-base font-semibold text-[#111827] dark:text-white">
+              Short Description
+              <RequiredAsterisk />
+            </label>
 
             <textarea
               maxLength={1000}
               value={formData.description}
               onChange={(e) => updateField("description", e.target.value)}
-              placeholder="Describe your product (or type a few words and click 'AI Polish')..."
+              placeholder="Describe your product..."
               className={`mt-2 w-full h-[220px] rounded-xl border border-[#E5E7EB] ${
                 errors.description
                   ? "border-red-500"
@@ -345,11 +328,13 @@ const BasicInfoStep = () => {
 
             <input
               type="text"
+              maxLength={100}
               value={formData.brand}
-              onChange={(e) => updateField("brand", e.target.value)}
+              onChange={(e) => updateField("brand", e.target.value.slice(0, 100))}
               placeholder="e.g. Apple"
               className="mt-2 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800"
             />
+            {errors.brand && <FormError error={errors.brand} />}
           </div>
 
           {/* Color */}
@@ -360,11 +345,13 @@ const BasicInfoStep = () => {
 
             <input
               type="text"
+              maxLength={50}
               value={formData.color}
-              onChange={(e) => updateField("color", e.target.value)}
+              onChange={(e) => updateField("color", e.target.value.slice(0, 50))}
               placeholder="e.g. Space Grey"
               className="mt-2 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800"
             />
+            {errors.color && <FormError error={errors.color} />}
           </div>
 
           {/* Condition */}
@@ -375,7 +362,8 @@ const BasicInfoStep = () => {
             </label>
 
             <div className="mt-2">
-              <Select
+              <Suspense fallback={SelectFallback}>
+              <LazySelect
                 name="condition"
                 options={PRODUCT_CONDITION_OPTIONS}
                 styles={selectStyles}
@@ -390,6 +378,7 @@ const BasicInfoStep = () => {
                   updateField("condition", selected?.value || "")
                 }
               />
+              </Suspense>
               <FormError error={errors.condition} />
             </div>
           </div>
@@ -402,7 +391,8 @@ const BasicInfoStep = () => {
             </label>
 
             <div className="mt-2">
-              <Select
+              <Suspense fallback={SelectFallback}>
+              <LazySelect
                 name="usageDuration"
                 options={PRODUCT_USAGE_OPTIONS}
                 styles={selectStyles}
@@ -418,6 +408,7 @@ const BasicInfoStep = () => {
                 }
                 className="bg-[#F7F8FA]"
               />
+              </Suspense>
               <FormError error={errors.usageDuration} />
             </div>
           </div>
@@ -431,6 +422,7 @@ const BasicInfoStep = () => {
 
             <input
               type="date"
+              min="2000-01-01"
               max={new Date().toISOString().split("T")[0]}
               value={formData.purchaseDate}
               onChange={(e) => updateField("purchaseDate", e.target.value)}
@@ -444,6 +436,9 @@ const BasicInfoStep = () => {
           </div>
         </div>
       </div>
+
+      {/* Step-1 Girls Corner toggle — visible only to girls/admins */}
+      <VisibilitySelector />
 
       {/* Footer */}
       <div className="mt-10 flex items-center justify-between">

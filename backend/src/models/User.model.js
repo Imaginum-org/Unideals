@@ -19,7 +19,7 @@ const userSchema = new Schema(
       trim: true,
       index: true,
       match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.[A-Za-z]{2,})+$/,
         "Please provide a valid email address",
       ],
     },
@@ -28,7 +28,7 @@ const userSchema = new Schema(
       type: String,
       required: [true, "Please provide your password"],
       select: false, // never return password
-      minlength: [6, "Password must be at least 6 characters"],
+      minlength: [8, "Password must be at least 8 characters"],
     },
 
     avatar: {
@@ -55,6 +55,49 @@ const userSchema = new Schema(
       lowercase: true,
       enum: ["male", "female", "other"],
       default: null,
+    },
+
+    // Girls Corner 🌸 — self-declared once, then locked (admin approval to change).
+    genderSource: {
+      type: String,
+      enum: ["self", "admin"],
+      default: "self",
+    },
+    genderUpdatedAt: {
+      type: Date,
+      default: null,
+    },
+    // Gender change requests needing admin approval. Single pending subdoc
+    // keeps it atomic + scalable (one indexed user write, no extra collection).
+    genderChangeRequest: {
+      _id: false,
+      requestedGender: {
+        type: String,
+        enum: ["male", "female", "other"],
+        default: null,
+      },
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: null,
+      },
+      requestedAt: {
+        type: Date,
+        default: null,
+      },
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+    },
+
+    // Campus marketplace: every user belongs to exactly one campus.
+    // Null only for legacy accounts until they pass the onboarding gate.
+    campus_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Campus",
+      default: null,
+      index: true,
     },
 
     subscription: {
@@ -86,6 +129,16 @@ const userSchema = new Schema(
       default: "",
     },
 
+    verifyTokenEmailExpiry: {
+      type: Date,
+      default: null,
+    },
+
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
+
     reset_password_token: {
       type: String,
       select: false,
@@ -113,21 +166,48 @@ const userSchema = new Schema(
       default: null,
     },
 
-    address_details: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Address",
-      },
-    ],
-
     subscription_details: {
       type: Schema.Types.ObjectId,
       ref: "Subscription",
     },
 
+    // Chat preferences (wallpaper, read receipts, typing indicators).
+    // Defaults keep classic behaviour; clients merge over these.
+    chat_settings: {
+      _id: false,
+      wallpaper: {
+        type: String,
+        trim: true,
+        maxlength: 40,
+        default: "default",
+      },
+      read_receipts: {
+        type: Boolean,
+        default: true,
+      },
+      typing_indicators: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
     refresh_token: {
       type: String,
       select: false,
+    },
+
+    // Previous refresh token kept briefly after rotation so parallel
+    // refresh calls (two tabs, retry storms) converge instead of nuking
+    // the session. Never accepted after refresh_token_prev_expires_at.
+    refresh_token_prev: {
+      type: String,
+      select: false,
+      default: null,
+    },
+
+    refresh_token_prev_expires_at: {
+      type: Date,
+      default: null,
     },
 
     forgot_password_otp: {
@@ -161,6 +241,64 @@ const userSchema = new Schema(
         ref: "Product",
       },
     ],
+
+    gamification: {
+      _id: false,
+      total_xp: {
+        type: Number,
+        default: 0,
+      },
+      level: {
+        type: Number,
+        default: 1,
+      },
+      rank_title: {
+        type: String,
+        default: "Seedling",
+      },
+      last_computed_at: {
+        type: Date,
+        default: null,
+      },
+      badges: [
+        {
+          _id: false,
+          badge_id: { type: String, required: true },
+          category: {
+            type: String,
+            enum: ["seller", "buyer", "communication", "trust", "milestone"],
+          },
+          tier: {
+            type: String,
+            enum: ["bronze", "silver", "gold", "special"],
+            default: "bronze",
+          },
+          earned_at: { type: Date, default: Date.now },
+          xp_granted: { type: Number, default: 0 },
+        },
+      ],
+
+      // ── Reward system fields ──────────────────────────────────────────
+      // Running balance of boost credits the user currently holds.
+      boost_credits: { type: Number, default: 0 },
+
+      // Audit log: every reward event ever granted to this user.
+      rewards_claimed: [
+        {
+          _id: false,
+          reward_id:   { type: String, required: true }, // e.g. "level_10_gift"
+          reward_type: { type: String, required: true }, // "boost_credit" | "subscription" | "badge" | "frame" | "tag"
+          value:       { type: Schema.Types.Mixed },     // credits count or sub tier string
+          claimed_at:  { type: Date, default: Date.now },
+        },
+      ],
+
+      // Active decorative frame key shown on profile. null = default.
+      profile_frame: { type: String, default: null },
+
+      // Special text tags on the profile (e.g. "hall_of_fame", "og_member").
+      special_tags: [{ type: String }],
+    },
   },
   {
     timestamps: true,

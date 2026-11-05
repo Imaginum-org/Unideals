@@ -10,6 +10,9 @@ function AuthMobileBanner({ taglines = defaultTaglines }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fade, setFade] = useState(true);
 
+  // Join once: a new same-length array from the parent must still refresh.
+  const taglineKey = taglines.join("|");
+
   useEffect(() => {
     let timeoutId;
 
@@ -25,7 +28,8 @@ function AuthMobileBanner({ taglines = defaultTaglines }) {
       clearInterval(interval);
       clearTimeout(timeoutId);
     };
-  }, [taglines.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taglineKey]);
 
   return (
     <div className="mt-[3vh] flex shrink-0 flex-col items-center gap-3 sm:mt-[4vh] md:hidden font-figtree">
@@ -42,7 +46,7 @@ function AuthMobileBanner({ taglines = defaultTaglines }) {
           <span
             key={tagline}
             className={`h-0.5 rounded-full transition-all duration-300 ${
-              currentIndex === index ? "w-7 bg-white" : "w-3 bg-white/50"
+              currentIndex === index ? "w-7 bg-[#F7F8FA]" : "w-3 bg-[#F7F8FA]/50"
             }`}
           />
         ))}

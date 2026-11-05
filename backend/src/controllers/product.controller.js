@@ -1,16 +1,39 @@
 import * as productService from "../services/product.service.js";
+import { resolveRequestCampus } from "../services/campus.service.js";
 import { deleteImage } from "../utils/imagekit.js";
+import { forwardServiceError } from "../utils/response.js";
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
+import { computeAndAwardBadges } from "../services/badgeService.js";
+
 // CREATE PRODUCT
 export const createProduct = async (req, res) => {
-  const fileIds = req.body.images?.map((image) => image.fileId) || [];
+  // Only collect well-formed fileIds for cleanup to prevent arbitrary deletion.
+  // ImageKit file IDs are alphanumeric with _-/; cap at 3 (max images).
+  const rawFileIds = Array.isArray(req.body.images)
+    ? req.body.images.map((image) => image?.fileId).filter(Boolean)
+    : [];
+  const fileIds = rawFileIds
+    .filter(
+      (id) =>
+        typeof id === "string" &&
+        id.length <= 256 &&
+        /^[A-Za-z0-9_\-/]+$/.test(id),
+    )
+    .slice(0, 3);
 
   try {
     const user = req.user;
     const data = req.body;
 
     const product = await productService.createProduct(data, user);
+
+    let gamification = null;
+    try {
+      gamification = await computeAndAwardBadges(user._id);
+    } catch (gamifyErr) {
+      console.error("Error updating gamification on createProduct:", gamifyErr);
+    }
 
     const productCount = await Product.countDocuments({
       seller_id: user._id,
@@ -25,16 +48,55 @@ export const createProduct = async (req, res) => {
       message: "Product created successfully",
       data: product,
       isFirstListing,
+      gamification,
     });
   } catch (error) {
-    // Cleanup uploaded images if product fails
+    // Cleanup uploaded images if product fails (best-effort, never fails request)
     if (fileIds.length > 0) {
-      await Promise.all(fileIds.map((id) => deleteImage(id)));
+      await Promise.allSettled(fileIds.map((id) => deleteImage(id)));
     }
 
-    return res.status(500).json({
+    const clientErrors = [
+      "Images are required",
+      "already listed a similar product",
+      "Selling price cannot be greater",
+      "Discount cannot exceed",
+      "Image host not allowed",
+      "Use public campus spot only",
+      "Quantity must be between",
+      "Selling price must be at least",
+      "Invalid purchase date",
+      "Purchase date cannot be",
+      "Listing limit reached",
+      "Draft limit reached",
+      "Invalid listing status",
+      "Campus is required",
+      "campus is unavailable",
+    ];
+    const isClientError =
+      Boolean(error.code) ||
+      error.statusCode === 400 ||
+      clientErrors.some((m) => String(error.message || "").includes(m));
+    const status =
+      error.statusCode ||
+      (error.code === "LISTING_LIMIT" || error.code === "DRAFT_LIMIT"
+        ? 403
+        : isClientError
+          ? 400
+          : 500);
+
+    // Preserve Girls Corner codes (403/429) exactly for frontend gating.
+    const girlsCodes = new Set([
+      "NOT_ELIGIBLE_GIRLS_ONLY",
+      "GIRLS_CORNER_RESTRICTED",
+      "GENDER_LOCKED",
+    ]);
+    const finalStatus = girlsCodes.has(error.code) ? error.statusCode || status : status;
+
+    return res.status(error.code === "LISTING_LIMIT" ? 403 : girlsCodes.has(error.code) ? finalStatus : isClientError ? 400 : 500).json({
       success: false,
-      message: error.message || "Product creation failed",
+      message: isClientError || status < 500 ? error.message : "Product creation failed",
+      ...(error.code ? { code: error.code } : {}),
     });
   }
 };
@@ -42,7 +104,10 @@ export const createProduct = async (req, res) => {
 // GET ALL PRODUCTS
 export const getAllProducts = async (req, res, next) => {
   try {
-    const result = await productService.getAllProducts(req.query);
+    const campus = await resolveRequestCampus(req);
+    const viewerGender = req.user?.gender ?? null;
+    const viewerRole = req.user?.role ?? null;
+    const result = await productService.getAllProducts(req.query, campus._id, viewerGender, viewerRole);
 
     return res.status(200).json({
       success: true,
@@ -57,23 +122,41 @@ export const getAllProducts = async (req, res, next) => {
 // GET SINGLE PRODUCT
 export const getSingleProduct = async (req, res, next) => {
   try {
-    const product = await productService.getSingleProduct(req.params.id);
+    const campus = await resolveRequestCampus(req);
+    const clientIp =
+      req.ip ||
+      (typeof req.headers?.["x-forwarded-for"] === "string"
+        ? req.headers["x-forwarded-for"].split(",")[0].trim()
+        : null);
+    const product = await productService.getSingleProduct(
+      req.params.id,
+      campus._id,
+      req.userId || null,
+      clientIp || null,
+      req.user?.gender ?? null,
+      req.user?.role ?? null,
+    );
 
+    // Owner sees extra snapshot fields — never share across users.
+    res.set("Cache-Control", "private, max-age=30, must-revalidate");
     return res.status(200).json({
       success: true,
       message: "Product fetched successfully",
       data: product,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 
 // GET BOOSTED PRODUCTS
 export const getBoostedProducts = async (req, res, next) => {
   try {
-    const products = await productService.getBoostedProducts();
+    const campus = await resolveRequestCampus(req);
+    const products = await productService.getBoostedProducts(campus._id, req.user?.gender ?? null, req.user?.role ?? null, req.query?.audience ?? null);
 
+    // Same content per campus URL for every viewer — edge-cacheable.
+    res.set("Cache-Control", "public, max-age=60, s-maxage=300");
     return res.status(200).json({
       success: true,
       message: "Boosted products fetched successfully",
@@ -96,7 +179,13 @@ export const getSearchSuggestions = async (req, res, next) => {
       });
     }
 
-    const suggestions = await productService.getSearchSuggestions(q);
+    const campus = await resolveRequestCampus(req);
+    const suggestions = await productService.getSearchSuggestions(
+      q,
+      campus._id,
+      req.user?.gender ?? null,
+      req.user?.role ?? null,
+    );
 
     return res.status(200).json({
       success: true,
@@ -109,20 +198,62 @@ export const getSearchSuggestions = async (req, res, next) => {
 
 export const searchProducts = async (req, res, next) => {
   try {
-    const { q } = req.query;
+    const {
+      q,
+      page,
+      limit,
+      sort,
+      category,
+      condition,
+      min_price,
+      max_price,
+      audience,
+    } = req.query;
 
-    if (!q || q.trim().length === 0) {
+    if (!q || String(q).trim().length === 0) {
       return res.status(200).json({
         success: true,
         products: [],
+        pagination: { total: 0, page: 1, limit: 20, totalPages: 1 },
       });
     }
 
-    const products = await productService.searchProducts(q);
+    const result = await productService.searchProducts(
+      {
+        q,
+        page,
+        limit,
+        sort,
+        category,
+        condition,
+        min_price,
+        max_price,
+        audience,
+      },
+      (await resolveRequestCampus(req))._id,
+      req.user?.gender ?? null,
+      req.user?.role ?? null,
+    );
 
     return res.status(200).json({
       success: true,
-      products,
+      ...result, // { products, pagination } — `products` key retained
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTrendingProducts = async (req, res, next) => {
+  try {
+    const campus = await resolveRequestCampus(req);
+    const products = await productService.getTrendingProducts(8, campus._id, req.user?.gender ?? null, req.user?.role ?? null);
+    // Same content per campus URL for every viewer — edge-cacheable.
+    res.set("Cache-Control", "public, max-age=60, s-maxage=300");
+    return res.status(200).json({
+      success: true,
+      message: "Trending products fetched successfully",
+      data: products,
     });
   } catch (error) {
     next(error);
@@ -152,13 +283,17 @@ export const deleteProduct = async (req, res, next) => {
 
     const product = await productService.deleteProduct(productId, userId);
 
+    computeAndAwardBadges(userId).catch((err) =>
+      console.error("Error updating gamification on deleteProduct:", err),
+    );
+
     return res.status(200).json({
       success: true,
       message: "Product deleted successfully",
       data: product,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 
@@ -169,13 +304,17 @@ export const unlistProduct = async (req, res, next) => {
 
     const product = await productService.unlistProduct(productId, userId);
 
+    computeAndAwardBadges(userId).catch((err) =>
+      console.error("Error updating gamification on unlistProduct:", err),
+    );
+
     return res.status(200).json({
       success: true,
       message: "Product unlisted successfully",
       data: product,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 
@@ -186,18 +325,21 @@ export const relistProduct = async (req, res, next) => {
 
     const product = await productService.relistProduct(productId, userId);
 
+    computeAndAwardBadges(userId).catch((err) =>
+      console.error("Error updating gamification on relistProduct:", err),
+    );
+
     return res.status(200).json({
       success: true,
       message: "Product relisted successfully",
       data: product,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };
 
-export const getMyDraftProducts = async (req, res, next) => {
-  try {
+export const getMyDraftProducts = async (req, res, next) => {  try {
     const userId = req.userId;
 
     const drafts = await productService.getMyDraftProducts(userId);
@@ -211,5 +353,49 @@ export const getMyDraftProducts = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+// PATCH /:id — owner-only edit. No image cleanup on failure: req.body may
+// reference already-live fileIds, and deleting them would destroy good
+// images. Orphaned fresh uploads from failed edits expire via normal flows.
+export const updateProduct = async (req, res, next) => {
+  try {
+    const product = await productService.updateProduct(
+      req.params.id,
+      req.userId,
+      req.body,
+    );
+
+    computeAndAwardBadges(req.userId).catch((err) =>
+      console.error("Error updating gamification on updateProduct:", err),
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      data: product,
+    });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// PATCH /:id/sold — owner-only listed → sold, boost exposure cleared.
+export const markProductSold = async (req, res, next) => {
+  try {
+    const product = await productService.markProductSold(req.params.id, req.userId);
+
+    computeAndAwardBadges(req.userId).catch((err) =>
+      console.error("Error updating gamification on markProductSold:", err),
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Product marked as sold",
+      data: product,
+    });
+  } catch (error) {
+    forwardServiceError(error, next);
   }
 };

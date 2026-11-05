@@ -1,70 +1,47 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "react-hot-toast";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "../../../components/ui/toast.js";
 import { useNavigate } from "react-router-dom";
 import {
   BadgeCheck,
   Camera,
-  Home,
   LogOut,
   Mail,
   MapPin,
-  Pencil,
   Phone,
   Plus,
   Shield,
   Trash2,
   User,
-  Loader2,
   Zap,
 } from "lucide-react";
-import { uploadImage } from "../../../services/Utils/imageUpload.js";
-import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
-import Loader from "../../../Components/ui/Loader.jsx";
+import { uploadImage } from "../../../utils/imageUpload.js";
+import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
-import { logoutUser } from "../../auth/api/authApi";
-import AddressModal from "../components/AddressModal.jsx";
+import { useCampus } from "../../../context/CampusContext.jsx";
+import { logoutUser, resendVerification } from "../../auth/api/authApi";
+import { getUserProducts } from "../../product/api/productApi.js";
+import PickupSpotModal from "../components/PickupSpotModal.jsx";
 import AlertDialogDemo from "../components/Deletebutton.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import SecuritySettings from "../components/SecuritySettings.jsx";
+import ChatSettings from "../components/ChatSettings.jsx";
 import {
-  createAddress,
-  deleteAddress,
-  getUserAddresses,
   getUserProfile,
-  setDefaultAddress,
-  updateAddress,
+  createPickupSpot,
+  deletePickupSpot,
+  getUserPickupSpots,
+  setPrimaryPickupSpot,
+  updatePickupSpot,
   updateAvatar,
   updateProfile,
   removeAvatar,
+  requestGenderChange,
+  getGenderChangeStatus,
 } from "../api/userApi";
 
-const tabs = [
-  "Profile",
-  "Security",
-  "Addresses",
-  "Pickup Spots",
-  "Verification",
-];
-
-const pickupSpots = [
-  {
-    id: "main-canteen",
-    name: "Main Canteen",
-    detail: "Ground floor, near entrance",
-    isPrimary: true,
-  },
-  {
-    id: "central-library",
-    name: "Central Library",
-    detail: "Lobby area, open till 9 PM",
-  },
-  {
-    id: "main-gate",
-    name: "Main Gate",
-    detail: "Security cabin side",
-  },
-];
+const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "Verification"];
 
 const formatMemberSince = (date) => {
   if (!date) return "Member since date unavailable";
@@ -82,34 +59,45 @@ const formatPhone = (phone) => {
 
 function Settings() {
   const navigate = useNavigate();
-  const { userDetails: contextUserDetails, updateUserDetails } = useUser();
+  const { userDetails: contextUserDetails, updateUserDetails, clearUserData } = useUser();
+  const { campuses, campus: activeCampus } = useCampus();
 
   const [activeTab, setActiveTab] = useState("Profile");
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
-  const [isProfileEditing, setIsProfileEditing] = useState(false);
-  const [profileChanged, setProfileChanged] = useState(false);
+  const [campusSlug, setCampusSlug] = useState("");
+  // Per-field editing: only one row (phone | campus | gender) is editable at
+  // a time, with its own Save/Cancel right there. No global "Edit all".
+  const [editingField, setEditingField] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [addresses, setAddresses] = useState([]);
+  const [pickupSpots, setPickupSpots] = useState([]);
+  const [pickupLoading, setPickupLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState(null);
+  const [pendingPrimaryId, setPendingPrimaryId] = useState(null);
+  const [showCampusConfirm, setShowCampusConfirm] = useState(false);
+  const [listingsToMove, setListingsToMove] = useState(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
+  const [genderRequest, setGenderRequest] = useState(null);
+  const [requestedGender, setRequestedGender] = useState("");
+  const [requestSaving, setRequestSaving] = useState(false);
 
   const fileInputRef = useRef(null);
-
-  const defaultAddress = useMemo(
-    () => addresses.find((address) => address.isDefault),
-    [addresses],
-  );
 
   useEffect(() => {
     if (contextUserDetails) {
       setUserDetails(contextUserDetails);
       setPhone(contextUserDetails?.mobile || "");
       setGender(contextUserDetails?.gender || "");
+      const slug =
+        typeof contextUserDetails?.campus_id === "object"
+          ? contextUserDetails.campus_id?.slug
+          : null;
+      setCampusSlug(slug || "");
       setLoading(false);
     }
   }, [contextUserDetails]);
@@ -125,12 +113,26 @@ function Settings() {
           setUserDetails(res.data.user);
           setPhone(res.data.user?.mobile || "");
           setGender(res.data.user?.gender || "");
+          const slug =
+            typeof res.data.user?.campus_id === "object"
+              ? res.data.user.campus_id?.slug
+              : null;
+          setCampusSlug(slug || "");
         }
       } catch (err) {
+        // Only clear + redirect when the session is truly dead (401 after
+        // the interceptor already tried a silent refresh). 403s here are
+        // permission/verification issues, not logout signals — the auth
+        // context owns session state and will react if needed.
         if (err.response?.status === 401) {
           localStorage.removeItem("isAuthenticated");
           localStorage.removeItem("cachedUserDetails");
+          localStorage.removeItem("accessToken");
           navigate("/login");
+        } else if (err.response?.status === 403) {
+          toast.error(
+            err.response?.data?.message || "You don't have access right now.",
+          );
         } else {
           toast.error("Failed to load profile");
         }
@@ -142,51 +144,187 @@ function Settings() {
     fetchUser();
   }, [contextUserDetails, navigate]);
 
-  const fetchAddresses = async () => {
+  const fetchPickupSpots = useCallback(async () => {
     try {
-      const res = await getUserAddresses();
-      if (res.data.success) setAddresses(res.data.addresses);
+      setPickupLoading(true);
+      const res = await getUserPickupSpots();
+      if (res.data.success) setPickupSpots(res.data.pickupSpots);
     } catch {
-      toast.error("Failed to load addresses");
+      toast.error("Failed to load pickup spots");
+    } finally {
+      setPickupLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPickupSpots();
+  }, [fetchPickupSpots]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getGenderChangeStatus();
+        if (!cancelled && res.data?.success) setGenderRequest(res.data.genderChangeRequest || null);
+      } catch {
+        // best-effort only
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleGenderRequest = async () => {
+    if (!requestedGender || requestSaving) return;
+    setRequestSaving(true);
+    try {
+      const res = await requestGenderChange(requestedGender);
+      if (res.data?.success) {
+        setGenderRequest(res.data.genderChangeRequest || null);
+        toast.success("Request sent for admin approval.");
+        setRequestedGender("");
+        // Close gender editing so phone/campus stay editable while pending.
+        setEditingField(null);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not send request.");
+    } finally {
+      setRequestSaving(false);
     }
   };
 
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
+  // Reset all drafts from the saved profile (used when starting / cancelling).
+  const resetDrafts = () => {
+    setPhone(userDetails?.mobile || "");
+    setGender(userDetails?.gender || "");
+    const slug =
+      typeof userDetails?.campus_id === "object"
+        ? userDetails.campus_id?.slug
+        : null;
+    setCampusSlug(slug || "");
+    setRequestedGender("");
+  };
 
-  const handleSaveProfile = async () => {
-    if (!profileChanged) {
-      setIsProfileEditing(false);
-      return true;
-    }
+  const startEditing = (field) => {
+    resetDrafts();
+    setEditingField(field);
+  };
 
-    try {
-      setIsSavingProfile(true);
-      const updateData = {};
+  const cancelEditing = () => {
+    resetDrafts();
+    setEditingField(null);
+  };
 
-      if (phone) updateData.mobile = phone.replace(/\D/g, "").slice(-10);
-      if (gender) updateData.gender = gender;
+  const syncProfileState = (savedUser, moved = 0) => {
+    setUserDetails(savedUser);
+    updateUserDetails(savedUser);
+    setPhone(savedUser?.mobile || "");
+    setGender(savedUser?.gender || "");
+    const slug =
+      typeof savedUser?.campus_id === "object" ? savedUser.campus_id?.slug : null;
+    setCampusSlug(slug || "");
+    setEditingField(null);
+    setShowCampusConfirm(false);
+    toast.success(
+      moved > 0
+        ? `Campus updated · ${moved} listing${moved > 1 ? "s" : ""} moved`
+        : "Profile updated successfully",
+    );
+  };
 
-      const res = await updateProfile(updateData);
-
-      if (res.data.success) {
-        toast.success("Profile updated successfully");
-        setUserDetails(res.data.user);
-        updateUserDetails(res.data.user);
-        setPhone(res.data.user?.mobile || "");
-        setGender(res.data.user?.gender || "");
-        setProfileChanged(false);
-        setIsProfileEditing(false);
+  // Per-field save — only the edited field is sent to the server.
+  const handleSaveField = async (field, confirmed = false) => {
+    if (field === "campus") {
+      const currentSlug =
+        typeof userDetails?.campus_id === "object"
+          ? userDetails.campus_id?.slug
+          : activeCampus?.slug;
+      const changingCampus = Boolean(campusSlug) && campusSlug !== currentSlug;
+      if (!changingCampus) {
+        setEditingField(null);
         return true;
       }
-      return false;
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update profile");
-      return false;
-    } finally {
-      setIsSavingProfile(false);
+      // Campus moves relocate live listings — confirm first (same theme modal).
+      if (!confirmed) {
+        try {
+          const res = await getUserProducts();
+          const items = res.data?.data || [];
+          setListingsToMove(
+            items.filter((p) =>
+              ["listed", "active"].includes((p.status || "").toLowerCase()),
+            ).length,
+          );
+        } catch {
+          setListingsToMove(null);
+        }
+        setShowCampusConfirm(true);
+        return false;
+      }
+      try {
+        setIsSavingProfile(true);
+        const res = await updateProfile({ campus_slug: campusSlug });
+        if (res.data.success) {
+          syncProfileState(res.data.user, res.data.movedListings || 0);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "Failed to update campus");
+        return false;
+      } finally {
+        setIsSavingProfile(false);
+      }
     }
+
+    if (field === "phone") {
+      const digits = String(phone).replace(/\D/g, "");
+      if ((userDetails?.mobile || "") === digits) {
+        setEditingField(null);
+        return true;
+      }
+      // Validate 10-digit Indian mobile starting 6-9, don't silently truncate
+      if (!/^[6-9]\d{9}$/.test(digits)) {
+        toast.error("Enter a valid 10-digit mobile number starting with 6-9");
+        return false;
+      }
+      try {
+        setIsSavingProfile(true);
+        const res = await updateProfile({ mobile: digits });
+        if (res.data.success) {
+          syncProfileState(res.data.user);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "Failed to update phone");
+        return false;
+      } finally {
+        setIsSavingProfile(false);
+      }
+    }
+
+    if (field === "gender") {
+      // First-set fallback only (locked profiles use admin approval).
+      if (!gender || userDetails?.gender) {
+        setEditingField(null);
+        return true;
+      }
+      try {
+        setIsSavingProfile(true);
+        const res = await updateProfile({ gender });
+        if (res.data.success) {
+          syncProfileState(res.data.user);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "Failed to update gender");
+        return false;
+      } finally {
+        setIsSavingProfile(false);
+      }
+    }
+
+    return false;
   };
 
   const handleAvatarChange = async (event) => {
@@ -196,9 +334,12 @@ function Settings() {
     setIsUploadingAvatar(true);
 
     try {
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please select a valid image.");
+      // Validate file type - allowlist only (SVG excluded to prevent XSS)
+      const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+      const allowedExts = ["png", "jpg", "jpeg", "webp"];
+      const ext = String(file.name || "").split(".").pop()?.toLowerCase() || "";
+      if (!allowedTypes.includes(file.type) || !allowedExts.includes(ext)) {
+        toast.error("Please select a JPG, PNG or WEBP image.");
         return;
       }
 
@@ -260,53 +401,75 @@ function Settings() {
     }
   };
 
-  const handleAddAddress = () => {
+  const handleAddPickupSpot = () => {
     setEditingIndex(null);
     setIsModalOpen(true);
   };
 
-  const handleEditAddress = (index) => {
+  const handleEditPickupSpot = (index) => {
     setEditingIndex(index);
     setIsModalOpen(true);
   };
 
-  const handleSaveAddress = async (data) => {
+  const handleSavePickupSpot = async (data) => {
     try {
+      // Enforce the 3-spot cap on save too (create path).
+      if (editingIndex === null && pickupSpots.length >= 3) {
+        toast.error("Maximum 3 pickup spots allowed");
+        return;
+      }
       let res;
       if (editingIndex !== null) {
-        res = await updateAddress(addresses[editingIndex]?._id, data);
+        res = await updatePickupSpot(pickupSpots[editingIndex]?._id, data);
       } else {
-        res = await createAddress(data);
+        res = await createPickupSpot(data);
       }
 
       if (res.data.success) {
-        toast.success("Address saved");
-        await fetchAddresses();
+        toast.success("Pickup spot saved");
+        await fetchPickupSpots();
         setIsModalOpen(false);
         setEditingIndex(null);
       }
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save address");
+      toast.error(err?.response?.data?.message || "Failed to save pickup spot");
     }
   };
 
-  const handleDeleteAddress = async (index) => {
+  const handleDeletePickupSpot = async (index) => {
     try {
-      await deleteAddress(addresses[index]?._id);
-      toast.success("Address deleted");
-      fetchAddresses();
+      await deletePickupSpot(pickupSpots[index]?._id);
+      toast.success("Pickup spot deleted");
+      fetchPickupSpots();
     } catch {
-      toast.error("Failed to delete address");
+      toast.error("Failed to delete pickup spot");
+    } finally {
+      setPendingDeleteIndex(null);
     }
   };
 
-  const handleSetDefaultAddress = async (id) => {
+  const handleSetPrimaryPickupSpot = async (id) => {
     try {
-      await setDefaultAddress(id);
-      toast.success("Default address updated");
-      fetchAddresses();
+      await setPrimaryPickupSpot(id);
+      toast.success("Primary pickup spot updated");
+      fetchPickupSpots();
     } catch {
-      toast.error("Failed to set default address");
+      toast.error("Failed to set primary pickup spot");
+    } finally {
+      setPendingPrimaryId(null);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!userDetails?.email) {
+      toast.error("No email on your account");
+      return;
+    }
+    try {
+      await resendVerification({ email: userDetails.email });
+      toast.success("Verification email sent");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to resend email");
     }
   };
 
@@ -315,20 +478,30 @@ function Settings() {
       const res = await logoutUser();
 
       if (res.data.success) {
-        localStorage.removeItem("isAuthenticated");
-        localStorage.removeItem("cachedUserDetails");
         toast.success("Logged out successfully");
         navigate("/login");
+      } else {
+        toast.error("Logout failed");
       }
     } catch {
       toast.error("Logout failed");
+    } finally {
+      // Always clear local session regardless of server result.
+      try {
+        clearUserData();
+      } catch {
+        localStorage.removeItem("isAuthenticated");
+        localStorage.removeItem("cachedUserDetails");
+        localStorage.removeItem("accessToken");
+      }
+      navigate("/login");
     }
   };
 
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#F5F6FA] dark:bg-[#131313]">
-        <Loader />
+        <BrandLoader size="lg" />
       </div>
     );
   }
@@ -353,19 +526,32 @@ function Settings() {
     },
     {
       label: "Campus",
-      value: defaultAddress?.line2 || defaultAddress?.city || "VIT Vellore",
+      value:
+        campuses.find((c) => c.slug === (campusSlug || activeCampus?.slug))
+          ?.name ||
+        activeCampus?.name ||
+        "Not set",
       icon: MapPin,
+      editable: true,
+      field: "campus",
     },
   ];
 
+  const currentCampusSlug =
+    (typeof userDetails?.campus_id === "object" &&
+      userDetails.campus_id?.slug) ||
+    activeCampus?.slug ||
+    "";
+  const campusChanged = Boolean(campusSlug) && campusSlug !== currentCampusSlug;
+
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#F7F9FD] font-figtree text-[#111827] dark:bg-[#131313] dark:text-white">
+    <div className="h-full w-full overflow-hidden bg-[#F7F9FD] font-figtree text-[#111827] dark:bg-[#131313] dark:text-white">
       <div className="flex h-[calc(100vh-70px)]">
-        <aside className="hidden bg-white dark:bg-[#131313] md:block md:w-auto md:shrink-0 xl:pt-2 xl:pb-0">
+        <aside className="hidden bg-[#F7F8FA] dark:bg-[#131313] md:block md:w-auto md:shrink-0 xl:pt-2 xl:pb-0">
           <Profile_left_part />
         </aside>
 
-        <main className="h-full w-full overflow-y-auto bg-[#F5F6FA] px-4 py-6 dark:bg-[#131313] sm:px-6 md:flex-1 lg:p-8 xl:px-[5.7rem] xl:py-6">
+        <main className="h-full w-full overflow-y-auto no-scrollbar bg-[#F5F6FA] px-4 py-6 dark:bg-[#131313] sm:px-6 md:flex-1 lg:p-8 xl:px-[5.7rem] xl:py-6">
           <div className="mx-auto w-full max-w-5xl pb-8">
             <header className="mb-5">
               <h1 className="text-[1.4rem] font-bold leading-tight text-gray-900 dark:text-white lg:text-2xl xl:text-xl">
@@ -376,15 +562,15 @@ function Settings() {
               </p>
             </header>
 
-            <nav className="mb-6 flex max-w-fit gap-2 overflow-x-auto rounded-xl border border-[#E4E7EF] bg-[#F1F3F8] p-1">
+            <nav className="mb-6 flex max-w-fit gap-2 overflow-x-auto rounded-xl border border-[#E4E7EF] bg-[#F1F3F8] p-1 dark:border-[#2A2E35] dark:bg-[#1B1F27]">
               {tabs.map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`min-w-max rounded-lg px-3.5 py-2 text-sm font-medium transition ${
                     activeTab === tab
-                      ? "bg-white text-[#111827] shadow-sm ring-1 ring-black/5"
-                      : "text-[#98A1B2] hover:text-[#4B5563]"
+                      ? "bg-[#F7F8FA] text-[#111827] shadow-sm ring-1 ring-black/5 dark:bg-[#252A35] dark:text-white dark:ring-white/10"
+                      : "text-[#98A1B2] hover:text-[#4B5563] dark:text-[#8F9BAA] dark:hover:text-white"
                   }`}
                 >
                   {tab}
@@ -394,7 +580,7 @@ function Settings() {
 
             {activeTab === "Profile" && (
               <section className="space-y-6">
-                <div className="rounded-2xl border border-gray-100 bg-white px-5 py-5 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] px-5 py-5 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-5">
                       <div className="relative">
@@ -402,7 +588,8 @@ function Settings() {
                           <AvatarComponent
                             name={userDetails?.name}
                             imageUrl={userDetails?.avatar?.url}
-                            plan={userDetails?.subscription}
+                            plan={userDetails?.subscription} role={userDetails?.role} isOwn
+                            showBadge
                             size="large"
                             isLoading={loading}
                             className="rounded-xl object-cover"
@@ -412,6 +599,11 @@ function Settings() {
                         <button
                           type="button"
                           disabled={isUploadingAvatar || isRemovingAvatar}
+                          aria-label={
+                            userDetails?.avatar?.url
+                              ? "Remove profile photo"
+                              : "Upload profile photo"
+                          }
                           onClick={() => {
                             if (userDetails?.avatar?.url) {
                               handleRemoveAvatar();
@@ -441,15 +633,15 @@ function Settings() {
   disabled:cursor-not-allowed
   disabled:opacity-60
   ${
-    userDetails?.avatar?.fileId
+    userDetails?.avatar?.url
       ? "bg-red-500 hover:bg-red-600 shadow-red-500/25"
       : "bg-[#4F46FF] hover:bg-[#4338CA] shadow-[#4F46FF]/25"
   }
 `}
                         >
                           {isUploadingAvatar || isRemovingAvatar ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : userDetails?.avatar?.fileId ? (
+                            <BrandLoader size="xs" tone="white" />
+                          ) : userDetails?.avatar?.url ? (
                             <Trash2 className="h-4 w-4" />
                           ) : (
                             <Camera className="h-4 w-4" />
@@ -467,8 +659,10 @@ function Settings() {
                           )}
                         </div>
                         <p className=" text-[0.8rem]  font-medium text-gray-400">
-                          VIT Vellore ·{" "}
-                          {formatMemberSince(userDetails?.createdAt)}
+                          {activeCampus?.short_name ||
+                            activeCampus?.name ||
+                            "Campus not set"}{" "}
+                          · {formatMemberSince(userDetails?.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -493,28 +687,11 @@ function Settings() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
                   <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-base font-bold">
                       Personal Information
                     </h2>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        isProfileEditing
-                          ? handleSaveProfile()
-                          : setIsProfileEditing(true)
-                      }
-                      disabled={isSavingProfile}
-                      className="flex items-center gap-2 text-sm font-semibold text-[#4F46FF] disabled:opacity-60"
-                    >
-                      <Pencil size={17} />
-                      {isProfileEditing
-                        ? isSavingProfile
-                          ? "Saving..."
-                          : "Save"
-                        : "Edit all"}
-                    </button>
                   </div>
 
                   <div className="divide-y divide-[#EDF0F5]">
@@ -534,16 +711,38 @@ function Settings() {
                               <div className="text-[0.68rem] font-medium uppercase tracking-normal text-[#98A1B2]">
                                 {row.label}
                               </div>
-                              {isProfileEditing && row.field === "phone" ? (
+                              {editingField === "phone" && row.field === "phone" ? (
                                 <input
                                   value={phone}
                                   onChange={(event) => {
                                     setPhone(event.target.value);
-                                    setProfileChanged(true);
                                   }}
                                   placeholder="10 digit mobile number"
-                                  className="mt-1.5 w-full rounded-xl border border-[#D8DDEA] bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
+                                  className="mt-1.5 w-full rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                                 />
+                              ) : editingField === "campus" && row.field === "campus" ? (
+                                <>
+                                  <select
+                                    value={campusSlug}
+                                    onChange={(event) => {
+                                      setCampusSlug(event.target.value);
+                                    }}
+                                    className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
+                                  >
+                                    <option value="">Select campus</option>
+                                    {campuses.map((c) => (
+                                      <option key={c.slug} value={c.slug}>
+                                        {c.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {campusChanged && (
+                                    <p className="mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                      Your live listings move to the new campus
+                                      on save.
+                                    </p>
+                                  )}
+                                </>
                               ) : (
                                 <div className="mt-1 break-words text-[0.9rem] font-medium">
                                   {row.value}
@@ -551,19 +750,37 @@ function Settings() {
                               )}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (row.editable) setIsProfileEditing(true);
-                            }}
-                            className={`text-sm font-semibold ${
-                              row.editable
-                                ? "text-[#4F46FF]"
-                                : "cursor-not-allowed text-[#CBD1DD]"
-                            }`}
-                          >
-                            Edit
-                          </button>
+                          {row.editable ? (
+                            editingField === row.field ? (
+                              <span className="flex shrink-0 items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={cancelEditing}
+                                  disabled={isSavingProfile}
+                                  className="text-sm font-semibold text-[#98A1B2] disabled:opacity-50"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveField(row.field)}
+                                  disabled={isSavingProfile}
+                                  className="text-sm font-semibold text-[#4F46FF] disabled:opacity-50"
+                                >
+                                  {isSavingProfile ? "Saving..." : "Save"}
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startEditing(row.field)}
+                                disabled={editingField !== null}
+                                className="text-sm font-semibold text-[#4F46FF] disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Edit
+                              </button>
+                            )
+                          ) : null}
                         </div>
                       );
                     })}
@@ -577,14 +794,13 @@ function Settings() {
                           <div className="text-[0.68rem] font-medium uppercase tracking-normal text-[#98A1B2]">
                             Gender
                           </div>
-                          {isProfileEditing ? (
+                          {editingField === "gender" && !userDetails?.gender ? (
                             <select
                               value={gender}
                               onChange={(event) => {
                                 setGender(event.target.value);
-                                setProfileChanged(true);
                               }}
-                              className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
+                              className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
                             >
                               <option value="">Select gender</option>
                               <option value="male">Male</option>
@@ -596,15 +812,82 @@ function Settings() {
                               {userDetails?.gender || "Not added"}
                             </div>
                           )}
+                          {userDetails?.gender && editingField === "gender" ? (
+                            <div className="mt-2 rounded-lg bg-[#F2F4F9] px-3 py-2 text-[11px] font-medium text-[#526071] dark:bg-[#252525] dark:text-slate-300">
+                              Gender is locked after setup. To change it, request admin approval below.
+                              {genderRequest?.status === "pending" ? (
+                                <span className="mt-1 block font-bold text-amber-600">
+                                  Pending approval for “{genderRequest.requestedGender}”.
+                                </span>
+                              ) : (
+                                <>
+                                  {genderRequest?.status === "rejected" ? (
+                                    <span className="mt-1 block font-bold text-red-500">
+                                      Last request was not approved. You can raise a new one.
+                                    </span>
+                                  ) : null}
+                                  <span className="mt-2 flex flex-wrap items-center gap-2">
+                                    <select
+                                      value={requestedGender}
+                                      onChange={(e) => setRequestedGender(e.target.value)}
+                                      className="rounded-lg border border-[#D8DDEA] bg-white px-2 py-1.5 text-xs outline-none dark:bg-[#1A1D20] dark:text-white"
+                                      aria-label="Requested gender"
+                                    >
+                                      <option value="">Select new gender</option>
+                                      {["male", "female", "other"]
+                                        .filter((g) => g !== userDetails?.gender)
+                                        .map((g) => (
+                                          <option key={g} value={g} className="capitalize">
+                                            {g.charAt(0).toUpperCase() + g.slice(1)}
+                                          </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={handleGenderRequest}
+                                      disabled={!requestedGender || requestSaving}
+                                      className="rounded-lg bg-[#111827] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                                    >
+                                      {requestSaving ? "Sending..." : "Request approval"}
+                                    </button>
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsProfileEditing(true)}
-                        className="text-sm font-semibold text-[#4F46FF]"
-                      >
-                        Edit
-                      </button>
+                      {editingField === "gender" ? (
+                        <span className="flex shrink-0 items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={cancelEditing}
+                            disabled={isSavingProfile || requestSaving}
+                            className="text-sm font-semibold text-[#98A1B2] disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          {!userDetails?.gender && (
+                            <button
+                              type="button"
+                              onClick={() => handleSaveField("gender")}
+                              disabled={isSavingProfile || !gender}
+                              className="text-sm font-semibold text-[#4F46FF] disabled:opacity-50"
+                            >
+                              {isSavingProfile ? "Saving..." : "Save"}
+                            </button>
+                          )}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEditing("gender")}
+                          disabled={editingField !== null}
+                          className="text-sm font-semibold text-[#4F46FF] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Edit
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -617,36 +900,9 @@ function Settings() {
               <SecuritySettings email={userDetails?.email} />
             )}
 
-            {activeTab === "Addresses" && (
-              <section>
-                <div className="grid gap-5 lg:grid-cols-2">
-                  {addresses.map((address, index) => (
-                    <AddressCard
-                      key={address._id}
-                      address={address}
-                      index={index}
-                      onEdit={() => handleEditAddress(index)}
-                      onDelete={() => handleDeleteAddress(index)}
-                      onSetDefault={() => handleSetDefaultAddress(address._id)}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleAddAddress}
-                  disabled={addresses.length >= 3}
-                  className="mt-5 flex h-10 w-full items-center justify-center rounded-xl bg-[#EEF0FF] text-sm font-semibold text-[#4F46FF] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Plus size={16} className="mr-1.5" />
-                  Add new address
-                </button>
-              </section>
-            )}
-
             {activeTab === "Pickup Spots" && (
               <section className="max-w-[770px]">
-                <div className="mb-5 flex gap-4 rounded-2xl border border-[#CDD2FF] bg-[#F0F1FF] p-3 text-sm leading-7 text-[#526071]">
+                <div className="mb-5 flex gap-4 rounded-2xl border border-[#CDD2FF] bg-[#F0F1FF] p-3 text-sm leading-7 text-[#526071] dark:border-[#343A5A] dark:bg-[#202438] dark:text-[#C8D1DE]">
                   <MapPin className="mt-1 shrink-0 text-[#4F46FF]" size={15} />
                   <p>
                     Pickup spots are shared with buyers when they message you.
@@ -654,18 +910,35 @@ function Settings() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-[#2A2E35] dark:bg-[#181A1F]">
                   <h2 className="mb-5 text-base font-bold">
                     Your pickup spots
                   </h2>
                   <div className="space-y-4">
-                    {pickupSpots.map((spot) => (
+                    {pickupLoading ? (
+                      <div className="space-y-3">
+                        {[0, 1].map((i) => (
+                          <div
+                            key={i}
+                            className="h-[76px] animate-pulse rounded-2xl border border-[#E4E7EF] bg-[#F4F6FB] dark:border-[#303641] dark:bg-[#20242B]"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                    <>
+                    {pickupSpots.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-[#D8DDEA] bg-[#FAFBFE] p-6 text-center text-sm font-medium text-[#98A1B2] dark:border-[#303641] dark:bg-[#20242B] dark:text-[#AAB9C5]">
+                        No pickup spots yet. Add a familiar campus location to
+                        share with buyers.
+                      </div>
+                    )}
+                    {pickupSpots.map((spot, index) => (
                       <div
-                        key={spot.id}
+                        key={spot._id}
                         className={`flex items-center justify-between rounded-2xl border p-4 ${
                           spot.isPrimary
-                            ? "border-[#B8B6FF] bg-[#FAFAFF]"
-                            : "border-[#E4E7EF] bg-[#FAFBFE]"
+                            ? "border-[#B8B6FF] bg-[#FAFAFF] dark:border-[#5E58D8] dark:bg-[#202438]"
+                            : "border-[#E4E7EF] bg-[#FAFBFE] dark:border-[#303641] dark:bg-[#20242B]"
                         }`}
                       >
                         <div className="flex items-center gap-4">
@@ -673,7 +946,7 @@ function Settings() {
                             className={`flex h-8 w-8 items-center justify-center rounded-xl ${
                               spot.isPrimary
                                 ? "bg-[#554BFF] text-white"
-                                : "bg-[#E9ECF3] text-[#98A1B2]"
+                                : "bg-[#E9ECF3] text-[#98A1B2] dark:bg-[#2C3340] dark:text-[#9AA7B8]"
                             }`}
                           >
                             <MapPin size={16} />
@@ -687,34 +960,53 @@ function Settings() {
                                 </span>
                               )}
                             </div>
-                            <p className="mt-1 text-xs font-medium text-[#98A1B2]">
+                            <p className="mt-1 text-xs font-medium text-[#98A1B2] dark:text-[#8F9BAA]">
                               {spot.detail}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-5">
                           {!spot.isPrimary && (
-                            <button className="text-xs font-semibold text-[#4F46FF]">
+                            <button
+                              type="button"
+                              onClick={() => setPendingPrimaryId(spot._id)}
+                              className="text-xs font-semibold text-[#4F46FF]"
+                            >
                               Set primary
                             </button>
                           )}
-                          <button className="text-[#98A1B2]">
+                          <button
+                            type="button"
+                            onClick={() => handleEditPickupSpot(index)}
+                            className="text-xs font-semibold text-[#64707D] dark:text-[#B8C2D0]"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingDeleteIndex(index)}
+                            className="text-[#98A1B2] transition hover:text-[#EF4444] dark:text-[#8F9BAA] dark:hover:text-[#F87171]"
+                          >
                             <Trash2 size={16} />
                           </button>
                         </div>
                       </div>
                     ))}
+                    </>
+                    )}
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  className="mt-5 flex h-10 w-full items-center justify-center rounded-xl bg-[#EEF0FF] text-sm font-semibold text-[#4F46FF]"
+                  onClick={handleAddPickupSpot}
+                  disabled={pickupSpots.length >= 3}
+                  className="mt-5 flex h-10 w-full items-center justify-center rounded-xl bg-[#EEF0FF] text-sm font-semibold text-[#4F46FF] transition hover:bg-[#E3E5FF] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#22263A] dark:text-[#8F8AFF] dark:hover:bg-[#282E4A]"
                 >
                   <Plus size={16} className="mr-1.5" />
                   Add pickup spot
                 </button>
-                <p className="mt-5 flex gap-2 text-sm font-medium text-[#98A1B2]">
+                <p className="mt-5 flex gap-2 text-sm font-medium text-[#98A1B2] dark:text-[#AAB9C5]">
                   <Zap className="shrink-0 text-[#FF7A30]" size={16} />
                   Pro tip: Always meet in well-lit public campus areas. Never
                   share your hostel room or home address.
@@ -722,45 +1014,169 @@ function Settings() {
               </section>
             )}
 
+            {activeTab === "Chat" && (
+              <ChatSettings
+                user={userDetails}
+                onSaved={(chat_settings) => {
+                  setUserDetails((prev) =>
+                    prev ? { ...prev, chat_settings } : prev,
+                  );
+                  updateUserDetails({ chat_settings });
+                }}
+              />
+            )}
+
             {activeTab === "Verification" && (
-              <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DCFCE7] text-[#16A34A]">
-                    <Shield size={18} />
+              <section className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                        userDetails?.is_email_verified
+                          ? "bg-[#DCFCE7] text-[#16A34A]"
+                          : "bg-amber-100 text-amber-600"
+                      }`}
+                    >
+                      <Shield size={18} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold">
+                        {userDetails?.is_email_verified
+                          ? "Email verified"
+                          : "Verification pending"}
+                      </h2>
+                      <p className="text-xs text-[#98A1B2]">
+                        {userDetails?.email || "No email on file"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-base font-bold">
-                      {userDetails?.is_email_verified
-                        ? "Email verified"
-                        : "Verification pending"}
-                    </h2>
-                    <p className=" text-xs text-[#98A1B2]">
-                      Student verification workflow is not available here yet.
-                    </p>
-                  </div>
+                  {!userDetails?.is_email_verified && (
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      className="rounded-xl bg-[#4F46FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#4338CA]"
+                    >
+                      Resend verification email
+                    </button>
+                  )}
                 </div>
               </section>
             )}
 
-            <AddressModal
+            <PickupSpotModal
               isOpen={isModalOpen}
               onClose={() => setIsModalOpen(false)}
-              onSave={handleSaveAddress}
+              onSave={handleSavePickupSpot}
               initialData={
                 editingIndex !== null
-                  ? addresses[editingIndex]
-                  : { line1: "", line2: "", state: "", city: "", pincode: "" }
+                  ? pickupSpots[editingIndex]
+                  : { name: "", detail: "", isPrimary: false }
               }
               mode={editingIndex !== null ? "update" : "create"}
-              addressId={
-                editingIndex !== null ? addresses[editingIndex]?._id : null
+              pickupSpotId={
+                editingIndex !== null ? pickupSpots[editingIndex]?._id : null
               }
             />
+
+            {/* Campus-move confirm (same theme) */}
+            {showCampusConfirm && (
+              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+                <div className="w-full max-w-[420px] rounded-[20px] border border-white/80 bg-[#F7F8FA] p-6 shadow-2xl dark:border-[#2A2E35] dark:bg-[#181A1F]">
+                  <h2 className="text-lg font-bold text-[#111827] dark:text-white">
+                    Change campus?
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#64748B] dark:text-[#AAB9C5]">
+                    {listingsToMove !== null
+                      ? `Move ${listingsToMove} active listing${listingsToMove === 1 ? "" : "s"} to the new campus?`
+                      : "Move your live listings to the new campus?"}{" "}
+                    Buyers on your old campus will no longer see them.
+                  </p>
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowCampusConfirm(false)}
+                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                    >
+                      Keep campus
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSavingProfile}
+                      onClick={() => handleSaveField("campus", true)}
+                      className="flex-1 rounded-xl bg-[#4F46FF] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {isSavingProfile ? "Moving…" : "Move listings"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Pickup spot delete confirm */}
+            {pendingDeleteIndex !== null && (
+              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+                <div className="w-full max-w-[400px] rounded-[20px] bg-[#F7F8FA] p-6 shadow-2xl dark:bg-[#181A1F]">
+                  <h2 className="text-base font-bold text-[#111827] dark:text-white">
+                    Delete pickup spot?
+                  </h2>
+                  <p className="mt-2 text-sm text-[#64748B] dark:text-[#AAB9C5]">
+                    “{pickupSpots[pendingDeleteIndex]?.name}” will be removed.
+                    Listings using it keep their saved snapshot.
+                  </p>
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteIndex(null)}
+                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePickupSpot(pendingDeleteIndex)}
+                      className="flex-1 rounded-xl bg-[#EF4444] py-2.5 text-sm font-semibold text-white"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Set-primary confirm */}
+            {pendingPrimaryId !== null && (
+              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+                <div className="w-full max-w-[400px] rounded-[20px] bg-[#F7F8FA] p-6 shadow-2xl dark:bg-[#181A1F]">
+                  <h2 className="text-base font-bold text-[#111827] dark:text-white">
+                    Set as primary?
+                  </h2>
+                  <p className="mt-2 text-sm text-[#64748B] dark:text-[#AAB9C5]">
+                    New listings will use this spot by default.
+                  </p>
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPendingPrimaryId(null)}
+                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetPrimaryPickupSpot(pendingPrimaryId)}
+                      className="flex-1 rounded-xl bg-[#4F46FF] py-2.5 text-sm font-semibold text-white"
+                    >
+                      Set primary
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/jpg"
+            accept="image/png,image/jpeg,image/webp"
             className="hidden"
             onChange={handleAvatarChange}
           />
@@ -772,7 +1188,7 @@ function Settings() {
 
 function AccountCard({ onLogout }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+    <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
       <h2 className="mb-5 text-base font-bold">Account</h2>
 
       <div className="flex items-center justify-between border-b border-[#E1E5EE] pb-5">
@@ -804,73 +1220,6 @@ function AccountCard({ onLogout }) {
         <AlertDialogDemo />
       </div>
     </div>
-  );
-}
-
-function AddressCard({ address, index, onEdit, onDelete, onSetDefault }) {
-  const isCampus = index === 0 || address.isDefault;
-  const title = isCampus ? "Campus" : "Home";
-  const Icon = isCampus ? MapPin : Home;
-
-  return (
-    <article
-      className={`rounded-2xl border bg-white px-5 py-4 shadow-sm dark:bg-[#1c1c1c] ${
-        address.isDefault
-          ? "border-[#514BFF] ring-2 ring-[#514BFF]"
-          : "border-[#E2E6EF]"
-      }`}
-    >
-      <div className="mb-1 flex items-start justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Icon
-            size={15}
-            className={address.isDefault ? "text-[#4F46FF]" : "text-[#98A1B2]"}
-          />
-          <h3 className="text-[0.95rem] font-semibold tracking-wide ">
-            {title}
-          </h3>
-        </div>
-        {address.isDefault ? (
-          <span className="rounded-lg bg-[#DDFBE9] px-2.5 py-0.5 text-xs font-semibold text-[#16A34A]">
-            Primary
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onSetDefault}
-            className="text-xs font-semibold text-[#4F46FF]"
-          >
-            Set primary
-          </button>
-        )}
-      </div>
-
-      <div className="min-h-[70px] text-[0.85rem] leading-6 text-[#334155] dark:text-[#D7D7D7]">
-        <p>{address.line1}</p>
-        {address.line2 && <p>{address.line2}</p>}
-        <p>
-          {address.city}, {address.state} {address.pincode}
-        </p>
-      </div>
-      <div className="flex justify-between mt-4">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex items-center gap-2 text-xs font-semibold text-[#4B5563] dark:text-[#D7D7D7]"
-        >
-          <Pencil size={14} />
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="flex items-center gap-2 text-xs font-semibold text-[#EF4444]"
-        >
-          <Trash2 size={14} />
-          Delete
-        </button>
-      </div>
-    </article>
   );
 }
 

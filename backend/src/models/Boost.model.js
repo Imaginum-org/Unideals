@@ -34,6 +34,15 @@ const boostSchema = new Schema(
       required: true,
       min: 1,
     },
+    // Quota accounting: false = monthly-quota boost (counts against the
+    // plan cap), true = one-time purchased add-on (payment is the
+    // entitlement, excluded from quota counts via { isAddon: { $ne: true } }
+    // so legacy docs without the field still count as quota).
+    isAddon: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     status: {
       type: String,
       enum: ["active", "expired"],

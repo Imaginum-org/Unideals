@@ -9,7 +9,7 @@ function LegalAgreementModal({ activeTab, onTabChange, onClose, onAccept }) {
       aria-modal="true"
       aria-labelledby="legal-agreement-title"
     >
-      <div className="flex max-h-[89dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-white text-[#18181B] shadow-2xl dark:bg-[#131313] dark:text-white sm:max-w-3xl sm:rounded-2xl">
+      <div className="flex max-h-[89dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-[#F7F8FA] text-[#18181B] shadow-2xl dark:bg-[#131313] dark:text-white sm:max-w-3xl sm:rounded-2xl">
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-zinc-800 sm:px-5">
           {/* <div>
             <h2

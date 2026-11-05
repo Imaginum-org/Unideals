@@ -20,10 +20,19 @@ export const compressImage = async (
   try {
     const compressedFile = await imageCompression(file, options);
 
+    // Ensure compression actually respects limits; reject if still oversized
+    if (compressedFile.size > 10 * 1024 * 1024) {
+      throw new Error("Image too large even after compression");
+    }
+
     return compressedFile;
   } catch (error) {
-    console.error("Image compression failed:", error);
-
-    return file;
+    // Do not silently return the original (could bypass size limits).
+    // Let callers show a proper error instead of uploading 10MB+ files.
+    throw new Error(
+      error?.message === "Image too large even after compression"
+        ? error.message
+        : "Image compression failed. Please try a smaller image.",
+    );
   }
 };

@@ -12,7 +12,7 @@
 
 ## Launch Offer
 
-> 🎉 **Early users get lifetime access at launch pricing.**
+> 🎉 **Become a Founder Member and enjoy lifetime benefits at a one-time launch price.**
 
 This offer is only available during the initial launch period. Once the Founder Offer ends, new users will move to the regular semester plans, while Founder members keep their lifetime benefits.
 
@@ -23,8 +23,8 @@ This offer is only available during the initial launch period. Once the Founder 
 ## Plans
 
 - 🆓 **Free**
-- ⭐ **Plus** — **₹149 / Semester**
-- 👑 **Premium** — **₹249 / Semester**
+- ⭐ **Pro** — **₹99 / Semester**
+- 👑 **Pro+** — **₹199 / Semester**
 
 ---
 
@@ -32,17 +32,16 @@ This offer is only available during the initial launch period. Once the Founder 
 
 | Feature | Free | Pro | Pro+ |
 |---------|:---:|:---:|:---:|
-| 🔍 Priority in Search Results | — | ✅ | ⭐ Highest |
+| 🛒 Buy & Sell Products | ✅ | ✅ | ✅ |
+| 💬 Unlimited Chats | ✅ | ✅ | ✅ |
 | 🚀 Monthly Boost Credits | 0 | 2 | 5 |
 | ⏳ Boost Duration | — | 3 Days | 7 Days |
-| 💬 Premium Chat Section | — | ✅ | ⭐ Higher Priority |
+| 🔍 Priority in Search Results | — | ✅ | ⭐ Highest |
+| 💬 Priority Chat Placement | — | ✅ | ⭐ Higher Priority |
 | 📦 Active Listings | 10 | 25 | Unlimited |
 | ❤️ Wishlist | 25 | 100 | Unlimited |
 | 🚀 Early Feature Access | — | Limited | Full |
 | 🎧 Customer Support | Standard | Priority | Highest Priority |
-| 🛒 Buy & Sell Products | ✅ | ✅ | ✅ |
-| 💬 Unlimited Chats | ✅ | ✅ | ✅ |
-
 ---
 
 # 🚀 One-Time Add-ons

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { MESSAGE_TYPE } from "../utils/constants.js";
+import { MESSAGE_TYPE } from "../config/constants.js";
 
 const conversationSchema = new mongoose.Schema(
   {
@@ -69,6 +69,13 @@ const conversationSchema = new mongoose.Schema(
       selling_price: {
         type: Number,
         required: true,
+      },
+
+      // Girls Corner 🌸 — denormalized for thread list icon. Old threads
+      // lack it → readers treat missing as false (backward compat).
+      isGirlsOnly: {
+        type: Boolean,
+        default: false,
       },
     },
 

@@ -5,8 +5,13 @@ export const getProducts = (params = {}) => {
   return axios.get("/api/product", {params});
 };
 
-export const getBoostedProducts = () => {
-  return axios.get("/api/product/boosted");
+// Girls Corner 🌸 feed — same endpoint, audience param (no new route).
+export const getGirlsCornerProducts = (params = {}) => {
+  return axios.get("/api/product", { params: { ...params, audience: "girls_only" } });
+};
+
+export const getBoostedProducts = (params = {}) => {
+  return axios.get("/api/product/boosted", { params });
 };
 
 export const getBoostSummary = () => {
@@ -14,8 +19,8 @@ export const getBoostSummary = () => {
 };
 
 // GET PRODUCT BY ID
-export const getProductById = (id) => {
-  return axios.get(`/api/product/${id}`);
+export const getProductById = (id, params = {}, config = {}) => {
+  return axios.get(`/api/product/${id}`, { params, ...config });
 };
 
 // GET USER PRODUCTS
@@ -59,6 +64,11 @@ export const unlistProduct = (productId) => {
 // RELIST PRODUCT
 export const relistProduct = (productId) => {
   return axios.patch(`/api/product/${productId}/relist`);
+};
+
+// MARK SOLD — PATCH /api/product/:id/sold (owner only, listed → sold)
+export const markProductSold = (productId) => {
+  return axios.patch(`/api/product/${productId}/sold`);
 };
 
 export const boostProduct = (productId) => {

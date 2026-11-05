@@ -21,7 +21,9 @@ const auth = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
+    const decoded = jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN, {
+      algorithms: ["HS256"],
+    });
 
     const user = await User.findById(decoded.id)
       .select("-password -refresh_token")
@@ -30,6 +32,27 @@ const auth = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         message: "User not found",
+        success: false,
+        error: true,
+      });
+    }
+
+    // Reject legacy pre-v tokens (no numeric v → force one re-login).
+    if (typeof decoded.v !== "number") {
+      return res.status(401).json({
+        message: "Session revoked. Please log in again.",
+        success: false,
+        error: true,
+      });
+    }
+
+    // Token version check - sessions revoked on logout/password reset/suspend
+    if (
+      typeof user.tokenVersion === "number" &&
+      decoded.v !== user.tokenVersion
+    ) {
+      return res.status(401).json({
+        message: "Session revoked. Please log in again.",
         success: false,
         error: true,
       });
@@ -49,6 +72,16 @@ const auth = async (req, res, next) => {
       });
     }
 
+    // Defense-in-depth verified gate for mutations (public GETs use
+    // optionalAuth so unaffected; login/verify routes don't use auth()).
+    if (!user.is_email_verified) {
+      return res.status(403).json({
+        message: "Email verification required.",
+        success: false,
+        error: true,
+      });
+    }
+
     req.userId = user._id;
     req.user = user;
 
@@ -60,6 +93,53 @@ const auth = async (req, res, next) => {
       error: true,
     });
   }
+};
+
+// Optional auth for public routes: attaches req.user when a valid session
+// cookie is present, never rejects. Lets campus-scoped public endpoints
+// (feed, search, detail) use the profile campus for logged-in users while
+// staying open to guests (who scope via campus_slug instead).
+export const optionalAuth = async (req, res, next) => {
+  try {
+    let token;
+
+    if (req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
+    } else if (req.headers.authorization?.startsWith("Bearer ")) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    if (!token) return next();
+
+    const decoded = jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN, {
+      algorithms: ["HS256"],
+    });
+
+    const user = await User.findById(decoded.id)
+      .select("-password -refresh_token")
+      .lean();
+
+    if (!user) return next();
+
+    // Legacy pre-v tokens carry no session version — treat as guest.
+    if (typeof decoded.v !== "number") return next();
+
+    if (
+      typeof user.tokenVersion === "number" &&
+      decoded.v !== user.tokenVersion
+    ) {
+      return next();
+    }
+
+    if (user.status !== USER_STATUS.ACTIVE) return next();
+
+    req.userId = user._id;
+    req.user = user;
+  } catch {
+    // Expired/invalid session on a public route: fall through as guest.
+  }
+
+  next();
 };
 
 export default auth;

@@ -19,6 +19,16 @@ const productSchema = new Schema(
       index: true,
     },
 
+    // Campus marketplace: denormalized from the seller at creation so
+    // every feed/search stays a single-collection indexed query.
+    // Never client-controlled — the service stamps it from req.user.
+    campus_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Campus",
+      default: null,
+      index: true,
+    },
+
     title: {
       type: String,
       required: function () {
@@ -139,6 +149,15 @@ const productSchema = new Schema(
       index: true,
     },
 
+    // Stock count for single-seller chat sales. Exposed to buyers;
+    // decrement is intentionally manual (chat-negotiated, one seller).
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 99,
+    },
+
     is_negotiable: {
       type: Boolean,
       default: true,
@@ -152,6 +171,10 @@ const productSchema = new Schema(
       },
     },
 
+    // Campus marketplace: buyer and seller are on the same campus, so the
+    // snapshot only carries the pickup spot (spot name -> address_line,
+    // spot detail -> city). State/pincode are legacy optional fields kept
+    // for old listings, never required for new ones.
     pickup_address_snapshot: {
       address_line: {
         type: String,
@@ -170,16 +193,10 @@ const productSchema = new Schema(
       state: {
         type: String,
         trim: true,
-        required: function () {
-          return this.status !== PRODUCT_STATUS.DRAFT;
-        },
       },
       pincode: {
         type: String,
         trim: true,
-        required: function () {
-          return this.status !== PRODUCT_STATUS.DRAFT;
-        },
         match: [/^\d{6}$/, "Invalid pincode"],
       },
       mobile: {
@@ -239,6 +256,32 @@ const productSchema = new Schema(
       default: false,
       index: true,
     },
+
+    // Girls Corner 🌸 — seller opt-in. true = invisible + uncontactable
+    // to non-females (enforced in product/conversation services).
+    isGirlsOnly: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    // Snapshot proving seller was female at creation; prevents flip loophole.
+    sellerGenderSnapshot: {
+      type: String,
+      enum: ["female"],
+      default: undefined,
+    },
+
+    // Legal consent tracking (optional; old listings simply lack it).
+    terms_version: {
+      type: String,
+      trim: true,
+      maxlength: 20,
+      default: undefined,
+    },
+    terms_accepted_at: {
+      type: Date,
+      default: undefined,
+    },
   },
   {
     timestamps: true,
@@ -270,6 +313,27 @@ productSchema.index({
   status: 1,
 });
 
+// Campus-first compounds: every feed/search match starts with campus_id,
+// keeping queries selective as the directory grows to 100s of campuses.
+productSchema.index({
+  campus_id: 1,
+  status: 1,
+  is_deleted: 1,
+  createdAt: -1,
+});
+// Girls Corner feed: campus + audience + status, avoids collection scans.
+productSchema.index({
+  campus_id: 1,
+  isGirlsOnly: 1,
+  status: 1,
+  createdAt: -1,
+});
+productSchema.index({
+  campus_id: 1,
+  category: 1,
+  selling_price: 1,
+});
+
 productSchema.index({ is_boosted: 1, boost_expires_at: -1, boost_tier: 1 });
 productSchema.index(
   { seller_id: 1, title: 1, selling_price: 1 },
@@ -285,14 +349,14 @@ productSchema.index({
 
 productSchema.pre("save", async function () {
   try {
-    // Generate slug
-    if (!this.slug) {
+    // Generate slug - skip for drafts without title
+    if (!this.slug && this.title) {
       const baseSlug = slugify(this.title, {
         lower: true,
         strict: true,
       });
 
-      this.slug = `${baseSlug}-${nanoid(6)}`;
+      this.slug = `${baseSlug || "product"}-${nanoid(6)}`;
     }
 
     // Price validation

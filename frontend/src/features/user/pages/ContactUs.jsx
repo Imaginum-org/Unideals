@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "../../../context/useUserContext.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
-import emailjs from "@emailjs/browser";
-import toast from "react-hot-toast";
+import { toast } from "../../../components/ui/toast.js";
+import axios from "../../../services/axiosInstance.js";
 import {
   Search,
   MessageSquare,
@@ -25,15 +25,15 @@ const faqData = [
     questions: [
       {
         q: "How do I track the status of a deal?",
-        a: 'Go to Orders in your profile — each deal shows a live progress tracker from "Enquired" through "Meetup Confirmed" and "Completed". You and the seller both get notifications at each stage.',
+        a: "Go to Orders in your profile to see your deals and their current status. You and the seller both get notifications when something changes.",
       },
       {
         q: "Can I return an item after buying it?",
-        a: "UniDeals connects students directly — there is no platform-level returns system. We strongly recommend inspecting all items before completing a deal. Once marked as done, transactions cannot be reversed.",
+        a: "UniDeals connects students directly. There is no platform-level returns system. We strongly recommend inspecting all items before completing a deal. Once marked as done, transactions cannot be reversed.",
       },
       {
         q: "What if I got scammed or the item is not as described?",
-        a: "Report the listing immediately using the flag icon on the product page or seller profile. Our safety team reviews every report within 24 hours and will contact you via email.",
+        a: "Report the issue using the Report option on this page with details of what happened. Our safety team reviews every report and will contact you via email.",
       },
     ],
   },
@@ -43,7 +43,7 @@ const faqData = [
     questions: [
       {
         q: "Is it safe to meet a seller on campus?",
-        a: "All users on UniDeals are verified students. Always meet in public, well-lit campus areas — the canteen, library lobby, or main gate. Never share home addresses or pay before inspecting the item.",
+        a: "All users on UniDeals are verified students. Always meet in public, well-lit campus areas: the canteen, library lobby, or main gate. Never share home addresses or pay before inspecting the item.",
       },
       {
         q: "What if a seller stops responding?",
@@ -57,7 +57,7 @@ const faqData = [
     questions: [
       {
         q: "How does Campus Verification Works ?",
-        a: "Go to Settings → Verification and enter your official university email (e.g. name@vitstudent.ac.in). We send a one-click confirmation link. Once verified, your profile shows a blue badge which increases buyer trust",
+        a: "Go to Settings and complete the verification steps shown there. Once verified, your profile shows a badge which increases buyer trust.",
       },
       {
         q: "How do I delete my account ?",
@@ -65,7 +65,7 @@ const faqData = [
       },
       {
         q: "Can I change my campus or pickup location ?",
-        a: "Yes — go to Settings → Pickup Spots to update your preferred campus meetup locations. To change your campus, update it under Settings → Profile.",
+        a: "Yes. Go to Settings → Pickup Spots to update your preferred campus meetup locations. To change your campus, update it under Settings → Profile.",
       },
     ],
   },
@@ -79,7 +79,7 @@ const faqData = [
       },
       {
         q: "How does Boost work",
-        a: "Boosting a listing promotes it to the top of search results and category feeds for 48 hours. You can boost any active listing from My Listings → Boost.",
+        a: "Boosting a listing promotes it to the top of search results and category feeds for 3 or 7 days depending on the plan you pick. You can boost any active listing from My Listings → Boost.",
       },
     ],
   },
@@ -90,6 +90,13 @@ function ContactUs() {
   const [activeForm, setActiveForm] = useState(null); // 'contact', 'report', 'suggest'
   const [openCategory, setOpenCategory] = useState(null);
   const [openQuestion, setOpenQuestion] = useState(null);
+  const [helpQuery, setHelpQuery] = useState("");
+
+  // Guest email: prefilled when logged in, editable input when guest.
+  const [guestEmail, setGuestEmail] = useState(userDetails?.email || "");
+  useEffect(() => {
+    if (userDetails?.email) setGuestEmail(userDetails.email);
+  }, [userDetails?.email]);
 
   // Unified Form States
   const [contactForm, setContactForm] = useState({ topic: "", message: "" });
@@ -118,10 +125,29 @@ function ContactUs() {
     e.preventDefault();
     setIsSubmitting(true);
 
+    // Client-side length + rate limits (EmailJS quota protection)
+    const lastSent = Number(sessionStorage.getItem("contactLastSent") || 0);
+    if (Date.now() - lastSent < 30000) {
+      toast.error("Please wait before sending another message.");
+      setIsSubmitting(false);
+      return;
+    }
+    const clamp = (s, max) => String(s || "").trim().slice(0, max);
+    const cleanReplyEmail = clamp(guestEmail, 254).toLowerCase();
+
+    if (!cleanReplyEmail || !cleanReplyEmail.includes("@")) {
+      toast.error("Please enter a valid email address.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Server-agnostic ticket ID shown to the user for follow-ups.
+    const ticketId = Date.now().toString(36).toUpperCase();
+
     // Base template parameters mapped to your HTML template
     let templateParams = {
-      sender_name: userDetails?.name || "Unregistered User",
-      sender_email: userDetails?.email || "No email provided",
+      sender_name: clamp(userDetails?.name || "Unregistered User", 100),
+      sender_email: cleanReplyEmail,
       preferred_reply: "Email",
       reference: "N/A",
     };
@@ -133,12 +159,17 @@ function ContactUs() {
         setIsSubmitting(false);
         return;
       }
+      if (contactForm.message.trim().length > 2000) {
+        toast.error("Message is too long (max 2000 characters).");
+        setIsSubmitting(false);
+        return;
+      }
       templateParams = {
         ...templateParams,
         contact_type: "Support Request",
         priority: "Normal",
-        user_subject: contactForm.topic,
-        user_message: contactForm.message,
+        user_subject: clamp(contactForm.topic, 200),
+        user_message: clamp(contactForm.message, 2000),
       };
     } else if (activeForm === "report") {
       if (!reportForm.category || !reportForm.description.trim()) {
@@ -146,13 +177,18 @@ function ContactUs() {
         setIsSubmitting(false);
         return;
       }
+      if (reportForm.description.trim().length > 2000) {
+        toast.error("Description is too long (max 2000 characters).");
+        setIsSubmitting(false);
+        return;
+      }
       templateParams = {
         ...templateParams,
         contact_type: "Issue / Bug Report",
         priority: "High",
-        reference: reportForm.link || "N/A",
-        user_subject: reportForm.category,
-        user_message: reportForm.description,
+        reference: clamp(reportForm.link || "N/A", 500),
+        user_subject: clamp(reportForm.category, 200),
+        user_message: clamp(reportForm.description, 2000),
       };
     } else if (activeForm === "suggest") {
       if (!suggestForm.title || !suggestForm.description.trim()) {
@@ -160,16 +196,42 @@ function ContactUs() {
         setIsSubmitting(false);
         return;
       }
+      if (
+        suggestForm.description.trim().length > 2000 ||
+        String(suggestForm.title || "").length > 200
+      ) {
+        toast.error("Suggestion is too long.");
+        setIsSubmitting(false);
+        return;
+      }
       templateParams = {
         ...templateParams,
         contact_type: "Feature Suggestion",
         priority: "Low",
-        user_subject: suggestForm.title,
-        user_message: `Description:\n${suggestForm.description}\n\nWhy it is useful:\n${suggestForm.whyUseful || "Not provided"}`,
+        user_subject: clamp(suggestForm.title, 200),
+        user_message: clamp(`Description:\n${suggestForm.description}\n\nWhy it is useful:\n${suggestForm.whyUseful || "Not provided"}`, 2000),
       };
     }
 
     try {
+      // 1. Save to backend database for the Admin Portal moderation queue
+      try {
+        await axios.post("/api/report/support", {
+          topic: templateParams.user_subject,
+          category: templateParams.user_subject,
+          description: templateParams.user_message,
+          reference: templateParams.reference,
+          email: cleanReplyEmail,
+          name: userDetails?.name,
+          support_type: activeForm,
+          priority: templateParams.priority,
+        });
+      } catch (backendErr) {
+        console.warn("Could not save support ticket to database:", backendErr);
+      }
+
+      // 2. Send via email service
+      const { default: emailjs } = await import("@emailjs/browser");
       await emailjs.send(
         import.meta.env.VITE_EMAILJS_SERVICE_ID,
         import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
@@ -177,15 +239,17 @@ function ContactUs() {
         import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
       );
 
-      toast.success("Message sent successfully! We'll be in touch soon.");
+      sessionStorage.setItem("contactLastSent", String(Date.now()));
+      toast.success(
+        `Message sent successfully! Ticket ID: ${ticketId}. We'll be in touch soon.`,
+      );
 
       // Clear forms and reset view
       setContactForm({ topic: "", message: "" });
       setReportForm({ category: "", link: "", description: "" });
       setSuggestForm({ title: "", description: "", whyUseful: "" });
       setActiveForm(null);
-    } catch (error) {
-      console.error("EmailJS Error:", error);
+    } catch {
       toast.error("Failed to send message. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -204,11 +268,11 @@ function ContactUs() {
   };
 
   return (
-    <div className="h-screen w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree text-black dark:text-white">
-      <div className="flex-1 lg:flex md:flex overflow-hidden">
+    <div className="h-full w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree text-black dark:text-white">
+      <div className="flex h-[calc(100vh-70px)]">
         {/* LEFT PANEL */}
         {userDetails?._id ? (
-          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
         ) : null}
@@ -216,9 +280,7 @@ function ContactUs() {
         {/* RIGHT PANEL */}
         <div
           className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-4 xl:px-[5.7rem] xl:py-6 ${
-            userDetails?._id
-              ? "w-full md:flex-1"
-              : "mx-auto w-full max-w-5xl"
+            userDetails?._id ? "w-full md:flex-1" : "mx-auto w-full max-w-5xl"
           }`}
         >
           <motion.div
@@ -242,8 +304,11 @@ function ContactUs() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
+                value={helpQuery}
+                onChange={(e) => setHelpQuery(e.target.value)}
                 placeholder="Search help articles..."
-                className="w-full pl-9 pr-4 py-2 text-sm border bg-white border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white transition-all"
+                aria-label="Search help articles"
+                className="w-full pl-9 pr-4 py-2 text-sm border bg-[#F7F8FA] border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white transition-all"
               />
             </motion.div>
 
@@ -258,7 +323,7 @@ function ContactUs() {
                   activeForm === "contact"
                     ? "border-indigo-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#4F46E5] group-hover:scale-105 group-hover:shadow-md">
                   <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400 transition-colors duration-300 group-hover:text-white" />
@@ -275,7 +340,7 @@ function ContactUs() {
                   activeForm === "report"
                     ? "border-red-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
                 <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#EF4444] group-hover:scale-105 group-hover:shadow-md">
                   <ShieldAlert className="w-4 h-4 text-red-500 transition-colors duration-300 group-hover:text-white" />
@@ -294,7 +359,7 @@ function ContactUs() {
                   activeForm === "suggest"
                     ? "border-green-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-white dark:bg-[#1f1f1f] dark:border-gray-700`}
+                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
                 <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#22C55E] group-hover:scale-105 group-hover:shadow-md">
                   <Lightbulb className="w-4 h-4 text-green-600 dark:text-green-400 transition-colors duration-300 group-hover:text-white" />
@@ -315,7 +380,7 @@ function ContactUs() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.98 }}
                   transition={{ duration: 0.25, ease: "easeOut" }}
-                  className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-[#1f1f1f] p-5 relative mb-6"
+                  className="border border-gray-200 dark:border-gray-700 rounded-xl bg-[#F7F8FA] dark:bg-[#1f1f1f] p-5 relative mb-6"
                 >
                   <button
                     onClick={() => setActiveForm(null)}
@@ -340,6 +405,19 @@ function ContactUs() {
                       </p>
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Your email
+                      </label>
+                      <input
+                        type="email"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        placeholder="you@college.edu"
+                        required
+                        maxLength={254}
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                      />
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Topic
                       </label>
                       <select
@@ -350,7 +428,7 @@ function ContactUs() {
                             topic: e.target.value,
                           })
                         }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
                         required
                       >
                         <option value="">Select a topic</option>
@@ -373,7 +451,7 @@ function ContactUs() {
                             message: e.target.value,
                           })
                         }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
                         placeholder="Describe your issue in as much detail as possible..."
                         required
                       ></textarea>
@@ -382,7 +460,7 @@ function ContactUs() {
                         <button
                           type="button"
                           onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
@@ -395,6 +473,17 @@ function ContactUs() {
                           {isSubmitting ? "Sending..." : "Send message"}
                         </button>
                       </div>
+                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                        Need to share a screenshot? Submit first, then email it
+                        to{" "}
+                        <a
+                          href="mailto:hi@unideals.in"
+                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          hi@unideals.in
+                        </a>{" "}
+                        with your ticket ID.
+                      </p>
                     </motion.form>
                   )}
 
@@ -412,6 +501,19 @@ function ContactUs() {
                       <p className="text-xs text-gray-500 mb-4">
                         Let us know what's wrong so we can fix it.
                       </p>
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Your email
+                      </label>
+                      <input
+                        type="email"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        placeholder="you@college.edu"
+                        required
+                        maxLength={254}
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                      />
 
                       <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-3 mb-4 flex gap-2">
                         <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -434,7 +536,7 @@ function ContactUs() {
                           })
                         }
                         required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                       >
                         <option value="">Select category...</option>
                         <option value="Fraud or Scam Seller">
@@ -453,6 +555,18 @@ function ContactUs() {
                         <option value="Inappropriate Content">
                           Inappropriate Content
                         </option>
+                        <option value="Payment / Deal Dispute">
+                          Payment / Deal Dispute
+                        </option>
+                        <option value="Account or Login Issue">
+                          Account or Login Issue
+                        </option>
+                        <option value="Fake or Misleading Product">
+                          Fake or Misleading Product
+                        </option>
+                        <option value="Other Issue">
+                          Other Issue
+                        </option>
                       </select>
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -464,7 +578,7 @@ function ContactUs() {
                         onChange={(e) =>
                           setReportForm({ ...reportForm, link: e.target.value })
                         }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                         placeholder="e.g. Paste a link, user ID, or type 'My Listings'"
                       />
 
@@ -481,7 +595,7 @@ function ContactUs() {
                           })
                         }
                         required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                         placeholder="Be as specific as possible. Include dates, messages, or steps to trigger the bug..."
                       ></textarea>
 
@@ -489,7 +603,7 @@ function ContactUs() {
                         <button
                           type="button"
                           onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
@@ -502,6 +616,17 @@ function ContactUs() {
                           {isSubmitting ? "Submitting..." : "Submit report"}
                         </button>
                       </div>
+                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                        Need to share a screenshot? Submit first, then email it
+                        to{" "}
+                        <a
+                          href="mailto:hi@unideals.in"
+                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          hi@unideals.in
+                        </a>{" "}
+                        with your ticket ID.
+                      </p>
                     </motion.form>
                   )}
 
@@ -521,6 +646,19 @@ function ContactUs() {
                       </p>
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Your email
+                      </label>
+                      <input
+                        type="email"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        placeholder="you@college.edu"
+                        required
+                        maxLength={254}
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                      />
+
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Feature title
                       </label>
                       <input
@@ -533,7 +671,7 @@ function ContactUs() {
                           })
                         }
                         required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="e.g. Filter by hostel block"
                       />
 
@@ -550,7 +688,7 @@ function ContactUs() {
                           })
                         }
                         required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="What should it do? How would it work?"
                       ></textarea>
 
@@ -566,7 +704,7 @@ function ContactUs() {
                             whyUseful: e.target.value,
                           })
                         }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-white dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
+                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
                         placeholder="Who benefits and how?"
                       ></textarea>
 
@@ -574,7 +712,7 @@ function ContactUs() {
                         <button
                           type="button"
                           onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
                         >
                           Back
                         </button>
@@ -587,6 +725,16 @@ function ContactUs() {
                           {isSubmitting ? "Submitting..." : "Submit idea"}
                         </button>
                       </div>
+                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                        Need to share a mockup? Submit first, then email it to{" "}
+                        <a
+                          href="mailto:hi@unideals.in"
+                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          hi@unideals.in
+                        </a>{" "}
+                        with your ticket ID.
+                      </p>
                     </motion.form>
                   )}
                 </motion.div>
@@ -599,7 +747,7 @@ function ContactUs() {
                   transition={{ duration: 0.3 }}
                 >
                   {/* Response Time Banner */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 mb-6 bg-white shadow-sm border border-gray-100 rounded-xl dark:bg-[#1a1a1a] dark:border-gray-800">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 mb-6 bg-[#F7F8FA] shadow-sm border border-gray-100 rounded-xl dark:bg-[#1a1a1a] dark:border-gray-800">
                     <div className="flex items-center text-xs text-gray-600 dark:text-gray-300">
                       <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg mr-3">
                         <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
@@ -614,14 +762,14 @@ function ContactUs() {
                     </div>
                     <a
                       href="mailto:hi@unideals.in"
-                      className="flex items-center mt-3 sm:mt-0 px-3 py-1.5 bg-gray-50 dark:bg-[#252525] rounded-lg text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors font-medium"
+                      className="flex items-center mt-3 sm:mt-0 px-3 py-1.5 bg-[#F7F8FA] dark:bg-[#252525] rounded-lg text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors font-medium"
                     >
                       <Mail className="w-3.5 h-3.5 mr-1.5" /> hi@unideals.in
                     </a>
                   </div>
 
                   {/* FAQ Section */}
-                  <div className="bg-white border border-gray-200 rounded-2xl dark:bg-[#1f1f1f] dark:border-gray-700 p-4 lg:p-6 shadow-sm">
+                  <div className="bg-[#F7F8FA] border border-gray-200 rounded-2xl dark:bg-[#1f1f1f] dark:border-gray-700 p-4 lg:p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
                       <h3 className="text-xs font-bold text-gray-400 tracking-wider">
                         FREQUENTLY ASKED
@@ -630,7 +778,24 @@ function ContactUs() {
                     </div>
 
                     <div className="">
-                      {faqData.map((category) => (
+                      {faqData
+                        .map((category) => {
+                          const q = helpQuery.trim().toLowerCase();
+                          if (!q) return category;
+                          const matched = category.questions.filter(
+                            (item) =>
+                              item.q.toLowerCase().includes(q) ||
+                              item.a.toLowerCase().includes(q),
+                          );
+                          if (
+                            category.title.toLowerCase().includes(q) &&
+                            matched.length === 0
+                          )
+                            return category;
+                          return { ...category, questions: matched };
+                        })
+                        .filter((category) => category.questions.length > 0)
+                        .map((category) => (
                         <div
                           key={category.id}
                           className="border-b border-gray-50 last:border-0 dark:border-gray-800/50 pb-1"
@@ -670,7 +835,7 @@ function ContactUs() {
                                     category.questions.map((item, idx) => (
                                       <div
                                         key={idx}
-                                        className="bg-gray-50/80 dark:bg-[#171717] rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 transition-all"
+                                        className="bg-[#F7F8FA]/80 dark:bg-[#171717] rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 transition-all"
                                       >
                                         <button
                                           onClick={() => toggleQuestion(item.q)}
@@ -732,6 +897,21 @@ function ContactUs() {
                           </AnimatePresence>
                         </div>
                       ))}
+                      {helpQuery.trim() &&
+                      faqData.every((category) => {
+                        const q = helpQuery.trim().toLowerCase();
+                        return !(
+                          category.questions.some(
+                            (item) =>
+                              item.q.toLowerCase().includes(q) ||
+                              item.a.toLowerCase().includes(q),
+                          ) || category.title.toLowerCase().includes(q)
+                        );
+                      }) ? (
+                        <p className="text-xs text-gray-400 p-2 italic">
+                          No help articles match “{helpQuery.trim()}”.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </motion.div>
@@ -745,4 +925,3 @@ function ContactUs() {
 }
 
 export default ContactUs;
-

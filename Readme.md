@@ -41,50 +41,82 @@
 
 ## Overview
 
-Unideals connects students in a campus marketplace. Users can register, verify their email, list products, browse and search listings, save favourites, manage addresses, report listings or users, and boost product visibility based on subscription tier.
+Unideals connects students in a campus marketplace. Users can register, verify their email, list products, browse and search listings, save favourites, manage campus pickup spots, report listings or users, and boost product visibility. Paid tiers (Pro / Pro+) and one-time boost add-ons are sold through Razorpay, with listing, wishlist, and boost quotas enforced per plan.
 
 **Highlights**
 
 | Area | Description |
 |---|---|
-| Authentication | JWT access tokens with HttpOnly refresh cookies, email verification, password reset, and Google OAuth2 |
+| Authentication | Short-lived (15 min) JWT access tokens with HttpOnly refresh cookies, session revocation, email verification, password reset, and Google OAuth2 + One-Tap |
 | Product lifecycle | Multi-step listing flow, drafts, search, category/price/condition filters, unlist/relist, soft delete, and boosted listings |
-| Wishlist & addresses | Save favourite products and manage delivery/meetup addresses |
+| Wishlist & pickup spots | Save favourite products (plan-capped) and manage up to 3 campus pickup spots; listings snapshot the chosen spot |
+| Payments & plans | Razorpay checkout for Pro / Pro+ Founder lifetime plans and one-time 3-day / 7-day boost add-ons; HMAC-verified payments with idempotent activation and webhooks |
 | Reporting | Flag inappropriate products or users |
-| Media | Signed ImageKit upload tokens on the backend; client-side image upload and compression |
+| Media | Signed ImageKit upload tokens on the backend; client-side image upload (JPG/PNG/WEBP) and compression |
 | Admin console | Separate admin authentication and moderation endpoints for users and products |
-| Security | Helmet, CORS, XSS filtering, NoSQL injection guards, and rate limiting on product creation |
+| Security | Helmet, CORS, deep XSS filtering, NoSQL injection guards, and rate limiting on auth, product creation, and payments |
 
 ---
 
 ## Tech Stack
 
-**Frontend**
+**Frontend** (`frontend/` — React 18 + Vite 6)
 
 | Technology | Purpose |
 |---|---|
 | React 18 | UI framework |
-| Vite | Dev server and production bundler |
-| React Router v7 | Client-side routing with protected layouts |
-| Axios | HTTP client with auth interceptors and token refresh |
-| Tailwind CSS | Utility-first styling |
+| Vite 6 | Dev server and production bundler |
+| React Router v7 | Client-side routing (public / protected / auth-only layouts) |
+| Tailwind CSS 3 | Utility-first styling with class-based dark mode |
+| Axios | HTTP client with cookie-based auth and silent token refresh |
+| React Context | User, theme, and wishlist state (no external store) |
 | ImageKit JS SDK | Client-side image uploads |
+| browser-image-compression | Image compression before upload |
+| Razorpay Checkout.js (lazy-loaded) | Pro / Pro+ upgrades and boost add-on purchases |
+| react-qr-code | Phone-handoff QR rendering (listing flow) |
 | EmailJS | Contact form email delivery |
-| Framer Motion, Swiper, Radix UI | Animations, carousels, and dialogs |
+| Framer Motion | Animations and transitions |
+| Swiper | Image carousels |
+| Radix UI | Accessible dialogs and primitives |
+| Lucide / react-icons / Heroicons | Icon sets |
+| react-hot-toast, react-toastify | Toast notifications |
+| react-select, react-slider, react-datepicker, react-burger-menu | Form and navigation widgets |
+| date-fns, clsx, canvas-confetti, lenis | Dates, classnames, celebrations, smooth scroll |
 
-**Backend**
+**Backend** (`backend/` — Node.js 22 + Express 5, ESM)
 
 | Technology | Purpose |
 |---|---|
 | Express.js 5 | REST API server |
-| MongoDB + Mongoose | Document database and ODM |
-| JWT + refresh tokens | Cookie-based session authentication |
-| Zod | Request body validation |
-| Resend | Transactional email (verification, password reset) |
-| ImageKit | Image storage, delivery, and server-side deletion |
-| Google OAuth2 | Social sign-in |
-| node-cron | Scheduled jobs (boost expiry, deleted product cleanup) |
+| MongoDB + Mongoose 9 | Document database and ODM (incl. TTL indexes) |
+| JWT + refresh tokens | 15-min access + 7-day rotating refresh tokens over HttpOnly cookies, with versioned revocation |
 | bcrypt | Password hashing |
+| Zod 4 | Request body validation |
+| Razorpay SDK 2.x | Plan and boost add-on orders, signature verification, webhooks |
+| ImageKit SDK 6 | Image storage, delivery, signed tokens, server-side upload/deletion |
+| Multer | Phone-handoff multipart uploads (memory storage) |
+| nanoid | Receipts, pairing codes, product slugs |
+| slugify | SEO-friendly product slugs |
+| Resend | Transactional email (verification, password reset) |
+| Google Auth Library | Google OAuth2 + One-Tap sign-in |
+| cookie-parser, CORS | Cookies and cross-origin policy |
+| Helmet | Secure HTTP response headers |
+| express-rate-limit | Per-endpoint abuse protection |
+| xss | Deep XSS sanitization |
+| morgan | Request logging (secrets redacted) |
+| node-cron | Scheduled jobs (boost expiry, deleted-product cleanup, subscription expiry) |
+| dotenv | Environment configuration |
+
+**Infrastructure & Services**
+
+| Technology | Purpose |
+|---|---|
+| Vercel | Frontend hosting (`app.unideals.in`) |
+| Render | Backend hosting (`api.unideals.in`) |
+| MongoDB Atlas | Managed database |
+| ImageKit CDN | Image storage, optimization, and delivery |
+| Razorpay (Test Mode) | Payment gateway: orders, Checkout, webhooks |
+| Resend + EmailJS | Backend transactional email + frontend contact form |
 
 ---
 
@@ -97,8 +129,9 @@ Unideals/
 │   │   ├── app/                 App entry, routes
 │   │   ├── features/            Feature modules
 │   │   │   ├── auth/            Login, signup, password reset, Google OAuth
-│   │   │   ├── product/         Home, listing, product detail, categories
-│   │   │   ├── user/            Profile, settings, wishlist, contact
+│   │   │   ├── product/         Home, listing, product detail, categories, pricing
+│   │   │   ├── user/            Profile, settings, wishlist, subscription, contact
+│   │   │   ├── payment/         Razorpay checkout hook and billing API client
 │   │   │   ├── search/          Search results and dropdown suggestions
 │   │   │   ├── chat/            Chat page UI
 │   │   │   ├── notification/    Notifications page UI
@@ -113,17 +146,20 @@ Unideals/
 │
 ├── backend/                     Express + MongoDB API
 │   ├── src/
-│   │   ├── config/               DB, constants, email, boost plans
+│   │   ├── config/               DB, constants, email, subscription and boost plans
 │   │   ├── controllers/          Route handlers
-│   │   ├── models/                Mongoose schemas
+│   │   ├── models/                Mongoose schemas (User, Product, Payment, Subscription, ...)
 │   │   ├── routes/                API route definitions
-│   │   ├── middlewares/           Auth, roles, validation, errors
-│   │   ├── services/              Business logic
+│   │   ├── middlewares/           Auth, roles, tiers, validation, errors
+│   │   ├── services/              Business logic (auth, product, payments, subscriptions, ...)
 │   │   ├── validations/           Zod schemas
-│   │   ├── jobs/                   Cron jobs
-│   │   └── utils/                  Tokens, ImageKit, email templates
+│   │   ├── jobs/                   Cron jobs (boosts, product cleanup, subscriptions)
+│   │   ├── seeds/                  Plan catalog self-check script
+│   │   └── utils/                  Tokens, ImageKit, Razorpay, email templates
 │   └── server.js
 │
+├── Subscription_plan.md           Plan pricing and monetization spec
+├── fix.md                         Security and feature fix log
 └── README.md
 ```
 
@@ -146,7 +182,7 @@ Helmet · CORS · XSS · NoSQL Guard"]
         Controllers[Controllers]
         Services[Service Layer]
         Jobs["Cron Jobs
-Boost Expiry · Product Cleanup"]
+Boost Expiry · Product Cleanup · Subscription Expiry"]
     end
 
     subgraph Data ["Data & Media"]
@@ -159,6 +195,8 @@ Media Storage & CDN]
     subgraph External ["External Services"]
         JWT[JWT + Refresh Tokens]
         Google[Google OAuth2]
+        Razorpay[Razorpay
+Orders · Verify · Webhooks]
         Resend[Resend
 Email Service]
         EmailJS[EmailJS
@@ -171,6 +209,7 @@ Contact Form]
     Services --> MongoDB
     Services --> ImageKit
     Services --> Resend
+    Services --> Razorpay
     Jobs --> MongoDB
     UserCtx --> Google
     UserCtx --> JWT
@@ -190,7 +229,7 @@ All routes are prefixed with the base URL configured via `VITE_API_BASE_URL`.
 |---|---|---|---|
 | POST | `/register` | Create new account | Public |
 | POST | `/login` | Local login | Public |
-| GET | `/logoutUser` | Clear auth cookies and invalidate refresh token | Public |
+| POST | `/logoutUser` | Clear auth cookies and invalidate refresh token (GET kept for legacy clients) | Protected (GET: Public, revokes via cookie) |
 | POST | `/refresh-token` | Rotate access token using refresh cookie | Public |
 | POST | `/verify-email` | Verify email address | Public |
 | GET | `/check-verification` | Check email verification status | Public |
@@ -201,14 +240,17 @@ All routes are prefixed with the base URL configured via `VITE_API_BASE_URL`.
 | GET | `/google` | Initiate Google OAuth redirect | Public |
 | GET | `/google/callback` | OAuth callback handler | Public |
 | POST | `/google/exchange` | Exchange OAuth code for session | Public |
+| POST | `/google/one-tap` | Google One-Tap sign-in | Public |
 
 ### User — `/api/user` (Protected)
 
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/userProfile` | Get authenticated user profile |
-| PUT | `/updateProfile` | Update profile details |
-| DELETE | `/deleteAccount` | Delete user account |
+| PUT | `/updateProfile` | Update profile details (mobile, gender) |
+| PUT | `/updateAvatar` | Update profile photo (ImageKit URL + fileId) |
+| DELETE | `/removeAvatar` | Remove profile photo |
+| DELETE | `/deleteAccount` | Deactivate account (listings unlisted, sessions revoked) |
 
 ### Product — `/api/product`
 
@@ -236,16 +278,17 @@ All routes are prefixed with the base URL configured via `VITE_API_BASE_URL`.
 | POST | `/toggle` | Toggle wishlist state |
 | GET | `/check/:productId` | Check if product is in wishlist |
 
-### Address — `/api/address` (Protected)
+### Pickup Spots — `/api/pickup-spots` (Protected)
+
+Campus meetup spots (max 3 per user). Listings snapshot the selected spot, so no street address is needed.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/` | Create address |
-| GET | `/` | List user addresses |
-| GET | `/:addressId` | Get address by ID |
-| PUT | `/:addressId` | Update address |
-| DELETE | `/:addressId` | Delete address |
-| PATCH | `/:addressId/default` | Set default address |
+| POST | `/` | Create pickup spot |
+| GET | `/` | List user pickup spots |
+| PUT | `/:pickupSpotId` | Update pickup spot |
+| DELETE | `/:pickupSpotId` | Delete pickup spot |
+| PATCH | `/:pickupSpotId/primary` | Set default pickup spot |
 
 ### Report — `/api/report` (Protected)
 
@@ -256,10 +299,23 @@ All routes are prefixed with the base URL configured via `VITE_API_BASE_URL`.
 
 ### Boost — `/api/boost` (Protected)
 
+Quota boosts follow the active plan (Free 0, Pro 2 × 3 days, Pro+ 5 × 7 days per month).
+
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/me/summary` | Get current user's boost usage summary |
-| POST | `/products/:productId` | Boost a product listing |
+| POST | `/products/:productId` | Boost a product listing (quota) |
+
+### Payments — `/api/payments`
+
+Razorpay checkout for Founder lifetime plans (Pro ₹99, Pro+ ₹199) and one-time boost add-ons (3-day ₹29, 7-day ₹49, any tier). Amounts are always computed server-side from the plan catalog.
+
+| Method | Endpoint | Description | Access |
+|---|---|---|---|
+| POST | `/orders` | Create order (`plan`, plus `productId` for boost add-ons); reuses a fresh unpaid order | Protected |
+| POST | `/verify` | Verify HMAC signature and activate plan / apply boost | Protected |
+| GET | `/me` | Current tier, plan, live usage, and payment history (powers the Subscription tab) | Protected |
+| POST | `/webhook` | Razorpay event webhook (`payment.captured`, `payment.failed`); HMAC over raw body, no auth | Public (signature-verified) |
 
 ### ImageKit — `/api/imagekit` (Protected)
 
@@ -279,8 +335,8 @@ All routes are prefixed with the base URL configured via `VITE_API_BASE_URL`.
 | PATCH | `/users/:id/status` | Update user status | Admin / Support |
 | GET | `/products` | List products for moderation | Admin / Support |
 | PATCH | `/products/:id/status` | Update product status | Admin / Support |
-| PATCH | `/products/:id/soft-delete` | Soft-delete a product | Admin / Support |
-| DELETE | `/products/:id` | Hard-delete a product | Admin / Support |
+| PATCH | `/products/:id/soft-delete` | Soft-delete a product | Admin only |
+| DELETE | `/products/:id` | Hard-delete a product | Admin only |
 
 ### Health
 
@@ -292,7 +348,7 @@ All routes are prefixed with the base URL configured via `VITE_API_BASE_URL`.
 
 ## Frontend Routes
 
-**Auth (no header)**
+**Auth (no header, logged-in users are redirected home)**
 
 ```
 /login                     Sign in
@@ -310,7 +366,7 @@ All routes are prefixed with the base URL configured via `VITE_API_BASE_URL`.
 /search                    Search results
 /product/:id               Product detail page
 /category/:categoryName    Category browser (includes boosted products)
-/price                     Price range filter view
+/price                     Plans & pricing (Pro / Pro+ checkout)
 /termscondition            Terms & conditions
 /privacy-policy            Privacy policy
 ```
@@ -319,18 +375,18 @@ All routes are prefixed with the base URL configured via `VITE_API_BASE_URL`.
 
 ```
 /profile                   User profile overview
-/settings                  Account settings
-/subscription              Subscription plans
+/settings                  Account settings (incl. pickup spots)
+/subscription              Subscription status, usage, and billing
 /wishlist                  Saved listings
 /myorders                  Order history
 /chat                      Messaging
 /notification              Activity notifications
 /upload                    Create a new listing (multi-step)
-/productlisted             Post-listing confirmation
+/productlisted             My listings dashboard (incl. boost / buy extra boost)
 /contact                   Contact support
 ```
 
-Legacy redirects: `/profileoverview` → `/profile`, `/setting` → `/settings`.
+Legacy redirects: `/profileoverview` → `/profile`, `/setting` → `/settings`. Unknown paths redirect to `/`.
 
 ---
 
@@ -353,21 +409,24 @@ Both services are configured via environment variables. Copy `.env.sample` to `.
 | `GOOGLE_REDIRECT_URI` | OAuth callback URL |
 | `IMAGEKIT_PUBLIC_KEY` / `IMAGEKIT_PRIVATE_KEY` / `IMAGEKIT_URL_ENDPOINT` | ImageKit credentials |
 | `RESEND_API_KEY` | Transactional email provider key |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Razorpay API credentials (use Test Mode keys for local dev) |
+| `RAZORPAY_WEBHOOK_SECRET` | Webhook signing secret from the Razorpay dashboard |
 
 **Frontend (`frontend/.env`)**
 
 | Variable | Description |
 |---|---|
 | `VITE_API_BASE_URL` | Backend API base URL |
+| `VITE_GOOGLE_CLIENT_ID` | Google One-Tap client ID |
+| `VITE_RAZORPAY_KEY_ID` | Razorpay public key ID (Test Mode key for local dev; never the secret) |
 | `VITE_IMAGEKIT_PUBLIC_KEY` / `VITE_IMAGEKIT_URL_ENDPOINT` | ImageKit client config |
 | `VITE_EMAILJS_SERVICE_ID` / `VITE_EMAILJS_TEMPLATE_ID` / `VITE_EMAILJS_PUBLIC_KEY` | EmailJS contact form config |
-| `VITE_SUPPORT_EMAIL` | Support contact address |
 
 ---
 
 ## Getting Started
 
-**Prerequisites:** Node.js ≥ 18, npm ≥ 9, a MongoDB instance, and accounts for ImageKit, Resend, Google Cloud Console, and EmailJS.
+**Prerequisites:** Node.js ≥ 18, npm ≥ 9, a MongoDB instance, and accounts for ImageKit, Resend, Google Cloud Console, EmailJS, and Razorpay (Test Mode is enough for local setup).
 
 ```bash
 # 1. Clone
@@ -376,18 +435,23 @@ cd Unideals
 
 # 2. Backend
 cd backend
-cp .env.sample .env        # fill in your values
+cp .env.sample .env        # fill in your values (see Configuration)
 npm install
+node src/seeds/plans.seed.js   # sanity-check the plan catalog
 npm run dev                # http://localhost:5000
 
-# 3. Frontend
-cd ../frontend
-cp .env.sample .env        # fill in your values
+# 3. Frontend (new terminal, from repo root)
+cd frontend
+cp .env.sample .env        # fill in your values (see Configuration)
 npm install
 npm run dev                # http://localhost:5173
 ```
 
 Verify the API is running at `http://localhost:5000/health`.
+
+**Testing payments locally:** keep Razorpay in Test Mode, use the test keys in both `.env` files, and point a webhook at your machine with a tunnel (e.g. `ngrok http 5000` → webhook URL `https://<tunnel>/api/payments/webhook` with `payment.captured` + `payment.failed` events). Pay with test card `4111 1111 1111 1111` (any future expiry/CVV) or test UPI `success@razorpay` / `failure@razorpay`. No real money moves in Test Mode.
+
+**Plan reference:** `Subscription_plan.md` in the repo root is the source of truth for plan prices, limits, and boost rules. Switch Founder → semester billing later by setting `ACTIVE_SUBSCRIPTION_TYPE = semester` in `backend/src/config/subscriptionPlans.js`.
 
 ---
 
@@ -396,14 +460,16 @@ Verify the API is running at `http://localhost:5000/health`.
 | Layer | Implementation |
 |---|---|
 | Transport | CORS restricted to configured frontend and admin origins |
-| Authentication | Short-lived JWT access tokens in cookies or Bearer header; HttpOnly refresh token cookies |
-| Authorization | Auth middleware on protected routes; role middleware for admin endpoints |
-| Input validation | Zod schemas on all validated request bodies |
-| XSS protection | Sanitization on string body and route params |
-| NoSQL injection | Request body/param key sanitization against `$` and `.` operators |
-| Rate limiting | Per-IP throttling on product creation (5 requests/minute) |
-| HTTP hardening | Helmet secure response headers |
-| Media | Signed ImageKit upload tokens; private keys kept server-side only |
+| Authentication | 15-minute JWT access tokens (HttpOnly cookies; Bearer accepted); rotating 7-day refresh tokens with reuse detection and instant revocation on logout, password reset, or suspension |
+| Authorization | Auth middleware on protected routes; role middleware for admin endpoints; tier guard helper for paid features |
+| Input validation | Strict Zod schemas on request bodies; server-side amounts for all payments (client can never set a price) |
+| Payments | HMAC-SHA256 signature verification, server-to-server order confirmation, atomic single-activation per order, idempotent webhooks |
+| XSS protection | Deep sanitization on nested body, params, and query strings |
+| NoSQL injection | Deep body/param/query/cookie key sanitization against `$` and `.` operators |
+| Rate limiting | Per-IP throttling on auth, product creation, boost, report, ImageKit auth, and payment endpoints |
+| Error handling | No stack or internal leakage to clients; correct status codes (404/409/400 mapped, 5xx masked) |
+| HTTP hardening | Helmet secure response headers; security headers on the frontend deployment |
+| Media | Signed ImageKit upload tokens; JPG/PNG/WEBP allowlist with size caps; private keys kept server-side only |
 
 ---
 

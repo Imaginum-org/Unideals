@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import xss from "xss";
 import { OAuth2Client } from "google-auth-library";
 import userModel from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
@@ -13,9 +14,48 @@ import {
   loginWithPassword,
   refreshSession,
   revokeRefreshToken,
+  revokeRefreshTokenByToken,
   sanitizeAuthUser,
   setAuthCookies,
 } from "../services/auth.service.js";
+import { safeErrorMessage } from "../utils/response.js";
+
+const sha256 = (value) =>
+  crypto.createHash("sha256").update(String(value)).digest("hex");
+
+// Per-target-email send throttle (in-memory, no new deps): max 3/hr per
+// email across forgot/resend/register-resend. Throttled callers still get
+// generic success (no oracle, no email-bombing signal).
+const emailSendThrottle = new Map(); // key -> { count, expiresAt }
+const EMAIL_SEND_LIMIT = 3;
+const EMAIL_SEND_WINDOW_MS = 60 * 60 * 1000;
+
+const isEmailSendThrottled = (normalizedEmail) => {
+  const entry = emailSendThrottle.get(normalizedEmail);
+  if (!entry) return false;
+  if (entry.expiresAt <= Date.now()) {
+    emailSendThrottle.delete(normalizedEmail);
+    return false;
+  }
+  return entry.count >= EMAIL_SEND_LIMIT;
+};
+
+const recordEmailSend = (normalizedEmail) => {
+  const now = Date.now();
+  const entry = emailSendThrottle.get(normalizedEmail);
+  if (!entry || entry.expiresAt <= now) {
+    emailSendThrottle.set(normalizedEmail, { count: 1, expiresAt: now + EMAIL_SEND_WINDOW_MS });
+  } else {
+    entry.count += 1;
+    emailSendThrottle.set(normalizedEmail, entry);
+  }
+};
+
+const isPasswordValidLength = (password) =>
+  typeof password === "string" && password.length >= 8 && password.length <= 72;
+
+const REGISTER_GENERIC_MESSAGE =
+  "If this email is registered, please log in or check your inbox for verification.";
 
 const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -23,9 +63,66 @@ const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_REDIRECT_URI,
 );
 
+const findOrCreateGoogleUser = async (payload) => {
+  const email = payload?.email?.toLowerCase();
+
+  if (!email) {
+    const error = new Error("Google did not return a valid email.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Only trust Google-verified emails for auto-verification/linking
+  if (payload?.email_verified === false) {
+    const error = new Error("Google email is not verified.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const name = xss(String(payload.name || email.split("@")[0]).slice(0, 100));
+  // Only accept Google-hosted avatar URLs to prevent stored XSS/phishing
+  const rawPicture = typeof payload.picture === "string" ? payload.picture : null;
+  const isGoogleAvatar =
+    rawPicture &&
+    /^https:\/\/lh\d*\.googleusercontent\.com\//.test(rawPicture);
+  const picture = isGoogleAvatar ? rawPicture.replace("s96-c", "s400-c") : null;
+
+  let user = await userModel.findOne({ email }).select("+password");
+
+  if (!user) {
+    const randomPassword = crypto.randomBytes(32).toString("hex");
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+    user = await userModel.create({
+      name,
+      email,
+      password: hashedPassword,
+      avatar: picture ? { url: picture } : undefined,
+      is_email_verified: true,
+      verifyTokenEmail: "",
+      verifyTokenEmailExpiry: null,
+    });
+  } else {
+    if (picture && !user.avatar?.url) {
+      user.avatar = {
+        ...(user.avatar?.toObject?.() || user.avatar || {}),
+        url: picture,
+      };
+    }
+
+    if (!user.is_email_verified) {
+      user.is_email_verified = true;
+    }
+
+    await user.save();
+  }
+
+  return user;
+};
+
 export const registerUserController = async (req, res) => {
   try {
-    let { name, email, password } = req.body;
+    let { name, email, password, gender } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -35,65 +132,121 @@ export const registerUserController = async (req, res) => {
       });
     }
 
-    email = email.trim().toLowerCase();
-    const existingUser = await userModel.findOne({ email });
-
-    if (existingUser && existingUser.is_email_verified) {
+    // Server-side backstop (frontend already enforces a stronger policy).
+    // bcrypt caps at 72 bytes — reject longer to avoid silent truncation.
+    if (!isPasswordValidLength(password)) {
       return res.status(400).json({
-        message: "This email is already registered. Please log in.",
+        message:
+          typeof password === "string" && password.length > 72
+            ? "Password must be at most 72 characters."
+            : "Password must be at least 8 characters.",
         error: true,
         success: false,
       });
     }
 
-    const verifyToken = crypto.randomBytes(32).toString("hex");
-    const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
+    email = email.trim().toLowerCase();
+    const normalizedEmail = email;
+    if (isEmailSendThrottled(normalizedEmail)) {
+      return res.status(200).json({
+        message: REGISTER_GENERIC_MESSAGE,
+        error: false,
+        success: true,
+      });
+    }
+    const existingUser = await userModel.findOne({ email });
 
-    let responseMessage = "";
-    let statusCode = 201;
+    if (existingUser) {
+      // Deleted/suspended accounts reactivate via forgot-password only —
+      // never resurrect or leak via re-register. Same generic 200.
+      if (existingUser.status !== USER_STATUS.ACTIVE) {
+        return res.status(200).json({
+          message: REGISTER_GENERIC_MESSAGE,
+          error: false,
+          success: true,
+        });
+      }
+      if (existingUser.is_email_verified) {
+        // Uniform success: distinct statuses/messages would let anyone
+        // probe which emails hold verified accounts.
+        return res.status(200).json({
+          message: REGISTER_GENERIC_MESSAGE,
+          error: false,
+          success: true,
+        });
+      }
+    }
+
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const hashedVerifyToken = sha256(verifyToken);
+    const verifyExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
 
     if (existingUser) {
       await userModel.findByIdAndUpdate(existingUser._id, {
-        verifyTokenEmail: verifyToken,
+        verifyTokenEmail: hashedVerifyToken,
+        verifyTokenEmailExpiry: verifyExpiry,
       });
 
-      responseMessage =
-        "Account exists but is unverified. We just resent your verification email!";
-      statusCode = 200;
-    } else {
-      const hashedPassword = await bcrypt.hash(password, 10);
+      recordEmailSend(normalizedEmail);
+      try {
+        await sendEmail({
+          sendTo: email,
+          subject: "Verify your email for Unideals",
+          html: verifyEmailTempplate({
+            name: existingUser.name,
+            url: verifyEmailUrl,
+          }),
+        });
+      } catch {
+        // best-effort: uniform success even if mailer fails
+      }
 
-      await userModel.create({
-        name,
-        email,
-        password: hashedPassword,
-        verifyTokenEmail: verifyToken,
-        is_email_verified: false,
+      // Uniform generic 200 (no verified/unverified/missing distinction).
+      return res.status(200).json({
+        message: REGISTER_GENERIC_MESSAGE,
+        error: false,
+        success: true,
       });
-
-      responseMessage =
-        "Account created successfully. Please check your email to verify.";
-      statusCode = 201;
     }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    await sendEmail({
-      sendTo: email,
-      subject: "Verify your email for Unideals",
-      html: verifyEmailTempplate({
-        name: existingUser ? existingUser.name : name,
-        url: verifyEmailUrl,
-      }),
+    // Girls Corner 🌸 optional self-declared gender at signup.
+    const cleanGender = gender === "female" || gender === "male" ? gender : undefined;
+    await userModel.create({
+      name,
+      email,
+      password: hashedPassword,
+      verifyTokenEmail: hashedVerifyToken,
+      verifyTokenEmailExpiry: verifyExpiry,
+      is_email_verified: false,
+      ...(cleanGender ? { gender: cleanGender, genderUpdatedAt: new Date() } : {}),
     });
 
-    return res.status(statusCode).json({
-      message: responseMessage,
+    recordEmailSend(normalizedEmail);
+    try {
+      await sendEmail({
+        sendTo: email,
+        subject: "Verify your email for Unideals",
+        html: verifyEmailTempplate({
+          name,
+          url: verifyEmailUrl,
+        }),
+      });
+    } catch {
+      // best-effort: uniform success even if mailer fails
+    }
+
+    // Uniform generic 200 (creation no longer signalled via 201/message).
+    return res.status(200).json({
+      message: REGISTER_GENERIC_MESSAGE,
       error: false,
       success: true,
     });
   } catch (err) {
     console.error("Registration Error:", err);
     return res.status(500).json({
-      message: err.message || "Internal server error",
+      message: safeErrorMessage(err, "Internal server error"),
       error: true,
       success: false,
     });
@@ -108,21 +261,19 @@ export const loginController = async (req, res) => {
 
     setAuthCookies(res, accessToken, refreshToken);
 
+    // Tokens travel via HttpOnly cookies only — never in the JSON body,
+    // where any XSS could exfiltrate the 7-day refresh token.
     return res.status(200).json({
       message: "Login successfully",
       success: true,
       error: false,
       data: {
-        refreshtoken: refreshToken,
-        accesstoken: accessToken,
-        refreshToken,
-        accessToken,
         user,
       },
     });
   } catch (err) {
     return res.status(err.statusCode || 500).json({
-      message: err.message || err,
+      message: safeErrorMessage(err, "Login failed"),
       success: false,
       error: true,
       requiresVerification: Boolean(err.requiresVerification),
@@ -134,10 +285,20 @@ export const loginController = async (req, res) => {
 
 export const googleAuthRedirectController = async (req, res) => {
   try {
+    // OAuth state binds the callback to this browser (login-CSRF defense).
+    const state = crypto.randomBytes(16).toString("hex");
+    res.cookie("oauth_state", state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 5 * 60 * 1000,
+      path: "/",
+    });
     const authorizeUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: ["openid", "email", "profile"],
       prompt: "select_account",
+      state,
     });
 
     return res.redirect(authorizeUrl);
@@ -153,7 +314,7 @@ export const googleAuthRedirectController = async (req, res) => {
 
 export const googleAuthCallbackController = async (req, res) => {
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) {
       return res.status(400).json({
         message: "Google authorization code is missing.",
@@ -161,6 +322,22 @@ export const googleAuthCallbackController = async (req, res) => {
         error: true,
       });
     }
+    // State must match the cookie set at redirect time — otherwise this
+    // login was planted by someone else (login CSRF / session fixation).
+    if (!state || state !== req.cookies?.oauth_state) {
+      return res.status(403).json({
+        message: "Google login session mismatch. Please try again.",
+        success: false,
+        error: true,
+      });
+    }
+    // Clear with the same flags used at set time or the cookie survives.
+    res.clearCookie("oauth_state", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      path: "/",
+    });
 
     const { tokens } = await oauth2Client.getToken(code);
     if (!tokens?.id_token) {
@@ -177,55 +354,22 @@ export const googleAuthCallbackController = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    const email = payload?.email?.toLowerCase();
-
-    if (!email) {
-      return res.status(400).json({
-        message: "Google did not return a valid email.",
+    const previewUser = await userModel
+      .findOne({ email: payload?.email?.toLowerCase() })
+      .select("status")
+      .lean();
+    if (previewUser && previewUser.status !== USER_STATUS.ACTIVE) {
+      const statusLabel =
+        previewUser.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
+      return res.status(403).json({
+        message: `Your account is ${statusLabel}. Please contact support.`,
         success: false,
         error: true,
+        accountBlocked: true,
+        accountStatus: previewUser.status,
       });
     }
-
-    const name = payload.name || email.split("@")[0];
-
-    // High-quality image
-    const picture = payload.picture
-      ? payload.picture.replace("s96-c", "s400-c")
-      : null;
-
-    let user = await userModel.findOne({ email }).select("+password");
-
-    if (!user) {
-      const randomPassword = crypto.randomBytes(32).toString("hex");
-      const hashedPassword = await bcrypt.hash(randomPassword, 10);
-
-      user = await userModel.create({
-        name,
-        email,
-        password: hashedPassword,
-        avatar: picture || undefined, // only store if exists
-        is_email_verified: true,
-        verifyTokenEmail: "",
-      });
-    } else {
-      // ONLY update avatar if user has default / no avatar
-      if (
-        picture &&
-        (!user.avatar ||
-          user.avatar.includes("avatar-default") ||
-          user.avatar === "")
-      ) {
-        user.avatar = picture;
-      }
-
-      // Ensure verified
-      if (!user.is_email_verified) {
-        user.is_email_verified = true;
-      }
-
-      await user.save();
-    }
+    const user = await findOrCreateGoogleUser(payload);
 
     const oauthLoginCode = crypto.randomBytes(32).toString("hex");
     const hashedOauthLoginCode = crypto
@@ -252,6 +396,64 @@ export const googleAuthCallbackController = async (req, res) => {
   }
 };
 
+export const googleOneTapController = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        message: "Google credential is required",
+        success: false,
+        error: true,
+      });
+    }
+
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const user = await findOrCreateGoogleUser(ticket.getPayload());
+
+    if (user.status !== USER_STATUS.ACTIVE) {
+      const statusLabel =
+        user.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
+
+      return res.status(403).json({
+        message: `Your account is ${statusLabel}. Please contact support.`,
+        success: false,
+        error: true,
+        accountBlocked: true,
+        accountStatus: user.status,
+      });
+    }
+
+    user.last_login_date = new Date();
+    await user.save();
+
+    const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
+    const refreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
+
+    setAuthCookies(res, accessToken, refreshToken);
+
+    return res.status(200).json({
+      message: "Google login successful",
+      success: true,
+      error: false,
+      data: {
+        user: sanitizeAuthUser(user),
+      },
+    });
+  } catch (error) {
+    console.error("Google One Tap error:", error);
+    return res.status(error.statusCode || 500).json({
+      message: error.message || "Google login failed",
+      success: false,
+      error: true,
+    });
+  }
+};
+
 export const exchangeGoogleOAuthCodeController = async (req, res) => {
   try {
     const { code } = req.body;
@@ -269,10 +471,17 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       .update(code)
       .digest("hex");
 
-    const user = await userModel.findOne({
-      oauth_login_token: hashedOauthLoginCode,
-      oauth_login_expiry: { $gt: new Date() },
-    });
+    // Atomic single-use consume to prevent parallel replay
+    const user = await userModel.findOneAndUpdate(
+      {
+        oauth_login_token: hashedOauthLoginCode,
+        oauth_login_expiry: { $gt: new Date() },
+      },
+      {
+        $set: { oauth_login_token: "", oauth_login_expiry: null },
+      },
+      { new: false },
+    );
 
     if (!user) {
       return res.status(401).json({
@@ -282,26 +491,26 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       });
     }
 
-    if (user.status !== USER_STATUS.ACTIVE) {
+    const freshUser = await userModel.findById(user._id);
+
+    if (freshUser.status !== USER_STATUS.ACTIVE) {
       const statusLabel =
-        user.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
+        freshUser.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
 
       return res.status(403).json({
         message: `Your account is ${statusLabel}. Please contact support.`,
         success: false,
         error: true,
         accountBlocked: true,
-        accountStatus: user.status,
+        accountStatus: freshUser.status,
       });
     }
 
-    user.oauth_login_token = "";
-    user.oauth_login_expiry = null;
-    user.last_login_date = new Date();
-    await user.save();
+    freshUser.last_login_date = new Date();
+    await freshUser.save();
 
-    const accessToken = await generatedAccessToken(user._id);
-    const refreshToken = await generatedRefreshToken(user._id);
+    const accessToken = await generatedAccessToken(freshUser._id, freshUser.tokenVersion || 0);
+    const refreshToken = await generatedRefreshToken(freshUser._id, freshUser.tokenVersion || 0);
 
     setAuthCookies(res, accessToken, refreshToken);
 
@@ -310,14 +519,12 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       success: true,
       error: false,
       data: {
-        accessToken,
-        refreshToken,
-        user: sanitizeAuthUser(user),
+        user: sanitizeAuthUser(freshUser),
       },
     });
   } catch (error) {
     return res.status(500).json({
-      message: error.message || "Google login failed",
+      message: safeErrorMessage(error, "Google login failed"),
       success: false,
       error: true,
     });
@@ -327,26 +534,37 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
 export const verifyEmailController = async (req, res) => {
   try {
     const { code } = req.body;
-    if (!code) {
+    if (!code || typeof code !== "string") {
       return res.status(400).json({
         message: "verification code required ",
         success: false,
         error: true,
       });
     }
-    const user = await userModel.findOne({
-      verifyTokenEmail: code,
+    // Hashed-first lookup; fallback to legacy raw tokens then upgrade to hash.
+    const hashedCode = sha256(code);
+    let user = await userModel.findOne({
+      verifyTokenEmail: hashedCode,
+      verifyTokenEmailExpiry: { $gt: new Date() },
     });
     if (!user) {
-      return res.status(400).json({
-        message: " Invalid or expired verification link",
-        success: false,
-        error: true,
+      const legacyUser = await userModel.findOne({
+        verifyTokenEmail: code,
+        verifyTokenEmailExpiry: { $gt: new Date() },
       });
+      if (!legacyUser) {
+        return res.status(400).json({
+          message: " Invalid or expired verification link",
+          success: false,
+          error: true,
+        });
+      }
+      user = legacyUser;
     }
 
     user.is_email_verified = true;
     user.verifyTokenEmail = "";
+    user.verifyTokenEmailExpiry = null;
     await user.save();
 
     return res.status(200).json({
@@ -366,7 +584,7 @@ export const verifyEmailController = async (req, res) => {
 export const checkEmailVerificationController = async (req, res) => {
   try {
     const email = req.query.email;
-    if (!email) {
+    if (!email || typeof email !== "string") {
       return res.status(400).json({
         message: "Email is required to check verification status",
         success: false,
@@ -374,26 +592,38 @@ export const checkEmailVerificationController = async (req, res) => {
       });
     }
 
-    const user = await userModel.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
+    const normalized = String(email).trim().toLowerCase();
+    // Basic email shape check to avoid DB probe with garbage
+    if (!/^\S+@\S+\.\S+$/.test(normalized)) {
+      return res.status(400).json({
+        message: "Invalid email format",
         success: false,
         error: true,
       });
     }
 
+    const GENERIC_CHECK_MESSAGE =
+      "If this email is registered, its verification status has been sent where applicable.";
+    const user = await userModel.findOne({ email: normalized });
+    if (!user) {
+      // Generic response to avoid enumeration; frontend treats as unverified
+      return res.status(200).json({
+        message: GENERIC_CHECK_MESSAGE,
+        success: true,
+        error: false,
+        verified: false,
+      });
+    }
+
     return res.status(200).json({
-      message: user.is_email_verified
-        ? "Email is verified"
-        : "Email is not verified yet",
+      message: GENERIC_CHECK_MESSAGE,
       success: true,
       error: false,
       verified: user.is_email_verified,
     });
   } catch (err) {
     return res.status(500).json({
-      message: err.message || err,
+      message: "Unable to check verification status",
       success: false,
       error: true,
     });
@@ -402,7 +632,13 @@ export const checkEmailVerificationController = async (req, res) => {
 
 export const logoutUser = async (req, res) => {
   try {
-    await revokeRefreshToken(req.userId);
+    // Prefer authenticated userId, fallback to refresh-cookie lookup
+    // so legacy GET /logoutUser (no auth middleware) still revokes server-side.
+    if (req.userId) {
+      await revokeRefreshToken(req.userId);
+    } else if (req.cookies?.refreshToken) {
+      await revokeRefreshTokenByToken(req.cookies.refreshToken);
+    }
     clearAuthCookies(res);
 
     return res.status(200).json({
@@ -412,10 +648,11 @@ export const logoutUser = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in logoutUser:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error during logout",
-      error: true,
+    clearAuthCookies(res);
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+      error: false,
     });
   }
 };
@@ -432,11 +669,17 @@ export const refreshAccessTokenController = async (req, res) => {
       message: "Token refreshed successfully",
       success: true,
       error: false,
-      data: session,
+      data: { user: session.user },
     });
   } catch (err) {
+    // Dead refresh token (401): wipe stale cookies so the browser stops
+    // sending them. Other failures (429/5xx/network) keep cookies — they
+    // may still be valid and the next attempt can succeed.
+    if ((err.statusCode || 401) === 401) {
+      clearAuthCookies(res);
+    }
     return res.status(err.statusCode || 401).json({
-      message: err.message || "Invalid refresh token",
+      message: safeErrorMessage(err, "Invalid refresh token"),
       success: false,
       error: true,
     });
@@ -446,47 +689,84 @@ export const refreshAccessTokenController = async (req, res) => {
 export const forgotPasswordController = async (req, res) => {
   try {
     const { email } = req.body;
+    const genericMessage =
+      "If an account exists for this email, a password reset link has been sent. Please check your inbox.";
 
-    const user = await userModel.findOne({ email });
+    if (!email || typeof email !== "string") {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    // Per-target-email throttle: generic success even when throttled.
+    if (isEmailSendThrottled(normalizedEmail)) {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
+    const user = await userModel.findOne({ email: normalizedEmail });
 
     if (!user) {
-      return res.status(404).json({
-        message: "User with this email doesn't exist",
-        success: false,
-        error: true,
+      // Generic success to prevent enumeration; small delay so missing
+      // accounts take ~as long as the email-sending path below.
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
       });
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedResetToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
 
     const expireTime = Date.now() + 15 * 60 * 1000;
     await userModel.findByIdAndUpdate(user._id, {
-      reset_password_token: resetToken,
+      reset_password_token: hashedResetToken,
       reset_password_expiry: expireTime,
     });
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
     // 5. Send the email
-    await sendEmail({
-      sendTo: email,
-      subject: "Reset your Unideals password",
-      html: forgotPaswordTemplate({
-        name: user.name,
-        resetUrl,
-      }),
-    });
+    try {
+      await sendEmail({
+        sendTo: normalizedEmail,
+        subject: "Reset your Unideals password",
+        html: forgotPaswordTemplate({
+          name: user.name,
+          resetUrl,
+        }),
+      });
+      recordEmailSend(normalizedEmail);
+    } catch (emailErr) {
+      // Roll back token if email fails so stale tokens don't linger
+      await userModel.findByIdAndUpdate(user._id, {
+        reset_password_token: "",
+        reset_password_expiry: null,
+      });
+      throw emailErr;
+    }
 
     return res.status(200).json({
-      message:
-        "Password reset link sent to your email. Please check your inbox.",
+      message: genericMessage,
       success: true,
       error: false,
     });
   } catch (error) {
     return res.status(500).json({
-      message:
-        error.message || "An error occurred while sending the reset email",
+      message: safeErrorMessage(
+        error,
+        "An error occurred while sending the reset email",
+      ),
       success: false,
       error: true,
     });
@@ -498,16 +778,20 @@ export const resetPasswordController = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
-    if (!password) {
+    if (!isPasswordValidLength(password)) {
       return res.status(400).json({
-        message: "Please provide a new password",
+        message:
+          typeof password === "string" && password.length > 72
+            ? "Password must be at most 72 characters."
+            : "Please provide a new password of at least 8 characters",
         success: false,
         error: true,
       });
     }
 
+    const hashedToken = crypto.createHash("sha256").update(String(token)).digest("hex");
     const user = await userModel.findOne({
-      reset_password_token: token,
+      reset_password_token: hashedToken,
       reset_password_expiry: { $gt: Date.now() }, // $gt means "greater than" right now
     });
 
@@ -526,7 +810,22 @@ export const resetPasswordController = async (req, res) => {
       password: hashedPassword,
       reset_password_token: "",
       reset_password_expiry: null,
+      refresh_token: null,
+      refresh_token_prev: null,
+      refresh_token_prev_expires_at: null,
+      $inc: { tokenVersion: 1 },
     });
+
+    // Post-reset notify (best-effort, never fail the request).
+    try {
+      await sendEmail({
+        sendTo: user.email,
+        subject: "Your Unideals password was changed",
+        html: `<p>Hi ${user.name || "there"},</p><p>Your Unideals password was just changed. If this wasn't you, please reset your password immediately or contact support.</p>`,
+      });
+    } catch {
+      // ignore notify failures
+    }
 
     return res.status(200).json({
       message: "Password updated successfully!",
@@ -535,8 +834,10 @@ export const resetPasswordController = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({
-      message:
-        error.message || "An error occurred while resetting the password",
+      message: safeErrorMessage(
+        error,
+        "An error occurred while resetting the password",
+      ),
       success: false,
       error: true,
     });
@@ -547,9 +848,10 @@ export const verifyResetTokenPreCheck = async (req, res) => {
   try {
     const { token } = req.params;
 
+    const hashedToken = crypto.createHash("sha256").update(String(token)).digest("hex");
     // Check if the token exists and hasn't expired yet
     const user = await userModel.findOne({
-      reset_password_token: token,
+      reset_password_token: hashedToken,
       reset_password_expiry: { $gt: Date.now() },
     });
 
@@ -579,45 +881,72 @@ export const verifyResetTokenPreCheck = async (req, res) => {
 export const resendVerificationController = async (req, res) => {
   try {
     const { email } = req.body;
+    const genericMessage = "If this email is registered and unverified, a verification email has been sent.";
 
-    const user = await userModel.findOne({ email });
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ message: "User not found.", success: false, error: true });
-    }
-
-    if (user.is_email_verified) {
-      return res.status(400).json({
-        message: "Email is already verified. Please log in.",
-        success: false,
-        error: true,
+    if (!email || typeof email !== "string") {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
       });
     }
 
-    // Generate a new token and update the user
+    const normalizedEmail = String(email).trim().toLowerCase();
+    // Per-target-email throttle: generic success even when throttled.
+    if (isEmailSendThrottled(normalizedEmail)) {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
+    const user = await userModel.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
+
+    if (user.is_email_verified) {
+      // Uniform success: a distinct 400 would confirm verified accounts.
+      return res.status(200).json({
+        message: genericMessage,
+        success: true,
+        error: false,
+      });
+    }
+
+    // Generate a new token (SHA256-hashed at rest, 24h expiry) and update the user
     const verifyToken = crypto.randomBytes(32).toString("hex");
     await userModel.findByIdAndUpdate(user._id, {
-      verifyTokenEmail: verifyToken,
+      verifyTokenEmail: sha256(verifyToken),
+      verifyTokenEmailExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
-    // Send the email
+    // Send the email (best-effort, uniform success)
     const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
-    await sendEmail({
-      sendTo: email,
-      subject: "Verify your email for Unideals",
-      html: verifyEmailTempplate({ name: user.name, url: verifyEmailUrl }),
-    });
+    try {
+      await sendEmail({
+        sendTo: normalizedEmail,
+        subject: "Verify your email for Unideals",
+        html: verifyEmailTempplate({ name: user.name, url: verifyEmailUrl }),
+      });
+      recordEmailSend(normalizedEmail);
+    } catch {
+      // best-effort: still return generic success
+    }
 
     return res.status(200).json({
-      message: "Verification email resent!",
+      message: genericMessage,
       success: true,
       error: false,
     });
   } catch (error) {
     return res
       .status(500)
-      .json({ message: error.message || error, success: false, error: true });
+      .json({ message: "Unable to resend verification email", success: false, error: true });
   }
 };

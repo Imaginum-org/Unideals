@@ -1,60 +1,116 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getProducts } from "../api/productApi";
-import { Share2, MessageSquare, Eye, ShieldCheck, Clock3, Bot, Sparkles, Expand, Minimize2 } from "lucide-react";
+import { MessageSquare, Eye, ShieldCheck, Clock3, Flag } from "lucide-react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
-import toast from "react-hot-toast";
+import ProductGallery from "../../../features/product/components/ProductGallery.jsx";
+import ImageLightbox from "../../../features/product/components/ImageLightbox.jsx";
+import { toast } from "../../../components/ui/toast.js";
 import { LuMessageSquareText } from "react-icons/lu";
 import { useParams, Link } from "react-router-dom";
 import { IoIosArrowForward } from "react-icons/io";
 import { getProductById } from "../api/productApi";
 import { HiOutlineBuildingLibrary } from "react-icons/hi2";
 import { MdLocationPin } from "react-icons/md";
-import AvatarComponent from "../../../Components/common/AvatarComponent.jsx";
+import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import { motion } from "framer-motion";
 import { FaWhatsapp, FaTelegram, FaLink } from "react-icons/fa";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 // condition
 import { GoChecklist } from "react-icons/go";
 // color
 import { IoColorPaletteOutline } from "react-icons/io5";
 import { useWishlist } from "../../../context/WishlistContext";
+import { useCampus } from "../../../context/CampusContext.jsx";
+import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
+import { ikThumb } from "../../../utils/imageTransform.js";
+import LimitModal from "../../../components/ui/LimitModal.jsx";
+import Seo from "../../../components/Seo.jsx";
+import { useUser } from "../../../context/useUserContext.jsx";
 // date of purchase
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaArrowRight } from "react-icons/fa6";
+import { PRODUCT_USAGE_OPTIONS } from "../constants/productOptions.js";
 
-const FALLBACK_IMAGE = "/image10.png";
+const FALLBACK_IMAGE = "/logo.svg";
+
+// "2024-04-12T00:00:00.000Z" -> "12 Apr 2024". Never throws, "" when empty.
+const formatPurchaseDate = (raw) => {
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+// Enum key -> human label ("one_to_three_months" -> "1 - 3 months").
+const formatUsageDuration = (raw) => {
+  const v = String(raw || "").trim();
+  if (!v) return "";
+  const hit = PRODUCT_USAGE_OPTIONS.find((o) => o.value === v);
+  return hit ? hit.label : v.replaceAll("_", " ");
+};
 
 const ProductDescription = () => {
   const { toggleWishlist, isInWishlist } = useWishlist();
+  const { campus, campusSlug } = useCampus();
+  const { userDetails, isLoggedIn } = useUser();
+  const safeTimeout = useSafeTimeout();
   const { id } = useParams();
   const [product, setProduct] = useState(null);
+  const [notAtCampus, setNotAtCampus] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [activeImage, setActiveImage] = useState("");
   const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [limitInfo, setLimitInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isContainMode, setIsContainMode] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   const staticCTARef = useRef(null);
   const floatingCTARef = useRef(null);
   const productId = product?._id;
   const inWishlist = isInWishlist(productId);
   const navigate = useNavigate();
+  // Girls Corner: non-eligible viewers (male/other/logged-out) never chat on
+  // girls-only listings. Admins see the product but chat stays girls-only.
+  const viewerGender = userDetails?.gender ?? null;
+  const viewerRole = userDetails?.role ?? null;
+  const viewerCanSeeGirls = viewerGender === "female" || viewerRole === "admin" || viewerRole === "support";
+  const girlsBlocked = Boolean(product?.isGirlsOnly) && !viewerCanSeeGirls;
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }, [id]);
 
   useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        const res = await getProductById(id);
+    let cancelled = false;
+    const controller = new AbortController();
 
+    const fetchProduct = async () => {
+      if (!campusSlug) {
+        // Campus still resolving: stop skeleton so a Retry can show.
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setNotAtCampus(false);
+      setProduct(null);
+      try {
+        const res = await getProductById(
+          id,
+          { campus_slug: campusSlug },
+          { signal: controller.signal },
+        );
+
+        if (cancelled) return;
         const fetchedProduct = res?.data?.data;
 
         setProduct(fetchedProduct);
@@ -63,14 +119,24 @@ const ProductDescription = () => {
           setActiveImage(fetchedProduct.images[0].url);
         }
       } catch (error) {
-        console.log(error);
+        if (cancelled) return;
+        // Cross-campus direct links resolve to CAMPUS_MISMATCH (404) —
+        // show a dedicated state instead of generic "not found".
+        if (error?.response?.data?.code === "CAMPUS_MISMATCH") {
+          setNotAtCampus(true);
+        }
+        // Other failures: loading state handles UI
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchProduct();
-  }, [id]);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [id, campusSlug]);
 
   // useEffect(() => {
   //   let isMounted = true;
@@ -97,30 +163,36 @@ const ProductDescription = () => {
   // }, [productId, checkProductInWishlist]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchSimilarProducts = async () => {
-      if (!product?.category) return;
+      if (!product?.category || !campusSlug) return;
 
       try {
         setSimilarLoading(true);
 
         const res = await getProducts({
           category: product.category,
+          campus_slug: campusSlug,
         });
 
+        if (cancelled) return;
         const filteredProducts = (res?.data?.data || [])
           .filter((item) => item._id !== product._id)
           .slice(0, 4);
 
         setSimilarProducts(filteredProducts);
-      } catch (error) {
-        console.log("Failed to fetch similar products", error);
+      } catch {
+        // Similar products are best-effort only
       } finally {
-        setSimilarLoading(false);
+        if (!cancelled) setSimilarLoading(false);
       }
     };
 
     fetchSimilarProducts();
-  }, [product]);
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.category, product?._id, campusSlug]);
 
   useEffect(() => {
     let rafId;
@@ -152,7 +224,7 @@ const ProductDescription = () => {
           const floating = floatingCTARef.current;
 
           floating.style.transition = "none";
-          floating.style.bottom = "16px";
+          floating.style.bottom = "max(16px, env(safe-area-inset-bottom))";
           floating.style.left = "16px";
           floating.style.right = "16px";
           floating.style.opacity = "1";
@@ -173,11 +245,16 @@ const ProductDescription = () => {
   }, []);
 
   const getShareData = () => {
-    const shareUrl = `${window.location.origin}/product/${product._id}`;
+    const base = `${window.location.origin}/product/${product._id}`;
+    const shareUrl = campusSlug
+      ? `${base}?campus_slug=${encodeURIComponent(campusSlug)}`
+      : base;
 
     const title = product?.title || "Product";
 
-    const text = `🎓 Found this on Unideals
+    const text = `🎓 Found this on Unideals${
+      campus?.name ? ` (${campus.name})` : ""
+    }
 
 ${title}
 ₹${product?.selling_price}
@@ -192,22 +269,6 @@ ${shareUrl}`;
       url: shareUrl,
     };
   };
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "ArrowLeft") {
-        goToPreviousImage();
-      }
-
-      if (e.key === "ArrowRight") {
-        goToNextImage();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeImage]);
 
   // const handleShare = async () => {
   //   const shareData = getShareData();
@@ -231,9 +292,11 @@ ${shareUrl}`;
   //   }
   // };
 
-  const shareUrl = `${window.location.origin}/product/${product?._id}`;
+  const shareUrl = campusSlug
+    ? `${window.location.origin}/product/${product?._id}?campus_slug=${encodeURIComponent(campusSlug)}`
+    : `${window.location.origin}/product/${product?._id}`;
 
-  const shareText = `🎓 Found this on Unideals
+  const shareText = `🎓 Found this on Unideals${campus?.name ? ` (${campus.name})` : ""}
 
 📦 ${product?.title}
 💰 ₹${product?.selling_price}
@@ -241,6 +304,43 @@ ${shareUrl}`;
 Available for pickup on campus.
 
 ${shareUrl}`;
+
+  // Availability derived from real status — never hardcoded.
+  const productStatus = String(product?.status || "listed").toLowerCase();
+  const isAvailable = ["listed", "active"].includes(productStatus);
+  // Live reservation (same Deal statuses chat treats as reserved). Reserved
+  // for someone else -> CTA becomes "Reserved"; the reserving buyer keeps
+  // their Chat CTA; cancelling the deal flips this back automatically.
+  const myIdForReservation = (() => {
+    try {
+      const cached = localStorage.getItem("cachedUserDetails");
+      return cached ? JSON.parse(cached)?._id : null;
+    } catch {
+      return null;
+    }
+  })();
+  const reservedByOther = Boolean(
+    isAvailable &&
+      product?.reservation?.reserved &&
+      String(product?.reservation?.buyerId || "") !==
+        String(myIdForReservation || ""),
+  );
+  const availabilityLabel = !isAvailable
+    ? productStatus === "sold" || productStatus === "delivered"
+      ? "Sold"
+      : productStatus === "unlisted"
+        ? "Unlisted"
+        : productStatus
+          ? productStatus.charAt(0).toUpperCase() + productStatus.slice(1)
+          : "Unavailable"
+    : "Available";
+  const displayAvailability = reservedByOther ? "Reserved" : availabilityLabel;
+  const savesCount =
+    product?.wishlist_count ??
+    product?.wishlisted_count ??
+    (Array.isArray(product?.wishlist) ? product.wishlist.length : null) ??
+    product?.saves_count ??
+    null;
 
   const original = Number(product?.original_price || 0);
   const selling = Number(product?.selling_price || 0);
@@ -262,13 +362,77 @@ ${shareUrl}`;
         id: "wishlist-toast",
       });
     } catch (error) {
-      toast.error("Failed to update wishlist", {
-        id: "wishlist-error",
-      });
+      const status = error?.response?.status;
+      const code = error?.response?.data?.code;
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update wishlist";
+      if (status === 401 || /login|auth|unauthor/i.test(message)) {
+        const returnTo = `${window.location.pathname}${window.location.search}`;
+        navigate("/login", { state: { from: returnTo } });
+        toast.error("Please log in to use your wishlist");
+        return;
+      }
+      if (code === "WISHLIST_LIMIT" || /wishlist limit/i.test(message)) {
+        setLimitInfo({ message });
+      } else {
+        toast.error(message, {
+          id: "wishlist-error",
+        });
+      }
     } finally {
       setWishlistLoading(false);
     }
   };
+
+  // Gallery state (hooks above early returns to satisfy rules-of-hooks).
+  const images = useMemo(
+    () =>
+      product?.images?.length > 0
+        ? product.images.map((image) => image.url)
+        : [FALLBACK_IMAGE],
+    [product],
+  );
+
+  const foundIndex = images.findIndex((img) => img === activeImage);
+  const currentImageIndex = foundIndex >= 0 ? foundIndex : 0;
+
+  const goToImage = useCallback(
+    (nextIndex) => {
+      if (images.length === 0) return;
+      const wrapped =
+        ((nextIndex % images.length) + images.length) % images.length;
+      setActiveImage(images[wrapped]);
+    },
+    [images],
+  );
+
+  const goToPreviousImage = useCallback(() => {
+    goToImage(currentImageIndex - 1);
+  }, [goToImage, currentImageIndex]);
+
+  const goToNextImage = useCallback(() => {
+    goToImage(currentImageIndex + 1);
+  }, [goToImage, currentImageIndex]);
+
+  // Inline gallery arrows. ImageLightbox owns keyboard nav while open.
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (isLightboxOpen) return;
+      if (e.key === "ArrowLeft") {
+        goToPreviousImage();
+      }
+
+      if (e.key === "ArrowRight") {
+        goToNextImage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goToPreviousImage, goToNextImage, isLightboxOpen]);
 
   if (loading) {
     return (
@@ -290,8 +454,40 @@ ${shareUrl}`;
 
   if (!product) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA]">
-        Product not found
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA] px-6">
+        <div className="text-center">
+          <p className="text-5xl">🎓</p>
+          <h1 className="mt-4 text-xl font-bold text-[#0F172A]">
+            {!campusSlug
+              ? "Pick your campus to view this listing"
+              : notAtCampus
+                ? "Not available at your campus"
+                : "Product not found"}
+          </h1>
+          <p className="mt-2 text-sm text-[#64748B]">
+            {!campusSlug
+              ? "We couldn't tell which campus marketplace to load."
+              : notAtCampus
+                ? "This listing belongs to another campus marketplace."
+                : "This listing may have been removed or sold."}
+          </p>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            {!campusSlug && (
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded-xl border border-[#3938EC] px-6 py-3 text-sm font-semibold text-[#3938EC] transition hover:bg-[#EEF0FF]"
+              >
+                Retry
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/")}
+              className="rounded-xl bg-[#3938EC] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
+            >
+              Back to Home
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -324,26 +520,25 @@ ${shareUrl}`;
     return "Just now";
   };
 
-  const images =
-    product?.images?.length > 0
-      ? product.images.map((image) => image.url)
-      : [FALLBACK_IMAGE];
-
-  const currentImageIndex = images.findIndex((img) => img === activeImage);
-
-  const goToPreviousImage = () => {
-    if (currentImageIndex > 0) {
-      setActiveImage(images[currentImageIndex - 1]);
-    }
-  };
-
-  const goToNextImage = () => {
-    if (currentImageIndex < images.length - 1) {
-      setActiveImage(images[currentImageIndex + 1]);
-    }
-  };
-
   return (
+    <>
+    <Seo
+      title={product?.title ? `${product.title} | Unideals` : "Product | Unideals"}
+      description={
+        product?.description
+          ? String(product.description).slice(0, 160)
+          : "View this campus listing on Unideals."
+      }
+      robots={product?.isGirlsOnly ? "noindex,nofollow" : "index,follow"}
+      canonical={
+        typeof window !== "undefined" && product?._id && !product?.isGirlsOnly
+          ? `${window.location.origin}/product/${product._id}`
+          : undefined
+      }
+      image={
+        product?.images?.[0]?.url || product?.images?.[0] || undefined
+      }
+    />
     <motion.div
       initial={{
         opacity: 0,
@@ -405,156 +600,43 @@ ${shareUrl}`;
           {/* LEFT */}
           <div className="flex flex-col gap-4">
             {/* Image Card */}
-            <div className="bg-[#FFFFFF] dark:bg-[#1A1D20] dark:border-0 rounded-xl border border-[#C9D1DC] p-3 md:p-4 xl:p-4">
-              {/* Main Image */}
-              <div className="relative group overflow-hidden rounded-2xl bg-[#F8FAFC]">
-                <motion.img
-                  key={activeImage}
-                  src={activeImage}
-                  initial={{
-                    opacity: 0,
-                    scale: 1.02,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    scale: 1,
-                  }}
-                  transition={{
-                    duration: 0.25,
-                  }}
-                  alt="Product"
-                  className={`w-full aspect-[1/0.93] transition-all duration-300 ${
-                    isContainMode ? "object-contain" : "object-cover"
-                  }`}
-                />
+            <div className="bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 rounded-xl border border-[#C9D1DC] p-3 md:p-4 xl:p-4">
+              <ProductGallery
+                images={images}
+                activeIndex={currentImageIndex}
+                onSelect={goToImage}
+                onPrev={goToPreviousImage}
+                onNext={goToNextImage}
+                onOpen={() => setIsLightboxOpen(true)}
+                onShare={() => setShowShareMenu(true)}
+              />
 
-                {images.length > 1 && currentImageIndex > 0 && (
-                  <button
-                    onClick={goToPreviousImage}
-                    className="
-      absolute
-      left-4
-      top-1/2
-      -translate-y-1/2
-      h-11
-      w-11
-      rounded-full
-      bg-white/90
-      backdrop-blur-md
-      shadow-lg
-      flex
-      items-center
-      justify-center
-      z-20
-      transition-all
-      duration-200
-      opacity-100
-      md:opacity-0
-      md:group-hover:opacity-100
-      hover:scale-105
-    "
-                  >
-                    <FiChevronLeft size={24} />
-                  </button>
-                )}
-
-                {images.length > 1 && currentImageIndex < images.length - 1 && (
-                  <button
-                    onClick={goToNextImage}
-                    className="
-      absolute
-      right-4
-      top-1/2
-      -translate-y-1/2
-      h-11
-      w-11
-      rounded-full
-      bg-white/90
-      backdrop-blur-md
-      shadow-lg
-      flex
-      items-center
-      justify-center
-      z-20
-      transition-all
-      duration-200
-      opacity-100
-      md:opacity-0
-      md:group-hover:opacity-100
-      hover:scale-105
-    "
-                  >
-                    <FiChevronRight size={24} />
-                  </button>
-                )}
-
-                {/* Image Fit Toggle */}
-                <button
-                  onClick={() => setIsContainMode((prev) => !prev)}
-                  className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center hover:scale-105 transition-all duration-200"
-                >
-                  {isContainMode ? (
-                    <Minimize2 size={18} className="text-[#181C1F]" />
-                  ) : (
-                    <Expand size={18} className="text-[#181C1F]" />
-                  )}
-                </button>
-                {/* Top Actions */}
-                <div className="absolute top-3 right-3 flex items-center gap-2">
-                  <button
-                    onClick={() => setShowShareMenu(true)}
-                    className="w-10 h-10 md:w-11 md:h-11 lg:w-9 lg:h-9 rounded-full bg-white shadow-md flex items-center justify-center"
-                  >
-                    <Share2 size={18} className="text-[#181C1F]" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Thumbnails */}
-              <div className="mt-3 flex gap-3 overflow-x-auto scrollbar-hide">
-                {images.map((img, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setActiveImage(img)}
-                    className={`min-w-[74px] sm:min-w-[84px] w-[74px] sm:w-[90px] h-[74px] sm:h-[90px] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                      activeImage === img
-                        ? "border-[#4F46E5]"
-                        : "border-[#ECECEC]"
-                    }`}
-                  >
-                    <img
-                      src={img}
-                      alt={`Preview ${index}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-
-              {/* Stats */}
-              <div className="mt-4 border border-[#E2E8F0] rounded-xl px-3 bg-[#FFFFFF] dark:bg-[#131313] dark:border-0 py-3 flex flex-wrap items-center justify-between gap-3 text-[12px] md:text-sm text-[#6B7280]">
+              {/* Stats — real counts only (views + saves); nothing invented */}
+              <div className="mt-4 border border-[#E2E8F0] rounded-xl px-3 bg-[#F7F8FA] dark:bg-[#131313] dark:border-0 py-3 flex flex-wrap items-center justify-between gap-3 text-[12px] md:text-sm text-[#6B7280]">
                 <div className="flex items-center gap-2 text-[#475569] dark:text-white font-medium">
                   <Eye size={16} className="text-[#2563EB]" />
 
                   <span>{product?.views_count || 0} views</span>
                 </div>
 
-                <div className="flex items-center dark:text-white gap-2 text-[#475569] font-medium">
-                  <MessageSquare size={16} />
+                {savesCount !== null && (
+                  <div className="flex items-center dark:text-white gap-2 text-[#475569] font-medium">
+                    <MessageSquare size={16} />
 
-                  <span>18 users chatted</span>
-                </div>
+                    <span>{savesCount} saves</span>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2 text-[#394FF1] font-medium">
                   <Clock3 size={16} />
 
-                  <span>5 chats in last hour</span>
+                  <span>Listed {getRelativeTime(product?.createdAt)}</span>
                 </div>
               </div>
             </div>
 
             {/* Key Details */}
-            <div className="bg-white dark:bg-[#1A1D20] dark:border-0 shadow-sm rounded-xl border border-[#E2E8F0] p-5 md:p-6">
+            <div className="bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 shadow-sm rounded-xl border border-[#E2E8F0] p-5 md:p-6">
               <h2 className="text-lg dark:text-white md:text-xl lg:text-xl xl:text-xl font-bold text-[#0F172A] mb-5">
                 Key Details
               </h2>
@@ -564,19 +646,22 @@ ${shareUrl}`;
                   {
                     icon: <GoChecklist size={17} className="text-[#3838EC]" />,
                     label: "Usage Duration",
-                    value: product?.attributes?.usage_duration || "<2 months",
+                    value:
+                      formatUsageDuration(
+                        product?.attributes?.usage_duration,
+                      ) || "Not specified",
                   },
 
                   {
                     icon: <GoChecklist size={17} className="text-[#3838EC]" />,
                     label: "Brand",
-                    value: product?.attributes?.brand || "N/A",
+                    value: String(product?.attributes?.brand || "").trim(),
                   },
 
                   {
                     icon: <GoChecklist size={17} className="text-[#3838EC]" />,
                     label: "Model",
-                    value: product?.title,
+                    value: String(product?.title || "").trim(),
                   },
                   {
                     icon: (
@@ -586,35 +671,40 @@ ${shareUrl}`;
                       />
                     ),
                     label: "Color",
-                    value: product?.attributes?.color || "N/A",
+                    value: String(product?.attributes?.color || "").trim(),
                   },
                   {
                     icon: (
                       <IoCalendarOutline size={17} className="text-[#3838EC]" />
                     ),
                     label: "Purchase Date",
-                    value: product?.attributes?.purchase_date || "N/A",
+                    value: formatPurchaseDate(
+                      product?.attributes?.purchase_date,
+                    ),
                   },
-                ].map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start justify-between text-sm"
-                  >
-                    <div className="flex items-center gap-3 text-[#6B7280] dark:text-white">
-                      <div className="flex items-center justify-center">
-                        {item.icon}
+                  // Empty optionals are omitted instead of showing "N/A" walls.
+                ]
+                  .filter((item) => item.value)
+                  .map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start justify-between gap-3 text-sm"
+                    >
+                      <div className="flex items-center gap-3 text-[#6B7280] dark:text-white shrink-0">
+                        <div className="flex items-center justify-center">
+                          {item.icon}
+                        </div>
+
+                        <span className="text-[#64748B] text-sm lg:text-base dark:text-slate-300">
+                          {item.label}
+                        </span>
                       </div>
 
-                      <span className="text-[#64748B] text-sm lg:text-base dark:text-slate-300">
-                        {item.label}
+                      <span className="max-w-[180px] text-end text-sm lg:text-base font-medium text-[#0F172A] dark:text-slate-300 break-words">
+                        {item.value}
                       </span>
                     </div>
-
-                    <span className="capitalize max-w-[180px] text-start text-sm lg:text-base font-medium text-[#0F172A] dark:text-slate-300">
-                      {item.value.replaceAll("_", " ")}
-                    </span>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
@@ -622,16 +712,40 @@ ${shareUrl}`;
           {/* RIGHT */}
           <div className="flex flex-col gap-4">
             {/* Product Info */}
-            <div className="bg-white rounded-xl border border-[#C9D1DC] p-5 md:p-7 xl:px-7 xl:py-5 dark:bg-[#1A1D20] dark:border-0 dark:text-white">
-              {/* Tags */}
+            <div className="bg-[#F7F8FA] rounded-xl border border-[#C9D1DC] p-5 md:p-7 xl:px-7 xl:py-5 dark:bg-[#1A1D20] dark:border-0 dark:text-white">
+              {/* Tags — availability derived from real status */}
               <div className="flex flex-wrap items-center gap-3">
                 <div className="bg-[#EAECFB] text-[#3838EC] text-sm font-medium px-4 py-1 rounded-full capitalize">
                   {product?.category?.replaceAll("_", " ")}
                 </div>
-                <div className="bg-[#E9F9EE] text-[#319F43] text-sm font-medium px-4 py-1 rounded-full">
-                  Available
+                {product?.isGirlsOnly && (
+                  <div className="bg-pink-100 text-pink-700 border border-pink-200 text-sm font-bold px-4 py-1 rounded-full">
+                    🌸 Girls Only
+                  </div>
+                )}
+                <div
+                  className={`text-sm font-medium px-4 py-1 rounded-full ${
+                    reservedByOther
+                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                      : isAvailable
+                        ? "bg-[#E9F9EE] text-[#319F43]"
+                        : "bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-300"
+                  }`}
+                >
+                  {displayAvailability}
                 </div>
               </div>
+
+              {!isAvailable && (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+                  No longer available. This listing is {availabilityLabel.toLowerCase()}.
+                </div>
+              )}
+              {product?.isGirlsOnly && (
+                <div className="mt-4 rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-sm font-medium text-pink-700 dark:bg-pink-950/30 dark:text-pink-200">
+                  🌸 Girls-only listing — only girls can chat with the seller.
+                </div>
+              )}
 
               {/* Title */}
               <h1 className="mt-4 md:mt-5 text-2xl sm:text-2xl md:text-2xl lg:text-3xl xl:text-3xl 2xl:text-4xl leading-[1.1] tracking-[-1px] font-bold text-[#0F172A] dark:text-white">
@@ -664,7 +778,8 @@ ${shareUrl}`;
                   <AvatarComponent
                     name={product?.seller_id?.name || "Seller"}
                     imageUrl={product?.seller_id?.avatar?.url}
-                    plan={product?.seller_id?.subscription} // Shows the seller's badge to buyers!
+                    plan={product?.seller_id?.subscription} role={product?.seller_id?.role} // Shows the seller's badge to buyers!
+                    showBadge
                     size="small"
                     className="lg:scale-125 origin-left" // This keeps your responsive sizing (w-7 to w-9)
                   />
@@ -679,6 +794,15 @@ ${shareUrl}`;
 
                   <span> Listed {getRelativeTime(product?.createdAt)}</span>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(true)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-red-500 underline-offset-2 hover:underline transition-colors"
+                >
+                  <Flag size={13} className="text-red-500" />
+                  Report listing
+                </button>
               </div>
 
               {/* About */}
@@ -709,7 +833,7 @@ ${shareUrl}`;
                   } ${
                     inWishlist
                       ? "bg-[#FFF1F4] border-pink-200"
-                      : "bg-white dark:bg-[#1A1D20] border-[#D6DCE5] dark:border-zinc-700 hover:border-[#3838EC]"
+                      : "bg-[#F7F8FA] dark:bg-[#1A1D20] border-[#D6DCE5] dark:border-zinc-700 hover:border-[#3838EC]"
                   }`}
                 >
                   {inWishlist ? (
@@ -719,37 +843,53 @@ ${shareUrl}`;
                   )}
                 </button>
 
-                {/* Chat */}
-                <Link
-                  to={`/chat?seller=${product?.seller_id?._id}`}
+                {/* Chat — Reserved for others once a deal is confirmed */}
+                {reservedByOther ? (
+                  <div
+                    title="This item is reserved for another buyer"
+                    className="flex-1 h-[55px] rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 text-amber-700 font-semibold text-base"
+                  >
+                    Reserved for another buyer
+                  </div>
+                ) : girlsBlocked ? (
+                  <div className="flex-1 min-h-[55px] rounded-2xl bg-pink-50 border border-pink-200 flex items-center justify-center gap-2 text-pink-700 font-semibold text-sm px-4 py-3 text-center dark:bg-pink-950/30 dark:text-pink-200">
+                    🌸 Girls-only listing — only girls can chat. {!isLoggedIn ? "Login to continue." : "Contact support for help."}
+                  </div>
+                ) : isAvailable ? (
+                  <Link
+                    to={
+                      product?.seller_id?._id
+                        ? `/chat?seller=${encodeURIComponent(product.seller_id._id)}&product=${encodeURIComponent(product._id || "")}`
+                        : "/chat"
+                    }
+                  onClick={(e) => {
+                    // Prevent chatting with own listing (backend also enforces)
+                    try {
+                      const cached = localStorage.getItem("cachedUserDetails");
+                      const me = cached ? JSON.parse(cached)?._id : null;
+                      if (me && product?.seller_id?._id === me) {
+                        e.preventDefault();
+                        toast.error("You cannot chat with yourself");
+                      }
+                    } catch {
+                      // ignore
+                    }
+                  }}
                   className="flex-1 h-[55px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] flex items-center justify-center gap-3 text-white font-semibold text-base tracking-wide shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   <LuMessageSquareText size={20} />
                   Chat with Seller
                 </Link>
+                ) : (
+                  <div className="flex-1 h-[55px] rounded-2xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center gap-3 text-gray-500 dark:text-gray-300 font-semibold text-base">
+                    No longer available
+                  </div>
+                )}
               </div>
-
-              {/* Ask AI About Deal */}
-              <button
-                type="button"
-                onClick={() => {
-                  window.dispatchEvent(
-                    new CustomEvent("open-unideals-assistant", {
-                      detail: {
-                        message: `Is ₹${product?.selling_price} a fair price for "${product?.title}"? What should I inspect before buying?`,
-                      },
-                    })
-                  );
-                }}
-                className="mt-3 w-full h-[48px] rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 flex items-center justify-center gap-2 text-[#394ff1] dark:text-indigo-400 font-semibold text-sm transition-all duration-300 shadow-sm"
-              >
-                <Sparkles size={16} className="text-[#394ff1] dark:text-indigo-400" />
-                Ask AI: Fair Price & Inspection Tips
-              </button>
             </div>
 
             {/* Pickup & Safety */}
-            <div className="bg-white dark:bg-[#1A1D20] dark:border-0 rounded-xl shadow-sm border border-[#E2E8F0] p-5 md:p-7 xl:px-7 xl:py-5">
+            <div className="bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 rounded-xl shadow-sm border border-[#E2E8F0] p-5 md:p-7 xl:px-7 xl:py-5">
               <h2 className="text-lg md:text-xl font-bold text-[#111827] dark:text-white mb-7">
                 Pickup & Safety
               </h2>
@@ -769,7 +909,9 @@ ${shareUrl}`;
                     </p>
 
                     <h4 className="mt-1 font-semibold text-[#0F172A] text-base dark:text-white">
-                      VIT Vellore
+                      {product.campus_id?.name ||
+                        campus?.name ||
+                        "Campus marketplace"}
                     </h4>
                   </div>
                 </div>
@@ -787,9 +929,18 @@ ${shareUrl}`;
                     <h4 className="mt-1 font-semibold text-[#0F172A] text-base dark:text-white">
                       {product.pickup_address_snapshot?.address_line} <br />
                       {product.pickup_address_snapshot?.city}
-                      <br />
-                      {product.pickup_address_snapshot?.pincode}
-                      {product.pickup_address_snapshot?.state}
+                      {product.pickup_address_snapshot?.pincode ? (
+                        <>
+                          <br />
+                          {product.pickup_address_snapshot.pincode}
+                        </>
+                      ) : null}
+                      {product.pickup_address_snapshot?.state ? (
+                        <>
+                          {" "}
+                          {product.pickup_address_snapshot.state}
+                        </>
+                      ) : null}
                       <br />
                     </h4>
                   </div>
@@ -798,7 +949,7 @@ ${shareUrl}`;
 
               {/* Safety Box */}
               <div className="mt-7 rounded-2xl bg-[#F5F6FF] dark:bg-[#131313] dark:border-0 border border-[#F1F5F9] p-5 flex gap-4">
-                <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center">
+                <div className="w-11 h-11 rounded-full bg-[#F7F8FA] flex items-center justify-center">
                   <ShieldCheck size={22} className="text-[#3838EC]" />
                 </div>
 
@@ -851,7 +1002,7 @@ ${shareUrl}`;
         className="sm:hidden"
         style={{
           position: "fixed",
-          bottom: "16px",
+          bottom: "max(16px, env(safe-area-inset-bottom))",
           left: "16px",
           right: "16px",
           zIndex: 50,
@@ -868,7 +1019,7 @@ ${shareUrl}`;
             className={`h-[56px] w-[60px] rounded-2xl backdrop-blur-xl border shadow-xl flex items-center justify-center ${
               inWishlist
                 ? "bg-[#FFF1F4] border-pink-200"
-                : "bg-white/95 border-white/50"
+                : "bg-[#F7F8FA]/95 border-white/50"
             }`}
           >
             {inWishlist ? (
@@ -878,13 +1029,42 @@ ${shareUrl}`;
             )}
           </button>
 
+          {reservedByOther ? (
+            <div
+              title="This item is reserved for another buyer"
+              className="flex-1 h-[56px] rounded-2xl bg-amber-50 border border-amber-200 shadow flex items-center justify-center gap-2 text-amber-700 font-semibold"
+            >
+              Reserved for another buyer
+            </div>
+          ) : girlsBlocked ? (
+            <div className="flex-1 h-[56px] rounded-2xl bg-pink-50 border border-pink-200 shadow flex items-center justify-center gap-2 px-4 text-center text-sm font-semibold text-pink-700 dark:bg-pink-950/30 dark:text-pink-200">
+              🌸 Girls-only listing — only girls can chat.
+            </div>
+          ) : (
           <Link
-            to={`/chat?seller=${product?.seller_id?._id}`}
+            to={
+              product?.seller_id?._id
+                ? `/chat?seller=${encodeURIComponent(product.seller_id._id)}&product=${encodeURIComponent(product._id || "")}`
+                : "/chat"
+            }
+            onClick={(e) => {
+              try {
+                const cached = localStorage.getItem("cachedUserDetails");
+                const me = cached ? JSON.parse(cached)?._id : null;
+                if (me && product?.seller_id?._id === me) {
+                  e.preventDefault();
+                  toast.error("You cannot chat with yourself");
+                }
+              } catch {
+                // ignore
+              }
+            }}
             className="flex-1 h-[56px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] shadow-[0_12px_30px_rgba(46,63,220,0.35)] flex items-center justify-center gap-3 text-white font-semibold"
           >
             <LuMessageSquareText size={20} />
-            Chat with Seller
+            {isAvailable ? "Chat with Seller" : "No longer available"}
           </Link>
+          )}
         </div>
       </div>
       {showShareMenu && (
@@ -940,7 +1120,7 @@ ${shareUrl}`;
   w-full
   md:w-[520px]
   mx-4
-  bg-white/95
+  bg-[#F7F8FA]/95
 dark:bg-[#16181B]/95
 border
 border-white/40
@@ -972,7 +1152,10 @@ dark:border-white/5
                 </p>
               </div>
 
-              <button onClick={() => setShowShareMenu(false)}>
+              <button
+                onClick={() => setShowShareMenu(false)}
+                aria-label="Close share dialog"
+              >
                 <IoClose className="text-black dark:text-white" size={24} />
               </button>
             </div>
@@ -987,7 +1170,7 @@ items-center
 gap-4
 p-4
 rounded-3xl
-bg-white
+bg-[#F7F8FA]
 dark:bg-zinc-900
 border
 border-zinc-200
@@ -995,7 +1178,12 @@ dark:border-zinc-800
 "
             >
               <img
-                src={product?.images?.[0]?.url || FALLBACK_IMAGE}
+                src={
+                  product?.images?.[0]?.url
+                    ? ikThumb(product.images[0].url)
+                    : FALLBACK_IMAGE
+                }
+                alt={product?.title || "Product"}
                 className="
     w-20
     h-20
@@ -1024,6 +1212,7 @@ dark:border-zinc-800
                   window.open(
                     `https://wa.me/?text=${encodeURIComponent(shareText)}`,
                     "_blank",
+                    "noopener,noreferrer",
                   );
 
                   setShowShareMenu(false);
@@ -1048,6 +1237,7 @@ dark:border-zinc-800
                       shareUrl,
                     )}&text=${encodeURIComponent(product?.title)}`,
                     "_blank",
+                    "noopener,noreferrer",
                   );
 
                   setShowShareMenu(false);
@@ -1067,15 +1257,19 @@ dark:border-zinc-800
 
               <motion.button
                 onClick={async () => {
-                  await navigator.clipboard.writeText(shareUrl);
+                  try {
+                    await navigator.clipboard.writeText(shareUrl);
 
-                  setCopied(true);
+                    setCopied(true);
 
-                  setTimeout(() => {
-                    setCopied(false);
-                  }, 2000);
+                    safeTimeout(() => {
+                      setCopied(false);
+                    }, 2000);
 
-                  toast.success("Link copied");
+                    toast.success("Link copied");
+                  } catch {
+                    toast.error("Could not copy link");
+                  }
 
                   setShowShareMenu(false);
                 }}
@@ -1111,6 +1305,7 @@ p-4
             >
               <p className="font-semibold text-[#3838EC]">
                 🎓 Share with classmates
+                {campus?.name ? ` · ${campus.name}` : ""}
               </p>
 
               <p className="text-sm text-slate-600 mt-1">
@@ -1131,8 +1326,149 @@ p-4
           </motion.div>
         </div>
       )}
+      {limitInfo && (
+        <LimitModal
+          title="Wishlist is full"
+          message={limitInfo.message}
+          onClose={() => setLimitInfo(null)}
+        />
+      )}
+      {showReportModal && (
+        <ReportListingModal
+          productId={product?._id}
+          productTitle={product?.title}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
+      <ImageLightbox
+        open={isLightboxOpen}
+        images={images}
+        index={currentImageIndex}
+        onClose={() => setIsLightboxOpen(false)}
+        onIndexChange={goToImage}
+      />
     </motion.div>
+    </>
   );
 };
 
 export default ProductDescription;
+
+// Inline "Report listing" dialog — backend contract:
+// POST /api/report/product/:id { reason (REPORT_REASONS enum), description? }.
+const REPORT_REASONS = [
+  "Fraud or Scam Seller",
+  "Safety Concern",
+  "Inappropriate Content",
+  "Spam or Bot account",
+  "Wrong price or details",
+  "Item already sold",
+];
+
+// UI label -> backend REPORT_REASONS enum (see backend/src/config/constants.js).
+const REPORT_REASON_MAP = {
+  "Fraud or Scam Seller": "fraud_or_scam",
+  "Safety Concern": "other",
+  "Inappropriate Content": "inappropriate_content",
+  "Spam or Bot account": "spam_or_advertisement",
+  "Wrong price or details": "fake_or_misleading",
+  "Item already sold": "sold_or_unavailable",
+};
+
+function ReportListingModal({ productId, productTitle, onClose }) {
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!reason) {
+      toast.error("Please select a reason");
+      return;
+    }
+    if (!details.trim() || details.trim().length < 10) {
+      toast.error("Please add a short description (min 10 characters)");
+      return;
+    }
+    setSending(true);
+    try {
+      const { default: axios } = await import(
+        "../../../services/axiosInstance.js"
+      );
+      await axios.post(`/api/report/product/${productId}`, {
+        reason: REPORT_REASON_MAP[reason] || "other",
+        description: String(details).slice(0, 500),
+      });
+      toast.success("Thanks. Our team will review this listing");
+      onClose();
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || "Could not submit the report. Please try again.",
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-end justify-center md:items-center">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <form
+        onSubmit={handleSubmit}
+        className="relative w-full md:w-[440px] mx-4 rounded-t-[24px] md:rounded-[24px] bg-[#F7F8FA] dark:bg-[#16181B] border border-zinc-200 dark:border-white/10 p-6 shadow-2xl"
+      >
+        <h3 className="text-lg font-bold text-[#0F172A] dark:text-white">
+          Report listing
+        </h3>
+        <p className="mt-1 text-sm text-zinc-500">
+          {productTitle || "This listing"}. Reports are reviewed within 24
+          hours.
+        </p>
+        <label className="mt-4 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+          Reason
+        </label>
+        <select
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#F7F8FA] px-3 py-2.5 text-sm outline-none focus:border-[#3838EC] dark:bg-zinc-900 dark:text-white"
+        >
+          <option value="">Select a reason</option>
+          {REPORT_REASONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <label className="mt-4 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+          What happened?
+        </label>
+        <textarea
+          rows={3}
+          value={details}
+          onChange={(e) => setDetails(e.target.value.slice(0, 2000))}
+          placeholder="Be specific: dates, messages, what's wrong…"
+          className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#F7F8FA] px-3 py-2.5 text-sm outline-none resize-none focus:border-[#3838EC] dark:bg-zinc-900 dark:text-white"
+        />
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-semibold text-gray-600 dark:bg-zinc-800 dark:text-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={sending}
+            className="flex-1 rounded-xl bg-[#EF4444] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {sending ? "Submitting…" : "Submit report"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

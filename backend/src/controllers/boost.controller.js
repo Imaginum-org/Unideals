@@ -1,4 +1,5 @@
 import * as boostService from "../services/boost.service.js";
+import { forwardServiceError } from "../utils/response.js";
 
 export const getMyBoostSummary = async (req, res, next) => {
   try {
@@ -27,6 +28,6 @@ export const boostProduct = async (req, res, next) => {
       data: result,
     });
   } catch (error) {
-    next(error);
+    forwardServiceError(error, next);
   }
 };

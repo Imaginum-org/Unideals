@@ -6,11 +6,11 @@ function Termscondition() {
   const { userDetails } = useUser();
 
   return (
-    <div className="h-screen w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree">
-      <div className="flex-1 lg:flex md:flex overflow-hidden">
+    <div className="h-full w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree">
+      <div className="flex h-[calc(100vh-70px)]">
         {/* LEFT PANEL - Only render if user exists */}
         {userDetails?._id ? (
-          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#FFFFFF] dark:bg-[#131313] xl:pt-2  xl:pb-0">
+          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0">
             <Profile_left_part />
           </div>
         ) : null}
@@ -18,9 +18,7 @@ function Termscondition() {
         {/* RIGHT PANEL (Main Content Area) */}
         <div
           className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:px-[5.7rem] lg:py-6 ${
-            userDetails?._id
-              ? "w-full md:flex-1"
-              : "mx-auto w-full max-w-5xl"
+            userDetails?._id ? "w-full md:flex-1" : "mx-auto w-full max-w-5xl"
           }`}
         >
           {/* Centered container to match other pages */}
@@ -34,4 +32,3 @@ function Termscondition() {
 }
 
 export default Termscondition;
-
