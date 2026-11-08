@@ -58,8 +58,21 @@ const reportSchema = new Schema(
 
     priority: {
       type: String,
-      enum: ["low", "normal", "medium", "high"],
+      enum: ["low", "normal", "medium", "high", "urgent"],
       default: "normal",
+    },
+
+    // Numeric twin of `priority` for queue ordering (higher first).
+    // Support tickets: set server-side from the requester's plan
+    // (Free normal=1, Pro high=2, Pro+ urgent=3; free suggestions low=0).
+    priority_rank: {
+      type: Number,
+      default: 1,
+    },
+
+    // Requester's plan at the time of the ticket (shown in the admin queue).
+    reporter_plan: {
+      type: String,
     },
 
     status: {
@@ -94,7 +107,10 @@ reportSchema.index(
     unique: true,
     partialFilterExpression: {
       target_model: { $in: ["Product", "User"] },
-      reporter_id: { $exists: true, $ne: null },
+      // $ne is not allowed in partial indexes (MongoDB rejected the whole
+      // index, so duplicate reports were never blocked). $type is allowed
+      // and also excludes null / missing reporter_id.
+      reporter_id: { $type: "objectId" },
     },
   },
 );

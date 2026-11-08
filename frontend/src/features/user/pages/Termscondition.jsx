@@ -7,7 +7,7 @@ function Termscondition() {
 
   return (
     <div className="h-full w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree">
-      <div className="flex h-[calc(100vh-70px)]">
+      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
         {/* LEFT PANEL - Only render if user exists */}
         {userDetails?._id ? (
           <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0">
@@ -17,7 +17,7 @@ function Termscondition() {
 
         {/* RIGHT PANEL (Main Content Area) */}
         <div
-          className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:px-[5.7rem] lg:py-6 ${
+          className={`min-w-0 w-full md:h-full md:overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] px-4 py-5 sm:p-6 lg:px-[5.7rem] lg:py-6 ${
             userDetails?._id ? "w-full md:flex-1" : "mx-auto w-full max-w-5xl"
           }`}
         >

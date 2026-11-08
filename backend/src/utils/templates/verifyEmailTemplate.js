@@ -1,3 +1,5 @@
+import escapeHtml from "../escapeHtml.js";
+
 const verifyEmailTemplate = ({ name, url }) => {
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F1F5F9; padding: 40px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Arial, sans-serif;">
@@ -39,14 +41,14 @@ const verifyEmailTemplate = ({ name, url }) => {
                 </h1>
 
                 <p style="color: #64748B; font-size: 14.5px; line-height: 1.65; margin: 0 0 28px 0; text-align: center;">
-                  Hi <strong style="color: #334155;">${name}</strong>, thanks for signing up. Please confirm this is your email address to activate your Unideals account.
+                  Hi <strong style="color: #334155;">${escapeHtml(name)}</strong>, thanks for signing up. Please confirm this is your email address to activate your Unideals account.
                 </p>
 
                 <!-- Button -->
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 28px auto;">
                   <tr>
                     <td align="center" bgcolor="#3838EC" style="border-radius: 8px;">
-                      <a href="${url}" target="_blank" style="display: inline-block; padding: 13px 36px; font-size: 14.5px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">
+                      <a href="${escapeHtml(url)}" target="_blank" style="display: inline-block; padding: 13px 36px; font-size: 14.5px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">
                         Verify Email
                       </a>
                     </td>
@@ -60,7 +62,7 @@ const verifyEmailTemplate = ({ name, url }) => {
                       <p style="color: #94A3B8; font-size: 11.5px; margin: 0 0 6px 0;">
                         Button not working? Paste this link into your browser:
                       </p>
-                      <a href="${url}" style="color: #3838EC; font-size: 11.5px; font-weight: 600; text-decoration: underline; word-break: break-all;">${url}</a>
+                      <a href="${escapeHtml(url)}" style="color: #3838EC; font-size: 11.5px; font-weight: 600; text-decoration: underline; word-break: break-all;">${escapeHtml(url)}</a>
                     </td>
                   </tr>
                 </table>

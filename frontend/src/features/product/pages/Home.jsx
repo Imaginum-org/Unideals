@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 import Category from "../../../features/product/components/Category.jsx";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
 import { getBoostedProducts, getProducts } from "../api/productApi";
-import { FaPlus } from "react-icons/fa6";
 import { IoIosArrowForward } from "react-icons/io";
 import { motion, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "../../../components/ui/toast.js";
 // Celebration (and its canvas-confetti dep) loads only when shown.
+// Below-the-fold feature bento: split out of the initial Home chunk.
+const LazyPromoBento = lazy(() => import("../components/home/PromoBento.jsx"));
+
 const LazyCelebration = lazy(
   () => import("../../../components/FirstListingCelebration.jsx"),
 );
@@ -20,6 +22,8 @@ import { useUser } from "../../../context/useUserContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { useGirlsMode } from "../../../context/GirlsModeContext.jsx";
 import GirlsEntryPill from "../../../components/ui/GirlsEntryPill.jsx";
+import { CampusEmptyState } from "../../../components/ui/EmptyStates.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { loginWithGoogleOneTap } from "../../auth/api/authApi.js";
 
 const HOME_GOOGLE_LOGIN_TRIGGER_KEY = "homeGoogleLoginTriggered";
@@ -347,6 +351,16 @@ const Home = () => {
     };
   }, []);
 
+  // Girl Mode swaps the category set: always show the new rail from its
+  // first card (the old scroll offset made it open mid-list). "instant"
+  // bypasses the rail's CSS smooth-scroll so there's no visible slide.
+  useEffect(() => {
+    const slider = sliderRef.current;
+    if (!slider) return;
+    slider.scrollTo({ left: 0, behavior: "instant" });
+    updateScrollButtons();
+  }, [showGirlsCategories]);
+
   useEffect(() => {
     fetchProducts(1);
   }, [fetchProducts]);
@@ -438,137 +452,76 @@ const Home = () => {
 
   return (
     <motion.div className="w-full bg-[#F7F8FA] dark:bg-[#131313] relative">
-      <div className="w-full pl-[4.5vw] pr-[4.5vw]">
+      <div className="w-full px-5 sm:px-[4.5vw]">
       <div className="flex flex-col w-full max-w-[1380px] mx-auto">
         {/* Girls Corner edge menu — fixed to the right edge, girls + admins only */}
         <GirlsEntryPill tab={audienceTab} onChange={handleAudienceTab} />
-        {/* Blue banner code */}
+        {/* Hero banner — one component, two compositions:
+            phones: left-aligned copy + bag art on the right (readable at 320px);
+            md+: centred copy flanked by the fan + bag, all vertically centred
+            (images used to sit at a fixed top-72 offset and got clipped). */}
         <motion.div
-          className="relative w-full mx-auto mt-4 mb-3
-    flex
-    rounded-lg md:rounded-xl
-    min-h-[22vh]
-    sm:min-h-[35vh]
-    md:min-h-[25vh]
-    lg:min-h-[22vh]
-    xl:h-[46vh]
-    2xl:min-h-[40vh]
-    shadow-[0_8px_20px_rgba(0,0,0,0.15)]
-    overflow-hidden
-    bg-cover
-    bg-center
-    bg-no-repeat"
-          style={{
-            backgroundImage: "url('/banner_bg.webp')",
-          }}
+          className="relative mx-auto mb-3 mt-3 flex w-full items-center overflow-hidden rounded-xl bg-cover bg-center bg-no-repeat shadow-[0_8px_20px_rgba(0,0,0,0.15)] sm:mt-4
+            min-h-[168px] sm:min-h-[220px] md:min-h-[240px] lg:min-h-[300px] xl:min-h-[360px] 2xl:min-h-[400px]
+            md:rounded-2xl"
+          style={{ backgroundImage: "url('/banner_bg.webp')" }}
         >
-          {/* Black Overlay for text */}
-          {/* <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-black/10 z-0" /> */}
-
-          {/* Left Image */}
-          <div
-            className="absolute left-6 lg:left-12 xl:left-20 top-72 -translate-y-1/2
-   w-24 md:w-36 lg:w-44 xl:w-80
-   z-10 pointer-events-none -scale-x-100 -rotate-12"
-          >
+          {/* Left art (md+) */}
+          <div className="pointer-events-none absolute left-[3%] top-1/2 z-10 hidden w-[clamp(7rem,15vw,19rem)] -translate-y-1/2 -scale-x-100 -rotate-12 md:block">
             <motion.img
               src="/fan.webp"
-              alt="Left Decoration"
-              className="w-full h-auto block"
-              animate={{ y: [0, -14, 0] }}
-              transition={{
-                duration: 4,
-                ease: "easeInOut",
-                repeat: Infinity,
-                repeatType: "loop",
-              }}
+              alt=""
+              className="block h-auto w-full"
+              animate={reduceMotion ? undefined : { y: [0, -14, 0] }}
+              transition={{ duration: 4, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
             />
           </div>
 
-          {/* Right Image */}
-          <div
-            className="absolute right-6 lg:right-12 xl:right-20 top-72 -translate-y-1/2
-   w-24 md:w-36 lg:w-44 xl:w-96
-   z-10 pointer-events-none -rotate-12"
-          >
+          {/* Right art: phones get a smaller bag beside the copy */}
+          <div className="pointer-events-none absolute right-[3%] top-1/2 z-10 w-[clamp(6.5rem,30vw,9rem)] -translate-y-1/2 -rotate-12 md:w-[clamp(7rem,16vw,22rem)]">
             <motion.img
               src="/bag_banner.webp"
-              alt="Right Decoration"
-              className="w-full h-auto block"
-              animate={{ y: [0, -16, 0] }}
-              transition={{
-                duration: 4.6,
-                ease: "easeInOut",
-                repeat: Infinity,
-                repeatType: "loop",
-                delay: 0.6,
-              }}
+              alt=""
+              className="block h-auto w-full"
+              animate={reduceMotion ? undefined : { y: [0, -16, 0] }}
+              transition={{ duration: 4.6, ease: "easeInOut", repeat: Infinity, repeatType: "loop", delay: 0.6 }}
             />
           </div>
 
-          <div className="relative z-10 flex h-full w-full items-center justify-center px-5">
-            {/* Left Content */}
-            <div className="text-white max-w-4xl text-center flex flex-col items-center font-figtree">
-              <h1 className="hidden md:block lg:text-[2.5vw] xl:text-4xl md:text-[2.7vw] text-[0.85rem] font-extrabold leading-tight font-figtree tracking-wider">
-                <RevealWords
-                  text="Unlock Deals, Share Essentials,"
-                  reduceMotion={reduceMotion}
-                />{" "}
+          <div className="relative z-20 flex w-full items-center px-5 py-6 sm:px-8 md:justify-center md:px-[18%] md:py-8">
+            <div className="flex max-w-[62%] flex-col items-start text-left font-figtree text-white sm:max-w-[58%] md:max-w-3xl md:items-center md:text-center">
+              <h1 className="font-figtree text-[clamp(1.05rem,min(4.6vw,6.5vh),1.5rem)] font-extrabold leading-[1.2] tracking-wide md:text-[clamp(1.6rem,3vw,2.6rem)]">
+                <RevealWords text="Unlock Deals, Share Essentials," reduceMotion={reduceMotion} />{" "}
                 <br className="hidden md:block" />
-                <RevealWords
-                  text="Simplify Campus Living!"
-                  delay={0.28}
-                  reduceMotion={reduceMotion}
-                />
-              </h1>
-              <h1 className="md:hidden lg:text-[2.5vw] xl:text-[2.2vw] md:text-[2.7vw] text-[0.85rem] font-extrabold leading-tight font-figtree">
-                <RevealWords
-                  text="Unlock Deals, Essentials,"
-                  reduceMotion={reduceMotion}
-                />{" "}
-                <br className="hidden md:block" />
-                <RevealWords
-                  text="Simplify Campus Living!"
-                  delay={0.21}
-                  reduceMotion={reduceMotion}
-                />
+                <RevealWords text="Simplify Campus Living!" delay={0.28} reduceMotion={reduceMotion} />
               </h1>
 
               <motion.p
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={
-                  reduceMotion
-                    ? { duration: 0.2, delay: 0.3 }
-                    : { duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.55 }
-                }
-                className="hidden text-center md:block lg:text-[1.7vw] tracking-wide xl:text-lg md:text-[2vw] text-[0.7rem] lg:leading-7 md:leading-5  text-gray-200 font-medium mt-4 font-figtree"
+                transition={reduceMotion ? { duration: 0.2, delay: 0.3 } : { duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.55 }}
+                className="mt-1.5 font-figtree text-[clamp(0.75rem,3.2vw,0.95rem)] font-medium leading-snug text-gray-200 md:mt-4 md:text-[clamp(0.95rem,1.5vw,1.15rem)] md:leading-7 md:tracking-wide"
               >
-                Your trusted platform to simplify student life
-                <br className="hidden sm:block" /> Buy, sell and connect easily!
+                <span className="md:hidden">Buy, sell & connect with students on your campus.</span>
+                <span className="hidden md:inline">
+                  Your trusted platform to simplify student life
+                  <br /> Buy, sell and connect easily!
+                </span>
               </motion.p>
+
               <motion.span
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.94 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={
-                  reduceMotion
-                    ? { duration: 0.2, delay: 0.4 }
-                    : {
-                        type: "spring",
-                        stiffness: 260,
-                        damping: 22,
-                        delay: 0.75,
-                      }
-                }
-                className="inline-flex lg:mt-4 xl:mt-8 md:mt-4 mt-3"
+                transition={reduceMotion ? { duration: 0.2, delay: 0.4 } : { type: "spring", stiffness: 260, damping: 22, delay: 0.75 }}
+                className="mt-3.5 inline-flex md:mt-6"
               >
-              <Link
-                to="/upload"
-                className="bg-white text-[#2D3339] font-bold rounded-md md:py-2 xl:py-2 lg:py-[0.5vh] xl:px-7 lg:px-7 xl:text-lg lg:text-lg md:text-base text-xs shadow-md py-[0.7vh] px-4 font-figtree duration-500 ease-in-out flex items-center justify-center gap-2"
-              >
-                <span>Sell Now</span>
-                <FiArrowRight />
-              </Link>
+                <Link
+                  to="/upload"
+                  className="flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-4 font-figtree text-[13px] font-bold text-[#2D3339] shadow-md transition-transform duration-200 active:scale-95 md:h-11 md:px-7 md:text-base"
+                >
+                  <span>Sell Now</span>
+                  <FiArrowRight />
+                </Link>
               </motion.span>
             </div>
           </div>
@@ -576,13 +529,16 @@ const Home = () => {
         </div>
       </div>
 
-      <div className="w-full min-h-screen bg-[#F7F8FA] flex flex-col items-center pl-[4.5vw] pr-[4.5vw] pb-24 lg:pb-0 dark:bg-[#131313]">
+      <div className="w-full min-h-screen bg-[#F7F8FA] flex flex-col items-center px-5 sm:px-[4.5vw] pb-24 lg:pb-0 dark:bg-[#131313]">
         {/* Category section */}
         <div id="categories" className="flex w-full max-w-[1380px] mx-auto flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-8 mt-4 scroll-mt-20">
           <div>
-            <h2 className="font-semibold text-black dark:text-white text-lg md:text-2xl font-figtree">
+            <h2 className="font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white">
               Shop by Category
             </h2>
+            <p className="mt-0.5 font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
+              Textbooks, gadgets, cycles and hostel must-haves, all from your campus.
+            </p>
           </div>
           {/* <div
             className="relative flex w-full gap-2 md:gap-4 lg:gap-6 items-center overflow-x-auto no-scrollbar cursor-grab select-none"
@@ -696,44 +652,53 @@ const Home = () => {
         </div>
 
         {boostedProducts.length > 0 && (
-          <div className="w-full max-w-[1380px] mx-auto mt-6 lg:mt-12 overflow-hidden rounded-2xl bg-[#2E4BFF] px-1 pb-1">
+          <div
+            className="mx-auto mt-6 w-full max-w-[1380px] lg:mt-12"
+          >
+          {/* With fewer than 4 boosted items the panel hugs its cards (each
+              capped at a feed-card width) instead of stretching across the
+              page with empty space. */}
+          <div
+            className="overflow-hidden rounded-2xl bg-[#2E4BFF] px-1 pb-1"
+            style={
+              boostedProducts.length < 4
+                ? { maxWidth: `calc(${Math.max(boostedProducts.length, 2)} * 300px + 2.5rem)` }
+                : undefined
+            }
+          >
             <h2 className="px-4 md:px-6 pt-2.5 md:pt-3 text-white font-bold text-lg md:text-xl font-figtree">
               Limited Time Deals
             </h2>
 
             <div className="mt-2.5 md:mt-3 rounded-2xl bg-white p-3 md:p-4 dark:bg-[#18181B]">
-            <div
-              className="
-    grid
-    w-full
-    grid-cols-2
-    lg:grid-cols-4
-    gap-2
-    sm:gap-3
-    md:gap-4
-    lg:gap-4
-    xl:gap-5
-  "
-            >
+            {/* Phones: swipeable rail (app pattern); tablet+: 4-up grid. */}
+            <div className="no-scrollbar -mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-3 px-3 pb-0.5 md:mx-0 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:px-0 xl:gap-5">
               {boostedProducts.slice(0, 4).map((product, i) => (
-                <ProductCard
-                  key={product._id}
-                  product={product}
-                  showBoostBar
-                  boostAccent={i % 2 === 0 ? "purple" : "orange"}
-                />
+                <div key={product._id} className="flex w-[min(46vw,220px)] shrink-0 snap-start md:w-auto">
+                  <ProductCard
+                    product={product}
+                    showBoostBar
+                    boostAccent={i % 2 === 0 ? "purple" : "orange"}
+                  />
+                </div>
               ))}
             </div>
             </div>
+          </div>
           </div>
         )}
 
         {/* Products section */}
         <div className="w-full max-w-[1380px] mx-auto lg:mt-12 mt-6 flex flex-col gap-4 lg:mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="font-semibold text-[#000000] font-figtree dark:text-white lg:text-[2vw] xl:text-2xl md:text-[2.1vw] text-sm">
-              Trending Items
-            </h1>
+            <div>
+              <h2 className="font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white">
+                Trending Items
+              </h2>
+              <p className="mt-0.5 font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
+                What students on your campus are checking out right now 🔥
+              </p>
+            </div>
           </div>
 
           <div
@@ -754,24 +719,8 @@ const Home = () => {
           >
             {/* EMPTY STATE */}
             {!initialLoading && !loading && products.length === 0 && !error && (
-              <div className="col-span-full flex w-full flex-col items-center gap-3 py-10 text-center">
-                <p className="text-gray-500 dark:text-gray-400">
-                  No products listed yet on this campus.
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <Link
-                    to="/upload"
-                    className="rounded-xl bg-[#394FF1] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition hover:bg-[#2f3fd6]"
-                  >
-                    List a product
-                  </Link>
-                  <a
-                    href="#categories"
-                    className="rounded-xl border border-zinc-200 px-5 py-2.5 text-sm font-bold text-zinc-600 transition hover:border-[#394FF1] hover:text-[#394FF1] dark:border-zinc-700 dark:text-zinc-300"
-                  >
-                    Browse categories
-                  </a>
-                </div>
+              <div className="col-span-full py-4">
+                <CampusEmptyState />
               </div>
             )}
             {products.map((product, index) => {
@@ -796,7 +745,7 @@ const Home = () => {
                     setHasMore(true);
                     fetchProducts(products.length === 0 ? 1 : page + 1, true);
                   }}
-                  className="rounded-xl bg-[#394FF1] px-5 py-2.5 text-sm font-bold text-white"
+                  className="rounded-lg bg-[#394FF1] px-5 py-2.5 text-sm font-bold text-white"
                 >
                   Retry
                 </button>
@@ -805,111 +754,45 @@ const Home = () => {
           </div>
 
           {loading && (
-            <p
-              role="status"
-              aria-live="polite"
-              className="w-full text-center mt-4 text-gray-500"
-            >
-              Loading more products...
-            </p>
+            <div className="mt-8 flex w-full justify-center">
+              <BrandLoader size="sm" label="Loading more products" />
+            </div>
           )}
 
+          {/* End-of-feed footer. Symmetric spacing: the same gap above it as
+              the bento section keeps below it (mt-10 / lg:mt-14 each). */}
           {!initialLoading && !loading && !hasMore && products.length > 0 && (
-            <div className="flex w-full justify-center mt-4 pb-6">
-              <button
-                type="button"
-                onClick={() => navigate("/explore")}
-                className="flex items-center gap-2 rounded-lg bg-[#3838EC] px-4 lg:px-5 py-2 text-base font-medium text-[#FCFCFC] transition-all duration-200 hover:scale-[1.02]"
-              >
-                <span>View more products</span>
-                <IoIosArrowForward className="size-3" />
-              </button>
+            <div className="mt-10 flex w-full flex-col items-center gap-4 lg:mt-14">
+              <p className="text-[13px] font-medium text-slate-400 dark:text-zinc-500">
+                You&apos;re all caught up on the latest drops ✨
+              </p>
+              <div className="flex w-full max-w-xl items-center gap-4">
+                <span aria-hidden="true" className="h-px flex-1 bg-gradient-to-r from-transparent to-neutral-200 dark:to-neutral-800" />
+                <button
+                  type="button"
+                  onClick={() => navigate("/explore")}
+                  className="es-secondary group inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white pl-5 pr-4 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-px hover:border-[#3838EC]/40 hover:text-[#3838EC] hover:shadow-[0_8px_20px_-10px_rgba(56,56,236,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3838EC]/40 focus-visible:ring-offset-2 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-100 dark:hover:border-[#6D6DF5] dark:hover:text-white dark:focus-visible:ring-offset-[#131313]"
+                >
+                  View more products
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-[#3838EC]/10 text-[#3838EC] transition-transform duration-200 group-hover:translate-x-0.5 dark:bg-white/10 dark:text-white">
+                    <IoIosArrowForward className="size-3.5" />
+                  </span>
+                </button>
+                <span aria-hidden="true" className="h-px flex-1 bg-gradient-to-l from-transparent to-neutral-200 dark:to-neutral-800" />
+              </div>
             </div>
           )}
         </div>
 
-        {/* Boost banner — sits below Trending (after View more) */}
-        <div className="w-full max-w-[1380px] mx-auto mt-3 lg:mt-6 mb-8 lg:mb-12">
-        <motion.div className="pt-3 pb-3 md:pb-5 md:pt-5 lg:pb-5 lg:pt-5 pr-[2vw] lg:pr-0 rounded-md md:rounded-xl text-white flex items-center justify-between relative overflow-hidden shadow-[14.361501693725586px_10.258214950561523px_30px_0px_rgba(0,0,0,0.06)] dark:bg-[#1A1D20]">
-          {/* Background Image */}
-          <img
-            src="/assets/Group_114.png"
-            alt="background"
-            className="absolute bottom-9 right-[-14vw] lg:right-[-7vw] z-0 w-[46vw] md:w-[38vw] lg:w-[32vw] xl:w-[24vw] h-auto md:bottom-11 lg:bottom-14 md:right-[-14vw]"
-          />
-
-          {/* White Banner Container */}
-          <motion.div className="w-full h-full text-black rounded-lg flex md:leading-tight leading-snug">
-            {/* Left Text Section */}
-            <div className="flex flex-col lg:pl-14 pl-6 w-3/4 justify-center md:pl-10">
-              <motion.h1 className="font-extrabold text-[clamp(0.65rem,1.3vw,1.4rem)] md:text-[1rem] lg:text-[1.1rem] text-black font-figtree dark:text-[#B2B2B2] tracking-tight xl:tracking-normal xl:text-[1.3rem]">
-                Sell Faster on Unideals
-              </motion.h1>
-              <motion.h1 className="text-[#364EF2] font-extrabold md:font-bold md:text-[1.2rem] lg:text-[1.3rem] tracking-tight text-[0.7rem] font-figtree lg:mt-1 dark:text-white uppercase xl:text-[1.5rem]">
-                Make Your Listing Stand Out
-              </motion.h1>
-              <motion.h3 className="hidden md:block text-[clamp(0.85rem,1.4vw,1.2rem)] lg:text-[1rem] text-black tracking-tight font-medium font-figtree dark:text-[#C9C9C9] xl:text-[1.2rem]">
-                Increase exposure and connect with interested buyers faster.
-              </motion.h3>
-              <motion.h3 className="md:hidden text-[clamp(0.55rem,1.4vw,1.2rem)] text-black font-medium font-figtree dark:text-[#C9C9C9]">
-                Reach more interested buyers and sell faster
-              </motion.h3>
-            </div>
-
-            {/* Right Price Section */}
-            <div className="flex items-end w-1/3 lg:gap-3 xl:gap-3 gap-2 justify-end lg:pr-12 pr-2 pt-3 md:pt-4">
-              <motion.div className="text-right flex flex-col">
-                <h1 className="text-black/85 lg:text-[1rem] xl:text-[1.1rem] text-[0.5rem] font-medium font-figtree md:text-sm dark:text-[#CBCBCB]">
-                  Boost my
-                </h1>
-                <span className="lg:text-[1.4rem] md:text-[1.3rem] xl:text-2xl font-semibold text-[0.75rem] text-black font-figtree md:text-2xl mt-[-0.4vh] xl:text-[1.5rem] lg:mt-[-0.3vh] dark:text-white">
-                  Product
-                </span>
-              </motion.div>
-
-              {/* Arrow Button */}
-              <motion.div>
-                <Link
-                  to={"/price"}
-                  className="rounded-full bg-[#394FF1] lg:p-[0.5vw] xl:p-[0.4vw] md:p-[0.6rem] text-white lg:text-2xl flex justify-center items-center z-20 hover:scale-110 transition-transform p-[0.2rem] mb-[0.2vh] lg:mb-0 md:mb-[0.3vh] text-sm dark:bg-[#394FF1] dark:text-white"
-                >
-                  <IoIosArrowForward />
-                </Link>
-              </motion.div>
-            </div>
-          </motion.div>
-        </motion.div>
+        {/* Feature bento — below the product feed */}
+        <div className="w-full max-w-[1380px] mx-auto mt-10 lg:mt-14 mb-10 lg:mb-14">
+          <Suspense fallback={<div className="min-h-[40vh]" aria-hidden="true" />}>
+            <LazyPromoBento />
+          </Suspense>
         </div>
       </div>
 
-      {/* Mobile Floating Sell Button */}
-      <Link
-        to="/upload"
-        aria-label="Sell Product"
-        className="
-          sm:hidden
-          fixed
-          left-1/2
-          -translate-x-1/2
-          bottom-[max(1rem,env(safe-area-inset-bottom))]
-          z-50
-          flex
-          items-center
-          gap-2 rounded-lg bg-[#3838EC]
-          px-5
-          py-3
-          text-base
-          font-semibold
-          text-white
-          shadow-[0_8px_30px_rgba(0,0,0,0.18)]
-          transition-all
-          duration-200
-          active:scale-95
-        "
-      >
-        <span>Sell</span>
-        <FaPlus className="size-3" />
-      </Link>
+      {/* Mobile Sell lives in the bottom tab bar (MobileTabBar). */}
 
       {showCelebration && (
         <Suspense fallback={null}>

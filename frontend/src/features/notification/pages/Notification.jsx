@@ -14,6 +14,7 @@ import {
 
 import Profile_left_part from "../../../features/user/components/Profile_left_part.jsx";
 import { useNotification } from "../../../context/NotificationContext.jsx";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 
 // Resolve icon and style by notification type
 const getNotificationTypeMeta = (type = "") => {
@@ -105,12 +106,12 @@ export default function Notification() {
 
   return (
     <div className="h-full w-full overflow-hidden bg-[#F7F8FA] font-figtree dark:bg-[#131313]">
-      <div className="flex h-[calc(100vh-70px)]">
+      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
         <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
           <Profile_left_part />
         </div>
 
-        <main className="h-full overflow-y-auto bg-[#F7F8FA] px-5 py-6 dark:bg-[#131313] md:flex-1 xl:px-[5.7rem]">
+        <main className="min-w-0 w-full md:h-full md:overflow-y-auto bg-[#F7F8FA] px-4 py-5 sm:px-5 sm:py-6 dark:bg-[#131313] md:flex-1 xl:px-[5.7rem]">
           <div className="mx-auto w-full max-w-4xl pb-10">
             <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -152,9 +153,7 @@ export default function Notification() {
             )}
 
             {loading ? (
-              <div className="flex justify-center py-16">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
-              </div>
+              <BrandLoader size="full" />
             ) : error && notifications.length === 0 ? null : notifications.length === 0 ? (
               <div className="rounded-2xl border border-[#E2E6EF] bg-[#F7F8FA] p-10 text-center dark:border-gray-800 dark:bg-[#1c1c1c]">
                 <p className="text-4xl">🎉</p>
@@ -166,104 +165,98 @@ export default function Notification() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <ul className="divide-y divide-[#EEF0F4] overflow-hidden rounded-2xl border border-[#E6E9F0] bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-[#1A1D20]">
                 {notifications.map((notification) => {
                   const meta = getNotificationTypeMeta(notification.type);
                   const Icon = meta.Icon;
                   const bannerImage =
                     notification.imageUrl || notification.image_url;
+                  const unread = notification.unread;
 
                   return (
-                    <article
+                    <li
                       key={notification.id || notification._id}
-                      className={`rounded-2xl border p-4 shadow-[0_10px_26px_rgba(15,23,42,0.055)] transition dark:bg-[#1c1c1c] ${
-                        notification.unread
-                          ? "border-[#DEDFFC] bg-[#F7F7FF] dark:border-indigo-900/60 dark:bg-indigo-950/20"
-                          : "border-[#E2E6EF] bg-[#F7F8FA] dark:border-gray-800"
+                      className={`relative flex gap-3 px-4 py-3.5 transition-colors sm:px-5 ${
+                        unread ? "bg-[var(--accent-soft)]/50" : ""
                       }`}
                     >
-                      <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-start">
-                        <div className="flex items-center gap-3">
-                          <Icon
-                            size={22}
-                            strokeWidth={1.8}
-                            className={meta.iconColor}
-                          />
-                          {notification.unread && (
-                            <span
-                              className={`h-2 w-2 rounded-full ${meta.dotColor}`}
-                            />
-                          )}
-                        </div>
+                      {/* Type icon tile (+ unread dot) */}
+                      <span className="relative mt-0.5 shrink-0">
+                        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#F3F4F8] dark:bg-white/5">
+                          <Icon size={19} strokeWidth={1.9} className={meta.iconColor} />
+                        </span>
+                        {unread && (
+                          <span className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-[#1A1D20] ${meta.dotColor}`} />
+                        )}
+                      </span>
 
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        {/* Whole text block is the tap target, like any inbox */}
+                        <button
+                          type="button"
+                          onClick={() => openNotification(notification)}
+                          className="block w-full pr-7 text-left"
+                        >
+                          <span className="flex items-baseline justify-between gap-3">
                             <span
-                              className={`rounded-md px-2.5 py-0.5 text-[10px] font-black tracking-wider ${meta.badgeBg}`}
+                              className={`min-w-0 truncate text-[14.5px] leading-5 text-[#09111F] dark:text-white ${
+                                unread ? "font-bold" : "font-semibold"
+                              }`}
                             >
-                              {meta.displayType}
-                            </span>
-                            <h2 className="text-[15px] font-extrabold text-[#09111F] dark:text-white">
                               {notification.title}
-                            </h2>
-                          </div>
-
-                          <p className="mt-2.5 max-w-3xl text-[13px] font-medium leading-6 text-[#09111F] dark:text-slate-200">
+                            </span>
+                            <span className="shrink-0 text-[11.5px] font-medium text-[#9AA3B2] dark:text-gray-500">
+                              {notification.time}
+                            </span>
+                          </span>
+                          <span className="mt-0.5 line-clamp-2 block text-[13px] leading-5 text-[#5B6474] dark:text-slate-300">
                             {notification.message || notification.description}
-                          </p>
+                          </span>
+                          <span className={`mt-1.5 inline-block rounded px-1.5 py-px text-[9.5px] font-black tracking-wider ${meta.badgeBg}`}>
+                            {meta.displayType}
+                          </span>
+                        </button>
 
-                          {/* Attached Banner Image Preview */}
-                          {bannerImage && (
-                            <div className="mt-3 max-w-md overflow-hidden rounded-xl border border-slate-200 dark:border-gray-800">
-                              <img
-                                src={bannerImage}
-                                alt="Offer Banner"
-                                className="h-32 w-full object-cover"
-                              />
-                            </div>
-                          )}
+                        {bannerImage && (
+                          <div className="mt-2.5 max-w-md overflow-hidden rounded-xl border border-slate-200 dark:border-gray-800">
+                            <img src={bannerImage} alt="" loading="lazy" className="h-32 w-full object-cover" />
+                          </div>
+                        )}
 
-                          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center">
-                            <button
-                              type="button"
-                              onClick={() => openNotification(notification)}
-                              className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl bg-[#4A3CFF] px-4 text-[13px] font-extrabold text-white shadow-sm shadow-indigo-500/25 transition hover:bg-[#3832E8] sm:w-auto"
-                            >
-                              {notification.actionLabel ||
-                                notification.action_label ||
-                                "View Offers"}
-                              <ArrowUpRight size={14} />
-                            </button>
-
+                        <div className="mt-2 flex items-center gap-4">
+                          <button
+                            type="button"
+                            onClick={() => openNotification(notification)}
+                            className="inline-flex items-center gap-1 text-[12.5px] font-bold text-[var(--accent-text)]"
+                          >
+                            {notification.actionLabel || notification.action_label || "View"}
+                            <ArrowUpRight size={13} />
+                          </button>
+                          {unread && (
                             <button
                               type="button"
                               onClick={() => markRead(notification.id)}
-                              disabled={!notification.unread}
-                              className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[#E2E6EF] bg-[#F7F8FA] px-4 text-[13px] font-bold text-[#09111F] transition hover:border-[#4A3CFF] hover:text-[#4A3CFF] disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-[#1c1c1c] dark:text-white sm:w-auto"
+                              className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#5B6474] hover:text-[#09111F] dark:text-zinc-400 dark:hover:text-white"
                             >
-                              <Check size={14} />
-                              {notification.unread ? "Mark as read" : "Read"}
+                              <Check size={13} />
+                              Mark read
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => dismiss(notification.id)}
-                              className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[#E2E6EF] bg-[#F7F8FA] px-4 text-[13px] font-bold text-[#9AA3B2] transition hover:border-rose-400 hover:text-rose-500 dark:border-gray-800 dark:bg-[#1c1c1c] sm:w-auto"
-                            >
-                              <X size={14} />
-                              Dismiss
-                            </button>
-                          </div>
+                          )}
                         </div>
-
-                        <p className="text-[12px] font-bold text-[#9AA3B2] dark:text-gray-400 sm:text-right">
-                          {notification.time}
-                        </p>
                       </div>
-                    </article>
+
+                      <button
+                        type="button"
+                        onClick={() => dismiss(notification.id)}
+                        aria-label="Dismiss notification"
+                        className="absolute right-2 top-2.5 grid h-8 w-8 place-items-center rounded-full text-[#9AA3B2] transition-colors hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/30"
+                      >
+                        <X size={15} />
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             )}
           </div>
         </main>

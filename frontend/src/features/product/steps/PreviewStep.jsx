@@ -644,18 +644,18 @@ const PreviewStep = () => {
           <button
             onClick={isEditMode ? handleSaveChanges : handlePublish}
             disabled={loading}
-            className={`w-full max-w-[360px] h-[62px] rounded-2xl font-bold text-lg transition-all duration-200
+            className={`w-full max-w-[360px] h-[62px] rounded-lg font-bold text-lg transition-all duration-200
               
               ${
                 loading
-                  ? "bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed"
+                  ? "bg-[#4F46E5]/90 text-white cursor-wait shadow-lg shadow-indigo-200"
                   : "bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-xl shadow-indigo-200"
               }`}
           >
             {loading ? (
               <div className="flex items-center justify-center gap-3">
-                <BrandLoader size="xs" tone="white" />
-                <span>{publishStage}</span>
+                <BrandLoader size="sm" tone="white" />
+                <span>{publishStage || "Publishing…"}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 justify-center">

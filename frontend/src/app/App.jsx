@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "../components/ui/Toast.jsx";
 import { toast } from "../components/ui/toast.js";
-import SiteLockGate from "../siteLock/SiteLockGate.jsx"; // [SITE-LOCK] delete this import to remove the lock
 import AppRoutes from "./routes.jsx";
+import usePrefetch from "./usePrefetch.js";
 import { useUser } from "../context/useUserContext.jsx";
 import { NotificationProvider } from "../context/NotificationContext.jsx";
 
@@ -35,6 +35,7 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const { clearUserData, isLoggedIn } = useUser();
+  usePrefetch();
 
   // Refs so the one-time event listeners always see fresh values.
   const isLoggedInRef = useRef(isLoggedIn);
@@ -84,11 +85,9 @@ function App() {
 
   return (
     <div className="App">
-      <SiteLockGate>
-        <NotificationProvider>
-          <AppRoutes />
-        </NotificationProvider>
-      </SiteLockGate>
+      <NotificationProvider>
+        <AppRoutes />
+      </NotificationProvider>
       <Toaster />
     </div>
   );

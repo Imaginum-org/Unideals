@@ -28,5 +28,15 @@ export const ikFirstThumb = (entry, fallback = "/logo.svg", size = 200) => {
 /** Listing cards / PDP main: crisp on retina without full-res cost. */
 export const ikCard = (url) => ik(url, { w: 800, q: 70 });
 
+/**
+ * Responsive srcset for listing cards. Cards render ~170–330px wide, so the
+ * browser picks 320/480/640 by viewport + DPR instead of always pulling the
+ * 800px variant (≈3x fewer image bytes on phones). Non-ImageKit → undefined.
+ */
+export const ikCardSrcSet = (url) =>
+  isImageKitUrl(url) && !/[?&]tr=/.test(url)
+    ? [320, 480, 640].map((w) => `${ik(url, { w, q: 70 })} ${w}w`).join(", ")
+    : undefined;
+
 /** Fullscreen viewer: near-original quality, still format-optimized. */
 export const ikFull = (url) => ik(url, { w: 1600, q: 80 });

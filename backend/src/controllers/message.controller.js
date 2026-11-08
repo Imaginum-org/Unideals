@@ -47,7 +47,14 @@ export const markRead = async (req, res, next) => {
     const conversation = await messageService.markConversationRead({
       conversationId: req.params.id,
       userId: req.userId,
-      receipt: req.body?.receipt,
+      // Turning receipts off is a Pro/Pro+ perk (see updateChatSettings).
+      // Without this check a free user could skip the paywall by sending
+      // { receipt: false } directly.
+      receipt:
+        req.user?.role === "admin" ||
+        ["pro", "pro_plus"].includes(req.user?.subscription)
+          ? req.body?.receipt
+          : true,
     });
     return res.status(200).json({
       success: true,

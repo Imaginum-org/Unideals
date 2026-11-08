@@ -108,6 +108,8 @@ notificationSchema.index(
   { expireAfterSeconds: 30 * 24 * 60 * 60 }
 );
 
+// (The per-minute scheduler query is served by scheduled_at's field index.)
+
 // Read receipt schema to track individual user reads/clicks on broadcast notifications
 const notificationReceiptSchema = new Schema(
   {

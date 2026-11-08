@@ -1,5 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   DashboardIcon,
   MessageCircleIcon,
@@ -15,24 +17,159 @@ import { ChevronLeft, Crown, Menu, Trophy } from "lucide-react";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
-import axios from "../../../services/axiosInstance.js";
+import { useChatUnread } from "../../../services/chatUnread.js";
 import { useNotification } from "../../../context/NotificationContext.jsx";
+
+// ─── Collapsed-mode tooltip ───
+// Production-style rail tooltip: theme-matched surface (same panel language
+// as the header dropdowns), compact type, hairline border, soft layered
+// shadow. Rendered in a portal at a fixed position because the menu area
+// scrolls (overflow-y-auto) and would clip an in-place tooltip.
+const SidebarTooltip = ({ anchorRect, label, badge, instant = false }) =>
+  createPortal(
+    <AnimatePresence>
+      {anchorRect && (
+        <motion.div
+          key={label}
+          role="tooltip"
+          initial={instant ? false : { opacity: 0, x: -4 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.08 } }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+          style={{
+            position: "fixed",
+            top: anchorRect.top + anchorRect.height / 2,
+            left: anchorRect.right + 10,
+            translateY: "-50%",
+          }}
+          className="pointer-events-none z-[1000] font-figtree"
+        >
+          <div className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-neutral-200/90 bg-white px-2.5 py-[0.4rem] text-[12.5px] font-medium leading-none text-[#0F172A] shadow-[0_8px_24px_-6px_rgba(15,23,42,0.16),0_2px_6px_-2px_rgba(15,23,42,0.08)] dark:border-neutral-800 dark:bg-[#1A1D20] dark:text-[#E6E8EB] dark:shadow-[0_10px_28px_-8px_rgba(0,0,0,0.7)]">
+            <span>{label}</span>
+            {badge > 0 && (
+              <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-md bg-[#3838EC]/10 px-1 text-[11px] font-semibold tabular-nums text-[#3838EC] dark:bg-[#3838EC]/25 dark:text-[#B4B6FF]">
+                {badge > 99 ? "99+" : badge}
+              </span>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+
+// Delay grouping (Radix/Linear behaviour): the first tooltip waits briefly
+// so a cursor merely passing over the rail doesn't flash labels; once one
+// is open, moving to the next icon swaps instantly with no re-animation.
+const TOOLTIP_OPEN_DELAY_MS = 140;
+const TOOLTIP_WARM_WINDOW_MS = 400;
+let lastTooltipClosedAt = 0;
+let anyTooltipOpen = false;
+
+const useCollapsedTooltip = (enabled) => {
+  const ref = useRef(null);
+  const timerRef = useRef(null);
+  const openRef = useRef(false);
+  const [state, setState] = useState(null); // { rect, instant }
+
+  const reveal = (instant) => {
+    if (!ref.current) return;
+    openRef.current = true;
+    anyTooltipOpen = true;
+    setState({ rect: ref.current.getBoundingClientRect(), instant });
+  };
+
+  // immediate = keyboard focus (no delay; focus is deliberate).
+  const show = (immediate = false) => {
+    if (!enabled || !ref.current) return;
+    clearTimeout(timerRef.current);
+    const warm =
+      anyTooltipOpen || Date.now() - lastTooltipClosedAt < TOOLTIP_WARM_WINDOW_MS;
+    if (warm || immediate === true) {
+      reveal(warm);
+    } else {
+      timerRef.current = setTimeout(() => reveal(false), TOOLTIP_OPEN_DELAY_MS);
+    }
+  };
+
+  const hide = () => {
+    clearTimeout(timerRef.current);
+    if (openRef.current) {
+      openRef.current = false;
+      anyTooltipOpen = false;
+      lastTooltipClosedAt = Date.now();
+    }
+    setState(null);
+  };
+
+  useEffect(() => {
+    if (!enabled) hide();
+  }, [enabled]);
+
+  useEffect(() => () => {
+    clearTimeout(timerRef.current);
+    if (openRef.current) {
+      anyTooltipOpen = false;
+      lastTooltipClosedAt = Date.now();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!state) return undefined;
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+    return () => {
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+    };
+  }, [state]);
+
+  return {
+    ref,
+    rect: enabled && state ? state.rect : null,
+    instant: Boolean(state?.instant),
+    show: () => show(false),
+    showNow: () => show(true),
+    hide,
+  };
+};
 
 // ─── NavItem defined OUTSIDE the parent so hooks are stable across renders ───
 // Having it inside caused React to reset state (including isCollapsed) on every
 // navigation because the component reference changed each render.
 const NavItem = ({ path, label, icon: Icon, badge, isCollapsed, pathname }) => {
   const iconRef = useRef(null);
+  const tooltip = useCollapsedTooltip(isCollapsed);
   const isActive =
     pathname === path ||
     (path === "/profile" && pathname === "/profileoverview");
 
   return (
-    <Link to={path} className="block w-full">
+    <Link
+      to={path}
+      className="block w-full rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3838EC]/50"
+      aria-label={isCollapsed ? label : undefined}
+      aria-current={isActive ? "page" : undefined}
+      onFocus={tooltip.showNow}
+      onBlur={tooltip.hide}
+      onClick={tooltip.hide}
+    >
+      <SidebarTooltip
+        anchorRect={tooltip.rect}
+        instant={tooltip.instant}
+        label={label}
+        badge={badge}
+      />
       <div
-        onMouseEnter={() => iconRef.current?.startAnimation?.()}
-        onMouseLeave={() => iconRef.current?.stopAnimation?.()}
-        title={isCollapsed ? label : undefined}
+        ref={tooltip.ref}
+        onMouseEnter={() => {
+          iconRef.current?.startAnimation?.();
+          tooltip.show();
+        }}
+        onMouseLeave={() => {
+          iconRef.current?.stopAnimation?.();
+          tooltip.hide();
+        }}
         className={`relative flex items-center rounded-xl py-2.5 transition-all duration-300 cursor-pointer ${
           isCollapsed ? "justify-center px-2" : "px-4"
         } ${
@@ -76,43 +213,65 @@ const NavItem = ({ path, label, icon: Icon, badge, isCollapsed, pathname }) => {
   );
 };
 
+// Collapse preference survives navigation. Every page renders its own
+// sidebar instance, so plain component state reset to "expanded" on each
+// tab switch. The choice lives in module memory (instant, no flash) and
+// localStorage (survives reloads).
+const COLLAPSE_KEY = "unideals-profile-menu-collapsed";
+let savedCollapsed = (() => {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === "1";
+  } catch {
+    return false;
+  }
+})();
+
+const persistCollapsed = (value) => {
+  savedCollapsed = value;
+  try {
+    localStorage.setItem(COLLAPSE_KEY, value ? "1" : "0");
+  } catch {
+    // storage unavailable — in-memory preference still applies
+  }
+};
+
+// Message tab auto-collapses the menu to give the chat room. This is a
+// per-tab override only: it never overwrites the saved preference, so
+// leaving chat restores whatever the user had chosen.
+const isChatPath = (path) => path === "/chat" || path.startsWith("/chat/");
+
 function Profile_left_part() {
   const { userDetails, loading, isLoggedIn } = useUser();
   const { unreadCount: notifUnread } = useNotification();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  // Live chat unread (same counters the chat list renders) — hidden at 0.
-  const [chatUnread, setChatUnread] = useState(0);
+  const onChat = isChatPath(pathname);
+  const [isCollapsed, setIsCollapsed] = useState(() =>
+    onChat ? true : savedCollapsed,
+  );
 
+  // Same instance across a route change (if a layout keeps it mounted):
+  // re-apply the rule for the new tab.
   useEffect(() => {
-    if (!isLoggedIn) {
-      setChatUnread(0);
-      return;
-    }
-    let stop = false;
-    const load = async () => {
-      try {
-        const chatRes = await axios.get("/api/conversations", {
-          params: { limit: 1 },
-        });
-        if (!stop) {
-          setChatUnread(Number(chatRes.data?.meta?.unreadTotal || 0));
-        }
-      } catch {
-        // Badge stays stale — never break the menu over it.
-      }
-    };
-    load();
-    const t = setInterval(load, 30000);
-    const onFocus = () => load();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      stop = true;
-      clearInterval(t);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [isLoggedIn]);
+    setIsCollapsed(onChat ? true : savedCollapsed);
+  }, [onChat]);
+
+  const toggleTip = useCollapsedTooltip(isCollapsed);
+
+  const toggleCollapsed = () => {
+    setIsCollapsed((current) => {
+      const next = !current;
+      // On the Message tab the toggle is temporary (chat-only override);
+      // everywhere else it becomes the remembered preference.
+      if (!onChat) persistCollapsed(next);
+      return next;
+    });
+    toggleTip.hide();
+  };
+  // Live chat unread (same counters the chat list renders) — hidden at 0.
+  const chatUnread = useChatUnread(isLoggedIn);
+
+  // Badge polling lives in the shared store (services/chatUnread.js).
 
   // Redirect to login only when the session is definitively gone:
   // not loading AND explicitly logged out. A transient null userDetails
@@ -126,8 +285,8 @@ function Profile_left_part() {
 
   if (loading) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-[#FBFBFB] dark:bg-[#131313]">
-        <BrandLoader size="md" />
+      <div className="h-full w-[4.9rem] bg-[#F7F8FA] dark:bg-[#131313]">
+        <BrandLoader size="full" className="!min-h-0" />
       </div>
     );
   }
@@ -198,7 +357,12 @@ function Profile_left_part() {
           </div>
           <button
             type="button"
-            onClick={() => setIsCollapsed((current) => !current)}
+            ref={toggleTip.ref}
+            onClick={toggleCollapsed}
+            onMouseEnter={toggleTip.show}
+            onMouseLeave={toggleTip.hide}
+            onFocus={toggleTip.showNow}
+            onBlur={toggleTip.hide}
             className={`ml-auto flex shrink-0 items-center justify-center text-[#8292A6] transition-all duration-200 hover:text-[#3838EC] dark:text-[#AAB9C5] dark:hover:text-white ${
               isCollapsed
                 ? "absolute left-1/2 top-[4.35rem] h-10 w-10 -translate-x-1/2 rounded-xl border border-gray-100 bg-[#F7F8FA] shadow-sm hover:border-[#DDD8FF] hover:bg-[#F5F2FF] dark:border-gray-800 dark:bg-[#171717] dark:hover:bg-[#1c1c1c]"
@@ -207,8 +371,13 @@ function Profile_left_part() {
             aria-label={
               isCollapsed ? "Expand profile menu" : "Collapse profile menu"
             }
-            title={isCollapsed ? "Expand" : "Collapse"}
+            title={isCollapsed ? undefined : "Collapse"}
           >
+            <SidebarTooltip
+              anchorRect={toggleTip.rect}
+              instant={toggleTip.instant}
+              label="Expand menu"
+            />
             {isCollapsed ? (
               <Menu size={21} strokeWidth={2} />
             ) : (

@@ -3,12 +3,8 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import Conversation from "../models/conversation.model.js";
 import User from "../models/User.model.js";
+import { loadAuthUser } from "../utils/userCache.js";
 import { USER_STATUS } from "../config/constants.js";
-// [SITE-LOCK] testing gate — delete this import to remove the lock
-import {
-  isSiteGateEnabled,
-  verifySiteGateToken,
-} from "../middlewares/siteGate.middleware.js";
 import { setIO } from "../utils/socket.js";
 
 const parseCookies = (header) => {
@@ -23,16 +19,6 @@ const parseCookies = (header) => {
 
 const authSocket = async (socket, next) => {
   try {
-    // [SITE-LOCK] testing gate: no realtime channel without the signed gate
-    // cookie (browsers attach HttpOnly cookies to the handshake
-    // automatically). Delete this block to remove the lock.
-    if (isSiteGateEnabled()) {
-      const gateCookies = parseCookies(socket.handshake.headers?.cookie || "");
-      if (!verifySiteGateToken(gateCookies.site_gate)) {
-        return next(new Error("Unauthorized"));
-      }
-    }
-    // [/SITE-LOCK]
     // Token via auth payload (client sends from memory) or HttpOnly cookie.
     let token =
       socket.handshake.auth?.token ||
@@ -51,9 +37,7 @@ const authSocket = async (socket, next) => {
     }
     // Session + account check per connection (cheap, once per socket).
     // Revoked sessions and suspended users get no realtime channel.
-    const user = await User.findById(decoded.id)
-      .select("_id status tokenVersion campus_id")
-      .lean();
+    const user = await loadAuthUser(User, decoded.id);
     if (
       !user ||
       user.status !== USER_STATUS.ACTIVE ||
@@ -92,12 +76,20 @@ export const initSockets = (httpServer) => {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  // Local dev origins only outside production (mirrors the REST CORS list).
+  const devOrigins =
+    process.env.NODE_ENV === "production"
+      ? []
+      : ["http://localhost:5173", "http://127.0.0.1:5173"];
   const io = new Server(httpServer, {
     cors: {
-      origin: [...frontend, "http://localhost:5173", "http://127.0.0.1:5173"],
+      origin: [...frontend, ...devOrigins],
       credentials: true,
     },
     transports: ["websocket", "polling"],
+    // Clients only send tiny control events (join/typing); cap frames so a
+    // single socket cannot push megabyte payloads at the server.
+    maxHttpBufferSize: 16 * 1024,
   });
 
   io.use(authSocket);
@@ -113,6 +105,7 @@ export const initSockets = (httpServer) => {
 
     // Join a conversation room after verifying participation.
     socket.on("join_conversation", async (conversationId, ack) => {
+      if (typeof ack !== "function") ack = null;
       try {
         if (!mongoose.Types.ObjectId.isValid(conversationId)) {
           ack?.({ ok: false, error: "Invalid conversation" });
@@ -138,15 +131,25 @@ export const initSockets = (httpServer) => {
     });
 
     socket.on("leave_conversation", (conversationId) => {
-      socket.leave(`conversation:${conversationId}`);
+      if (!mongoose.Types.ObjectId.isValid(conversationId)) return;
+      const room = `conversation:${conversationId}`;
+      if (!socket.rooms.has(room)) return;
+      socket.leave(room);
       emitPresence(io, conversationId);
     });
 
     // Ephemeral typing indicator, relayed to the room (no persistence).
     // Flood-guarded: "still typing" at most ~1/sec per socket, "stopped"
     // always passes so the indicator never sticks on.
-    socket.on("typing", ({ conversationId, isTyping }) => {
+    // Payload is fully client-controlled: a missing/null payload used to
+    // throw on destructuring inside the listener, and any socket could
+    // spoof typing into ANY conversation room by id. Now only rooms this
+    // socket actually joined (participant-verified) are relayed to.
+    socket.on("typing", (payload) => {
+      if (!payload || typeof payload !== "object") return;
+      const { conversationId, isTyping } = payload;
       if (!mongoose.Types.ObjectId.isValid(conversationId)) return;
+      if (!socket.rooms.has(`conversation:${conversationId}`)) return;
       const now = Date.now();
       if (isTyping && now - (socket._lastType || 0) < 900) return;
       socket._lastType = now;

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Profile_left_part from "../components/Profile_left_part.jsx";
+import MobileAccountMenu from "../components/MobileAccountMenu.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { useWishlist } from "../../../context/WishlistContext";
@@ -111,17 +112,17 @@ function ProfileOverview() {
 
   return (
     <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
-      <div className="flex h-[calc(100vh-70px)] ">
+      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
         {/* LEFT PANEL */}
         <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
           <Profile_left_part />
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="h-full md:flex-1 overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6 ">
-          <div className="max-w-5xl mx-auto space-y-7 pb-2">
+        <div className="min-w-0 w-full md:h-full md:flex-1 md:overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] px-4 py-5 sm:p-6 lg:p-8 xl:px-[5.7rem] xl:py-6 ">
+          <div className="max-w-5xl mx-auto space-y-7 pb-2 max-md:flex max-md:flex-col max-md:gap-7 max-md:space-y-0">
             {/* 1. PROFILE HEADER CARD */}
-            <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 dark:border-gray-800 grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto] gap-x-4 md:gap-x-6 items-center">
+            <div className="max-md:order-first bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 dark:border-gray-800 grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto] gap-x-4 md:gap-x-6 items-center">
               {/* 1. Avatar (Left side, spans both rows vertically on desktop) */}
               <div className="relative shrink-0 col-span-1 md:row-span-2 self-start md:self-center">
                 <AvatarComponent
@@ -172,7 +173,7 @@ function ProfileOverview() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <FiCalendar size={14} className="text-gray-400 shrink-0" />
-                    <span className="truncate">
+                    <span className="min-w-0">
                       {userDetails?.createdAt
                         ? `Member since ${memberSince}`
                         : memberSince}
@@ -222,7 +223,7 @@ function ProfileOverview() {
               <div className="col-span-2 md:col-span-1 md:col-start-3 md:row-start-1 md:row-span-2 mt-5 md:mt-0">
                 <Link
                   to="/settings"
-                  className="block bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-6 py-2.5 rounded-xl text-[0.82rem] font-semibold transition-colors w-full md:w-auto text-center"
+                  className="block bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-6 py-2.5 rounded-lg text-[0.82rem] font-semibold transition-colors w-full md:w-auto text-center"
                 >
                   Edit Profile
                 </Link>
@@ -233,86 +234,86 @@ function ProfileOverview() {
               <h3 className="text-xs sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
                 Your Activity
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-2.5 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* Card 1 */}
-                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl px-5 py-4 shadow-sm border border-gray-100 dark:border-gray-800">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="bg-green-100 dark:bg-green-900/20 p-2.5 rounded-xl text-green-500 ">
+                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-3 sm:px-5 sm:py-4 shadow-sm border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4">
+                    <div className="bg-green-100 dark:bg-green-900/20 p-1.5 sm:p-2.5 rounded-xl text-green-500 ">
                       <FiShoppingBag size={18} />
                     </div>
                   </div>
-                  <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white">
                     {stats.productsSold}
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-[11px] leading-tight sm:text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Products Sold
                   </p>
                 </div>
 
                 {/* Card 2 */}
-                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-2.5 rounded-xl text-indigo-600 dark:text-indigo-400">
+                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-3 sm:px-5 sm:py-4 shadow-sm border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4">
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-1.5 sm:p-2.5 rounded-xl text-indigo-600 dark:text-indigo-400">
                       <FiPackage size={20} />
                     </div>
                   </div>
-                  <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white">
                     {stats.activeListings}
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-[11px] leading-tight sm:text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Active Listings
                   </p>
                 </div>
 
                 {/* Card 3 */}
-                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="bg-pink-100 dark:bg-pink-900/20 p-2.5 rounded-xl text-pink-500 ">
+                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-3 sm:px-5 sm:py-4 shadow-sm border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4">
+                    <div className="bg-pink-100 dark:bg-pink-900/20 p-1.5 sm:p-2.5 rounded-xl text-pink-500 ">
                       <FiHeart size={18} />
                     </div>
                   </div>
-                  <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white">
                     {stats.wishlistSaved}
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-[11px] leading-tight sm:text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Wishlist Saved
                   </p>
                 </div>
 
                 {/* Card 4 */}
-                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-xl text-blue-600 dark:text-blue-400">
+                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-3 sm:px-5 sm:py-4 shadow-sm border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-1.5 sm:p-2.5 rounded-xl text-blue-600 dark:text-blue-400">
                       <FiEye size={18} />
                     </div>
                   </div>
                   <h2 className="text-[1.2rem] font-extrabold text-gray-900 dark:text-white">
                     {stats.profileViews}
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-[11px] leading-tight sm:text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Profile Views
                   </p>
                 </div>
 
                 {/* Card 5 — no invented rating */}
-                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="bg-yellow-100 dark:bg-yellow-900/20 p-2.5 rounded-xl text-yellow-400 dark:text-yellow-400">
+                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-3 sm:px-5 sm:py-4 shadow-sm border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4">
+                    <div className="bg-yellow-100 dark:bg-yellow-900/20 p-1.5 sm:p-2.5 rounded-xl text-yellow-400 dark:text-yellow-400">
                       <FaStar size={18} />
                     </div>
                   </div>
                   <h2 className="text-[1.2rem] font-extrabold text-gray-900 dark:text-white">
                     -
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-[11px] leading-tight sm:text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Avg Rating · no ratings yet
                   </p>
                 </div>
 
                 {/* Card 6 — no invented response time */}
-                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-5  shadow-sm border border-gray-100 dark:border-gray-800">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-xl text-blue-600 dark:text-blue-400">
+                <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl p-3 sm:px-5 sm:py-4 shadow-sm border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-1.5 sm:p-2.5 rounded-xl text-blue-600 dark:text-blue-400">
                       <FiClock size={18} />
                     </div>
                   </div>
@@ -499,6 +500,11 @@ function ProfileOverview() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Phones: account destinations + log out (sidebar is md+ only). */}
+            <div className="max-md:-order-1">
+              <MobileAccountMenu />
             </div>
           </div>
         </div>

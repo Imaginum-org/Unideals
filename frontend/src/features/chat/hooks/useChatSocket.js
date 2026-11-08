@@ -1,14 +1,14 @@
 import { useEffect, useRef } from "react";
-import { io } from "socket.io-client";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL || "";
-// Socket server = API origin (strip trailing /api if present).
-const socketURL = baseURL.replace(/\/api\/?$/, "") || undefined;
+import { acquireSocket, releaseSocket } from "../../../services/realtime.js";
 
 /**
  * Realtime subscription for one conversation + the user's list channel.
  * Server auth uses the HttpOnly cookie (withCredentials), so no token needed.
  * All handlers are best-effort, REST polling in Chat.jsx stays authoritative.
+ *
+ * Uses the tab-wide shared socket (services/realtime.js): switching threads
+ * only leaves/joins rooms instead of tearing down and re-handshaking the
+ * whole connection.
  *
  * Tick lifecycle events:
  * - message:new -> a new bubble (receiver side marks read if thread open)
@@ -29,16 +29,7 @@ export const useChatSocket = ({
   enabled = true,
 }) => {
   const socketRef = useRef(null);
-  const handlersRef = useRef({
-    onMessage,
-    onDeal,
-    onDelivered,
-    onRead,
-    onTyping,
-    onPresence,
-    onStatus,
-    onListUpdate,
-  });
+  const handlersRef = useRef({});
   handlersRef.current = {
     onMessage,
     onDeal,
@@ -50,65 +41,68 @@ export const useChatSocket = ({
     onListUpdate,
   };
 
+  // Shared connection + stable listeners for the lifetime of the chat page.
   useEffect(() => {
     if (!enabled) return undefined;
     let socket;
     try {
-      socket = io(socketURL, {
-        withCredentials: true,
-        transports: ["websocket", "polling"],
-      });
+      socket = acquireSocket();
     } catch {
       return undefined;
     }
     socketRef.current = socket;
 
+    const listeners = {
+      "message:new": (msg) => handlersRef.current.onMessage?.(msg),
+      "deal:updated": ({ deal } = {}) => handlersRef.current.onDeal?.(deal),
+      "message:delivered": (info) => handlersRef.current.onDelivered?.(info),
+      "message:read": (info) => handlersRef.current.onRead?.(info),
+      typing: (info) => handlersRef.current.onTyping?.(info),
+      "presence:update": (info) => handlersRef.current.onPresence?.(info),
+      "conversation:updated": (info) => handlersRef.current.onListUpdate?.(info),
+      connect: () => handlersRef.current.onStatus?.(true),
+      disconnect: () => handlersRef.current.onStatus?.(false),
+    };
+    Object.entries(listeners).forEach(([event, fn]) => socket.on(event, fn));
+    if (socket.connected) handlersRef.current.onStatus?.(true);
+
+    return () => {
+      Object.entries(listeners).forEach(([event, fn]) => socket.off(event, fn));
+      socketRef.current = null;
+      releaseSocket(socket);
+    };
+  }, [enabled]);
+
+  // Room membership follows the selected conversation. Server-side rooms
+  // die on disconnect, so re-join on every (re)connect.
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!enabled || !socket || !conversationId) return undefined;
+
     const doJoin = () => {
       try {
-        if (conversationId) socket.emit("join_conversation", conversationId);
+        socket.emit("join_conversation", conversationId);
       } catch {
         // ignore
       }
     };
-
-    socket.on("message:new", (msg) => handlersRef.current.onMessage?.(msg));
-    socket.on("deal:updated", ({ deal } = {}) =>
-      handlersRef.current.onDeal?.(deal),
-    );
-    socket.on("message:delivered", (info) =>
-      handlersRef.current.onDelivered?.(info),
-    );
-    socket.on("message:read", (info) => handlersRef.current.onRead?.(info));
-    socket.on("typing", (info) => handlersRef.current.onTyping?.(info));
-    socket.on("presence:update", (info) =>
-      handlersRef.current.onPresence?.(info),
-    );
-    socket.on("conversation:updated", (info) =>
-      handlersRef.current.onListUpdate?.(info),
-    );
-    // Server-side rooms die on disconnect, re-join on every (re)connect
-    // or realtime silently stops after a network blip.
-    socket.on("connect", () => {
-      doJoin();
-      handlersRef.current.onStatus?.(true);
-    });
-    socket.on("disconnect", () => handlersRef.current.onStatus?.(false));
-
-    doJoin();
+    const onConnect = () => doJoin();
+    socket.on("connect", onConnect);
+    if (socket.connected) doJoin();
 
     return () => {
+      socket.off("connect", onConnect);
       try {
-        if (conversationId) socket.emit("leave_conversation", conversationId);
-        socket.disconnect();
+        socket.emit("leave_conversation", conversationId);
       } catch {
         // ignore
       }
-      socketRef.current = null;
     };
   }, [conversationId, enabled]);
 
   const sendTyping = (isTyping) => {
     try {
+      if (!conversationId) return;
       socketRef.current?.emit("typing", {
         conversationId,
         isTyping: Boolean(isTyping),

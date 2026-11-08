@@ -277,7 +277,7 @@ const PhoneUpload = () => {
         type="button"
         onClick={handleUpload}
         disabled={uploading || files.length === 0}
-        className="mt-5 flex h-[54px] w-full items-center justify-center gap-3 rounded-2xl bg-[#4F46E5] text-base font-bold text-white shadow-xl shadow-indigo-200 transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-5 flex h-[54px] w-full items-center justify-center gap-3 rounded-lg bg-[#4F46E5] text-base font-bold text-white shadow-xl shadow-indigo-200 transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {uploading ? (
           <>

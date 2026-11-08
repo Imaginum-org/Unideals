@@ -198,11 +198,19 @@ export const hardDeleteProduct = async (productId) => {
   }
 
   // Best-effort ImageKit cleanup (never fails hard delete)
-  const { deleteImage } = await import("../utils/imagekit.js");
+  const { deleteImageSafely } = await import("../utils/imagekit.js");
   const fileIds = Array.isArray(product.images)
     ? product.images.map((i) => i?.fileId).filter(Boolean)
     : [];
-  await Promise.allSettled(fileIds.map((id) => deleteImage(id)));
+  // Skip files another live listing/avatar still points at.
+  await Promise.allSettled(
+    fileIds.map((id) =>
+      deleteImageSafely(id, {
+        ownerId: product.seller_id,
+        excludeProductId: product._id,
+      }),
+    ),
+  );
 
   await Promise.all([
     Product.deleteOne({ _id: productId }),

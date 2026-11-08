@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Select from "../../../components/ui/Select.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import { toast } from "../../../components/ui/toast.js";
@@ -16,6 +17,7 @@ import {
   X,
   AlertTriangle,
 } from "lucide-react";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 // FAQ Data Structure
 const faqData = [
@@ -269,7 +271,7 @@ function ContactUs() {
 
   return (
     <div className="h-full w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree text-black dark:text-white">
-      <div className="flex h-[calc(100vh-70px)]">
+      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
         {/* LEFT PANEL */}
         {userDetails?._id ? (
           <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
@@ -279,7 +281,7 @@ function ContactUs() {
 
         {/* RIGHT PANEL */}
         <div
-          className={`h-full overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-4 xl:px-[5.7rem] xl:py-6 ${
+          className={`min-w-0 w-full md:h-full md:overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-4 xl:px-[5.7rem] xl:py-6 ${
             userDetails?._id ? "w-full md:flex-1" : "mx-auto w-full max-w-5xl"
           }`}
         >
@@ -315,59 +317,59 @@ function ContactUs() {
             {/* Action Cards */}
             <motion.div
               variants={itemVariants}
-              className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6"
+              className="grid grid-cols-1 md:grid-cols-3 gap-2.5 md:gap-3 mb-6"
             >
               <button
                 onClick={() => setActiveForm("contact")}
-                className={`group p-4 text-left border rounded-2xl transition-all duration-300 ${
+                className={`group p-4 text-left border rounded-2xl transition-all duration-300 max-md:grid max-md:grid-cols-[auto_1fr] max-md:items-center max-md:gap-x-3 max-md:px-4 max-md:py-3.5 ${
                   activeForm === "contact"
                     ? "border-indigo-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
                 } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#4F46E5] group-hover:scale-105 group-hover:shadow-md">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-4 max-md:row-span-2 max-md:mb-0 max-md:h-10 max-md:w-10 transition-all duration-300 group-hover:bg-[#4F46E5] group-hover:scale-105 group-hover:shadow-md">
                   <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400 transition-colors duration-300 group-hover:text-white" />
                 </div>
                 <h3 className="text-sm font-bold  text-gray-900 dark:text-white transition-colors">
                   Contact support
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">Reach our team</p>
+                <p className="text-xs text-gray-500 mt-1 max-md:mt-0.5">Reach our team</p>
               </button>
 
               <button
                 onClick={() => setActiveForm("report")}
-                className={`group p-4 text-left border rounded-2xl transition-all duration-300 ${
+                className={`group p-4 text-left border rounded-2xl transition-all duration-300 max-md:grid max-md:grid-cols-[auto_1fr] max-md:items-center max-md:gap-x-3 max-md:px-4 max-md:py-3.5 ${
                   activeForm === "report"
                     ? "border-red-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
                 } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
-                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#EF4444] group-hover:scale-105 group-hover:shadow-md">
+                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center mb-4 max-md:row-span-2 max-md:mb-0 max-md:h-10 max-md:w-10 transition-all duration-300 group-hover:bg-[#EF4444] group-hover:scale-105 group-hover:shadow-md">
                   <ShieldAlert className="w-4 h-4 text-red-500 transition-colors duration-300 group-hover:text-white" />
                 </div>
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white transition-colors">
                   Report an issue
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1 max-md:mt-0.5">
                   Safety, fraud or bugs
                 </p>
               </button>
 
               <button
                 onClick={() => setActiveForm("suggest")}
-                className={`group p-4 text-left border rounded-2xl transition-all duration-300 ${
+                className={`group p-4 text-left border rounded-2xl transition-all duration-300 max-md:grid max-md:grid-cols-[auto_1fr] max-md:items-center max-md:gap-x-3 max-md:px-4 max-md:py-3.5 ${
                   activeForm === "suggest"
                     ? "border-green-500 shadow-sm"
                     : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
                 } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
               >
-                <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-[#22C55E] group-hover:scale-105 group-hover:shadow-md">
+                <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-4 max-md:row-span-2 max-md:mb-0 max-md:h-10 max-md:w-10 transition-all duration-300 group-hover:bg-[#22C55E] group-hover:scale-105 group-hover:shadow-md">
                   <Lightbulb className="w-4 h-4 text-green-600 dark:text-green-400 transition-colors duration-300 group-hover:text-white" />
                 </div>
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white transition-colors">
                   Suggest a feature
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">Share your ideas</p>
+                <p className="text-xs text-gray-500 mt-1 max-md:mt-0.5">Share your ideas</p>
               </button>
             </motion.div>
 
@@ -420,24 +422,14 @@ function ContactUs() {
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Topic
                       </label>
-                      <select
+                      <Select
+                        className="mb-4"
                         value={contactForm.topic}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            topic: e.target.value,
-                          })
-                        }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                        required
-                      >
-                        <option value="">Select a topic</option>
-                        <option value="Account assistance">
-                          Account assistance
-                        </option>
-                        <option value="Deal inquiries">Deal inquiries</option>
-                        <option value="Other">Other</option>
-                      </select>
+                        onChange={(v) => setContactForm({ ...contactForm, topic: v })}
+                        placeholder="Select a topic"
+                        ariaLabel="Select a topic"
+                        options={[{ value: "Account assistance", label: "Account assistance" }, { value: "Deal inquiries", label: "Deal inquiries" }, { value: "Other", label: "Other" }]}
+                      />
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Message
@@ -470,7 +462,7 @@ function ContactUs() {
                           className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
                         >
                           <MessageSquare className="w-4 h-4" />{" "}
-                          {isSubmitting ? "Sending..." : "Send message"}
+                          <ButtonLoader loading={isSubmitting} loadingText="Sending…">Send message</ButtonLoader>
                         </button>
                       </div>
                       <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
@@ -527,47 +519,14 @@ function ContactUs() {
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         What are you reporting?
                       </label>
-                      <select
+                      <Select
+                        className="mb-4"
                         value={reportForm.category}
-                        onChange={(e) =>
-                          setReportForm({
-                            ...reportForm,
-                            category: e.target.value,
-                          })
-                        }
-                        required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
-                      >
-                        <option value="">Select category...</option>
-                        <option value="Fraud or Scam Seller">
-                          Fraud or Scam Seller
-                        </option>
-                        <option value="Safety Concern">Safety Concern</option>
-                        <option value="App Bug / Glitch">
-                          App Bug / Glitch
-                        </option>
-                        <option value="Harassment or abuse">
-                          Harassment or abuse
-                        </option>
-                        <option value="Spam or Bot account">
-                          Spam or Bot account
-                        </option>
-                        <option value="Inappropriate Content">
-                          Inappropriate Content
-                        </option>
-                        <option value="Payment / Deal Dispute">
-                          Payment / Deal Dispute
-                        </option>
-                        <option value="Account or Login Issue">
-                          Account or Login Issue
-                        </option>
-                        <option value="Fake or Misleading Product">
-                          Fake or Misleading Product
-                        </option>
-                        <option value="Other Issue">
-                          Other Issue
-                        </option>
-                      </select>
+                        onChange={(v) => setReportForm({ ...reportForm, category: v })}
+                        placeholder="Select category…"
+                        ariaLabel="Select category…"
+                        options={[{ value: "Fraud or Scam Seller", label: "Fraud or Scam Seller" }, { value: "Safety Concern", label: "Safety Concern" }, { value: "App Bug / Glitch", label: "App Bug / Glitch" }, { value: "Harassment or abuse", label: "Harassment or abuse" }, { value: "Spam or Bot account", label: "Spam or Bot account" }, { value: "Inappropriate Content", label: "Inappropriate Content" }, { value: "Payment / Deal Dispute", label: "Payment / Deal Dispute" }, { value: "Account or Login Issue", label: "Account or Login Issue" }, { value: "Fake or Misleading Product", label: "Fake or Misleading Product" }, { value: "Other Issue", label: "Other Issue" }]}
+                      />
 
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Link, User ID, or Page Section (optional)
@@ -613,7 +572,7 @@ function ContactUs() {
                           className="flex-1 flex items-center justify-center gap-2 bg-[#EF4444] hover:bg-red-600 disabled:bg-red-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
                         >
                           <ShieldAlert className="w-4 h-4" />{" "}
-                          {isSubmitting ? "Submitting..." : "Submit report"}
+                          <ButtonLoader loading={isSubmitting} loadingText="Submitting…">Submit report</ButtonLoader>
                         </button>
                       </div>
                       <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
@@ -722,7 +681,7 @@ function ContactUs() {
                           className="flex-1 flex items-center justify-center gap-2 bg-[#22C55E] hover:bg-green-600 disabled:bg-green-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
                         >
                           <Lightbulb className="w-4 h-4" />{" "}
-                          {isSubmitting ? "Submitting..." : "Submit idea"}
+                          <ButtonLoader loading={isSubmitting} loadingText="Submitting…">Submit idea</ButtonLoader>
                         </button>
                       </div>
                       <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
@@ -758,6 +717,15 @@ function ContactUs() {
                           under 2 hours
                         </strong>{" "}
                         during campus hours (9 AM – 9 PM)
+                        {userDetails?.subscription === "pro_plus" ? (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-[#4B45FF]/10 px-2 py-0.5 text-[11px] font-semibold text-[#2E40DC] dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]">
+                            Pro Plus · your tickets are handled first
+                          </span>
+                        ) : userDetails?.subscription === "pro" ? (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-[#4B45FF]/10 px-2 py-0.5 text-[11px] font-semibold text-[#2E40DC] dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]">
+                            Pro · priority queue
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                     <a

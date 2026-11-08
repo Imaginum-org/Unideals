@@ -7,15 +7,23 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { io } from "socket.io-client";
 import { notificationApi } from "../features/notification/api/notificationApi.js";
 import { useUser } from "./useUserContext.jsx";
 import { toast } from "../components/ui/toast.js";
+import { acquireSocket, releaseSocket } from "../services/realtime.js";
 
 const NotificationContext = createContext(null);
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || "";
-const socketURL = baseURL.replace(/\/api\/?$/, "") || undefined;
+// Notification links come from the server (incl. admin campaigns). Only
+// in-app paths are navigated to; anything else (absolute URLs,
+// protocol-relative "//host", javascript:) falls back to the inbox.
+// eslint-disable-next-line react-refresh/only-export-components
+export const safeActionPath = (value, fallback = "/notification") => {
+  if (typeof value !== "string") return fallback;
+  const v = value.trim();
+  if (v.startsWith("/") && !v.startsWith("//") && !v.includes("\\")) return v;
+  return fallback;
+};
 
 // eslint-disable-next-line react/prop-types
 export function NotificationProvider({ children }) {
@@ -36,7 +44,7 @@ export function NotificationProvider({ children }) {
         title: n.title,
         description: n.message || n.description,
         time: n.time || "Just now",
-        actionPath: n.actionPath || n.action_url || "/notification",
+        actionPath: safeActionPath(n.actionPath || n.action_url),
         unread: Boolean(n.unread),
         type: n.type,
         imageUrl: n.imageUrl || n.image_url,
@@ -73,18 +81,24 @@ export function NotificationProvider({ children }) {
 
     setLoading(true);
     fetchNotifications();
+    // Throttled re-sync: the socket "connect" event fires right after the
+    // mount fetch (double request on every page load), and every tab switch
+    // refetched. Live items arrive via "notification:new"; a re-sync is only
+    // needed after a real gap, so skip it if we synced < 30s ago.
+    let lastSync = Date.now();
+    const resync = () => {
+      if (Date.now() - lastSync < 30000) return;
+      lastSync = Date.now();
+      fetchNotifications();
+    };
 
-    const socket = io(socketURL, {
-      withCredentials: true,
-      transports: ["websocket", "polling"],
-    });
+    const socket = acquireSocket();
     socketRef.current = socket;
 
-    socket.on("connect", fetchNotifications);
-    socket.on("connect_error", (socketError) => {
-      console.error("Notification realtime connection failed:", socketError);
-    });
-    socket.on("notification:new", (item) => {
+    const onConnectError = (socketError) => {
+      console.error("Notification realtime connection failed:", socketError?.message);
+    };
+    const onNotification = (item) => {
       if (!mountedRef.current || !item) return;
 
       const id = item.id || item._id;
@@ -96,7 +110,7 @@ export function NotificationProvider({ children }) {
         title: item.title || "New Notification",
         description: item.description || item.message || "",
         time: "Just now",
-        actionPath: item.actionPath || item.action_url || "/notification",
+        actionPath: safeActionPath(item.actionPath || item.action_url),
         unread: true,
         type: item.type,
         imageUrl: item.imageUrl || item.image_url,
@@ -106,18 +120,24 @@ export function NotificationProvider({ children }) {
       };
       setNotifications((current) => [newItem, ...current].slice(0, 100));
       toast(newItem.title);
-    });
+    };
+    socket.on("connect", resync);
+    socket.on("connect_error", onConnectError);
+    socket.on("notification:new", onNotification);
 
     const handleVisibilityChange = () => {
-      if (!document.hidden) fetchNotifications();
+      if (!document.hidden) resync();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       mountedRef.current = false;
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      socket.disconnect();
+      socket.off("connect", resync);
+      socket.off("connect_error", onConnectError);
+      socket.off("notification:new", onNotification);
       if (socketRef.current === socket) socketRef.current = null;
+      releaseSocket(socket);
     };
   }, [fetchNotifications, isLoggedIn, userLoading]);
 
@@ -150,9 +170,9 @@ export function NotificationProvider({ children }) {
   const trackClick = useCallback(async (id) => {
     try {
       await notificationApi.trackClick(id);
-    } catch (requestError) {
-      console.error("Failed to track notification click:", requestError);
-      toast.error("Could not record this notification action.");
+    } catch {
+      // Click analytics are best-effort — never interrupt the user with an
+      // error toast for a background tracking call.
     }
   }, []);
 
@@ -173,17 +193,32 @@ export function NotificationProvider({ children }) {
     [notifications],
   );
 
-  const value = {
-    notifications,
-    unreadCount,
-    loading,
-    error,
-    markRead,
-    markAllRead,
-    trackClick,
-    dismiss,
-    fetchNotifications,
-  };
+  // Memoized: a fresh object every render re-rendered every consumer
+  // (Header, inbox page) on any provider render.
+  const value = useMemo(
+    () => ({
+      notifications,
+      unreadCount,
+      loading,
+      error,
+      markRead,
+      markAllRead,
+      trackClick,
+      dismiss,
+      fetchNotifications,
+    }),
+    [
+      notifications,
+      unreadCount,
+      loading,
+      error,
+      markRead,
+      markAllRead,
+      trackClick,
+      dismiss,
+      fetchNotifications,
+    ],
+  );
 
   return (
     <NotificationContext.Provider value={value}>

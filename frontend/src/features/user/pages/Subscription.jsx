@@ -19,6 +19,7 @@ import {
 
 import Profile_left_part from "../components/Profile_left_part.jsx";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
+import EarlyAccessCard from "../components/EarlyAccessCard.jsx";
 import { getBilling } from "../../payment/api/paymentApi.js";
 
 const TIER_TO_ID = {
@@ -234,12 +235,12 @@ function Subscription() {
   if (loading) {
     return (
       <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
-        <div className="flex h-[calc(100vh-70px)]">
+        <div className="flex md:h-[calc(100dvh-var(--header-h))]">
           <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
-          <main className="flex h-full flex-1 items-center justify-center">
-            <BrandLoader size="md" />
+          <main className="h-full flex-1">
+            <BrandLoader size="full" />
           </main>
         </div>
       </div>
@@ -249,7 +250,7 @@ function Subscription() {
   if (loadError || !billing) {
     return (
       <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
-        <div className="flex h-[calc(100vh-70px)]">
+        <div className="flex md:h-[calc(100dvh-var(--header-h))]">
           <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
@@ -271,12 +272,12 @@ function Subscription() {
 
   return (
     <div className="h-full w-full overflow-hidden bg-[#F6F8FC] font-figtree dark:bg-[#131313]">
-      <div className="flex h-[calc(100vh-70px)]">
+      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
             <Profile_left_part />
           </div>
 
-        <main className="h-full overflow-y-auto bg-[#F6F8FC] px-5 py-6 dark:bg-[#131313] md:flex-1 xl:px-[5.7rem]">
+        <main className="min-w-0 w-full md:h-full md:overflow-y-auto bg-[#F6F8FC] px-4 py-5 sm:px-5 sm:py-6 dark:bg-[#131313] md:flex-1 xl:px-[5.7rem]">
           <div className="mx-auto w-full max-w-4xl space-y-5 pb-10">
             <header>
               <h1 className="mb-1 text-[1.4rem] font-bold text-gray-900 dark:text-white lg:text-2xl xl:text-xl">
@@ -443,6 +444,8 @@ function Subscription() {
                 ))}
               </div>
             </section>
+
+            <EarlyAccessCard />
 
             <section className="rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
               <h2 className="mb-4 text-[14px] font-extrabold text-[#09111F] dark:text-white">

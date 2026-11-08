@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useCallback, useEffect, useRef, useState } from "react";
+import Select from "../../../components/ui/Select.jsx";
 import { toast } from "../../../components/ui/toast.js";
 import { useNavigate } from "react-router-dom";
 import {
@@ -40,6 +41,7 @@ import {
   requestGenderChange,
   getGenderChangeStatus,
 } from "../api/userApi";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "Verification"];
 
@@ -500,8 +502,8 @@ function Settings() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#F5F6FA] dark:bg-[#131313]">
-        <BrandLoader size="lg" />
+      <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#F5F6FA] dark:bg-[#131313]">
+        <BrandLoader size="full" />
       </div>
     );
   }
@@ -546,12 +548,12 @@ function Settings() {
 
   return (
     <div className="h-full w-full overflow-hidden bg-[#F7F9FD] font-figtree text-[#111827] dark:bg-[#131313] dark:text-white">
-      <div className="flex h-[calc(100vh-70px)]">
+      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
         <aside className="hidden bg-[#F7F8FA] dark:bg-[#131313] md:block md:w-auto md:shrink-0 xl:pt-2 xl:pb-0">
           <Profile_left_part />
         </aside>
 
-        <main className="h-full w-full overflow-y-auto no-scrollbar bg-[#F5F6FA] px-4 py-6 dark:bg-[#131313] sm:px-6 md:flex-1 lg:p-8 xl:px-[5.7rem] xl:py-6">
+        <main className="min-w-0 w-full md:h-full w-full md:overflow-y-auto no-scrollbar bg-[#F5F6FA] px-4 py-6 dark:bg-[#131313] sm:px-6 md:flex-1 lg:p-8 xl:px-[5.7rem] xl:py-6">
           <div className="mx-auto w-full max-w-5xl pb-8">
             <header className="mb-5">
               <h1 className="text-[1.4rem] font-bold leading-tight text-gray-900 dark:text-white lg:text-2xl xl:text-xl">
@@ -673,7 +675,7 @@ function Settings() {
                       onClick={() => fileInputRef.current?.click()}
                       className="w-fit rounded-lg bg-[#EEF0FF] px-3.5 py-2 text-xs font-semibold text-[#4F46FF]"
                     >
-                      {isUploadingAvatar ? "Uploading..." : "Change Photo"}
+                      <ButtonLoader loading={isUploadingAvatar} loadingText="Uploading…">Change Photo</ButtonLoader>
                     </button> */}
                     {/* 
                     <button
@@ -682,7 +684,7 @@ function Settings() {
                       disabled={isUploadingAvatar || isRemovingAvatar}
                       className="rounded-lg border border-red-500 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50"
                     >
-                      {isRemovingAvatar ? "Removing..." : "Remove Photo"}
+                      <ButtonLoader loading={isRemovingAvatar} loadingText="Removing…">Remove Photo</ButtonLoader>
                     </button> */}
                   </div>
                 </div>
@@ -722,20 +724,14 @@ function Settings() {
                                 />
                               ) : editingField === "campus" && row.field === "campus" ? (
                                 <>
-                                  <select
+                                  <Select
+                                    className="mt-1.5 max-w-xs"
                                     value={campusSlug}
-                                    onChange={(event) => {
-                                      setCampusSlug(event.target.value);
-                                    }}
-                                    className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
-                                  >
-                                    <option value="">Select campus</option>
-                                    {campuses.map((c) => (
-                                      <option key={c.slug} value={c.slug}>
-                                        {c.name}
-                                      </option>
-                                    ))}
-                                  </select>
+                                    onChange={setCampusSlug}
+                                    placeholder="Select campus"
+                                    ariaLabel="Campus"
+                                    options={campuses.map((c) => ({ value: c.slug, label: c.name }))}
+                                  />
                                   {campusChanged && (
                                     <p className="mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
                                       Your live listings move to the new campus
@@ -767,7 +763,7 @@ function Settings() {
                                   disabled={isSavingProfile}
                                   className="text-sm font-semibold text-[#4F46FF] disabled:opacity-50"
                                 >
-                                  {isSavingProfile ? "Saving..." : "Save"}
+                                  <ButtonLoader loading={isSavingProfile} loadingText="Saving…">Save</ButtonLoader>
                                 </button>
                               </span>
                             ) : (
@@ -795,18 +791,18 @@ function Settings() {
                             Gender
                           </div>
                           {editingField === "gender" && !userDetails?.gender ? (
-                            <select
+                            <Select
+                              className="mt-1.5 max-w-xs"
                               value={gender}
-                              onChange={(event) => {
-                                setGender(event.target.value);
-                              }}
-                              className="mt-1.5 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
-                            >
-                              <option value="">Select gender</option>
-                              <option value="male">Male</option>
-                              <option value="female">Female</option>
-                              <option value="other">Other</option>
-                            </select>
+                              onChange={setGender}
+                              placeholder="Select gender"
+                              ariaLabel="Gender"
+                              options={[
+                                { value: "male", label: "Male" },
+                                { value: "female", label: "Female" },
+                                { value: "other", label: "Other" },
+                              ]}
+                            />
                           ) : (
                             <div className="mt-1 break-words text-[0.9rem] capitalize">
                               {userDetails?.gender || "Not added"}
@@ -827,28 +823,23 @@ function Settings() {
                                     </span>
                                   ) : null}
                                   <span className="mt-2 flex flex-wrap items-center gap-2">
-                                    <select
+                                    <Select
+                                      className="w-48"
                                       value={requestedGender}
-                                      onChange={(e) => setRequestedGender(e.target.value)}
-                                      className="rounded-lg border border-[#D8DDEA] bg-white px-2 py-1.5 text-xs outline-none dark:bg-[#1A1D20] dark:text-white"
-                                      aria-label="Requested gender"
-                                    >
-                                      <option value="">Select new gender</option>
-                                      {["male", "female", "other"]
+                                      onChange={setRequestedGender}
+                                      placeholder="Select new gender"
+                                      ariaLabel="Requested gender"
+                                      options={["male", "female", "other"]
                                         .filter((g) => g !== userDetails?.gender)
-                                        .map((g) => (
-                                          <option key={g} value={g} className="capitalize">
-                                            {g.charAt(0).toUpperCase() + g.slice(1)}
-                                          </option>
-                                        ))}
-                                    </select>
+                                        .map((g) => ({ value: g, label: g.charAt(0).toUpperCase() + g.slice(1) }))}
+                                    />
                                     <button
                                       type="button"
                                       onClick={handleGenderRequest}
                                       disabled={!requestedGender || requestSaving}
                                       className="rounded-lg bg-[#111827] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50 dark:bg-white dark:text-black"
                                     >
-                                      {requestSaving ? "Sending..." : "Request approval"}
+                                      <ButtonLoader loading={requestSaving} loadingText="Sending…">Request approval</ButtonLoader>
                                     </button>
                                   </span>
                                 </>
@@ -874,7 +865,7 @@ function Settings() {
                               disabled={isSavingProfile || !gender}
                               className="text-sm font-semibold text-[#4F46FF] disabled:opacity-50"
                             >
-                              {isSavingProfile ? "Saving..." : "Save"}
+                              <ButtonLoader loading={isSavingProfile} loadingText="Saving…">Save</ButtonLoader>
                             </button>
                           )}
                         </span>
@@ -1054,7 +1045,7 @@ function Settings() {
                     <button
                       type="button"
                       onClick={handleResendVerification}
-                      className="rounded-xl bg-[#4F46FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#4338CA]"
+                      className="rounded-lg bg-[#4F46FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#4338CA]"
                     >
                       Resend verification email
                     </button>
@@ -1095,7 +1086,7 @@ function Settings() {
                     <button
                       type="button"
                       onClick={() => setShowCampusConfirm(false)}
-                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                      className="flex-1 rounded-lg bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
                     >
                       Keep campus
                     </button>
@@ -1103,9 +1094,9 @@ function Settings() {
                       type="button"
                       disabled={isSavingProfile}
                       onClick={() => handleSaveField("campus", true)}
-                      className="flex-1 rounded-xl bg-[#4F46FF] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                      className="flex-1 rounded-lg bg-[#4F46FF] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                     >
-                      {isSavingProfile ? "Moving…" : "Move listings"}
+                      <ButtonLoader loading={isSavingProfile} loadingText="Moving…">Move listings</ButtonLoader>
                     </button>
                   </div>
                 </div>
@@ -1127,14 +1118,14 @@ function Settings() {
                     <button
                       type="button"
                       onClick={() => setPendingDeleteIndex(null)}
-                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                      className="flex-1 rounded-lg bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeletePickupSpot(pendingDeleteIndex)}
-                      className="flex-1 rounded-xl bg-[#EF4444] py-2.5 text-sm font-semibold text-white"
+                      className="flex-1 rounded-lg bg-[#EF4444] py-2.5 text-sm font-semibold text-white"
                     >
                       Delete
                     </button>
@@ -1157,14 +1148,14 @@ function Settings() {
                     <button
                       type="button"
                       onClick={() => setPendingPrimaryId(null)}
-                      className="flex-1 rounded-xl bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
+                      className="flex-1 rounded-lg bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={() => handleSetPrimaryPickupSpot(pendingPrimaryId)}
-                      className="flex-1 rounded-xl bg-[#4F46FF] py-2.5 text-sm font-semibold text-white"
+                      className="flex-1 rounded-lg bg-[#4F46FF] py-2.5 text-sm font-semibold text-white"
                     >
                       Set primary
                     </button>
@@ -1201,7 +1192,7 @@ function AccountCard({ onLogout }) {
         <button
           type="button"
           onClick={onLogout}
-          className="flex items-center gap-2 rounded-xl border border-[#E2E6EF] px-5 py-2.5 text-sm font-semibold text-[#4B5563]"
+          className="flex items-center gap-2 rounded-lg border border-[#E2E6EF] px-5 py-2.5 text-sm font-semibold text-[#4B5563]"
         >
           <LogOut size={17} />
           Sign out

@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import axios from "../services/axiosInstance.js";
+import { invalidateRequests } from "../services/requestCache.js";
 
 const UserContext = createContext();
 
@@ -70,6 +71,19 @@ export const UserProvider = ({ children }) => {
   }, []);
 
   // Clear user
+  // Feed / detail responses depend on who is asking (campus, gender, role).
+  // Drop cached API reads whenever the identity, campus or gender changes.
+  const identityKey = userDetails
+    ? `${userDetails._id}|${userDetails.campus_id?._id || userDetails.campus_id || ""}|${userDetails.gender || ""}|${userDetails.role || ""}`
+    : "guest";
+  const identityRef = useRef(identityKey);
+  useEffect(() => {
+    if (identityRef.current !== identityKey) {
+      identityRef.current = identityKey;
+      invalidateRequests();
+    }
+  }, [identityKey]);
+
   const clearUserData = useCallback(() => {
     setUserDetails(null);
     setIsLoggedIn(false);

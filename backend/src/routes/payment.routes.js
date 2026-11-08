@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import auth from "../middlewares/auth.middleware.js";
+import auth, { optionalAuth } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validation.middleware.js";
 import {
   createOrderSchema,
@@ -10,6 +10,7 @@ import {
   createPaymentOrder,
   verifyPaymentOrder,
   getMyBilling,
+  getPlanPricing,
   paymentWebhook,
 } from "../controllers/payment.controller.js";
 
@@ -37,6 +38,7 @@ const meLimiter = rateLimit({
 router.post("/orders", auth, orderLimiter, validate(createOrderSchema), createPaymentOrder);
 router.post("/verify", auth, orderLimiter, validate(verifyPaymentSchema), verifyPaymentOrder);
 router.get("/me", auth, meLimiter, getMyBilling);
+router.get("/plans", meLimiter, optionalAuth, getPlanPricing);
 
 export const paymentWebhookHandler = paymentWebhook;
 

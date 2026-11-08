@@ -3,8 +3,24 @@ import Conversation from "../models/conversation.model.js";
 import Deal from "../models/deal.model.js";
 import Product from "../models/Product.model.js";
 import User from "../models/User.model.js";
-import { DEAL_STATUS, OFFER_STATUS } from "../config/constants.js";
+import { DEAL_STATUS, OFFER_STATUS, PRODUCT_STATUS } from "../config/constants.js";
 import { AppError } from "../utils/appError.js";
+import { chatRank } from "../utils/planPerks.js";
+
+// Seller contact details in the pickup snapshot (mobile, pincode) are
+// private: the product detail endpoint already strips them for non-owners,
+// but the chat payloads populated the raw snapshot and leaked the seller's
+// phone number to anyone who opened a chat. Only the seller keeps them.
+const redactPickupForViewer = (product, viewerId) => {
+  if (!product || typeof product !== "object") return product;
+  const snap = product.pickup_address_snapshot;
+  if (!snap) return product;
+  const sellerId = String(product.seller_id?._id || product.seller_id || "");
+  if (viewerId && sellerId && sellerId === String(viewerId)) return product;
+  // eslint-disable-next-line no-unused-vars
+  const { mobile, pincode, ...publicSnap } = snap;
+  return { ...product, pickup_address_snapshot: publicSnap };
+};
 
 /**
  * Create or return an existing conversation (1 buyer + 1 seller + 1 product).
@@ -43,6 +59,11 @@ export const createConversation = async ({ buyerId, productId }) => {
     seller_id: sellerId,
     product_id: productId,
   });
+  // Existing threads always reopen; NEW threads only for live listings
+  // (no fresh chats on blocked / unlisted / sold / draft items).
+  if (!conversation && product.status && product.status !== PRODUCT_STATUS.LISTED) {
+    throw new AppError("This item is no longer available.", 400);
+  }
   if (!conversation) {
     conversation = await Conversation.create({
       buyer_id: buyerId,
@@ -118,6 +139,7 @@ export const getConversationById = async (conversationId, userId = null) => {
   const other = isBuyer ? conversation.seller_id : conversation.buyer_id;
   return {
     ...conversation,
+    product_id: redactPickupForViewer(conversation.product_id, me),
     role: me ? (isBuyer ? "buying" : "selling") : null,
     otherParty: other || null,
     unread: me
@@ -190,7 +212,7 @@ export const getUserConversations = async ({
     .populate("seller_id", "name avatar subscription role")
     .populate(
       "product_id",
-      "title selling_price images status is_negotiable pickup_address_snapshot",
+      "title selling_price images status is_negotiable pickup_address_snapshot seller_id",
     )
     .sort({ last_activity_at: -1 })
     .limit(200)
@@ -229,6 +251,18 @@ export const getUserConversations = async ({
     });
   }
 
+  // Plan perk "Chat priority": conversations with a Pro+ counterpart sort
+  // first, then Pro, then everyone else; recency order is kept inside each
+  // band (stable). Applies to every inbox view (chat list, header preview,
+  // profile "recent chats"), not just the client-side Pro circle.
+  rows = rows
+    .map((r, i) => {
+      const other = String(r.buyer_id?._id || r.buyer_id) === me ? r.seller_id : r.buyer_id;
+      return { r, i, rank: chatRank(other?.subscription) };
+    })
+    .sort((a, b) => b.rank - a.rank || a.i - b.i)
+    .map((x) => x.r);
+
   const total = rows.length;
   const pageRows = rows.slice((pg - 1) * lim, (pg - 1) * lim + lim);
 
@@ -261,7 +295,8 @@ export const getUserConversations = async ({
             images: r.product_id.images || [],
             status: r.product_id.status,
             is_negotiable: r.product_id.is_negotiable,
-            pickup_address_snapshot: r.product_id.pickup_address_snapshot,
+            pickup_address_snapshot: redactPickupForViewer(r.product_id, me)
+              .pickup_address_snapshot,
           }
         : {
             title: r.product_snapshot?.title,
@@ -409,4 +444,39 @@ export const deleteConversation = async ({ conversationId, userId }) => {
   await conversation.save();
 
   return conversation;
+};
+
+/**
+ * Navbar unread badge — the cheap path.
+ * The badge used to call the full list endpoint (up to 200 conversations,
+ * 3 populates + a Deal lookup) every 30s per tab just to read one number.
+ * This is a single indexed aggregation that returns only the sum.
+ */
+export const getUnreadTotal = async (userId) => {
+  const id = new mongoose.Types.ObjectId(String(userId));
+  const [row] = await Conversation.aggregate([
+    {
+      $match: {
+        $or: [
+          { buyer_id: id, "deleted_for.buyer": false },
+          { seller_id: id, "deleted_for.seller": false },
+        ],
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: {
+          $sum: {
+            $cond: [
+              { $eq: ["$buyer_id", id] },
+              { $ifNull: ["$unread_count.buyer", 0] },
+              { $ifNull: ["$unread_count.seller", 0] },
+            ],
+          },
+        },
+      },
+    },
+  ]);
+  return row?.total || 0;
 };

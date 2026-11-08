@@ -114,9 +114,9 @@ const BasicInfoStep = () => {
           ? "#EF4444"
           : state.isFocused
             ? "#4F46E5"
-            : "#E5E7EB",
+            : "var(--select-border)",
 
-        backgroundColor: "#F8FAFC",
+        backgroundColor: "var(--select-bg)",
 
         boxShadow: state.isFocused ? "0 0 0 4px rgba(79,70,229,0.08)" : "none",
 
@@ -177,21 +177,50 @@ const BasicInfoStep = () => {
 
       marginTop: 8,
 
-      borderRadius: 20,
+      borderRadius: 16,
 
       overflow: "hidden",
 
-      border: "1px solid #E5E7EB",
+      padding: 6,
 
-      boxShadow: "0 24px 60px rgba(15,23,42,0.12)",
+      border: "1px solid var(--select-border)",
+
+      backgroundColor: "var(--select-menu-bg)",
+
+      boxShadow: "0 14px 34px rgba(15,23,42,0.12)",
 
       animation: "fadeIn 180ms ease",
 
       zIndex: 30,
     }),
 
+    singleValue: (provided) => ({
+      ...provided,
+      color: "var(--select-value)",
+    }),
+
+    menuList: (provided) => ({
+      ...provided,
+      padding: 0,
+    }),
+
+    input: (provided) => ({
+      ...provided,
+      color: "var(--select-value)",
+    }),
+
+    // Same item language as every dropdown (.dd-item): accent tint on
+    // hover/keyboard focus, selected = accent text + semibold (no fill).
     option: (provided, state) => ({
       ...provided,
+      borderRadius: 8,
+      padding: "10px 12px",
+      fontSize: 13.5,
+      fontWeight: state.isSelected ? 600 : 500,
+      cursor: "pointer",
+      color: state.isSelected || state.isFocused ? "var(--select-option-hover-text)" : "var(--select-text)",
+      backgroundColor: state.isFocused ? "var(--select-option-hover)" : "transparent",
+      ":active": { backgroundColor: "var(--select-option-hover)" },
       // backgroundColor: state.isFocused ? "#EEF2FF" : "#FFFFFF",
 
       // color: "#111827",
@@ -214,7 +243,7 @@ const BasicInfoStep = () => {
         duration: 0.35,
         ease: "easeOut",
       }}
-      className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 dark:bg-[#1A1D20] dark:text-white dark:border-0"
+      className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 dark:bg-[#1A1D20] dark:text-white dark:border-0 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none dark:max-sm:bg-transparent"
     >
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
@@ -441,7 +470,7 @@ const BasicInfoStep = () => {
       <VisibilitySelector />
 
       {/* Footer */}
-      <div className="mt-10 flex items-center justify-between">
+      <div className="mt-10 flex items-center justify-between max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-50 max-sm:mt-0 max-sm:border-t max-sm:border-neutral-200/80 max-sm:bg-white/95 max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:backdrop-blur-xl dark:max-sm:border-neutral-800 dark:max-sm:bg-[#16181B]/95">
         {/* Pagination */}
         <div className="flex items-center gap-2">
           <span className="text-base text-[#94A3B8]">Step 1 of 4</span>
@@ -460,7 +489,7 @@ const BasicInfoStep = () => {
         {/* Continue */}
         <button
           onClick={() => validateAndProceed(validateBasicInfo, nextStep)}
-          className="h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-xl flex justify-center items-center gap-2 font-semibold transition-all duration-200 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
+          className="h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-lg flex justify-center items-center gap-2 font-semibold transition-all duration-200 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
         >
           <span>Continue</span>
           <IoArrowForward className="size-5" />

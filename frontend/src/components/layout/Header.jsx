@@ -34,6 +34,7 @@ import { searchProducts, getTrendingProducts } from "../../features/search/api/s
 import SearchDropdown from "../../features/search/components/SearchDropdown";
 import { toast } from "../ui/toast.js";
 import axios from "../../services/axiosInstance.js";
+import { publishChatUnread, useChatUnread } from "../../services/chatUnread.js";
 import { timeAgo } from "../../features/chat/components/ConversationCard.jsx";
 import { avatarUrl, formatName } from "../../features/chat/utils/display.js";
 import { levelProgress, xpToNextLevel } from "../../utils/badgeConfig.js";
@@ -474,7 +475,7 @@ const NotifDropdown = ({ items, unread, onOpen, onMarkAll, onViewAll }) => (
       <button
         type="button"
         onClick={onViewAll}
-        className="w-full rounded-xl bg-[#4B45FF]/10 px-4 py-2.5 text-[13px] font-bold text-[#2E40DC] transition-colors duration-150 hover:bg-[#4B45FF]/20 dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]"
+        className="w-full rounded-lg bg-[#4B45FF]/10 px-4 py-2.5 text-[13px] font-bold text-[#2E40DC] transition-colors duration-150 hover:bg-[#4B45FF]/20 dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]"
       >
         View all notifications
       </button>
@@ -597,7 +598,7 @@ const MsgDropdown = ({ items, unread, loading, onOpen, onViewAll }) => (
       <button
         type="button"
         onClick={onViewAll}
-        className="w-full rounded-xl bg-[#4B45FF]/10 px-4 py-2.5 text-[13px] font-bold text-[#2E40DC] transition-colors duration-150 hover:bg-[#4B45FF]/20 dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]"
+        className="w-full rounded-lg bg-[#4B45FF]/10 px-4 py-2.5 text-[13px] font-bold text-[#2E40DC] transition-colors duration-150 hover:bg-[#4B45FF]/20 dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]"
       >
         View all messages
       </button>
@@ -646,7 +647,7 @@ const Header = () => {
   const [showNotif, setShowNotif] = useState(false);
   const notifRef = useRef(null);
   // Live chat unread badge (same unread counters the chat list renders).
-  const [chatBadge, setChatBadge] = useState(0);
+  const chatBadge = useChatUnread(isLoggedIn);
   const [showMsg, setShowMsg] = useState(false);
   const [msgItems, setMsgItems] = useState([]);
   const [msgLoading, setMsgLoading] = useState(false);
@@ -675,7 +676,7 @@ const Header = () => {
           };
         }),
       );
-      setChatBadge(Number(res.data?.meta?.unreadTotal || 0));
+      publishChatUnread(res.data?.meta?.unreadTotal);
     } catch {
       // keep stale items, never break the header
     } finally {
@@ -719,32 +720,7 @@ const Header = () => {
       window.removeEventListener("scroll", handleScroll);
     };
   }, [showMsg]);
-  useEffect(() => {
-    if (!isLoggedIn) {
-      setChatBadge(0);
-      return;
-    }
-    let stop = false;
-    const load = async () => {
-      try {
-        const res = await axios.get("/api/conversations", {
-          params: { limit: 1 },
-        });
-        if (!stop) setChatBadge(Number(res.data?.meta?.unreadTotal || 0));
-      } catch {
-        // Badge stays stale — never break the header over it.
-      }
-    };
-    load();
-    const t = setInterval(load, 30000);
-    const onFocus = () => load();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      stop = true;
-      clearInterval(t);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [isLoggedIn]);
+  // Badge polling lives in the shared store (services/chatUnread.js).
 
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [cube, setCube] = useState({ step: 0, faces: [0, 1, 2, 3] });
@@ -853,6 +829,23 @@ const Header = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  // Phones: sub-pages get a back chevron in the app bar (tab roots don't).
+  // Account pages fall back to the Profile tab, everything else to Home,
+  // when there's no in-app history to pop (deep link / fresh tab).
+  const ACCOUNT_SUBPAGES = ["/settings", "/myorders", "/productlisted", "/wishlist", "/notification", "/achievements", "/badge", "/subscription", "/contact", "/termscondition"];
+  const OTHER_SUBPAGES = ["/product/", "/category/", "/search", "/price", "/privacy-policy"];
+  const matchesRoute = (list) =>
+    list.some((r) => location.pathname === r || location.pathname.startsWith(r.endsWith("/") ? r : `${r}/`));
+  const mobileBackTo = matchesRoute(ACCOUNT_SUBPAGES) ? "/profile" : matchesRoute(OTHER_SUBPAGES) ? "/" : null;
+  const handleMobileBack = () => {
+    if (window.history.state && window.history.state.idx > 0) navigate(-1);
+    else navigate(mobileBackTo || "/", { replace: true });
+  };
+  // Browsing screens get a persistent search field under the mobile app bar.
+  const showMobileSearchRow =
+    location.pathname === "/" ||
+    location.pathname.startsWith("/explore") ||
+    location.pathname.startsWith("/category/");
 
   const menuRefMobile = useRef(null);
   const menuRefDesktop = useRef(null);
@@ -1289,13 +1282,23 @@ const Header = () => {
     <>
       <nav
         className={`
+    site-header
     sticky
     top-0
     z-50
-    px-3
-    pt-3
+    border-b
+    border-neutral-200/80
+    bg-white/90
+    pt-[env(safe-area-inset-top)]
+    backdrop-blur-xl
+    dark:border-neutral-800
+    dark:bg-[#16181B]/90
+    sm:border-0
+    sm:bg-transparent
     sm:px-6
-    dark:bg-transparent
+    sm:pt-3
+    sm:backdrop-blur-none
+    sm:dark:bg-transparent
     font-figtree
     transition-transform
     duration-300
@@ -1303,92 +1306,57 @@ const Header = () => {
     ${showHeader ? "translate-y-0" : "-translate-y-full"}
   `}
       >
-        <div className="mx-auto flex h-14 w-full max-w-[1380px] min-w-0 items-center justify-between rounded-2xl border border-[#ECEEF3] bg-[#F7F8FA] px-3 sm:h-16 sm:px-5 shadow-[0_10px_36px_-16px_rgba(23,27,80,0.22)] dark:border-neutral-800 dark:bg-[#1A1D20] dark:shadow-[0_10px_36px_-16px_rgba(0,0,0,0.7)]">
-          {/* Mobile Navbar — single row: brand + icon actions */}
+        <div className="mx-auto flex h-14 w-full max-w-[1380px] min-w-0 items-center justify-between px-5 sm:h-16 sm:rounded-2xl sm:border sm:border-[#ECEEF3] sm:bg-[#F7F8FA] sm:px-5 sm:shadow-[0_10px_36px_-16px_rgba(23,27,80,0.22)] sm:dark:border-neutral-800 sm:dark:bg-[#1A1D20] sm:dark:shadow-[0_10px_36px_-16px_rgba(0,0,0,0.7)]">
+          {/* Mobile app bar (< sm): brand + campus on the left, alerts on the
+              right. Search gets its own full-width field below on browsing
+              screens; account + chats live in the bottom tab bar. */}
           <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:hidden">
-            <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
-            <Link
-              to="/"
-              aria-label="Unideals home"
-              className="flex h-10 shrink-0 items-center"
-            >
-              <Wordmark
-                fontSize={17}
-                fontWeight={500}
-                letterSpacing={0}
-                className="text-[#000000] dark:text-white"
-              />
-            </Link>
-
-            <div className="flex min-w-0 shrink-0 items-center gap-1">
-              <ThemeToggle size="sm" />
-
-              {isLoggedIn && (
+            <div className="flex min-w-0 items-center gap-2">
+              {mobileBackTo && (
                 <button
-                  onClick={() => navigate("/notification")}
-                  className="relative rounded-full p-2 transition-transform duration-200 active:scale-95"
-                  aria-label="Notifications"
+                  type="button"
+                  onClick={handleMobileBack}
+                  aria-label="Go back"
+                  className="-ml-2 grid h-10 w-9 shrink-0 place-items-center rounded-full text-slate-800 transition-colors active:bg-neutral-100 dark:text-white dark:active:bg-white/10"
                 >
-                  <IoNotificationsOutline
-                    size={22}
-                    className="text-[#090A0B] dark:text-neutral-300"
-                  />
-                  {unreadCount > 0 && (
-                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[10px] font-bold text-white">
-                      {unreadCount}
-                    </span>
-                  )}
+                  <IoChevronBackOutline size={22} />
                 </button>
               )}
+              <Link to="/" aria-label="Unideals home" className="flex h-10 shrink-0 items-center">
+                <Wordmark fontSize={21} fontWeight={700} letterSpacing={-0.5} className="text-[#000000] dark:text-white" />
+              </Link>
 
-              <button
-                onClick={() => {
-                  setShowMobileSearch(true);
-                  setShowDropdown(false);
-                }}
-                className="rounded-full p-2 transition-transform duration-200 active:scale-95"
-                aria-label="Open Search"
-              >
-                <CiSearch
-                  size={22}
-                  className="text-[#090A0B] dark:text-neutral-300"
-                />
-              </button>
-
-              {activeCampus &&
+              {activeCampus && !mobileBackTo &&
                 (isLoggedIn && !isAdmin ? (
                   <span
                     title="Your campus marketplace. Change it in Settings."
-                    className="rounded-full p-2"
+                    className="flex h-7 min-w-0 items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2.5 text-[12px] font-semibold text-[var(--accent-text)]"
                   >
-                    <GrLocation
-                      size={22}
-                      className="text-[#2E4BFF] dark:text-[#A5B0FF]"
-                    />
+                    <GrLocation className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{activeCampus.short_name || activeCampus.name}</span>
                   </span>
                 ) : (
-                  <span className="relative" ref={campusRefMobile}>
+                  <span className="relative min-w-0" ref={campusRefMobile}>
                     <button
                       type="button"
                       onClick={() => setShowMobileCampus((prev) => !prev)}
-                      title="Choose a campus to browse"
                       aria-expanded={showMobileCampus}
                       aria-haspopup="listbox"
                       aria-label="Choose a campus to browse"
-                      className="block rounded-full p-2 transition-transform duration-200 active:scale-95"
+                      className="flex h-7 min-w-0 max-w-[40vw] items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2.5 text-[12px] font-semibold text-[var(--accent-text)] transition-transform duration-200 active:scale-95"
                     >
-                      <GrLocation
-                        size={22}
-                        className="text-[#2E4BFF] dark:text-[#A5B0FF]"
-                      />
+                      <GrLocation className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span className="truncate">{activeCampus.short_name || activeCampus.name}</span>
+                      <svg className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
                     </button>
-
                     <AnimatePresence>
                       {showMobileCampus && (
                         <CampusDropdown
                           campuses={campuses}
                           activeSlug={activeCampus.slug}
-                          alignClass="right-0 w-64 max-w-[calc(100vw-3rem)]"
+                          alignClass="left-0 w-64 max-w-[calc(100vw-2rem)]"
                           onPick={(slug) => {
                             selectCampus(slug);
                             setShowMobileCampus(false);
@@ -1398,134 +1366,39 @@ const Header = () => {
                     </AnimatePresence>
                   </span>
                 ))}
-
-              {isLoggedIn ? (
-                <div className="relative" ref={menuRefMobile}>
-                  <button
-                    onClick={handleMenu}
-                    className="transition-transform duration-200 active:scale-95"
-                    aria-label="Open Menu"
-                  >
-                    <AvatarComponent
-                      name={userDetails?.name}
-                      imageUrl={userDetails?.avatar?.url}
-                      size="small"
-                      plan={userDetails?.subscription} role={userDetails?.role} isOwn
-                      isLoading={userLoading}
-                      className="rounded-full"
-                      showBadge
-                    />
-                  </button>
-
-                  <AnimatePresence>
-                    {showmenu && (
-                      <ProfileDropdown
-                        userDetails={userDetails}
-                        userLoading={userLoading}
-                        onClose={() => setShowmenu(false)}
-                        onLogout={handleLogoutClick}
-                        mobile
-                      />
-                    )}
-                  </AnimatePresence>
-                </div>
-              ) : (
-                <div className="relative" ref={menuRefMobile}>
-                  <button
-                    onClick={handleMenu}
-                    className="
-      flex
-      h-8
-      w-8
-      items-center
-      justify-center
-      rounded-full
-      bg-neutral-100
-      dark:bg-neutral-800
-    "
-                  >
-                    <LuUserRound className="text-lg text-neutral-700 dark:text-neutral-200" />
-                  </button>
-
-                  <AnimatePresence>
-                    {showmenu && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                        transition={{
-                          duration: 0.18,
-                          ease: [0.22, 1, 0.36, 1],
-                        }}
-                        className="
-          absolute
-          -right-3
-          top-full
-          z-50
-          mt-3
-          w-[220px]
-          overflow-hidden
-          rounded-2xl
-          border
-          border-neutral-200
-          bg-[#F7F8FA]
-          shadow-2xl
-          dark:border-neutral-800
-          dark:bg-[#1A1D20]
-          sm:-right-4
-        "
-                      >
-                        <div className="p-3">
-                          <button
-                            onClick={() => {
-                              setShowmenu(false);
-                              goToLogin();
-                            }}
-                            className="
-              mb-2
-              w-full
-              rounded-xl
-              bg-[#1E1E1E]
-              px-4
-              py-3
-              text-sm
-              font-medium
-              text-white
-              dark:bg-white
-              dark:text-black
-            "
-                          >
-                            Login
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setShowmenu(false);
-                              goToSignup();
-                            }}
-                            className="
-              w-full
-              rounded-xl
-              border
-              border-neutral-200
-              px-4
-              py-3
-              text-sm
-              font-medium
-              text-neutral-700
-              dark:border-neutral-700
-              dark:text-neutral-200
-            "
-                          >
-                            Sign Up
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
             </div>
+
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                  onClick={() => {
+                    setShowMobileSearch(true);
+                    setShowDropdown(false);
+                  }}
+                  className={`h-10 w-10 place-items-center rounded-full transition-transform duration-200 active:scale-95 ${
+                    // On browsing screens the full-width field replaces this
+                    // icon, except on short (landscape) phones where that row
+                    // is dropped to save height.
+                    showMobileSearchRow ? "hidden [@media(max-height:480px)]:grid" : "grid"
+                  }`}
+                  aria-label="Open search"
+                >
+                  <CiSearch size={22} className="text-[#090A0B] dark:text-neutral-300" />
+                </button>
+              <ThemeToggle size="sm" />
+              {isLoggedIn && (
+                <button
+                  onClick={() => navigate("/notification")}
+                  className="relative grid h-10 w-10 place-items-center rounded-full transition-transform duration-200 active:scale-95"
+                  aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+                >
+                  <IoNotificationsOutline size={22} className="text-[#090A0B] dark:text-neutral-300" />
+                  {unreadCount > 0 && (
+                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-[#16181B]">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1672,7 +1545,7 @@ const Header = () => {
                                 setShowDropdown(false);
                               }}
                               className="
-                rounded-full
+                rounded-lg
                 border
                 border-neutral-200
                 bg-[#F7F8FA]
@@ -1737,9 +1610,13 @@ const Header = () => {
                 text-neutral-700
                 transition-colors
                 duration-200
-                active:bg-neutral-100
+                hover:bg-[#4B45FF]/10
+                hover:text-[#2E40DC]
+                active:bg-[#4B45FF]/[0.15]
                 dark:text-neutral-300
-                dark:active:bg-neutral-800
+                dark:hover:bg-[#4B45FF]/20
+                dark:hover:text-[#C3C9FF]
+                dark:active:bg-[#4B45FF]/25
               "
                             >
                               <CiSearch className="text-neutral-400" />
@@ -1776,9 +1653,13 @@ const Header = () => {
                 text-neutral-700
                 transition-colors
                 duration-200
-                active:bg-neutral-100
+                hover:bg-[#4B45FF]/10
+                hover:text-[#2E40DC]
+                active:bg-[#4B45FF]/[0.15]
                 dark:text-neutral-300
-                dark:active:bg-neutral-800
+                dark:hover:bg-[#4B45FF]/20
+                dark:hover:text-[#C3C9FF]
+                dark:active:bg-[#4B45FF]/25
               "
                               >
                                 <img
@@ -2284,7 +2165,7 @@ lg:pr-24"
 
                     <button
                       onClick={goToLogin}
-                      className="rounded-xl bg-[#1E1E1E] px-6 xl:px-7 py-2 text-base lg:text-base md:text-sm font-medium text-white transition-all duration-200 hover:scale-[1.01] dark:bg-white dark:text-black"
+                      className="rounded-lg bg-[#1E1E1E] px-6 xl:px-7 py-2 text-base lg:text-base md:text-sm font-medium text-white transition-all duration-200 hover:scale-[1.01] dark:bg-white dark:text-black"
                     >
                       Login
                     </button>
@@ -2294,6 +2175,24 @@ lg:pr-24"
             </div>
           </div>
         </div>
+
+        {/* Mobile search field (browsing screens). Tapping opens the
+            full-screen search sheet with suggestions + trending. */}
+        {showMobileSearchRow && (
+          <div className="px-5 pb-2.5 sm:hidden [@media(max-height:480px)]:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setShowMobileSearch(true);
+                setShowDropdown(false);
+              }}
+              className="flex h-10 w-full items-center gap-2.5 rounded-xl border border-neutral-200 bg-[#F4F5F8] px-3.5 text-left text-[14px] text-slate-400 transition-colors active:bg-neutral-100 dark:border-neutral-800 dark:bg-[#1F2226] dark:text-zinc-500"
+            >
+              <CiSearch size={19} className="shrink-0 text-slate-500 dark:text-zinc-400" aria-hidden="true" />
+              <span className="truncate">Search textbooks, cycles, gadgets…</span>
+            </button>
+          </div>
+        )}
       </nav>
     </>
   );

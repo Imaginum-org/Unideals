@@ -1,5 +1,6 @@
 import {
   createOrder,
+  getPricingForViewer,
   verifyPayment,
   verifyWebhookSignature,
   handleWebhookEvent,
@@ -66,6 +67,20 @@ export const verifyPaymentOrder = async (req, res) => {
           : "Payment verification failed",
       ...(err.code ? { code: err.code } : {}),
     });
+  }
+};
+
+// GET /api/payments/plans — viewer-specific display prices (guests get list
+// prices; eligible accounts see the Girls Founder offer). Read-only.
+export const getPlanPricing = async (req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      message: "Plan pricing fetched",
+      data: getPricingForViewer(req.user || null),
+    });
+  } catch {
+    return res.status(500).json({ success: false, message: "Unable to load pricing" });
   }
 };
 

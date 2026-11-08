@@ -190,7 +190,7 @@ export default function PriceRangeSlider({
   };
 
   const thumbBase =
-    "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 size-5 rounded-full bg-[#394FF1] border-2 border-white shadow-md cursor-grab active:cursor-grabbing outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-[#394FF1] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#131313] touch-none select-none";
+    "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 size-5 rounded-full bg-[var(--accent)] border-2 border-white shadow-md cursor-grab active:cursor-grabbing outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#131313] touch-none select-none";
 
   return (
     <div
@@ -204,7 +204,7 @@ export default function PriceRangeSlider({
       <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-zinc-200 dark:bg-zinc-700" />
       {/* active fill */}
       <div
-        className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#394FF1]"
+        className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--accent)]"
         style={{ left: `${loPct}%`, width: `${Math.max(0, hiPct - loPct)}%` }}
       />
       {[0, 1].map((i) => (

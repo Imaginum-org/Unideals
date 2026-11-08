@@ -22,6 +22,7 @@ import {
   suggestPassword,
 } from "../utils/passwordStrength.js";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 function Signup() {
   const [email, setEmail] = useState("");
@@ -412,9 +413,9 @@ function Signup() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-[2.2vh] h-[6.3vh] sm:h-11 md:h-10 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] w-full rounded-xl bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60  md:mt-[2.8vh]  md:rounded-xl md:text-xs lg:mt-2.5 lg:text-sm xl:text-[0.8rem] xl:mt-[3vh] 2xl:text-[0.85rem] 2xl:mt-[2.6vh]"
+                className="mt-[2.2vh] h-[6.3vh] sm:h-11 md:h-10 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] w-full rounded-lg bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60  md:mt-[2.8vh]  md:text-xs lg:mt-2.5 lg:text-sm xl:text-[0.8rem] xl:mt-[3vh] 2xl:text-[0.85rem] 2xl:mt-[2.6vh]"
               >
-                {isSubmitting ? "Creating..." : "Create Account"}
+                <ButtonLoader loading={isSubmitting} loadingText="Creating…">Create Account</ButtonLoader>
               </button>
 
               {/* Login link */}

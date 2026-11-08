@@ -13,7 +13,7 @@ export default function TabSwitcher({ activeTab, setActiveTab, counts = {} }) {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[12px] md:text-[13px] font-medium transition-all duration-200 border outline-none ${
+            className={`shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] md:text-[13px] font-medium transition-all duration-200 border outline-none ${
               isActive
                 ? "bg-[#364EF2] border-[#364EF2] text-white shadow-sm shadow-blue-500/20"
                 : "bg-[#F7F8FA] dark:bg-[#1A1D20] border-gray-200 dark:border-gray-700 text-gray-600 dark:text-[#D6D6D6] hover:border-gray-300 dark:hover:border-gray-500"

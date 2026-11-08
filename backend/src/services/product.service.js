@@ -1,5 +1,32 @@
 import Product from "../models/Product.model.js";
 import Campus from "../models/Campus.model.js";
+import { createTtlCache, keyOf } from "../utils/ttlCache.js";
+import { FEED_RANK_WEIGHT, SEARCH_RANK_WEIGHT, sellerRank } from "../utils/planPerks.js";
+
+// Aggregate results that don't need to be real-time: total counts and price
+// bounds for a given filter. Each feed/search page used to run 2 extra
+// aggregations on every request (including infinite-scroll pages 2, 3, …).
+// A short TTL keeps them fresh enough while cutting those DB calls ~90%.
+const feedMetaCache = createTtlCache({ max: 2000 });
+const COUNT_TTL_MS = 30 * 1000;
+const PRICE_META_TTL_MS = 60 * 1000;
+const cachedCount = (pipeline) =>
+  feedMetaCache.memo(`count:${keyOf(pipeline)}`, COUNT_TTL_MS, async () => {
+    const r = await Product.aggregate([...pipeline, { $count: "total" }]);
+    return r[0]?.total || 0;
+  });
+
+// Seller join: pull only the 3 public fields instead of the whole user
+// document (wishlist, gamification, tokens…) for every card.
+const sellerLookup = {
+  $lookup: {
+    from: "users",
+    localField: "seller_id",
+    foreignField: "_id",
+    as: "seller",
+    pipeline: [{ $project: { name: 1, avatar: 1, subscription: 1 } }],
+  },
+};
 import Conversation from "../models/conversation.model.js";
 import Deal from "../models/deal.model.js";
 import mongoose from "mongoose";
@@ -8,9 +35,10 @@ import {
   PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
   GIRLS_ONLY_CATEGORIES,
+  PRODUCT_CONDITION,
 } from "../config/constants.js";
 import { getListingLimit } from "../config/subscriptionPlans.js";
-import { deleteImage } from "../utils/imagekit.js";
+import { deleteImageSafely } from "../utils/imagekit.js";
 import { notifyPriceDrop } from "./notification.service.js";
 import {
   isEligibleGender,
@@ -20,6 +48,52 @@ import {
   girlsCornerError,
   GIRLS_ERRORS,
 } from "../utils/girlsCorner.js";
+
+// ── Shared browse facets (feed + search) ─────────────────────────────
+// condition: one or more whitelisted values ("like_new,gently_used").
+// posted_within: "1" | "7" | "30" days; the cutoff is floored to the
+// minute so identical requests share a cache key (feedMetaCache).
+// negotiable: "true" → only listings open to offers.
+const VALID_CONDITIONS = new Set(Object.values(PRODUCT_CONDITION));
+const POSTED_WITHIN_DAYS = { 1: 1, 7: 7, 30: 30 };
+
+const applyFacetFilters = (match, { condition, posted_within, negotiable } = {}) => {
+  const conds = [
+    ...new Set(
+      String(condition || "")
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => VALID_CONDITIONS.has(c)),
+    ),
+  ];
+  if (conds.length === 1) match.condition = conds[0];
+  else if (conds.length > 1) match.condition = { $in: conds };
+
+  const days = POSTED_WITHIN_DAYS[String(posted_within || "")];
+  if (days) {
+    const minute = 60 * 1000;
+    match.createdAt = { $gte: new Date(Math.floor((Date.now() - days * 864e5) / minute) * minute) };
+  }
+
+  if (negotiable === true || negotiable === "true") match.is_negotiable = true;
+};
+
+// Price range from query strings. Swaps a reversed range instead of
+// returning nothing; ignores non-numbers / negatives.
+const buildPriceRange = (min_price, max_price) => {
+  const num = (v) => {
+    if (v === undefined || v === null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  let lo = num(min_price);
+  let hi = num(max_price);
+  if (lo != null && hi != null && lo > hi) [lo, hi] = [hi, lo];
+  const range = {};
+  if (lo != null) range.$gte = lo;
+  if (hi != null) range.$lte = hi;
+  return Object.keys(range).length ? range : null;
+};
 
 const campusError = (statusCode, message, code) => {
   const error = new Error(message);
@@ -336,6 +410,7 @@ export const createProduct = async (data, user) => {
     delete data.terms_accepted_at;
   }
 
+  data.seller_tier = sellerRank(user?.subscription);
   const created = await Product.create(data);
 
   // Atomic post-check (race guard, same pattern as boost): a parallel
@@ -385,14 +460,20 @@ export const getBoostedProducts = async (campusId, viewerGender = null, viewerRo
     filter.category = { $nin: [...GIRLS_ONLY_CATEGORIES] };
   }
 
-  return await Product.find(filter)
-    .sort({ boost_expires_at: -1 })
-    .limit(10)
-    .select(
-      "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier isGirlsOnly",
-    )
-    .populate("seller_id", "name avatar subscription role")
-    .lean();
+  // Boosted rail renders on every Home view: share one query per campus +
+  // audience for 30s. The key omits `now` on purpose (it changes every ms);
+  // the same filter is re-evaluated on each refresh.
+  const cacheKey = `boosted:${keyOf({ ...filter, boost_expires_at: null })}`;
+  return feedMetaCache.memo(cacheKey, 30 * 1000, () =>
+    Product.find(filter)
+      .sort({ boost_expires_at: -1 })
+      .limit(10)
+      .select(
+        "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier isGirlsOnly",
+      )
+      .populate("seller_id", "name avatar subscription role")
+      .lean(),
+  );
 };
 
 export const getAllProducts = async (query, campusId, viewerGender = null, viewerRole = null) => {
@@ -406,6 +487,8 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     max_price,
     sort = "recommended",
     audience,
+    posted_within,
+    negotiable,
   } = query;
 
   // Clamp pagination to prevent DoS via huge limit / negative skip
@@ -451,32 +534,20 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     }
   }
 
-  if (typeof condition === "string" && condition) {
-    baseMatch.condition = condition;
-  }
+  applyFacetFilters(baseMatch, { condition, posted_within, negotiable });
 
-  if (min_price !== undefined || max_price !== undefined) {
-    baseMatch.selling_price = {};
-
-    if (min_price !== undefined && min_price !== "") {
-      const minNum = Number(min_price);
-      if (Number.isFinite(minNum)) baseMatch.selling_price.$gte = minNum;
-    }
-
-    if (max_price !== undefined && max_price !== "") {
-      const maxNum = Number(max_price);
-      if (Number.isFinite(maxNum)) baseMatch.selling_price.$lte = maxNum;
-    }
-    if (Object.keys(baseMatch.selling_price).length === 0) {
-      delete baseMatch.selling_price;
-    }
-  }
+  // Price bounds are computed over every filter EXCEPT price, so the
+  // slider keeps the full campus range while a price is selected (it used
+  // to collapse to the chosen range and could never be widened again).
+  const priceBoundsMatch = { ...baseMatch };
+  const priceRange = buildPriceRange(min_price, max_price);
+  if (priceRange) baseMatch.selling_price = priceRange;
 
   const pipeline = [{ $match: baseMatch }];
 
   const priceMetaPipeline = [
     {
-      $match: baseMatch,
+      $match: priceBoundsMatch,
     },
   ];
 
@@ -554,6 +625,8 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
             { $multiply: ["$recencyScore", 30] },
             { $multiply: ["$popularityScore", 10] },
             "$trendingScore",
+            // Plan perk: "Search ranking" Normal / Higher / Highest.
+            { $multiply: [{ $ifNull: ["$seller_tier", 0] }, FEED_RANK_WEIGHT] },
           ],
         },
       },
@@ -594,14 +667,7 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
 
   // JOIN SELLER
   pipeline.push(
-    {
-      $lookup: {
-        from: "users",
-        localField: "seller_id",
-        foreignField: "_id",
-        as: "seller",
-      },
-    },
+    sellerLookup,
     {
       $unwind: {
         path: "$seller",
@@ -610,8 +676,9 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     },
     {
       $project: {
+        // description intentionally omitted: cards never render it and it is
+        // the largest field on a listing (detail page fetches it).
         title: 1,
-        description: 1,
         images: 1,
         selling_price: 1,
         original_price: 1,
@@ -648,13 +715,13 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     },
   });
 
-  const [products, totalResult, priceMeta] = await Promise.all([
+  const [products, total, priceMeta] = await Promise.all([
     Product.aggregate(pipeline),
-    Product.aggregate([...totalPipeline, { $count: "total" }]),
-    Product.aggregate(priceMetaPipeline),
+    cachedCount(totalPipeline),
+    feedMetaCache.memo(`price:${keyOf(priceMetaPipeline)}`, PRICE_META_TTL_MS, () =>
+      Product.aggregate(priceMetaPipeline),
+    ),
   ]);
-
-  const total = totalResult[0]?.total || 0;
 
   const filterMeta = {
     price: {
@@ -938,6 +1005,8 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
     min_price,
     max_price,
     audience,
+    posted_within,
+    negotiable,
   } = options;
   let { page = 1, limit = 20 } = options;
 
@@ -964,7 +1033,9 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
   const rawTokens = sanitizedQuery.split(/\s+/).slice(0, 5);
   const tokens = rawTokens.map(escapeRegex);
   const typoVariants = [
-    ...new Set(tokens.flatMap(transpositionVariants)),
+    // Raw tokens: transpositionVariants escapes its own output (passing the
+    // already-escaped tokens double-escaped them, e.g. "c++" never matched).
+    ...new Set(rawTokens.flatMap(transpositionVariants)),
   ].slice(0, 12);
   // Similar-meaning + stemming expansion for the fallback matcher.
   const synonymClauses = synonymVariants(rawTokens);
@@ -996,21 +1067,10 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
       baseMatch.category = category;
     }
   }
-  if (typeof condition === "string" && condition) {
-    baseMatch.condition = condition;
-  }
-  const priceRange = {};
-  if (min_price !== undefined && min_price !== "") {
-    const minNum = Number(min_price);
-    if (Number.isFinite(minNum)) priceRange.$gte = minNum;
-  }
-  if (max_price !== undefined && max_price !== "") {
-    const maxNum = Number(max_price);
-    if (Number.isFinite(maxNum)) priceRange.$lte = maxNum;
-  }
-  if (Object.keys(priceRange).length > 0) {
-    baseMatch.selling_price = priceRange;
-  }
+  applyFacetFilters(baseMatch, { condition, posted_within, negotiable });
+  // Price is applied after candidate scoping so the price bounds (below)
+  // can be computed over the same result set without the price filter.
+  const priceRange = buildPriceRange(min_price, max_price);
 
   // Speed: indexed $text first pass scopes candidates (stemming included).
   // Falls back to the full set when $text finds nothing (typos live there).
@@ -1031,6 +1091,8 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
       // Malformed $text input or missing index: full regex scan below.
     }
   }
+  const boundsScope = matchScope;
+  if (priceRange) matchScope = { ...matchScope, selling_price: priceRange };
 
   const relevanceAdds = [
     {
@@ -1145,7 +1207,12 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
     {
       $addFields: {
         finalScore: {
-          $add: ["$relevanceScore", { $multiply: ["$recencyScore", 30] }],
+          $add: [
+            "$relevanceScore",
+            { $multiply: ["$recencyScore", 30] },
+            // Plan perk: higher plans win ties between equally relevant results.
+            { $multiply: [{ $ifNull: ["$seller_tier", 0] }, SEARCH_RANK_WEIGHT] },
+          ],
         },
       },
     },
@@ -1181,11 +1248,21 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
 
   // Total from match stages only (same pattern as the feed).
   const totalPipeline = pipeline.filter((stage) => stage.$match);
-  const [products, totalResult] = await Promise.all([
+  // Price bounds: same query + facets, minus the price filter (so the
+  // slider always spans the real range of matching listings).
+  const textMatch = pipeline[1]?.$match ? [pipeline[1]] : [];
+  const boundsPipeline = [
+    { $match: boundsScope },
+    ...textMatch,
+    { $group: { _id: null, minPrice: { $min: "$selling_price" }, maxPrice: { $max: "$selling_price" } } },
+  ];
+  const [products, total, priceMeta] = await Promise.all([
     Product.aggregate(pipeline),
-    Product.aggregate([...totalPipeline, { $count: "total" }]),
+    cachedCount(totalPipeline),
+    feedMetaCache.memo(`sprice:${keyOf(boundsPipeline)}`, PRICE_META_TTL_MS, () =>
+      Product.aggregate(boundsPipeline),
+    ),
   ]);
-  const total = totalResult[0]?.total || 0;
 
   return {
     products,
@@ -1194,6 +1271,9 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+    filterMeta: {
+      price: { min: priceMeta[0]?.minPrice ?? 0, max: priceMeta[0]?.maxPrice ?? 0 },
     },
     matchedCategories,
   };
@@ -1264,7 +1344,12 @@ export const deleteProduct = async (productId, userId) => {  const product = awa
   await Promise.allSettled(
     product.images
       .filter((image) => image.fileId)
-      .map((image) => deleteImage(image.fileId)),
+      .map((image) =>
+        deleteImageSafely(image.fileId, {
+          ownerId: userId,
+          excludeProductId: product._id,
+        }),
+      ),
   );
 
   // Soft delete product + revoke any live boost exposure.

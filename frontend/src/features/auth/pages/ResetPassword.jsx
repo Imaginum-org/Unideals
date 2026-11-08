@@ -19,12 +19,13 @@ import {
 } from "../utils/passwordStrength";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 const cardShell =
   "w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden no-scrollbar rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none";
 
 const primaryBtn =
-  "mt-[2.2vh] h-[6.3vh] w-full rounded-xl bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-3 md:h-10 md:rounded-xl md:text-xs lg:mt-3 lg:h-10 lg:text-sm xl:mt-[2.9vh] xl:h-[6.4vh] xl:text-[0.8rem] 2xl:mt-[2.6vh] 2xl:h-[6.4vh] 2xl:text-[0.85rem]";
+  "mt-[2.2vh] h-[6.3vh] w-full rounded-lg bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-3 md:h-10 md:text-xs lg:mt-3 lg:h-10 lg:text-sm xl:mt-[2.9vh] xl:h-[6.4vh] xl:text-[0.8rem] 2xl:mt-[2.6vh] 2xl:h-[6.4vh] 2xl:text-[0.85rem]";
 
 function ResetPassword() {
   const [password, setPassword] = useState("");
@@ -302,7 +303,7 @@ function ResetPassword() {
                     disabled={isSubmitting}
                     className={`${primaryBtn} mt-[2.3vh] xl:mt-[2.4vh]`}
                   >
-                    {isSubmitting ? "Updating…" : "Update password"}
+                    <ButtonLoader loading={isSubmitting} loadingText="Updating…">Update password</ButtonLoader>
                   </button>
 
                   <p className="mt-4 text-center text-xs md:mt-3 lg:text-sm xl:mt-[2.5vh]">

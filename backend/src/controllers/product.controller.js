@@ -1,6 +1,6 @@
 import * as productService from "../services/product.service.js";
 import { resolveRequestCampus } from "../services/campus.service.js";
-import { deleteImage } from "../utils/imagekit.js";
+import { deleteImageSafely } from "../utils/imagekit.js";
 import { forwardServiceError } from "../utils/response.js";
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
@@ -53,7 +53,11 @@ export const createProduct = async (req, res) => {
   } catch (error) {
     // Cleanup uploaded images if product fails (best-effort, never fails request)
     if (fileIds.length > 0) {
-      await Promise.allSettled(fileIds.map((id) => deleteImage(id)));
+      // Ownership-checked: a failed create must never purge files that
+      // belong to someone else (fileIds come straight from the request).
+      await Promise.allSettled(
+        fileIds.map((id) => deleteImageSafely(id, { ownerId: req.user?._id })),
+      );
     }
 
     const clientErrors = [
@@ -208,6 +212,8 @@ export const searchProducts = async (req, res, next) => {
       min_price,
       max_price,
       audience,
+      posted_within,
+      negotiable,
     } = req.query;
 
     if (!q || String(q).trim().length === 0) {
@@ -229,6 +235,8 @@ export const searchProducts = async (req, res, next) => {
         min_price,
         max_price,
         audience,
+        posted_within,
+        negotiable,
       },
       (await resolveRequestCampus(req))._id,
       req.user?.gender ?? null,

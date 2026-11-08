@@ -15,6 +15,7 @@ import {
   createConversation,
   listConversations,
   getConversation,
+  getUnreadCount,
 } from "../controllers/conversation.controller.js";
 import {
   listMessages,
@@ -67,6 +68,8 @@ const dealActionLimiter = rateLimit({
 });
 
 router.get("/", auth, listLimiter, listConversations);
+// Must be registered before "/:id" so "unread-count" isn't read as an id.
+router.get("/unread-count", auth, listLimiter, getUnreadCount);
 router.post("/", auth, messageLimiter, validate(createConversationSchema), createConversation);
 
 router.get("/:id", auth, listLimiter, getConversation);

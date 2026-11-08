@@ -233,16 +233,25 @@ export const sendTextMessage = async ({ conversationId, senderId, text, replyTo 
   }
 
   const preview = screen.flagged ? BLOCKED_PLACEHOLDER : clean.slice(0, 500);
+  const activityAt = new Date();
+  const unreadSide =
+    String(conversation.buyer_id) === String(receiverId) ? "buyer" : "seller";
+  // Atomic $inc: the old read-modify-save lost unread increments when two
+  // messages (or a message + an offer) were written concurrently.
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    {
+      $set: {
+        last_message: preview,
+        last_message_type: MESSAGE_TYPE.TEXT,
+        last_message_sender: senderId,
+        last_activity_at: activityAt,
+      },
+      $inc: { [`unread_count.${unreadSide}`]: 1 },
+    },
+  );
   conversation.last_message = preview;
-  conversation.last_message_type = MESSAGE_TYPE.TEXT;
-  conversation.last_message_sender = senderId;
-  conversation.last_activity_at = new Date();
-  if (String(conversation.buyer_id) === String(receiverId)) {
-    conversation.unread_count.buyer += 1;
-  } else {
-    conversation.unread_count.seller += 1;
-  }
-  await conversation.save();
+  conversation.last_activity_at = activityAt;
 
   const [payload] = await attachReplies([toClientMessage(message)]);
   emitToConversation(conversation._id, "message:new", payload);

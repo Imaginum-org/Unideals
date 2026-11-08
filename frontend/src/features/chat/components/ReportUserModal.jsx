@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Flag, X } from "lucide-react";
 import { INPUT_BASE, SELL_BTN } from "../utils/chatTheme.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
+import Select from "../../../components/ui/Select.jsx";
 
 const REASONS = [
   { value: "spam_or_advertisement", label: "Spam or ads" },
@@ -88,20 +90,16 @@ const ReportUserModal = ({ open, userName, title, targetType = "user", submittin
           report.
         </p>
         <div className="p-4 space-y-3">
-          <label className="block text-xs font-semibold text-zinc-500">
+          <div className="block text-xs font-semibold text-zinc-500">
             Reason
-            <select
+            <Select
+              className="mt-1"
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className={`${INPUT_BASE} mt-1 w-full px-3 py-2.5 text-base sm:text-sm`}
-            >
-              {REASONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={setReason}
+              options={REASONS}
+              ariaLabel="Report reason"
+            />
+          </div>
           <label className="block text-xs font-semibold text-zinc-500">
             Description
             <textarea
@@ -125,7 +123,7 @@ const ReportUserModal = ({ open, userName, title, targetType = "user", submittin
               disabled={submitting}
               className={`${SELL_BTN} flex-1 px-4 py-2.5 text-sm`}
             >
-              {submitting ? "Sending…" : "Send report"}
+              <ButtonLoader loading={submitting} loadingText="Sending…">Send report</ButtonLoader>
             </button>
           </div>
         </div>

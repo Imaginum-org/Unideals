@@ -4,6 +4,7 @@ import { Check, Crown, Lock, MessageSquareText, X } from "lucide-react";
 import { WALLPAPERS, chatSettingsOf } from "../../chat/utils/wallpapers.js";
 import { updateChatSettings } from "../api/userApi.js";
 import { toast } from "../../../components/ui/toast.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 const Toggle = ({ checked, onChange, label, hint }) => (
   <button
@@ -204,7 +205,7 @@ const ChatSettings = ({ user, onSaved }) => {
             disabled={!dirty || saving}
             className="rounded-lg bg-[#3838EC] px-5 py-2.5 text-sm font-medium text-[#FCFCFC] transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
           >
-            {saving ? "Saving…" : "Save changes"}
+            <ButtonLoader loading={saving} loadingText="Saving…">Save changes</ButtonLoader>
           </button>
         </div>
       </div>

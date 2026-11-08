@@ -87,14 +87,14 @@ export default function Achievements() {
 
   return (
     <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
-      <div className="flex h-[calc(100vh-70px)]">
+      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
         {/* Left panel */}
         <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2">
           <Profile_left_part />
         </div>
 
         {/* Main content */}
-        <div className="h-full md:flex-1 overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
+        <div className="min-w-0 w-full md:h-full md:flex-1 md:overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] px-4 py-5 sm:p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
           <div className="max-w-5xl mx-auto space-y-6 pb-6">
 
             {/* Page header */}
@@ -143,7 +143,7 @@ export default function Achievements() {
                       )
                       .finally(() => setLoading(false));
                   }}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
                 >
                   Retry
                 </button>
@@ -166,7 +166,7 @@ export default function Achievements() {
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
                     activeCategory === cat.id
                       ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                       : "bg-[#F7F8FA] dark:bg-[#1c1c1c] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-600"

@@ -42,7 +42,7 @@ const ListingLayout = () => {
 
   return (
     <div className="w-full min-h-screen text-black dark:text-white bg-[#FAFAFA] dark:bg-[#131313] font-figtree">
-      <div className="max-w-6xl w-full mx-auto px-7 sm:px-6 lg:px-8 xl:px-10 py-6 md:py-8">
+      <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 pb-28 pt-3 sm:py-6 md:py-8">
         {/* Back */}
         <button
           onClick={() => {
@@ -52,7 +52,7 @@ const ListingLayout = () => {
               prevStep();
             }
           }}
-          className="group inline-flex items-center gap-1 text-sm lg:text-base font-medium text-[#090A0B] dark:text-white"
+          className="group -ml-2 inline-flex h-10 items-center gap-1 rounded-lg pr-3 text-sm lg:text-base font-medium text-[#090A0B] active:bg-neutral-100 dark:text-white dark:active:bg-white/10 sm:ml-0"
         >
           <div className="flex items-center justify-center w-8 h-8 group-hover:text-[#4F46E5]">
             <IoArrowBack className="size-4" />
@@ -64,7 +64,7 @@ const ListingLayout = () => {
         </button>
 
         {/* Header */}
-        <div className="mt-7">
+        <div className="mt-3 sm:mt-7">
           <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
             {isEditMode ? "Edit Your Product" : "Sell Your Product"}
           </h1>
@@ -77,13 +77,13 @@ const ListingLayout = () => {
         </div>
 
         {/* Stepper */}
-        <div className="mt-6">
+        <div className="mt-5 sm:mt-6">
           <Stepper />
         </div>
 
         {/* Main */}
         <div
-          className={`mt-8 grid grid-cols-1 gap-6 items-start ${
+          className={`mt-6 grid grid-cols-1 gap-6 items-start sm:mt-8 ${
             step !== 4 ? "xl:grid-cols-[1fr_320px]" : ""
           }`}
         >

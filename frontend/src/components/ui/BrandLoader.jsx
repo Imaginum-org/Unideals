@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 
 // BrandLoader — the single loader for the whole app.
 //
@@ -9,17 +10,22 @@ import React from "react";
 //
 // Props:
 //   size: "xs" (16, buttons) | "sm" (24) | "md" (48, default) |
-//         "lg" (96) | "full" (fullscreen centered overlay)
-//   tone: "brand" (default) | "white" (on colored buttons/badges)
+//         "lg" (96) | "full" (exact viewport-centre overlay; see below)
+//   tone: "brand" (default) | "white" (on colored buttons/badges) |
+//         "current" (inherits the parent's text colour — use in buttons)
 //   label: optional visible caption under the mark
 //   className: extra classes for the wrapper
 //
 // Respects prefers-reduced-motion (renders a static mark).
+// One loader size everywhere a page/section waits (md, lg and full all
+// render at 40px, the size production SaaS apps use). xs/sm are for
+// buttons and inline "load more" rows.
 const SIZE_PX = {
   xs: 16,
   sm: 24,
-  md: 48,
-  lg: 96,
+  md: 40,
+  lg: 40,
+  full: 40,
 };
 
 // Logo artwork from public/logo.svg (shared viewBox "285 245 430 520").
@@ -38,6 +44,30 @@ export const LOGO_PATHS = [
   },
 ];
 
+// ─── Full-screen loader coordination ───
+// Several components can show a page loader at the same moment (e.g. the
+// profile sidebar + the page body while the session loads). Only the first
+// mounted one draws, so users never see two out-of-sync logos stacked.
+const screenLoaders = { ids: [], listeners: new Set() };
+const subscribeScreen = (listener) => {
+  screenLoaders.listeners.add(listener);
+  return () => screenLoaders.listeners.delete(listener);
+};
+const emitScreen = () => screenLoaders.listeners.forEach((l) => l());
+
+const useReducedMotion = () => {
+  const [reducedMotion, setReducedMotion] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(query.matches);
+    const onChange = (event) => setReducedMotion(event.matches);
+    query.addEventListener?.("change", onChange);
+    return () => query.removeEventListener?.("change", onChange);
+  }, []);
+  return reducedMotion;
+};
+
 const BrandLoader = ({
   size = "md",
   tone = "brand",
@@ -46,130 +76,178 @@ const BrandLoader = ({
 }) => {
   const px = SIZE_PX[size] || SIZE_PX.md;
   const isFull = size === "full";
-  const [reducedMotion, setReducedMotion] = React.useState(false);
+  const isInline = size === "xs";
+  const reducedMotion = useReducedMotion();
 
-  React.useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReducedMotion(query.matches);
-    const onChange = (event) => setReducedMotion(event.matches);
-    query.addEventListener?.("change", onChange);
-    return () => query.removeEventListener?.("change", onChange);
-  }, []);
+  // Unique per instance: a shared id breaks when the first SVG defining it
+  // sits inside a hidden (display:none) subtree — browsers then fail to
+  // resolve url(#id) for every other loader and the stroke disappears.
+  const uid = React.useId().replace(/:/g, "");
+  const gradientId = `brandLoaderGradient-${uid}`;
 
-  const drawStroke = tone === "white" ? "#FFFFFF" : "url(#brandLoaderGradient)";
+  // Full-screen dedupe registration.
+  React.useLayoutEffect(() => {
+    if (!isFull) return undefined;
+    screenLoaders.ids.push(uid);
+    emitScreen();
+    return () => {
+      screenLoaders.ids = screenLoaders.ids.filter((id) => id !== uid);
+      emitScreen();
+    };
+  }, [isFull, uid]);
+  const isPrimaryScreen = React.useSyncExternalStore(
+    subscribeScreen,
+    () => screenLoaders.ids[0] === uid,
+    () => false,
+  );
 
-  const renderPaths = (animated) =>
-    LOGO_PATHS.map((item, index) => (
-      <g key={index} transform={item.transform}>
-        {animated ? (
+  const strokeFor = () => {
+    if (tone === "white") return "#FFFFFF";
+    if (tone === "current") return "currentColor";
+    return `url(#${gradientId})`;
+  };
+  const solidFor = (fallback) =>
+    tone === "white" ? "#FFFFFF" : tone === "current" ? "currentColor" : fallback;
+
+  const svg = (
+    <svg
+      viewBox={LOGO_VIEWBOX}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="h-full w-full overflow-visible"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient
+          id={gradientId}
+          x1="0"
+          y1="0"
+          x2="100"
+          y2="100"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0%" stopColor="#3838EC" />
+          <stop offset="100%" stopColor="#5C6DFF" />
+        </linearGradient>
+      </defs>
+      {/* Faint filled body for a subtle premium base */}
+      {LOGO_PATHS.map((item, index) => (
+        <g
+          key={`base-${index}`}
+          transform={item.transform}
+          opacity={isInline ? "0.22" : "0.12"}
+        >
+          <path d={item.d} fill={solidFor(item.fill)} />
+        </g>
+      ))}
+      {/* Soft glow behind the stroke (skipped at button size: it smears) */}
+      {!isInline && (
+        <g opacity="0.22" style={{ filter: "blur(7px)" }}>
+          {LOGO_PATHS.map((item, index) => (
+            <g key={`glow-${index}`} transform={item.transform}>
+              <path
+                d={item.d}
+                fill="none"
+                stroke={solidFor("#3838EC")}
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
+          ))}
+        </g>
+      )}
+      {/* Draw-on loop (thicker at button size so it stays legible) */}
+      {LOGO_PATHS.map((item, index) => (
+        <g key={index} transform={item.transform}>
           <path
             d={item.d}
             pathLength="1000"
             fill="none"
-            stroke={drawStroke}
-            strokeWidth="10"
+            stroke={strokeFor()}
+            strokeWidth={isInline ? 26 : 10}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeDasharray="1000"
-            strokeDashoffset="1000"
+            {...(reducedMotion
+              ? {}
+              : { strokeDasharray: "1000", strokeDashoffset: "1000" })}
           >
-            <animate
-              attributeName="stroke-dashoffset"
-              values="1000;0;0;1000"
-              keyTimes="0;0.42;0.78;1"
-              dur="2.2s"
-              repeatCount="indefinite"
-            />
+            {!reducedMotion && (
+              <animate
+                attributeName="stroke-dashoffset"
+                values="1000;0;0;1000"
+                keyTimes="0;0.42;0.78;1"
+                dur="2.2s"
+                repeatCount="indefinite"
+              />
+            )}
           </path>
-        ) : (
-          <path d={item.d} fill="none" stroke={drawStroke} strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-        )}
-      </g>
-    ));
+        </g>
+      ))}
+    </svg>
+  );
 
+  const pulseClass = reducedMotion ? "" : "brand-loader-pulse";
+
+  // Button size: inline span so it sits on the text baseline inside
+  // buttons/links without breaking their layout.
+  if (isInline) {
+    return (
+      <span
+        className={`inline-flex shrink-0 items-center justify-center ${className}`}
+        role="status"
+        aria-label={label || "Loading"}
+      >
+        <span className={`inline-block ${pulseClass}`} style={{ width: px, height: px }}>
+          {svg}
+        </span>
+      </span>
+    );
+  }
+
+  const markSize = px;
   const mark = (
     <div
-      className={`flex flex-col items-center justify-center gap-3 ${className}`}
+      className={`flex flex-col items-center justify-center gap-3 ${isFull ? "" : className}`}
       role="status"
       aria-live="polite"
       aria-label={label || "Loading"}
     >
-      <div
-        className={reducedMotion ? "" : "animate-[brandLoaderPulse_2.2s_ease-in-out_infinite]"}
-        style={{ width: isFull ? 112 : px, height: isFull ? 112 : px }}
-      >
-        <svg
-          viewBox={LOGO_VIEWBOX}
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-full w-full overflow-visible"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient
-              id="brandLoaderGradient"
-              x1="0"
-              y1="0"
-              x2="100"
-              y2="100"
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop offset="0%" stopColor="#3838EC" />
-              <stop offset="100%" stopColor="#5C6DFF" />
-            </linearGradient>
-          </defs>
-          {/* Faint filled body for a subtle premium base */}
-          {LOGO_PATHS.map((item, index) => (
-            <g key={`base-${index}`} transform={item.transform} opacity="0.12">
-              <path d={item.d} fill={tone === "white" ? "#FFFFFF" : item.fill} />
-            </g>
-          ))}
-          {/* Soft glow behind the stroke */}
-          <g opacity="0.22" style={{ filter: "blur(7px)" }}>
-            {LOGO_PATHS.map((item, index) => (
-              <g key={`glow-${index}`} transform={item.transform}>
-                <path
-                  d={item.d}
-                  fill="none"
-                  stroke={tone === "white" ? "#FFFFFF" : "#3838EC"}
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </g>
-            ))}
-          </g>
-          {/* Draw-on loop */}
-          {renderPaths(!reducedMotion)}
-        </svg>
+      <div className={pulseClass} style={{ width: markSize, height: markSize }}>
+        {svg}
       </div>
-      {label ? (
+      {/* Full-screen loaders are mark-only (uniform, minimal); the label
+          still reaches screen readers via aria-label. */}
+      {label && !isFull ? (
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400 font-figtree">
           {label}
         </p>
       ) : (
         <span className="sr-only">Loading</span>
       )}
-      <style>{`
-        @keyframes brandLoaderPulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.05); opacity: 0.94; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .animate-\\[brandLoaderPulse_2\\.2s_ease-in-out_infinite\\] {
-            animation: none;
-          }
-        }
-      `}</style>
     </div>
   );
 
   if (isFull) {
+    // In-flow placeholder keeps the page height (no footer jump while
+    // loading); the mark itself is portaled to <body> as a fixed overlay so
+    // it is always at the exact viewport centre, even inside transformed /
+    // animated ancestors (which would otherwise re-anchor position:fixed).
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-[#F7F8FA] dark:bg-[#131313]">
-        {mark}
-      </div>
+      <>
+        <div
+          className={`min-h-[70vh] w-full ${className}`}
+          aria-hidden="true"
+        />
+        {isPrimaryScreen && typeof document !== "undefined"
+          ? createPortal(
+              <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center">
+                {mark}
+              </div>,
+              document.body,
+            )
+          : null}
+      </>
     );
   }
 

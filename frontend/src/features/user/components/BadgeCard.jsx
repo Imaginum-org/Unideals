@@ -178,7 +178,7 @@ export default function BadgeCard({
 
             <button
               onClick={() => setShowModal(false)}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors"
+              className="w-full py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors"
             >
               Close
             </button>

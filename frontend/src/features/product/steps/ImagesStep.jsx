@@ -260,7 +260,7 @@ const ImagesStep = () => {
   };
 
   return (
-    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8">
+    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none dark:max-sm:bg-transparent">
       {/* Header */}
       <div>
         <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
@@ -627,7 +627,7 @@ const ImagesStep = () => {
       </div>
 
       {/* Footer */}
-      <div className="mt-10 flex items-center justify-between">
+      <div className="mt-10 flex items-center justify-between max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-50 max-sm:mt-0 max-sm:border-t max-sm:border-neutral-200/80 max-sm:bg-white/95 max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:backdrop-blur-xl dark:max-sm:border-neutral-800 dark:max-sm:bg-[#16181B]/95">
         {/* Pagination */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-[#9CA3AF]">Step 2 of 4</span>
@@ -648,7 +648,7 @@ const ImagesStep = () => {
           {/* Continue */}
           <button
             onClick={() => validateAndProceed(validateImages, nextStep)}
-            className="h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-xl flex justify-center items-center gap-2 font-semibold transition-all duration-200 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
+            className="h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-lg flex justify-center items-center gap-2 font-semibold transition-all duration-200 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
           >
             <span>Continue</span>
             <IoArrowForward className="size-5" />

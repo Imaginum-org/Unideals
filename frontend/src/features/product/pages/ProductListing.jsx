@@ -32,7 +32,7 @@ const EditModeInitializer = ({ productId, onReady }) => {
 
     (async () => {
       try {
-        const res = await getProductById(productId);
+        const res = await getProductById(productId, {}, { fresh: true });
         const product =
           res.data?.data || res.data?.product || res.data;
         if (cancelled) return;
@@ -70,8 +70,8 @@ const EditModeInitializer = ({ productId, onReady }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-[#131313]">
-        <BrandLoader size="lg" label="Loading product…" />
+      <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#FAFAFA] dark:bg-[#131313]">
+        <BrandLoader size="full" label="Loading product…" />
       </div>
     );
   }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { refreshChatUnread } from "../../../services/chatUnread.js";
 import { Ban, ChevronDown, ChevronLeft, Crown, Flag, Lock, Reply, Search, Send, ShieldAlert, Timer, WifiOff, X } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 import axios from "../../../services/axiosInstance";
@@ -15,6 +16,7 @@ import { chatSettingsOf, wallpaperById } from "../utils/wallpapers.js";
 import { formatName } from "../utils/display.js";
 import Profile_left_part from "../../user/components/Profile_left_part.jsx";
 import * as chatApi from "../services/chatApi.js";
+import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 
 const QUICK_CHIPS = [
   "Yes",
@@ -340,19 +342,55 @@ const ChatPanel = ({ embedded = false }) => {
     loadList();
   }, [loadList]);
 
-  // Poll list every 12s for new chats / unread (socket also pushes).
-  // Skipped while the tab is hidden, sockets + focus refetch cover it.
+  // Poll the list as a safety net only. While the socket is live it already
+  // pushes new chats / unread, so polling backs off 12s → 60s (5x fewer
+  // conversation-list DB queries per open chat tab). Hidden tabs never poll.
   useEffect(() => {
     const t = setInterval(() => {
       if (!document.hidden) loadList(true);
-    }, 12000);
+    }, socketLive ? 60000 : 12000);
     const onFocus = () => loadList(true);
     window.addEventListener("focus", onFocus);
     return () => {
       clearInterval(t);
       window.removeEventListener("focus", onFocus);
     };
-  }, [loadList]);
+  }, [loadList, socketLive]);
+
+  // Mobile: an open thread goes full-screen (global header + tab bar step
+  // aside via html[data-chat-thread], see index.css).
+  useEffect(() => {
+    if (embedded === false) return undefined;
+    const root = document.documentElement;
+    if (selectedId) root.setAttribute("data-chat-thread", "");
+    else root.removeAttribute("data-chat-thread");
+    return () => root.removeAttribute("data-chat-thread");
+  }, [selectedId, embedded]);
+
+  // Opening a thread marks it read server-side → refresh the shared header
+  // badge once (debounced) instead of waiting for its next poll.
+  useEffect(() => {
+    if (!selectedId) return undefined;
+    const t = setTimeout(() => refreshChatUnread({ force: true }), 1200);
+    return () => clearTimeout(t);
+  }, [selectedId]);
+
+  // Socket came back after a drop → catch up immediately (anything missed
+  // while offline), instead of waiting for the next slow poll tick.
+  const wasLiveRef = useRef(true);
+  useEffect(() => {
+    if (socketLive && !wasLiveRef.current) {
+      loadList(true);
+      if (selectedId) {
+        chatApi
+          .fetchMessages(selectedId, { limit: 50 })
+          .then((m) => setMessages((prev) => mergeThreadMessages(prev, m.messages)))
+          .catch(() => {});
+      }
+    }
+    wasLiveRef.current = socketLive;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketLive]);
 
   // ---- deep link ?conversation=... (from orders) or ?product=... ----
   useEffect(() => {
@@ -471,7 +509,9 @@ const ChatPanel = ({ embedded = false }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, me]);
 
-  // Poll active thread every 5s (covers socket gaps / offline).
+  // Poll the active thread: every 5s only when the socket is down (covers
+  // gaps / offline); 30s while live, since messages, ticks and deal changes
+  // arrive over the socket. Was 2 requests every 5s per open chat.
   useEffect(() => {
     if (!selectedId) return undefined;
     const t = setInterval(async () => {
@@ -486,9 +526,9 @@ const ChatPanel = ({ embedded = false }) => {
       } catch {
         // ignore
       }
-    }, 5000);
+    }, socketLive ? 30000 : 5000);
     return () => clearInterval(t);
-  }, [selectedId]);
+  }, [selectedId, socketLive]);
 
   // Smart auto-scroll: follow live chat at the bottom, never yank history.
   const prevLenRef = useRef(0);
@@ -1010,7 +1050,11 @@ const ChatPanel = ({ embedded = false }) => {
             selectedId ? "hidden lg:flex" : "flex"
           } w-full lg:flex-[0_0_33%] lg:min-w-[300px] lg:max-w-[440px] flex-col min-h-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313]`}
         >
-          <div className="p-4 space-y-3">
+          <div className="space-y-3 px-4 pb-3 pt-4">
+            {/* App-style large title (phones/tablets; desktop has the sidebar) */}
+            <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-zinc-900 lg:hidden dark:text-white">
+              Chats
+            </h1>
             <div className="flex items-center bg-[#F1F3F6] dark:bg-[#1A1D20] rounded-lg px-3 py-1">
               <Search className="text-zinc-400 w-4 h-4 shrink-0" />
               <input
@@ -1026,7 +1070,7 @@ const ChatPanel = ({ embedded = false }) => {
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className={`px-3.5 py-1.5 rounded-full text-[13px] capitalize transition-all ${
+                  className={`px-3.5 py-1.5 rounded-lg text-[13px] capitalize transition-all ${
                     tab === t
                       ? "bg-[#3838EC] text-white font-semibold shadow-sm"
                       : "bg-zinc-100 dark:bg-[#1A1D20] font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200"
@@ -1037,9 +1081,9 @@ const ChatPanel = ({ embedded = false }) => {
               ))}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-4" ref={listRef}>
+          <div className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-2 pb-4 sm:px-3" ref={listRef}>
             {listLoading ? (
-              <p className="px-4 py-8 text-center text-xs text-zinc-400">Loading chats…</p>
+              <BrandLoader size="full" />
             ) : conversations.length === 0 ? (
               <div className="px-4 py-8 text-center">
                 <p className="text-sm font-semibold text-zinc-900 dark:text-white">No conversations yet</p>
@@ -1108,12 +1152,12 @@ const ChatPanel = ({ embedded = false }) => {
               )}
 
               {/* Product header card */}
-              <div className="mx-3 sm:mx-6 lg:mx-12 xl:mx-20 mt-3 rounded-lg border border-zinc-200 bg-white dark:bg-[#1c1c1c] dark:border-zinc-800 px-3 py-2 min-h-[60px] flex items-center justify-between gap-3">
+              <div className="mx-3 sm:mx-6 lg:mx-12 xl:mx-20 mt-3 rounded-lg border border-zinc-200 bg-white dark:bg-[#1c1c1c] dark:border-zinc-800 px-3 py-2 min-h-[60px] flex items-center justify-between gap-3 max-lg:mx-0 max-lg:mt-0 max-lg:rounded-none max-lg:border-x-0 max-lg:border-t-0 max-lg:pl-1.5 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))]">
                 <div className="flex items-center gap-3 min-w-0">
                   <button
                     onClick={() => setSelectedId(null)}
                     aria-label="Back to conversations"
-                    className="lg:hidden p-1 hover:bg-zinc-100 rounded-full"
+                    className="lg:hidden grid h-10 w-9 shrink-0 place-items-center rounded-full active:bg-zinc-100 dark:active:bg-white/10"
                   >
                     <ChevronLeft className="w-6 h-6 text-[#394ff1]" />
                   </button>
@@ -1137,13 +1181,14 @@ const ChatPanel = ({ embedded = false }) => {
                         </span>
                       )}
                     </p>
-                    <p className="text-[10px] text-zinc-400 leading-tight">
-                      {agreedPrice != null ? "Agreed price" : "Asking price"}
-                      {peerOnline ? (
-                        <span className="font-normal text-[13px] text-[#319F43]">
-                          {" "}online
-                        </span>
-                      ) : null}
+                    <p className="flex min-w-0 items-center gap-1 text-[11px] leading-tight text-zinc-500 dark:text-zinc-400">
+                      {peerOnline && (
+                        <span className="size-1.5 shrink-0 rounded-full bg-[#22c55e]" aria-hidden="true" />
+                      )}
+                      <span className="truncate">
+                        {otherName}
+                        {peerOnline ? " · online" : ` · ${agreedPrice != null ? "agreed price" : "asking price"}`}
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -1373,7 +1418,7 @@ const ChatPanel = ({ embedded = false }) => {
               )}
 
               {/* Floating bottom bar: quick chips + input in one blurred card */}
-              <div className="mx-3 sm:mx-6 lg:mx-12 xl:mx-20 mb-[max(0.75rem,env(safe-area-inset-bottom))] rounded-2xl bg-white/90 dark:bg-[#1c1c1c]/90 backdrop-blur-md border border-white/70 dark:border-zinc-700/60 shadow-[0_14px_44px_-12px_rgba(56,56,236,0.35)]">
+              <div className="mx-3 sm:mx-6 lg:mx-12 xl:mx-20 mb-[max(0.75rem,env(safe-area-inset-bottom))] rounded-2xl bg-white/90 dark:bg-[#1c1c1c]/90 backdrop-blur-md border border-white/70 dark:border-zinc-700/60 shadow-[0_14px_44px_-12px_rgba(56,56,236,0.35)] max-lg:mx-0 max-lg:mb-0 max-lg:rounded-none max-lg:border-x-0 max-lg:border-b-0 max-lg:border-t-zinc-200 max-lg:bg-white/95 max-lg:pb-[env(safe-area-inset-bottom)] max-lg:shadow-none dark:max-lg:border-t-zinc-800 dark:max-lg:bg-[#16181B]/95">
               {coolingDown && (
                 <div className="mx-3 mt-2.5 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 px-3 py-2">
                   <Timer size={14} className="text-red-500 shrink-0" />
@@ -1611,7 +1656,7 @@ const ChatPanel = ({ embedded = false }) => {
 const Chat = () => {
   return (
     <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD]">
-      <div className="flex h-[calc(100vh-70px)] h-[calc(100dvh-70px)]">
+      <div className="flex h-[calc(100vh-var(--header-h)-var(--tabbar-h))] h-[calc(100dvh-var(--header-h)-var(--tabbar-h))]">
         {/* LEFT: profile menu */}
         <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
           <Profile_left_part />

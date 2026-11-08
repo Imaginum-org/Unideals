@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { FaStar, FaHeart, FaRegHeart, FaCrown } from "react-icons/fa";
 import { useWishlist } from "../../../context/WishlistContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
-import { ikCard } from "../../../utils/imageTransform.js";
+import { ikCard, ikCardSrcSet } from "../../../utils/imageTransform.js";
 import LimitModal from "../../../components/ui/LimitModal.jsx";
 import { toast } from "../../../components/ui/toast.js";
 import { IoLocationOutline } from "react-icons/io5";
@@ -187,6 +187,9 @@ const ProductCard = memo(
         return firstImage?.url ? ikCard(firstImage.url) : FALLBACK_IMAGE;
       }, [images]);
 
+      const rawImage = typeof images?.[0] === "string" ? images[0] : images?.[0]?.url;
+      const imageSrcSet = useMemo(() => ikCardSrcSet(rawImage), [rawImage]);
+
       const savings = useMemo(
         () =>
           original_price && original_price > selling_price
@@ -194,6 +197,12 @@ const ProductCard = memo(
             : 0,
         [original_price, selling_price],
       );
+
+      // Whole-number discount for the image badge ("53% off").
+      const discountPct =
+        savings > 0 && original_price > 0
+          ? Math.round((savings / original_price) * 100)
+          : 0;
 
       const formattedPrice = useMemo(
         () => ({
@@ -273,6 +282,7 @@ const ProductCard = memo(
 
       const handleImageError = useCallback((e) => {
         e.currentTarget.onerror = null;
+        e.currentTarget.removeAttribute("srcset");
         e.currentTarget.src = FALLBACK_IMAGE;
       }, []);
 
@@ -309,7 +319,8 @@ ${tierStyles.cardShadow}
 `}
         >
           {/* PADDED WRAPPER FOR EVERYTHING AS PER DESIGN */}
-          <div className="p-3 flex flex-col h-full">
+          {/* Inset layout: 8px frame around the image, content on a 4/8/12 rhythm */}
+          <div className="flex h-full flex-col p-2">
             {/* BOOSTED TOP BAR — rocket + live countdown. Rendered only
                 where showBoostBar is set (Limited Time Deals rail); the
                 trending feed marks boosted cards with the subtle border
@@ -318,7 +329,7 @@ ${tierStyles.cardShadow}
                 Scales down on small cards: emoji + "Ends" prefix join at
                 larger widths so the row never overflows a narrow card. */}
             {isBoosted && showBoostBar && (
-              <div className="mb-2 flex min-w-0 items-center justify-between gap-1 sm:gap-2">
+              <div className="mb-2 flex min-w-0 items-center justify-between gap-1 px-1.5 pt-1 sm:gap-2">
                 <span
                   className={`inline-flex min-w-0 items-center gap-1 text-[11px] font-extrabold sm:text-[13px] ${boostAccentStyles.label}`}
                 >
@@ -345,8 +356,9 @@ ${tierStyles.cardShadow}
               <img
                 loading="lazy"
                 decoding="async"
-                // fetchPriority="low"
                 src={imageUrl}
+                srcSet={imageSrcSet}
+                sizes="(min-width: 1024px) 320px, (min-width: 768px) 33vw, 50vw"
                 alt={title}
                 onError={handleImageError}
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-500
@@ -389,11 +401,9 @@ group-hover:pointer-events-auto
                   className="
       rounded-lg
       bg-[#3838EC]
-              px-3 sm:px-5
-      py-2.5
-              text-[11px] sm:text-xs
-      xl:text-base
-      2xl:text-sm
+              px-3.5 sm:px-4
+      py-2
+              text-xs sm:text-[13px]
       font-semibold
       text-white
       shadow-lg
@@ -406,7 +416,7 @@ group-hover:pointer-events-auto
       active:scale-95
     "
                 >
-                  <MdOutlineChatBubbleOutline size={18} />
+                  <MdOutlineChatBubbleOutline size={16} />
                   <span>Chat Now</span>
                 </button>
               </div>
@@ -420,8 +430,8 @@ group-hover:pointer-events-auto
               <div
                 className="
 absolute
-top-3
-right-3
+top-2.5
+right-2.5
 z-20
 
 translate-x-0
@@ -453,8 +463,8 @@ md:group-hover:pointer-events-auto
                   }
                   className="
       flex
-      h-10
-      w-10
+      h-9
+      w-9
       items-center
       justify-center
 
@@ -473,19 +483,19 @@ md:group-hover:pointer-events-auto
     "
                 >
                   {inWishlist ? (
-                    <FaHeart className="text-[#ef4444] text-lg" />
+                    <FaHeart className="text-[#ef4444] text-base" />
                   ) : (
-                    <FaRegHeart className="text-zinc-500 text-lg" />
+                    <FaRegHeart className="text-zinc-500 text-base" />
                   )}
                 </button>
               </div>
             </div>
 
             {/* CONTENT SECTION */}
-            <div className="mt-3 flex flex-col flex-grow">
-              {/* CATEGORY (Plain text style matching image) */}
-              <div className="flex items-center gap-2">
-                <div className="text-[13px] md:text-base font-semibold text-[#3838EC] dark:text-[#5C6DFF] capitalize">
+            <div className="pc-content flex flex-grow flex-col px-1.5 pb-1 pt-3">
+              {/* CATEGORY — quiet eyebrow label (title + price lead) */}
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="truncate text-[11.5px] md:text-xs font-semibold tracking-[0.01em] text-[var(--accent-text)] capitalize">
                   {formattedCategory}
                 </div>
                 {/* Girls Corner 🌸 text badge (never color-only, a11y) */}
@@ -497,33 +507,40 @@ md:group-hover:pointer-events-auto
               </div>
 
               {/* TITLE */}
-              <h3 className="mt-2 text-[16px] md:text-lg font-bold text-[#2D3339] dark:text-white min-h-[32px]  line-clamp-2">
+              {/* Fixed 2-line height so cards in a row always align */}
+              <h3 className="mt-1 min-h-[2.7em] text-[14px] md:text-[15px] font-semibold leading-[1.35] tracking-[-0.005em] text-slate-900 dark:text-white line-clamp-2">
                 {title}
               </h3>
 
-              {/* PRICE & DISCOUNT */}
-              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                <span className="text-[19px] md:text-lg xl:text-xl font-bold text-[#2A2A2A] dark:text-white whitespace-nowrap">
+              {/* PRICE & DISCOUNT — price · MRP · % off on one line. On narrow
+                  cards the struck MRP truncates first; price and discount
+                  never wrap or clip. */}
+              <div className="mt-2 flex min-w-0 items-baseline gap-1.5">
+                <span className="shrink-0 whitespace-nowrap text-[17px] font-bold tabular-nums tracking-tight text-slate-950 md:text-lg dark:text-white">
                   ₹{formattedPrice.selling}
                 </span>
-
                 {savings > 0 && (
                   <>
-                    <span className="text-[13px] md:text-[15px] font-medium text-[#ACACAC] line-through whitespace-nowrap">
+                    <span className={`${String(formattedPrice.selling).length > 5 ? "pc-mrp pc-mrp-long" : "pc-mrp"} min-w-0 truncate text-[12px] font-medium tabular-nums text-slate-400 line-through decoration-slate-300 md:text-[13px] dark:text-zinc-500 dark:decoration-zinc-600`}>
                       ₹{formattedPrice.original}
                     </span>
-                    <div className="bg-[#008000] text-white text-[11px] md:text-[12px] font-medium px-2 py-0.5 md:py-1 rounded-md whitespace-nowrap">
-                      Save ₹{formattedPrice.savings}
-                    </div>
+                    {discountPct > 0 && (
+                      <span
+                        title={`You save ₹${formattedPrice.savings}`}
+                        className="shrink-0 whitespace-nowrap text-[12px] font-semibold tabular-nums text-emerald-600 md:text-[13px] dark:text-emerald-400"
+                      >
+                        {discountPct}% off
+                      </span>
+                    )}
                   </>
                 )}
               </div>
 
-              {/* DIVIDER */}
-              <div className="mt-3 mb-2 h-px bg-[#EEF1F5] dark:bg-zinc-800" />
+
 
               {/* FOOTER (Avatar, Rating & Location) */}
-              <div className="flex items-center gap-1.5 mt-auto min-w-0">
+              <div className="mt-auto pt-3">
+              <div className="flex min-w-0 items-center gap-2 border-t border-[#EEF1F5] pt-2.5 dark:border-zinc-800">
                 {/* Left Side: Avatar & Name */}
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <AvatarComponent
@@ -533,17 +550,19 @@ md:group-hover:pointer-events-auto
                     plan={sellerPlan}
                     role={sellerInfo?.role}
                     showBadge
-                    className="shrink-0 h-6 w-6 md:h-7 md:w-7"
+                    className="shrink-0 h-6 w-6"
                   />
-                  <span className="capitalize text-[13px] md:text-[14px] font-medium text-zinc-500 dark:text-zinc-400 line-clamp-1 min-w-0 max-w-[56px] sm:max-w-[80px]">
+                  {/* Fills the free space and ends with "…" (a hard max-width used to
+                      clip long names mid-letter, e.g. "Priyadarshin"). */}
+                  <span className="min-w-0 truncate capitalize text-[12px] md:text-[13px] font-medium text-slate-500 dark:text-zinc-400 md:max-w-[120px]">
                     {sellerName}
                   </span>
 
                   {/* Rating Badge (real data only) */}
                   {sellerRating !== null && (
                     <div className="flex shrink-0 items-center gap-1 border border-[#E1E1E1] dark:border-zinc-700 rounded-full px-1.5 sm:px-2 py-1 ml-0.5 sm:ml-1">
-                      <FaStar className="text-yellow-400 text-[13px]" />
-                      <span className="text-[13px] font-medium text-zinc-400">
+                      <FaStar className="text-yellow-400 text-[11px]" />
+                      <span className="text-[11.5px] font-semibold tabular-nums text-slate-500 dark:text-zinc-400">
                         {sellerRating}
                       </span>
                     </div>
@@ -552,13 +571,14 @@ md:group-hover:pointer-events-auto
 
                 {/* Right Side: Location */}
                 {formattedLocation && (
-                  <div className="flex items-center justify-center gap-1 text-[#A2ACB8] shrink-0">
-                    <IoLocationOutline size={16} className="text-[#4A5565] md:h-[18px] md:w-[18px]" />
-                    <span className="hidden md:block text-[12px] md:text-[14px] font-medium truncate max-w-[110px]">
+                  <div className="flex items-center justify-center gap-1 text-slate-400 shrink-0 dark:text-zinc-500">
+                    <IoLocationOutline size={14} className="text-slate-400 dark:text-zinc-500" />
+                    <span className="hidden md:block text-[12px] font-medium truncate max-w-[110px]">
                       {formattedLocation}
                     </span>
                   </div>
                 )}
+              </div>
               </div>
             </div>
           </div>

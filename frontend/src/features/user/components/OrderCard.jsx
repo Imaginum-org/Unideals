@@ -235,7 +235,7 @@ const OrderCard = ({
         plan: addon.id,
         productId: orderId,
       });
-      const { orderId: rzpOrderId, amount, currency } = orderRes.data?.data || {};
+      const { orderId: rzpOrderId, amount, currency, keyId } = orderRes.data?.data || {};
       if (!rzpOrderId) throw new Error("Unable to initiate payment");
 
       const paymentRes = await openCheckout({
@@ -243,6 +243,8 @@ const OrderCard = ({
         amount,
         currency,
         planName: `${addon.label} Boost`,
+        description: `${addon.label} Listing Boost`,
+        keyId,
       });
 
       const verifyRes = await verifyPayment({
@@ -259,7 +261,7 @@ const OrderCard = ({
         let updated = verifyRes.data?.data?.product;
         if (!updated?._id) {
           try {
-            const fresh = await getProductById(orderId);
+            const fresh = await getProductById(orderId, {}, { fresh: true });
             updated = fresh.data?.data || fresh.data?.product;
           } catch {
             updated = null;

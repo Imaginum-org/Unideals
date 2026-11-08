@@ -37,8 +37,14 @@ export const getAuditLogs = async (query = {}) => {
 
   const match = {};
 
-  if (query.action && query.action.trim()) {
-    match.action = { $regex: query.action.trim(), $options: "i" };
+  // Escape the filter: raw user input was used as a regex (ReDoS /
+  // pattern injection), and a non-string (?action=a&action=b) crashed .trim().
+  if (typeof query.action === "string" && query.action.trim()) {
+    const safe = query.action
+      .trim()
+      .slice(0, 100)
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    match.action = { $regex: safe, $options: "i" };
   }
 
   if (query.target_type) {

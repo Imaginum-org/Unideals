@@ -21,9 +21,12 @@ import {
 import { useUser } from "../../../context/useUserContext.jsx";
 import {
   createPaymentOrder,
+  getPlanPricing,
   verifyPayment,
 } from "../../payment/api/paymentApi.js";
+import AnimatedOfferPrice from "../../payment/components/AnimatedOfferPrice.jsx";
 import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 const PLAN_TIER = {
   free: "base_user",
@@ -41,6 +44,29 @@ const PricingModel = () => {
   const { openCheckout } = useRazorpayCheckout();
   const payingRef = useRef(false);
   const [payingPlan, setPayingPlan] = useState(null);
+
+  // Viewer-specific display prices from the server (Girls Founder offer for
+  // eligible accounts). Falls back to list prices if the call fails; the
+  // real charge is always computed server-side when the order is created.
+  const [pricing, setPricing] = useState(null);
+  useEffect(() => {
+    let active = true;
+    getPlanPricing()
+      .then((res) => {
+        if (active) setPricing(res.data?.data || null);
+      })
+      .catch(() => {
+        if (active) setPricing(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isLoggedIn, userDetails?._id, userDetails?.gender]);
+  const proPrice = pricing?.plans?.pro || { amount: 99, baseAmount: 99 };
+  const proPlusPrice = pricing?.plans?.pro_plus || { amount: 199, baseAmount: 199 };
+  const hasGirlsOffer = pricing?.offer === "girls_founder";
+  // ~₹20 per canteen chai.
+  const chais = (amount) => Math.max(1, Math.round(amount / 20));
 
   const rawTier = userDetails?.subscription || "base_user";
   const currentTier = TIER_RANK[rawTier] === undefined ? "base_user" : rawTier;
@@ -64,7 +90,7 @@ const PricingModel = () => {
     setPayingPlan(planId);
     try {
       const orderRes = await createPaymentOrder({ plan: PLAN_TIER[planId] });
-      const { orderId, amount, currency } = orderRes.data?.data || {};
+      const { orderId, amount, currency, keyId } = orderRes.data?.data || {};
       if (!orderId) throw new Error("Unable to initiate payment");
 
       const planName = planId === "pro" ? "Pro" : "Pro Plus";
@@ -73,6 +99,7 @@ const PricingModel = () => {
         amount,
         currency,
         planName,
+        keyId,
         prefill: {
           name: userDetails?.name,
           email: userDetails?.email,
@@ -139,7 +166,7 @@ const PricingModel = () => {
       name: "Free",
       price: "0",
       footerTitle: "Start for free",
-      footerSubtitle: "It's all yours",
+      footerSubtitle: "Lowkey all you need to start",
       features: [
         "10 Active Listings",
         "25 Wishlist Saves",
@@ -151,11 +178,12 @@ const PricingModel = () => {
     {
       id: "pro",
       name: "Pro",
-      price: "99",
-      priceNote: "About 5 canteen chais, paid just once.",
+      price: proPrice.amount,
+      baseAmount: proPrice.baseAmount,
+      priceNote: `About ${chais(proPrice.amount)} canteen chais, paid just once.`,
       highlighted: true,
-      footerTitle: "Best for active seller",
-      footerSubtitle: "Time to become leader",
+      footerTitle: "For the hostel hustlers",
+      footerSubtitle: "Main character energy",
       features: [
         "25 Active Listings",
         "100 Wishlist Saves",
@@ -167,10 +195,11 @@ const PricingModel = () => {
     {
       id: "pro-plus",
       name: "Pro Plus",
-      price: "199",
-      priceNote: "About 10 canteen chais, once ever.",
-      footerTitle: "For Serious sellers",
-      footerSubtitle: "No one's above you",
+      price: proPlusPrice.amount,
+      baseAmount: proPlusPrice.baseAmount,
+      priceNote: `About ${chais(proPlusPrice.amount)} canteen chais, once ever.`,
+      footerTitle: "For the campus kingpins",
+      footerSubtitle: "Literally no one's above you",
       features: [
         "Unlimited Active Listings",
         "Unlimited Wishlist",
@@ -227,7 +256,7 @@ const PricingModel = () => {
       free: "-",
       pro: "Limited",
       proPlus: "Full",
-      blurb: "Try new Unideals drops before everyone else. Pro gets a peek, Pro Plus gets it all.",
+      blurb: "Try new Unideals drops before everyone else. Right now: Smart price suggestions (Pro and Pro Plus) and the Demand meter (Pro Plus).",
     },
     {
       feature: "Customer Support",
@@ -317,12 +346,11 @@ const PricingModel = () => {
           </span>
 
           <h1 className="mx-auto mt-5 max-w-4xl text-2xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-3xl font-figtree">
-            Choose Your Plan to{" "}
-            <span className="text-[#3300ff]">Sell Smarter</span>
+            Pick your plan. <span className="text-[#3300ff]">Sell smarter</span>, not harder.
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-base font-medium text-slate-500 dark:text-[#848484] sm:text-lg font-figtree">
-            Made for campus budgets. Start free, go Pro for a few canteen chais.
+            Made for hostel-life budgets. Start free, go Pro for a few canteen chais. No cap.
           </p>
         </div>
 
@@ -344,8 +372,8 @@ const PricingModel = () => {
             </div>
             <ul className="w-full max-w-sm space-y-2.5">
               {[
-                "One-time payment, lifetime benefits",
-                "Free plan stays free forever",
+                "Pay once, flex it all four years",
+                "Free stays free. Forever. No cap.",
                 "Got placed? Come back and buy us a chai",
               ].map((line) => (
                 <li
@@ -359,6 +387,20 @@ const PricingModel = () => {
             </ul>
           </div>
         </div>
+
+        {/* Girls Founder offer ribbon (eligible accounts only) */}
+        {hasGirlsOffer && (
+          <div className="mx-auto mt-8 flex max-w-6xl items-center justify-center">
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full border border-pink-200 bg-gradient-to-r from-[#FFF1F7] to-[#FDE7F3] px-5 py-2.5 text-center text-sm font-semibold text-[#9D174D] shadow-[0_10px_30px_-14px_rgba(219,39,119,0.55)] dark:border-pink-900/60 dark:from-pink-950/40 dark:to-pink-950/20 dark:text-pink-200 font-figtree">
+              <span aria-hidden="true">🌸</span>
+              <span>Girls Founder offer unlocked, bestie:</span>
+              <span className="text-[#DB2777] dark:text-pink-300">
+                Pro ₹{proPrice.amount} · Pro Plus ₹{proPlusPrice.amount}
+              </span>
+              <span className="font-medium text-[#9D174D]/70 dark:text-pink-200/70">lifetime, one-time</span>
+            </div>
+          </div>
+        )}
 
         {/* Pricing cards */}
         <div className="mx-auto mt-16 grid max-w-6xl justify-items-center gap-6 md:grid-cols-1 lg:grid-cols-3 lg:items-stretch">
@@ -405,12 +447,22 @@ const PricingModel = () => {
                 </h2>
 
                 <div className="mt-3 flex flex-wrap items-end gap-2">
-                  <span className="text-3xl font-extrabold tracking-normal text-slate-950 dark:text-white font-figtree">
-                    ₹{plan.price}
-                  </span>
-                  <span className="pb-1 text-xs font-medium text-slate-500 dark:text-[#D7D7D7] font-figtree">
-                    {plan.id === "free" ? "free forever" : "one-time"}
-                  </span>
+                  {plan.baseAmount > plan.price ? (
+                    <AnimatedOfferPrice
+                      amount={plan.price}
+                      baseAmount={plan.baseAmount}
+                      suffix="one-time"
+                    />
+                  ) : (
+                    <>
+                      <span className="text-3xl font-extrabold tracking-normal text-slate-950 dark:text-white font-figtree">
+                        ₹{plan.price}
+                      </span>
+                      <span className="pb-1 text-xs font-medium text-slate-500 dark:text-[#D7D7D7] font-figtree">
+                        {plan.id === "free" ? "free forever" : "one-time"}
+                      </span>
+                    </>
+                  )}
                 </div>
                 {plan.priceNote && (
                   <p className="mt-1.5 text-[11px] font-semibold text-slate-400 dark:text-[#848484] font-figtree">
@@ -449,7 +501,7 @@ const PricingModel = () => {
                           : "text-white shadow-lg hover:opacity-90"
                       }`}
                     >
-                      {isPaying ? "Processing..." : state.text}
+                      <ButtonLoader loading={isPaying} loadingText="Processing…">{state.text}</ButtonLoader>
                     </button>
                   );
                 })()}
@@ -497,7 +549,7 @@ const PricingModel = () => {
               Detailed Comparison
             </h2>
             <p className="mt-4 text-base font-medium text-slate-500 dark:text-[#848484] font-figtree">
-              Start free forever. Pro is one payment, nothing extra after that. Got placed? Then come support us.
+              Start free forever. Pro is one payment, nothing extra after that. Got placed? Then come support us, bestie.
             </p>
           </div>
 
@@ -605,12 +657,12 @@ const PricingModel = () => {
             {/* One-time add-ons (part of the plan doc, all users) */}
             <div className="mx-auto mt-10 max-w-3xl">
               <p className="text-center text-[15px] font-bold text-slate-900 dark:text-white font-figtree">
-                Only need a single push?
+                Just need one quick boost?
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {[
                   { days: "3-Day Boost", price: "₹29", blurb: "Quick push for the weekend rush." },
-                  { days: "7-Day Boost", price: "₹49", blurb: "Stay on top for the whole week." },
+                  { days: "7-Day Boost", price: "₹49", blurb: "Top of the feed all week. Big W." },
                 ].map((a) => (
                   <div
                     key={a.days}

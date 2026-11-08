@@ -2,6 +2,7 @@ import React from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer";
+import MobileTabBar, { shouldShowTabBar } from "../components/layout/MobileTabBar.jsx";
 import CampusGate from "../features/campus/components/CampusGate.jsx";
 import GenderGate from "../features/user/components/GenderGate.jsx";
 import { useCampus } from "../context/CampusContext.jsx";
@@ -42,7 +43,7 @@ const MainLayout = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-[100dvh] flex-col">
       <Header />
 
       <main className="flex-1">
@@ -50,6 +51,13 @@ const MainLayout = () => {
       </main>
 
       {shouldShowFooter && <Footer />}
+
+      {/* Phones: app-style bottom tabs. The spacer keeps the last content
+          (and the footer) clear of the fixed bar + home-indicator inset. */}
+      {shouldShowTabBar(location.pathname) && !location.pathname.startsWith("/chat") && (
+        <div aria-hidden="true" className="tabbar-spacer h-[var(--tabbar-h)] shrink-0 sm:hidden" />
+      )}
+      <MobileTabBar />
     </div>
   );
 };

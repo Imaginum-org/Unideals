@@ -7,7 +7,7 @@ const EditButton = React.forwardRef(({ isEditing, ...props }, ref) => {
     <button
       ref={ref}
       {...props}
-      className="relative flex items-center bg-[#EBEDFF] w-[78px] h-[31px] xl:w-[82px] xl:h-[35px] rounded-full px-2 overflow-hidden transition-all duration-300"
+      className="relative flex items-center bg-[#EBEDFF] w-[78px] h-[31px] xl:w-[82px] xl:h-[35px] rounded-lg px-2 overflow-hidden transition-all duration-300"
     >
       <motion.span
         initial={false}

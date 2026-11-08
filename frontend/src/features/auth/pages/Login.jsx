@@ -10,6 +10,7 @@ import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import SignInwithGoogle from "../components/signinWithGoogle";
 import { useUser } from "../../../context/useUserContext.jsx";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -104,6 +105,33 @@ function Login() {
     };
 
     const params = new URLSearchParams(location.search);
+
+    // Google callback failures now redirect here with a short code instead
+    // of showing the user a raw JSON error page from the API.
+    const oauthError = params.get("oauth_error");
+    if (oauthError) {
+      const OAUTH_ERROR_TEXT = {
+        account_suspended: "Your account is suspended. Please contact support.",
+        account_inactive: "Your account is inactive. Please contact support.",
+        session_mismatch: "Google sign-in expired. Please try again.",
+      };
+      setFormMessage({
+        variant: "error",
+        text:
+          OAUTH_ERROR_TEXT[oauthError] ||
+          "Google sign-in failed. Please try again.",
+      });
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("oauth_error");
+        window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+      } catch {
+        // ignore
+      }
+      return () => {
+        isActive = false;
+      };
+    }
 
     const oauthCode = params.get("oauth_code");
     if (oauthCode) {
@@ -341,9 +369,9 @@ function Login() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-[2.2vh] h-[6.3vh] w-full rounded-xl bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-3 md:h-10 md:rounded-xl md:text-xs lg:mt-3 lg:h-10 lg:text-sm xl:mt-[2.9vh] xl:h-[6.4vh] 2xl:h-[6.4vh 2xl:mt-[2.6vh]"
+                className="mt-[2.2vh] h-[6.3vh] w-full rounded-lg bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-3 md:h-10 md:text-xs lg:mt-3 lg:h-10 lg:text-sm xl:mt-[2.9vh] xl:h-[6.4vh] 2xl:h-[6.4vh 2xl:mt-[2.6vh]"
               >
-                {isSubmitting ? "Signing in..." : "Sign In"}
+                <ButtonLoader loading={isSubmitting} loadingText="Signing in…">Sign In</ButtonLoader>
               </button>
 
               {/* Sign up link */}

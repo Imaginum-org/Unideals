@@ -4,12 +4,12 @@ import { getProducts } from "../api/productApi";
 import { MessageSquare, Eye, ShieldCheck, Clock3, Flag } from "lucide-react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
+import { Breadcrumbs } from "../components/browse/BrowseKit.jsx";
 import ProductGallery from "../../../features/product/components/ProductGallery.jsx";
 import ImageLightbox from "../../../features/product/components/ImageLightbox.jsx";
 import { toast } from "../../../components/ui/toast.js";
 import { LuMessageSquareText } from "react-icons/lu";
 import { useParams, Link } from "react-router-dom";
-import { IoIosArrowForward } from "react-icons/io";
 import { getProductById } from "../api/productApi";
 import { HiOutlineBuildingLibrary } from "react-icons/hi2";
 import { MdLocationPin } from "react-icons/md";
@@ -32,6 +32,8 @@ import { useUser } from "../../../context/useUserContext.jsx";
 import { IoCalendarOutline } from "react-icons/io5";
 import { FaArrowRight } from "react-icons/fa6";
 import { PRODUCT_USAGE_OPTIONS } from "../constants/productOptions.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
+import Select from "../../../components/ui/Select.jsx";
 
 const FALLBACK_IMAGE = "/logo.svg";
 
@@ -194,55 +196,8 @@ const ProductDescription = () => {
     };
   }, [product?.category, product?._id, campusSlug]);
 
-  useEffect(() => {
-    let rafId;
-    let wasVisible = false;
-
-    const check = () => {
-      if (staticCTARef.current && floatingCTARef.current) {
-        const rect = staticCTARef.current.getBoundingClientRect();
-        const isStaticVisible = rect.top < window.innerHeight;
-
-        if (isStaticVisible && !wasVisible) {
-          // Static CTA just came into view — animate floating bar TO that position
-          wasVisible = true;
-          const floating = floatingCTARef.current;
-
-          const targetBottom = window.innerHeight - rect.bottom;
-          const targetLeft = rect.left;
-          const targetRight = window.innerWidth - rect.right;
-
-          // Set destination position directly on DOM (no React re-render)
-          floating.style.bottom = `${targetBottom}px`;
-          floating.style.left = `${targetLeft}px`;
-          floating.style.right = `${targetRight}px`;
-          floating.style.opacity = "0";
-          floating.style.pointerEvents = "none";
-        } else if (!isStaticVisible && wasVisible) {
-          // Scrolled back up — snap floating bar back to bottom instantly (no transition)
-          wasVisible = false;
-          const floating = floatingCTARef.current;
-
-          floating.style.transition = "none";
-          floating.style.bottom = "max(16px, env(safe-area-inset-bottom))";
-          floating.style.left = "16px";
-          floating.style.right = "16px";
-          floating.style.opacity = "1";
-          floating.style.pointerEvents = "auto";
-
-          // Re-enable transition after snap
-          requestAnimationFrame(() => {
-            floating.style.transition =
-              "bottom 450ms cubic-bezier(0.4, 0, 0.2, 1), left 450ms cubic-bezier(0.4, 0, 0.2, 1), right 450ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease";
-          });
-        }
-      }
-      rafId = requestAnimationFrame(check);
-    };
-
-    rafId = requestAnimationFrame(check);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
+  // (Mobile CTA is a docked bottom bar now; the old per-frame rAF loop
+  // that morphed it into the inline CTA was removed.)
 
   const getShareData = () => {
     const base = `${window.location.origin}/product/${product._id}`;
@@ -475,14 +430,14 @@ ${shareUrl}`;
             {!campusSlug && (
               <button
                 onClick={() => window.location.reload()}
-                className="rounded-xl border border-[#3938EC] px-6 py-3 text-sm font-semibold text-[#3938EC] transition hover:bg-[#EEF0FF]"
+                className="rounded-lg border border-[#3938EC] px-6 py-3 text-sm font-semibold text-[#3938EC] transition hover:bg-[#EEF0FF]"
               >
                 Retry
               </button>
             )}
             <button
               onClick={() => navigate("/")}
-              className="rounded-xl bg-[#3938EC] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
+              className="rounded-lg bg-[#3938EC] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
             >
               Back to Home
             </button>
@@ -552,7 +507,7 @@ ${shareUrl}`;
         duration: 0.35,
         ease: "easeOut",
       }}
-      className="w-full min-h-screen bg-[#F7F9FD] font-figtree dark:bg-[#131313]"
+      className="w-full min-h-screen bg-[#F7F9FD] pb-[calc(5rem+env(safe-area-inset-bottom))] font-figtree dark:bg-[#131313] sm:pb-0"
     >
       <motion.div
         initial={{
@@ -568,39 +523,36 @@ ${shareUrl}`;
           delay: 0.1,
           ease: "easeOut",
         }}
-        className="pt-4 text-[#454655] mx-auto w-full max-w-[1380px] px-6 sm:px-8 md:px-11 lg:px-14 2xl:px-0"
+        className="pt-3 text-[#454655] mx-auto w-full max-w-[1380px] px-4 sm:px-8 sm:pt-4 md:px-11 lg:px-14 2xl:px-0"
       >
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1 text-sm text-[#454655] mb-4 overflow-x-auto whitespace-nowrap font-semibold">
-          <button
-            onClick={() => navigate("/")}
-            className="hover:text-[#3838EC] dark:text-slate-300 transition-colors"
-          >
-            Home
-          </button>
-
-          <IoIosArrowForward size={12} />
-
-          <button
-            onClick={() => navigate(`/category/${product?.category}`)}
-            className="capitalize font-semibold text-[#454655] dark:text-slate-300 hover:text-[#3838EC] transition-colors"
-          >
-            {product?.category.replaceAll("_", " ")}
-          </button>
-
-          <IoIosArrowForward size={12} />
-
-          <span className="font-bold text-black dark:text-white">
-            {product?.title}
-          </span>
+        {/* Breadcrumb (shared with browse pages; long titles truncate) */}
+        <div className="mb-4">
+          <Breadcrumbs
+            items={[
+              { label: "Home", to: "/" },
+              ...(product?.category
+                ? [{
+                    label: product.category
+                      .split("_")
+                      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                      .join(" "),
+                    to: `/category/${product.category}`,
+                  }]
+                : []),
+              { label: product?.title || "Listing" },
+            ]}
+          />
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-[530px_1fr] gap-6 xl:gap-5">
+        {/* Below lg the two columns flatten (display: contents) so sections
+            can be ordered like a shopping app: photos → title & price →
+            details → pickup. */}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[530px_1fr] xl:gap-5">
           {/* LEFT */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 max-lg:contents">
             {/* Image Card */}
-            <div className="bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 rounded-xl border border-[#C9D1DC] p-3 md:p-4 xl:p-4">
+            <div className="max-lg:order-1 bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 rounded-xl border border-[#C9D1DC] p-2 sm:p-3 md:p-4 xl:p-4">
               <ProductGallery
                 images={images}
                 activeIndex={currentImageIndex}
@@ -636,7 +588,7 @@ ${shareUrl}`;
             </div>
 
             {/* Key Details */}
-            <div className="bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 shadow-sm rounded-xl border border-[#E2E8F0] p-5 md:p-6">
+            <div className="max-lg:order-3 bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 shadow-sm rounded-xl border border-[#E2E8F0] p-5 md:p-6">
               <h2 className="text-lg dark:text-white md:text-xl lg:text-xl xl:text-xl font-bold text-[#0F172A] mb-5">
                 Key Details
               </h2>
@@ -710,9 +662,9 @@ ${shareUrl}`;
           </div>
 
           {/* RIGHT */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 max-lg:contents">
             {/* Product Info */}
-            <div className="bg-[#F7F8FA] rounded-xl border border-[#C9D1DC] p-5 md:p-7 xl:px-7 xl:py-5 dark:bg-[#1A1D20] dark:border-0 dark:text-white">
+            <div className="max-lg:order-2 bg-[#F7F8FA] rounded-xl border border-[#C9D1DC] p-5 md:p-7 xl:px-7 xl:py-5 dark:bg-[#1A1D20] dark:border-0 dark:text-white">
               {/* Tags — availability derived from real status */}
               <div className="flex flex-wrap items-center gap-3">
                 <div className="bg-[#EAECFB] text-[#3838EC] text-sm font-medium px-4 py-1 rounded-full capitalize">
@@ -819,7 +771,7 @@ ${shareUrl}`;
               {/* CTA */}
               <div
                 ref={staticCTARef}
-                className="mt-10 flex flex-row items-stretch gap-3"
+                className="mt-10 hidden flex-row items-stretch gap-3 sm:flex"
               >
                 {/* Wishlist */}
                 <button
@@ -828,7 +780,7 @@ ${shareUrl}`;
                   aria-label={
                     inWishlist ? "Remove from wishlist" : "Add to wishlist"
                   }
-                  className={`h-[55px] w-[60px] rounded-2xl border flex items-center justify-center transition-all duration-300 ${
+                  className={`h-[55px] w-[60px] rounded-lg border flex items-center justify-center transition-all duration-300 ${
                     loading ? "opacity-50 cursor-not-allowed" : ""
                   } ${
                     inWishlist
@@ -875,7 +827,7 @@ ${shareUrl}`;
                       // ignore
                     }
                   }}
-                  className="flex-1 h-[55px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] flex items-center justify-center gap-3 text-white font-semibold text-base tracking-wide shadow-lg hover:shadow-xl transition-all duration-300"
+                  className="flex-1 h-[55px] rounded-lg bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] flex items-center justify-center gap-3 text-white font-semibold text-base tracking-wide shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   <LuMessageSquareText size={20} />
                   Chat with Seller
@@ -889,7 +841,7 @@ ${shareUrl}`;
             </div>
 
             {/* Pickup & Safety */}
-            <div className="bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 rounded-xl shadow-sm border border-[#E2E8F0] p-5 md:p-7 xl:px-7 xl:py-5">
+            <div className="max-lg:order-4 bg-[#F7F8FA] dark:bg-[#1A1D20] dark:border-0 rounded-xl shadow-sm border border-[#E2E8F0] p-5 md:p-7 xl:px-7 xl:py-5">
               <h2 className="text-lg md:text-xl font-bold text-[#111827] dark:text-white mb-7">
                 Pickup & Safety
               </h2>
@@ -999,27 +951,26 @@ ${shareUrl}`;
 
       <div
         ref={floatingCTARef}
-        className="sm:hidden"
-        style={{
-          position: "fixed",
-          bottom: "max(16px, env(safe-area-inset-bottom))",
-          left: "16px",
-          right: "16px",
-          zIndex: 50,
-          opacity: 1,
-          pointerEvents: "auto",
-          transition:
-            "bottom 450ms cubic-bezier(0.4, 0, 0.2, 1), left 450ms cubic-bezier(0.4, 0, 0.2, 1), right 450ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease",
-        }}
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-neutral-200/80 bg-white/90 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden dark:border-neutral-800 dark:bg-[#16181B]/90"
       >
-        <div className="flex gap-3">
+        {/* Docked action bar (phones): price at a glance + primary action. */}
+        <div className="flex items-center gap-3">
+          {Number.isFinite(Number(product?.selling_price)) && (
+            <div className="min-w-0 shrink-0 pr-1">
+              <p className="text-[11px] font-medium leading-none text-slate-500 dark:text-zinc-400">Price</p>
+              <p className="mt-1 text-[19px] font-bold leading-none tracking-tight text-slate-900 dark:text-white">
+                ₹{Number(product.selling_price).toLocaleString("en-IN")}
+              </p>
+            </div>
+          )}
           <button
             onClick={handleWishlistClick}
             disabled={wishlistLoading}
-            className={`h-[56px] w-[60px] rounded-2xl backdrop-blur-xl border shadow-xl flex items-center justify-center ${
+            aria-label={inWishlist ? "Remove from wishlist" : "Save to wishlist"}
+            className={`grid h-12 w-12 shrink-0 place-items-center rounded-lg border transition-transform active:scale-95 ${
               inWishlist
                 ? "bg-[#FFF1F4] border-pink-200"
-                : "bg-[#F7F8FA]/95 border-white/50"
+                : "bg-white border-neutral-200 dark:bg-[#1A1D20] dark:border-neutral-700"
             }`}
           >
             {inWishlist ? (
@@ -1032,12 +983,12 @@ ${shareUrl}`;
           {reservedByOther ? (
             <div
               title="This item is reserved for another buyer"
-              className="flex-1 h-[56px] rounded-2xl bg-amber-50 border border-amber-200 shadow flex items-center justify-center gap-2 text-amber-700 font-semibold"
+              className="flex-1 h-12 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 px-3 text-center text-sm text-amber-700 font-semibold"
             >
               Reserved for another buyer
             </div>
           ) : girlsBlocked ? (
-            <div className="flex-1 h-[56px] rounded-2xl bg-pink-50 border border-pink-200 shadow flex items-center justify-center gap-2 px-4 text-center text-sm font-semibold text-pink-700 dark:bg-pink-950/30 dark:text-pink-200">
+            <div className="flex-1 h-12 rounded-lg bg-pink-50 border border-pink-200 flex items-center justify-center gap-2 px-3 text-center text-[13px] font-semibold text-pink-700 dark:bg-pink-950/30 dark:text-pink-200">
               🌸 Girls-only listing — only girls can chat.
             </div>
           ) : (
@@ -1059,7 +1010,7 @@ ${shareUrl}`;
                 // ignore
               }
             }}
-            className="flex-1 h-[56px] rounded-2xl bg-gradient-to-r from-[#2E3FDC] to-[#4B5CF5] shadow-[0_12px_30px_rgba(46,63,220,0.35)] flex items-center justify-center gap-3 text-white font-semibold"
+            className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-[15px] font-semibold text-white transition-transform active:scale-[0.98]"
           >
             <LuMessageSquareText size={20} />
             {isAvailable ? "Chat with Seller" : "No longer available"}
@@ -1224,7 +1175,7 @@ dark:border-zinc-800
                 whileTap={{
                   scale: 0.94,
                 }}
-                className="h-14 rounded-xl text-white transition-all shadow-sm hover:shadow-xl bg-[#25D366] flex items-center justify-center gap-3"
+                className="h-14 rounded-lg text-white transition-all shadow-sm hover:shadow-xl bg-[#25D366] flex items-center justify-center gap-3"
               >
                 <FaWhatsapp size={24} />
                 <span className="font-medium">WhatsApp</span>
@@ -1249,7 +1200,7 @@ dark:border-zinc-800
                 whileTap={{
                   scale: 0.94,
                 }}
-                className="h-14 rounded-xl text-white transition-all shadow-sm hover:shadow-xl bg-[#3390EC] flex items-center justify-center gap-3"
+                className="h-14 rounded-lg text-white transition-all shadow-sm hover:shadow-xl bg-[#3390EC] flex items-center justify-center gap-3"
               >
                 <FaTelegram size={24} />
                 Telegram
@@ -1280,7 +1231,7 @@ dark:border-zinc-800
                 whileTap={{
                   scale: 0.97,
                 }}
-                className="hover:brightness-110 col-span-2 h-14 rounded-xl text-white bg-[#4556F0] flex items-center justify-center gap-3 font-semibold"
+                className="hover:brightness-110 col-span-2 h-14 rounded-lg text-white bg-[#4556F0] flex items-center justify-center gap-3 font-semibold"
               >
                 {copied ? (
                   <>✓ Copied</>
@@ -1430,18 +1381,14 @@ function ReportListingModal({ productId, productTitle, onClose }) {
         <label className="mt-4 block text-xs font-semibold text-gray-600 dark:text-gray-300">
           Reason
         </label>
-        <select
+        <Select
+          className="mt-1.5"
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#F7F8FA] px-3 py-2.5 text-sm outline-none focus:border-[#3838EC] dark:bg-zinc-900 dark:text-white"
-        >
-          <option value="">Select a reason</option>
-          {REPORT_REASONS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+          onChange={setReason}
+          placeholder="Select a reason"
+          options={REPORT_REASONS.map((r) => ({ value: r, label: r }))}
+          ariaLabel="Report reason"
+        />
         <label className="mt-4 block text-xs font-semibold text-gray-600 dark:text-gray-300">
           What happened?
         </label>
@@ -1456,16 +1403,16 @@ function ReportListingModal({ productId, productTitle, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-semibold text-gray-600 dark:bg-zinc-800 dark:text-gray-200"
+            className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm font-semibold text-gray-600 dark:bg-zinc-800 dark:text-gray-200"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={sending}
-            className="flex-1 rounded-xl bg-[#EF4444] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+            className="flex-1 rounded-lg bg-[#EF4444] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {sending ? "Submitting…" : "Submit report"}
+            <ButtonLoader loading={sending} loadingText="Submitting…">Submit report</ButtonLoader>
           </button>
         </div>
       </form>

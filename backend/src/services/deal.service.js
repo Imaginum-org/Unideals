@@ -63,6 +63,29 @@ export const ensureDeal = async (conversation) => {
   return deal;
 };
 
+// Atomic preview + unread bump (mirrors message.service). Read-modify-save
+// on unread_count lost increments under concurrent sends.
+const touchConversation = async (conversation, { text, type, senderId, receiverId }) => {
+  const at = new Date();
+  const side = String(conversation.buyer_id) === String(receiverId) ? "buyer" : "seller";
+  const preview = String(text || "").slice(0, 500);
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    {
+      $set: {
+        last_message: preview,
+        last_message_type: type,
+        last_message_sender: senderId,
+        last_activity_at: at,
+      },
+      $inc: { [`unread_count.${side}`]: 1 },
+    },
+  );
+  conversation.last_message = preview;
+  conversation.last_message_type = type;
+  conversation.last_activity_at = at;
+};
+
 const pushSystemMessage = async ({ conversation, senderId, text, deal }) => {
   const receiverId = otherPartyOf(conversation, senderId);
   const msg = await Message.create({
@@ -74,16 +97,12 @@ const pushSystemMessage = async ({ conversation, senderId, text, deal }) => {
     deal_id: deal?._id || null,
     message_status: MESSAGE_STATUS.SENT,
   });
-  conversation.last_message = text.slice(0, 500);
-  conversation.last_message_type = MESSAGE_TYPE.SYSTEM;
-  conversation.last_message_sender = senderId;
-  conversation.last_activity_at = new Date();
-  if (String(conversation.buyer_id) === String(receiverId)) {
-    conversation.unread_count.buyer += 1;
-  } else {
-    conversation.unread_count.seller += 1;
-  }
-  await conversation.save();
+  await touchConversation(conversation, {
+    text,
+    type: MESSAGE_TYPE.SYSTEM,
+    senderId,
+    receiverId,
+  });
   const payload = msg.toObject();
   emitToConversation(conversation._id, "message:new", payload);
   return msg;
@@ -199,16 +218,12 @@ export const makeOffer = async ({ conversationId, userId, amount }) => {
   }
   await deal.save();
 
-  conversation.last_message = `Offered ${inr(amt)}`;
-  conversation.last_message_type = MESSAGE_TYPE.OFFER;
-  conversation.last_message_sender = userId;
-  conversation.last_activity_at = new Date();
-  if (String(conversation.buyer_id) === String(receiverId)) {
-    conversation.unread_count.buyer += 1;
-  } else {
-    conversation.unread_count.seller += 1;
-  }
-  await conversation.save();
+  await touchConversation(conversation, {
+    text: `Offered ${inr(amt)}`,
+    type: MESSAGE_TYPE.OFFER,
+    senderId: userId,
+    receiverId,
+  });
 
   emitToConversation(conversation._id, "message:new", offerMsg.toObject());
   broadcastDeal(conversation, deal.toObject());
@@ -360,8 +375,11 @@ export const confirmDeal = async ({ conversationId, userId, amount }) => {
   await deal.save();
 
   // Keep header snapshot in sync so the list shows reserved price.
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    { $set: { "product_snapshot.selling_price": amt } },
+  );
   conversation.product_snapshot.selling_price = amt;
-  await conversation.save();
 
   await pushSystemMessage({
     conversation,

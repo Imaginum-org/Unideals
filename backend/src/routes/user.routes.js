@@ -1,5 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
+import { getMyLabs } from "../controllers/labs.controller.js";
 import auth from "../middlewares/auth.middleware.js";
 
 import {
@@ -26,6 +27,8 @@ const deleteAccountLimiter = rateLimit({
 });
 
 userRouter.get("/userProfile", auth, getUserProfile);
+// Labs (early access) features available to this account.
+userRouter.get("/labs", auth, getMyLabs);
 userRouter.put("/updateProfile", auth, updateUserProfile)
 userRouter.put("/chatSettings", auth, updateChatSettings);
 // Gender is set-once; later changes need admin approval (tight limiter).
@@ -38,7 +41,6 @@ const genderRequestLimiter = rateLimit({
 });
 userRouter.post("/requestGenderChange", auth, genderRequestLimiter, requestGenderChange);
 userRouter.get("/genderChangeStatus", auth, getGenderChangeStatus);
-userRouter.put("/chatSettings", auth, updateChatSettings);
 userRouter.put("/updateAvatar", auth, updateUserAvatar);
 userRouter.delete("/removeAvatar", auth, removeUserAvatar);
 userRouter.delete("/deleteAccount", auth, deleteAccountLimiter, deleteAccount);

@@ -11,6 +11,7 @@ import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 const cardShell =
   "w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none";
@@ -184,7 +185,7 @@ function VerifyEmail() {
                       className="h-10 shrink-0 rounded-xl bg-[#393AF2] px-4 text-xs font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isResending
-                        ? "Sending…"
+                        ? <ButtonLoader loading loadingText="Sending…" />
                         : resendCooldown > 0
                           ? formatTimer(resendCooldown)
                           : "Resend"}

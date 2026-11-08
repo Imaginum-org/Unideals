@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import userModel from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
-import { deleteImage } from "../utils/imagekit.js";
+import { deleteImageSafely, getFileOwnership } from "../utils/imagekit.js";
 import { safeErrorMessage } from "../utils/response.js";
 import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges } from "../services/badgeService.js";
 import { clearAuthCookies } from "../services/auth.service.js";
@@ -232,7 +232,10 @@ export const updateUserAvatar = async (req, res) => {
         message: "Avatar service unavailable",
       });
     }
-    const isImageKit = avatar.url.startsWith(endpoint);
+    // Compare with a trailing slash so "https://ik.imagekit.io/abc" does not
+    // also accept another account's "https://ik.imagekit.io/abcdef/...".
+    const endpointPrefix = endpoint.endsWith("/") ? endpoint : `${endpoint}/`;
+    const isImageKit = avatar.url.startsWith(endpointPrefix);
     const isGoogle = /^https:\/\/lh\d*\.googleusercontent\.com\//.test(avatar.url);
     if (!isImageKit && !isGoogle) {
       return res.status(400).json({
@@ -257,6 +260,23 @@ export const updateUserAvatar = async (req, res) => {
       }
     }
 
+    // Ownership: the new avatar file must be the caller's own upload.
+    // Otherwise a user could adopt someone else's fileId and have it
+    // purged on their next avatar change.
+    if (isImageKit && avatar.fileId) {
+      const ownership = await getFileOwnership(avatar.fileId);
+      if (
+        !ownership.exists ||
+        (ownership.ownerId && ownership.ownerId !== String(userId).toLowerCase())
+      ) {
+        return res.status(403).json({
+          success: false,
+          error: true,
+          message: "Avatar file must be your own upload",
+        });
+      }
+    }
+
     const user = await userModel.findById(userId);
 
     if (!user) {
@@ -267,9 +287,12 @@ export const updateUserAvatar = async (req, res) => {
       });
     }
 
-    // Delete previous uploaded avatar (don't delete the default avatar)
-    if (user.avatar?.fileId) {
-      await deleteImage(user.avatar.fileId);
+    // Delete previous uploaded avatar (ownership + reference checked).
+    if (user.avatar?.fileId && user.avatar.fileId !== avatar.fileId) {
+      await deleteImageSafely(user.avatar.fileId, {
+        ownerId: userId,
+        excludeUserId: userId,
+      });
     }
 
     user.avatar = {
@@ -329,7 +352,10 @@ export const removeUserAvatar = async (req, res) => {
 
     // Delete custom avatar from ImageKit
     if (user.avatar?.fileId) {
-      await deleteImage(user.avatar.fileId);
+      await deleteImageSafely(user.avatar.fileId, {
+        ownerId: userId,
+        excludeUserId: userId,
+      });
     }
 
     // Remove custom avatar

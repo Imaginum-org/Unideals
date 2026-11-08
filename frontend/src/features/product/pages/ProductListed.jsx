@@ -15,6 +15,8 @@ import {
   HeartIcon,
   MessageCircleIcon,
 } from "@animateicons/react/lucide";
+import EmptyState from "../../../components/ui/EmptyState.jsx";
+import { Plus } from "lucide-react";
 // Custom Tabs matching the new screenshot
 const tabs = ["All", "Active", "Unlisted", "Sold"];
 
@@ -148,14 +150,14 @@ function ProductListed() {
 
   return (
     <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
-      <div className="flex h-[calc(100vh-70px)] ">
+      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
         {/* LEFT PANEL */}
         <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
           <Profile_left_part />
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="h-full md:flex-1 overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
+        <div className="min-w-0 w-full md:h-full md:flex-1 md:overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] px-4 py-5 sm:p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
           <div className="max-w-4xl mx-auto">
             {/* 1. Page Header */}
             <div className="flex justify-between items-start mb-4">
@@ -177,7 +179,7 @@ function ProductListed() {
               <div className="hidden md:block">
                 <button
                   onClick={() => navigate("/upload")}
-                  className="bg-[#3838EC] hover:bg-blue-700 text-white px-3 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20"
+                  className="bg-[#3838EC] hover:bg-blue-700 text-white px-3 py-2.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20"
                 >
                   <FiPlus size={18} />
                   List New Product
@@ -251,7 +253,7 @@ function ProductListed() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-[0.45rem] rounded-xl text-sm font-medium transition-colors ${
+                  className={`px-4 py-[0.45rem] rounded-lg text-sm font-medium transition-colors ${
                     activeTab === tab
                       ? "bg-[#1A1D20] text-white dark:bg-white dark:text-black shadow-md"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -265,17 +267,36 @@ function ProductListed() {
             {/* 4. Products List */}
             <div className="flex flex-col gap-5 pb-10">
               {loading ? (
-                <div className="flex justify-center items-center py-12">
-                  <BrandLoader size="md" />
-                </div>
+                <BrandLoader size="full" />
               ) : error ? (
                 <div className="py-8 text-center text-red-500 dark:text-red-400 bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
                   {error}
                 </div>
               ) : filteredProducts.length === 0 ? (
-                <div className="py-12 text-center text-gray-500 dark:text-gray-400 bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
-                  No products found for "{activeTab}"
-                </div>
+                <EmptyState
+                  variant="listings"
+                  title={
+                    activeTab === "All"
+                      ? "You haven't listed anything yet"
+                      : activeTab === "Active"
+                        ? "No live listings right now"
+                        : activeTab === "Unlisted"
+                          ? "No unlisted items"
+                          : "Nothing sold yet"
+                  }
+                  description={
+                    activeTab === "All" || activeTab === "Active"
+                      ? "Turn the stuff gathering dust in your hostel room into cash. Listing takes about 2 minutes, and every student on your campus sees it."
+                      : activeTab === "Unlisted"
+                        ? "Listings you hide from buyers show up here, so you can relist them anytime."
+                        : "Once you complete a deal with a buyer, the item moves here."
+                  }
+                  primaryAction={
+                    activeTab === "Unlisted" || activeTab === "Sold"
+                      ? { label: "View all listings", onClick: () => setActiveTab("All") }
+                      : { label: "List an item", to: "/upload", icon: Plus }
+                  }
+                />
               ) : (
                 filteredProducts.map((p) => (
                   <OrderCard

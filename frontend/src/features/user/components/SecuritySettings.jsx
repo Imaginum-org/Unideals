@@ -5,6 +5,7 @@ import { toast } from "../../../components/ui/toast.js";
 import { Eye, Lock, Shield, X } from "lucide-react";
 
 import { forgotPassword } from "../../../features/auth/api/authApi.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 export default function SecuritySettings({ email }) {
   const [resetEmail, setResetEmail] = useState(email || "");
@@ -103,7 +104,7 @@ export default function SecuritySettings({ email }) {
                     <Dialog.Close asChild>
                       <button
                         type="button"
-                        className="flex-1 rounded-xl bg-gray-200 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
+                        className="flex-1 rounded-lg bg-gray-200 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
                       >
                         Cancel
                       </button>
@@ -111,9 +112,9 @@ export default function SecuritySettings({ email }) {
                     <button
                       type="submit"
                       disabled={isSendingReset}
-                      className="flex-1 rounded-xl bg-[#4F46FF] py-3 font-semibold text-white transition-colors hover:bg-[#3b34d7] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex-1 rounded-lg bg-[#4F46FF] py-3 font-semibold text-white transition-colors hover:bg-[#3b34d7] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {isSendingReset ? "Sending..." : "Send Link"}
+                      <ButtonLoader loading={isSendingReset} loadingText="Sending…">Send Link</ButtonLoader>
                     </button>
                   </div>
                 </form>

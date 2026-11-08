@@ -251,6 +251,16 @@ const productSchema = new Schema(
       default: 0,
     },
 
+    // Seller's plan rank (0 Free, 1 Pro, 2 Pro+), denormalised so feed and
+    // search can rank by it without a $lookup before $sort. Kept in sync by
+    // User model hooks (utils/sellerTierSync.js).
+    seller_tier: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 2,
+    },
+
     is_deleted: {
       type: Boolean,
       default: false,

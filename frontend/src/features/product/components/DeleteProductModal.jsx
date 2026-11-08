@@ -2,6 +2,7 @@ import * as React from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import "../../../styles/deletestyle.css";
 import { toast } from "../../../components/ui/toast.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 function DeleteProductModal({
   isOpen,
@@ -62,7 +63,7 @@ function DeleteProductModal({
                 disabled={isLoading}
                 className="Button red dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
               >
-                {isLoading ? "Deleting..." : "Yes, delete product"}
+                <ButtonLoader loading={isLoading} loadingText="Deleting…">Yes, delete product</ButtonLoader>
               </button>
             </AlertDialog.Action>
           </div>

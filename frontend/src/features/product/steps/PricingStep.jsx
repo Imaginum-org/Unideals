@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Select from "../../../components/ui/Select.jsx";
+import PriceInsights from "../components/PriceInsights.jsx";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 import { HiOutlineLocationMarker, HiOutlineCash } from "react-icons/hi";
@@ -144,7 +146,7 @@ const [legalTab, setLegalTab] = useState(null);
           }}
         />
       )}
-      <div className="w-full text-black dark:text-white rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8">
+      <div className="w-full text-black dark:text-white rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none dark:max-sm:bg-transparent">
         {/* Header */}
         <div>
           <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
@@ -222,6 +224,13 @@ const [legalTab, setLegalTab] = useState(null);
               )}
             </div>
           </div>
+
+          {/* Labs: smart price suggestion / demand meter (or locked teaser) */}
+          <PriceInsights
+            category={formData.category}
+            condition={formData.condition}
+            onUsePrice={(value) => updateField("sellingPrice", String(value))}
+          />
 
           {/* Negotiation */}
           <div className="mt-4 flex items-center justify-between">
@@ -301,7 +310,7 @@ const [legalTab, setLegalTab] = useState(null);
                   <button
                     key={option.value}
                     onClick={() => updateField("paymentMethod", option.value)}
-                    className={`h-[45px] min-w-[120px] px-8 rounded-2xl border text-sm font-semibold transition-all duration-200
+                    className={`h-[45px] min-w-[120px] px-8 rounded-lg border text-sm font-semibold transition-all duration-200
                 
                 ${
                   isActive
@@ -389,20 +398,16 @@ const [legalTab, setLegalTab] = useState(null);
                       </p>
                     ) : pickupSpots.length > 0 ? (
                       <>
-                        <select
+                        <Select
                           value={formData.address?._id || ""}
-                          onChange={(e) => handleSelectSpot(e.target.value)}
-                          className="w-full rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2.5 text-sm font-semibold text-[#111827] outline-none transition focus:border-[#4F46E5] focus:ring-4 focus:ring-[#4F46E5]/10"
-                          aria-label="Choose pickup spot"
-                        >
-                          {pickupSpots.map((spot) => (
-                            <option key={spot._id} value={spot._id}>
-                              {spot.name}
-                              {spot.isPrimary ? " (Primary)" : ""},{" "}
-                              {spot.detail}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={handleSelectSpot}
+                          placeholder="Choose a pickup spot"
+                          ariaLabel="Choose pickup spot"
+                          options={pickupSpots.map((spot) => ({
+                            value: spot._id,
+                            label: `${spot.name}${spot.isPrimary ? " (Primary)" : ""}, ${spot.detail}`,
+                          }))}
+                        />
 
                         <p className="mt-2 text-sm text-[#6B7280] leading-6">
                           {formData.address?.detail ||
@@ -505,7 +510,7 @@ const [legalTab, setLegalTab] = useState(null);
         </div>
 
         {/* Footer */}
-        <div className="mt-10 flex items-center justify-between">
+        <div className="mt-10 flex items-center justify-between max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-50 max-sm:mt-0 max-sm:border-t max-sm:border-neutral-200/80 max-sm:bg-white/95 max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:backdrop-blur-xl dark:max-sm:border-neutral-800 dark:max-sm:bg-[#16181B]/95">
           {/* Pagination */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-[#9CA3AF]">Step 3 of 4</span>
@@ -526,7 +531,7 @@ const [legalTab, setLegalTab] = useState(null);
             {/* Continue */}
             <button
               onClick={() => validateAndProceed(validatePricing, nextStep)}
-              className="group h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-xl flex justify-center items-center gap-2 font-semibold transition-all duration-300 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200 hover:-translate-y-[1px] hover:shadow-xl hover:shadow-indigo-200/40 active:translate-y-[1px] active:scale-[0.98] active:shadow-md"
+              className="group h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-lg flex justify-center items-center gap-2 font-semibold transition-all duration-300 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200 hover:-translate-y-[1px] hover:shadow-xl hover:shadow-indigo-200/40 active:translate-y-[1px] active:scale-[0.98] active:shadow-md"
             >
               <span>Preview</span>
               {/* <IoArrowForward className="size-5" /> */}
