@@ -652,6 +652,72 @@ const PricingModel = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Comparison table */}
+            <table className="relative z-20 w-full table-fixed overflow-hidden rounded-xl bg-white text-left shadow-xl shadow-slate-200 dark:bg-[#1A1D20] dark:shadow-none">
+              <colgroup>
+                <col className="w-[32%]" />
+                <col className="w-[22%]" />
+                <col className="w-[20%]" />
+                <col className="w-[26%]" />
+              </colgroup>
+
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-white/10">
+                  <th className="px-7 py-6 text-sm font-semibold text-slate-900 dark:text-white font-poppins">
+                    Features
+                  </th>
+                  <th className="px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
+                    Free
+                  </th>
+                  <th className="border-x-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
+                    Pro
+                  </th>
+                  <th className="px-7 py-6 text-center text-sm font-semibold text-orange-500 font-poppins">
+                    Pro Plus
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {comparisonRows.map((row, index) => {
+                  const isLastRow = index === comparisonRows.length - 1;
+
+                  return (
+                    <tr
+                      key={row.feature}
+                      className="border-b border-slate-100 last:border-0 dark:border-white/10"
+                    >
+                      <td
+                        className={`px-7 py-6 text-sm font-medium leading-5 font-poppins ${
+                          row.featureHighlight
+                            ? "text-[#3300ff]"
+                            : "text-slate-700 dark:text-[#D7D7D7]"
+                        }`}
+                      >
+                        {row.feature}
+                      </td>
+
+                      <td className="px-7 py-6 text-center text-sm">
+                        {renderComparisonValue(row.free, "free", row)}
+                      </td>
+
+                      <td
+                        className={`border-x-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] px-7 py-6 text-center text-sm font-semibold ${
+                          isLastRow ? "rounded-b-2xl border-b-4" : ""
+                        }`}
+                      >
+                        {renderComparisonValue(row.pro, "pro", row)}
+                      </td>
+
+                      <td className="px-7 py-6 text-center text-sm font-semibold">
+                        {renderComparisonValue(row.proPlus, "proPlus", row)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
             {/* One-time add-ons (part of the plan doc, all users) */}

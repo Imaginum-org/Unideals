@@ -5,6 +5,7 @@ import Footer from "../components/layout/Footer";
 import MobileTabBar, { shouldShowTabBar } from "../components/layout/MobileTabBar.jsx";
 import CampusGate from "../features/campus/components/CampusGate.jsx";
 import GenderGate from "../features/user/components/GenderGate.jsx";
+import FloatingAssistant from "../features/chat/components/FloatingAssistant.jsx";
 import { useCampus } from "../context/CampusContext.jsx";
 import { useUser } from "../context/useUserContext.jsx";
 
@@ -52,6 +53,8 @@ const MainLayout = () => {
       </main>
 
       {shouldShowFooter && <Footer />}
+      <FloatingAssistant />
+
 
       {/* Phones: app-style bottom tabs. The spacer keeps the last content
           (and the footer) clear of the fixed bar + home-indicator inset. */}

@@ -18,6 +18,7 @@ import wishlistRouter from "./routes/wishlist.routes.js";
 import campusRouter from "./routes/campus.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import boostRouter from "./routes/boost.routes.js";
+import chatRouter from "./routes/chat.routes.js";
 import paymentRouter, { paymentWebhookHandler } from "./routes/payment.routes.js";
 import badgeRouter from "./routes/badgeRoutes.js";
 import rewardRouter from "./routes/rewardRoutes.js";
@@ -234,6 +235,7 @@ app.use(
   adminRouter,
 );
 app.use("/api/boost", boostRouter);
+app.use("/api/chat", chatRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/badges", badgeRouter);
 app.use("/api/rewards", rewardRouter);

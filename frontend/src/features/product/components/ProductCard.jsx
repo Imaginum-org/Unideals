@@ -359,6 +359,7 @@ ${tierStyles.cardShadow}
               <img
                 loading="lazy"
                 decoding="async"
+                fetchPriority="low"
                 src={imageUrl}
                 srcSet={imageSrcSet}
                 sizes="(min-width: 1024px) 320px, (min-width: 768px) 33vw, 50vw"
