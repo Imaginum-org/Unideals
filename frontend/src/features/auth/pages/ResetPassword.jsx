@@ -56,6 +56,11 @@ function ResetPassword() {
 
         if (response.data.success) {
           setIsTokenValid(true);
+          // Keep the one-time token out of the address bar, browser history
+          // and screenshots/screen-shares once it's been read. useParams
+          // still holds it in memory for the submit (the router doesn't
+          // re-render on a raw history.replaceState).
+          window.history.replaceState(window.history.state, "", "/reset-password");
         }
       } catch (error) {
         setIsTokenValid(false);

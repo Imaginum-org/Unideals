@@ -1,31 +1,24 @@
 import { useUser } from "../../../context/useUserContext.jsx";
 import LegalDocument from "../../legal/components/LegalDocuments.jsx";
-import Profile_left_part from "../components/Profile_left_part.jsx";
+import { AccountLayout } from "../components/account/AccountKit.jsx";
 
+// Signed in: inside the account shell. Signed out: plain page (the account
+// sidebar would bounce guests to /login, and legal pages must stay public).
 function Termscondition() {
   const { userDetails } = useUser();
 
-  return (
-    <div className="h-full w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree">
-      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
-        {/* LEFT PANEL - Only render if user exists */}
-        {userDetails?._id ? (
-          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0">
-            <Profile_left_part />
-          </div>
-        ) : null}
+  if (userDetails?._id) {
+    return (
+      <AccountLayout seoTitle="Terms & privacy | Unideals" mobileTitle="Terms & privacy" bare>
+        <LegalDocument initialType="privacy" />
+      </AccountLayout>
+    );
+  }
 
-        {/* RIGHT PANEL (Main Content Area) */}
-        <div
-          className={`min-w-0 w-full md:h-full md:overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] px-4 py-5 sm:p-6 lg:px-[5.7rem] lg:py-6 ${
-            userDetails?._id ? "w-full md:flex-1" : "mx-auto w-full max-w-5xl"
-          }`}
-        >
-          {/* Centered container to match other pages */}
-          <div className="max-w-4xl mx-auto  ">
-            <LegalDocument initialType="privacy" />
-          </div>
-        </div>
+  return (
+    <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#F7F9FD] font-figtree dark:bg-[#131313]">
+      <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:py-8">
+        <LegalDocument initialType="privacy" />
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import {
   getBoostedProducts,
   getSearchSuggestions,
   getTrendingProducts,
+  recordProductView,
   searchProducts,
   getMyProducts,
   getMyDraftProducts,
@@ -53,6 +54,13 @@ const detailLimiter = rateLimit({
 });
 
 // Public aggregation endpoints: generous but bounded (per-keystroke traffic).
+const viewLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const searchLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -94,6 +102,8 @@ router.patch("/:id/sold", auth, markProductSold);
 // partial-update validator (privileged keys are stripped server-side).
 router.patch("/:id", auth, validate(createProductSchema), updateProduct);
 
+// One call per product-page open; dedupe is per viewer per 24h server-side.
+router.post("/:id/view", viewLimiter, optionalAuth, recordProductView);
 router.get("/:id", detailLimiter, optionalAuth, getSingleProduct);
 
 export default router;

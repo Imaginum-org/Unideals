@@ -6,9 +6,19 @@ import { safeErrorMessage } from "../utils/response.js";
  * GET /api/badges/me
  * Returns current user's XP, level, rank, and earned badges.
  */
+// Badges recompute on listing events, but deals, ratings and chat activity
+// don't trigger it. Instead of a manual "Sync" button, opening Achievements
+// refreshes stale data itself, at most once per user per 10 minutes, so the
+// page is always current without hammering the database.
+const BADGE_STALE_MS = 10 * 60 * 1000;
+
 export const getMyBadges = async (req, res) => {
   try {
-    const data = await getGamificationData(req.user._id);
+    let data = await getGamificationData(req.user._id);
+    const last = data.last_computed_at ? new Date(data.last_computed_at).getTime() : 0;
+    if (Date.now() - last > BADGE_STALE_MS) {
+      data = await computeAndAwardBadges(req.user._id);
+    }
     return res.status(200).json({ success: true, data });
   } catch (err) {
     return res.status(500).json({ success: false, message: safeErrorMessage(err) });

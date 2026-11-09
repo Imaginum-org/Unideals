@@ -45,6 +45,12 @@ export const getProductById = (id, params = {}, { fresh = false } = {}) => {
   return cachedRequest(requestKey(url, params), DETAIL_TTL, () => axios.get(url, { params }));
 };
 
+// Record one product-page view (never cached; the server dedupes per
+// viewer per 24h and ignores owners/bots). The detail GET above never
+// counts views, so hover prefetch can stay aggressive.
+export const recordProductView = (id, params = {}) =>
+  axios.post(`/api/product/${id}/view`, null, { params });
+
 // Warm the detail cache (card hover / touchstart) so opening it is instant.
 export const prefetchProduct = (id, params = {}) => getProductById(id, params).catch(() => {});
 

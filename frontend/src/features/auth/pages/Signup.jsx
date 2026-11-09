@@ -94,7 +94,8 @@ function Signup() {
         }, 1400);
       }
     } catch (error) {
-      console.error("Signup Error:", error);
+      // Never log the axios error object: its config carries the request body (password).
+      console.error("Signup failed:", error?.response?.status, error?.response?.data?.message || error?.message);
       setFormMessage({
         variant: "error",
         text:

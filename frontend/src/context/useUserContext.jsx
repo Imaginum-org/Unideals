@@ -12,6 +12,46 @@ import { invalidateRequests } from "../services/requestCache.js";
 
 const UserContext = createContext();
 
+
+// localStorage is readable by any script on the page, so persist only what
+// the UI needs for an instant first paint. Phone, chat settings, wishlist,
+// gender-change requests etc. stay in memory and are refetched each visit.
+const CACHEABLE_FIELDS = [
+  "_id", "name", "email", "avatar", "role", "subscription", "gender",
+  "campus_id", "is_email_verified", "createdAt", "college", "campus",
+];
+const toCacheable = (user) => {
+  if (!user || typeof user !== "object") return user;
+  const out = {};
+  for (const key of CACHEABLE_FIELDS) if (user[key] !== undefined) out[key] = user[key];
+  if (user.gamification) {
+    const { level, rank_title, total_xp } = user.gamification;
+    out.gamification = { level, rank_title, total_xp };
+  }
+  return out;
+};
+
+/**
+ * Wipe account-scoped leftovers on an EXPLICIT logout / account deletion,
+ * so on a shared or library computer the next person doesn't see this
+ * user's listing draft, searches or chat/notification state. Not called on
+ * session expiry (a half-written listing must survive a re-login). Device
+ * prefs (theme, campus, sidebar width) are kept.
+ */
+export const clearAccountScopedStorage = () => {
+  try {
+    ["unideals-product-draft", "recentSearches", "unideals-notifications-read", "unideals-last-payment"].forEach((k) =>
+      localStorage.removeItem(k),
+    );
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith("unideals-offer-hint:"))
+      .forEach((k) => localStorage.removeItem(k));
+    sessionStorage.removeItem("contactLastSent");
+  } catch {
+    // storage unavailable (private mode): nothing to clear
+  }
+};
+
 export const UserProvider = ({ children }) => {
   const [userDetails, setUserDetails] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -38,7 +78,11 @@ export const UserProvider = ({ children }) => {
       localStorage.removeItem("accessToken");
 
       if (cachedUser?._id) {
-        setUserDetails(cachedUser);
+        // Migration: older builds cached the full profile (phone, location,
+        // token metadata). Rewrite it trimmed.
+        const trimmed = toCacheable(cachedUser);
+        localStorage.setItem("cachedUserDetails", JSON.stringify(trimmed));
+        setUserDetails(trimmed);
       } else if (cachedUser) {
         localStorage.removeItem("cachedUserDetails");
       }
@@ -61,7 +105,7 @@ export const UserProvider = ({ children }) => {
       const updated = { ...prev, ...updatedFields };
 
       try {
-        localStorage.setItem("cachedUserDetails", JSON.stringify(updated));
+        localStorage.setItem("cachedUserDetails", JSON.stringify(toCacheable(updated)));
       } catch (err) {
         console.error("Error caching updated user:", err);
       }
@@ -128,7 +172,7 @@ export const UserProvider = ({ children }) => {
 
         // cache non-sensitive profile only
         try {
-          localStorage.setItem("cachedUserDetails", JSON.stringify(user));
+          localStorage.setItem("cachedUserDetails", JSON.stringify(toCacheable(user)));
           localStorage.setItem("isAuthenticated", "true");
         } catch {
           // quota errors ignored

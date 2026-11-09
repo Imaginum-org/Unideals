@@ -11,7 +11,9 @@
     "seed:campuses": "node src/seeds/campuses.seed.js",
     "lint": "echo \"Add ESLint here\"",
     "format": "echo \"Add Prettier here\"",
-    "test:plans": "node tests/plans.integration.test.mjs"
+    "test:plans": "node tests/plans.integration.test.mjs",
+    "test:views": "node tests/views.integration.test.mjs",
+    "test:deals": "node tests/deals.integration.test.mjs"
   },
   "keywords": [
     "nodejs",

@@ -1009,3 +1009,19 @@ Every page was captured at full length on a phone in light and dark (plus tablet
 - If they're set on the hosting dashboards (e.g. Render / Vercel), they can be deleted there; nothing reads them anymore.
 
 **Verified:** no references remain, the backend app loads, and the frontend builds.
+
+---
+
+## Update: Mobile wordmark, one 20px phone gutter, one-line Home subheadings
+
+- **Wordmark:** the phone "Unideals" now matches the laptop one: 21px, weight 700, letter-spacing −0.5 (it was 18px / 500 / 0). File: `Header.jsx`.
+- **One phone gutter:** content sits 20px from the screen edges on every page below 640px. Tablet and desktop spacing is unchanged.
+  - Header and search row; Home; Explore / Category / Search.
+  - Product page and its bottom bar; the Sell flow and its docked step bars.
+  - Profile, Orders, Wishlist, My Listings, Achievements, Settings, Subscription, Notifications, Terms, Help & Support.
+  - Chat list header and footer.
+- **Home subheadings:** shorter on phones so they fit on one line, with a truncate guard as a safety net.
+  - "Textbooks, gadgets, cycles & more"
+  - "Hot on your campus right now 🔥"
+  - The full sentences still show from `sm` up.
+- **Verified:** screenshots with 20px guide lines at 320 and 375px; the build passes.

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { ikFirstThumb } from "../../../utils/imageTransform.js";
+import { productPath } from "../../../utils/productPath.js";
 
 const INR = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -73,7 +74,7 @@ const SearchDropdown = ({
       key={item._id}
       role="option"
       aria-selected={selectedIndex === index}
-      to={`/product/${item._id}`}
+      to={productPath(item)}
       onClick={() => onSelect?.()}
       onMouseEnter={() => setSelectedIndex(index)}
       className={`
@@ -85,7 +86,7 @@ duration-150
 
 ${
   selectedIndex === index
-      ? "bg-blue-100 dark:bg-blue-950/30"
+      ? "bg-[#4B45FF]/10 dark:bg-[#4B45FF]/20"
       : mobile
         ? "active:bg-[#4B45FF]/[0.15] dark:active:bg-[#4B45FF]/25"
         : "hover:bg-[#4B45FF]/10 dark:hover:bg-[#4B45FF]/20"

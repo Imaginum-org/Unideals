@@ -1,7 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { refreshChatUnread } from "../../../services/chatUnread.js";
-import { Ban, ChevronDown, ChevronLeft, Crown, Flag, Lock, Reply, Search, Send, ShieldAlert, Timer, WifiOff, X } from "lucide-react";
+import {
+  Ban,
+  ChevronDown,
+  ChevronLeft,
+  ChevronUp,
+  Crown,
+  ExternalLink,
+  Flag,
+  Lock,
+  MessagesSquare,
+  MoreVertical,
+  Search,
+  Send,
+  ShieldAlert,
+  Timer,
+  WifiOff,
+  X,
+  XCircle,
+} from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 import axios from "../../../services/axiosInstance";
 import { useUser } from "../../../context/useUserContext.jsx";
@@ -11,12 +29,12 @@ import DealProgress from "../components/DealProgress.jsx";
 import ReportUserModal from "../components/ReportUserModal.jsx";
 import { useChatSocket } from "../hooks/useChatSocket.js";
 import { dealStatusBadge } from "../utils/dealStage.js";
-import { INPUT_BASE, SELL_BTN } from "../utils/chatTheme.js";
 import { chatSettingsOf, wallpaperById } from "../utils/wallpapers.js";
 import { formatName } from "../utils/display.js";
 import Profile_left_part from "../../user/components/Profile_left_part.jsx";
+import { useAppScreen } from "../../../components/layout/MobileAppBar.jsx";
+import { productPath } from "../../../utils/productPath.js";
 import * as chatApi from "../services/chatApi.js";
-import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 
 const QUICK_CHIPS = [
   "Yes",
@@ -1033,596 +1051,792 @@ const ChatPanel = ({ embedded = false }) => {
       !threadLoading,
   );
 
+  // ---- UI-only state (search, filters, menus, composer) ----
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [threadQuery, setThreadQuery] = useState("");
+  const [matchIdx, setMatchIdx] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadAnchor, setUnreadAnchor] = useState(null); // { id, count, resolved, dividerId }
+  const menuRef = useRef(null);
+  const composerRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  // Phones: the inbox is a full-screen app view (site header hidden).
+  useAppScreen();
+
+  // Fresh thread: close search/menu, forget the old query.
+  useEffect(() => {
+    setSearchOpen(false);
+    setThreadQuery("");
+    setMatchIdx(0);
+    setMenuOpen(false);
+  }, [selectedId]);
+
+  // Overflow menu: outside tap / Escape closes it.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (e) => menuRef.current && !menuRef.current.contains(e.target) && setMenuOpen(false);
+    const onKey = (e) => e.key === "Escape" && setMenuOpen(false);
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  // Composer grows with its content (up to ~5 lines), shrinks after send.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }, [chatInput, selectedId]);
+
+  // "New messages" divider: placed once, above the first message that was
+  // unread when the conversation was opened from the list.
+  const openConversation = useCallback(
+    (conv) => {
+      setUnreadAnchor({ id: String(conv?._id || ""), count: conv?.unread || 0, resolved: false, dividerId: null });
+      selectConversation(conv);
+    },
+    [selectConversation],
+  );
+  useEffect(() => {
+    if (!unreadAnchor || unreadAnchor.resolved || threadLoading) return;
+    if (unreadAnchor.id !== String(selectedId) || unreadAnchor.count <= 0 || messages.length === 0) return;
+    const incoming = messages.filter((m) => me && String(m.sender_id) !== me && m.message_type !== "system");
+    const target = incoming[incoming.length - unreadAnchor.count];
+    setUnreadAnchor((a) => ({ ...a, resolved: true, dividerId: target?._id ? String(target._id) : null }));
+  }, [unreadAnchor, threadLoading, selectedId, messages, me]);
+  const dividerId = unreadAnchor?.id === String(selectedId) ? unreadAnchor?.dividerId : null;
+
+  // In-thread search over loaded messages (newest match first).
+  const q = threadQuery.trim();
+  const matchIds = useMemo(() => {
+    if (q.length < 2) return [];
+    const needle = q.toLowerCase();
+    return messages
+      .filter((m) => m.message_type === "text" && !m.is_flagged && String(m.text || "").toLowerCase().includes(needle))
+      .map((m) => String(m._id));
+  }, [messages, q]);
+  useEffect(() => {
+    if (matchIds.length === 0) return;
+    const idx = matchIds.length - 1;
+    setMatchIdx(idx);
+    jumpToMessage(matchIds[idx]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+  const stepMatch = (dir) => {
+    if (matchIds.length === 0) return;
+    const next = (matchIdx + dir + matchIds.length) % matchIds.length;
+    setMatchIdx(next);
+    jumpToMessage(matchIds[next]);
+  };
+
+  const visibleProConvs = unreadOnly ? proConvs.filter((c) => (c.unread || 0) > 0) : proConvs;
+  const visibleNormalConvs = unreadOnly ? normalConvs.filter((c) => (c.unread || 0) > 0) : normalConvs;
+  const totalUnread = conversations.reduce((t, c) => t + (c.unread || 0), 0);
+  const nothingToShow = visibleProConvs.length === 0 && visibleNormalConvs.length === 0;
+  const charCount = chatInput.length;
+
+  const iconBtn =
+    "grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-neutral-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white";
+
   return (
     <div
       className={
         embedded
-          ? "flex flex-col h-full min-h-0 text-zinc-900 dark:text-zinc-100 overflow-hidden font-figtree touch-manipulation"
-          : "fixed inset-0 flex flex-col bg-[#F7F8FA] dark:bg-[#131313] text-zinc-900 dark:text-zinc-100 overflow-hidden font-figtree"
+          ? "flex h-full min-h-0 touch-manipulation flex-col overflow-hidden font-figtree text-slate-900 dark:text-zinc-100"
+          : "fixed inset-0 flex flex-col overflow-hidden bg-[#F7F9FD] font-figtree text-slate-900 dark:bg-[#131313] dark:text-zinc-100"
       }
     >
-      <div className="flex-1 flex overflow-hidden relative min-h-0">
-        {/* LEFT */}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {/* ── Inbox ── */}
         <div
           ref={sidebarRef}
           style={sideW ? { width: sideW, flex: "0 0 auto" } : undefined}
           className={`${
             selectedId ? "hidden lg:flex" : "flex"
-          } w-full lg:flex-[0_0_33%] lg:min-w-[300px] lg:max-w-[440px] flex-col min-h-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313]`}
+          } min-h-0 w-full flex-col border-r border-neutral-200/80 bg-white lg:w-[340px] lg:flex-none xl:w-[360px] dark:border-neutral-800 dark:bg-[#16181B]`}
         >
-          <div className="space-y-3 px-4 pb-3 pt-4">
-            {/* App-style large title (phones/tablets; desktop has the sidebar) */}
-            <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-zinc-900 lg:hidden dark:text-white">
-              Chats
-            </h1>
-            <div className="flex items-center bg-[#F1F3F6] dark:bg-[#1A1D20] rounded-lg px-3 py-1">
-              <Search className="text-zinc-400 w-4 h-4 shrink-0" />
+          <div className="space-y-2.5 px-4 pb-2.5 pt-[max(0.75rem,env(safe-area-inset-top))] lg:pt-3.5">
+            <div className="flex items-center justify-between">
+              <h1 className="text-[26px] font-semibold tracking-tight text-slate-900 lg:text-[17px] dark:text-white">
+                <span className="lg:hidden">Chats</span>
+                <span className="hidden lg:inline">Messages</span>
+              </h1>
+              {totalUnread > 0 && (
+                <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11.5px] font-semibold text-[var(--accent-text)]">
+                  {totalUnread} unread
+                </span>
+              )}
+            </div>
+            <label className="flex h-10 items-center gap-2 rounded-lg bg-neutral-100 px-3 lg:h-9 dark:bg-white/5">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
               <input
+                type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="Search chats"
-                className="w-full p-2 outline-none bg-transparent text-base sm:text-[15px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
-                placeholder="Search names or products..."
+                className="w-full bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400 lg:text-[13.5px] dark:text-zinc-100"
+                placeholder="Search people or products"
               />
-            </div>
-            <div className="flex gap-2">
+            </label>
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               {["all", "buying", "selling"].map((t) => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => setTab(t)}
-                  className={`px-3.5 py-1.5 rounded-lg text-[13px] capitalize transition-all ${
+                  className={`h-8 shrink-0 rounded-full px-3 text-[13px] capitalize transition-colors lg:h-7 lg:text-[12.5px] ${
                     tab === t
-                      ? "bg-[#3838EC] text-white font-semibold shadow-sm"
-                      : "bg-zinc-100 dark:bg-[#1A1D20] font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200"
+                      ? "bg-slate-900 font-semibold text-white dark:bg-white dark:text-slate-900"
+                      : "bg-neutral-100 font-medium text-slate-600 hover:bg-neutral-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10"
                   }`}
                 >
                   {t === "all" ? "All" : t}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setUnreadOnly((v) => !v)}
+                aria-pressed={unreadOnly}
+                className={`h-8 shrink-0 rounded-full px-3 text-[13px] transition-colors lg:h-7 lg:text-[12.5px] ${
+                  unreadOnly
+                    ? "bg-[var(--accent)] font-semibold text-white"
+                    : "bg-neutral-100 font-medium text-slate-600 hover:bg-neutral-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10"
+                }`}
+              >
+                Unread
+              </button>
             </div>
           </div>
-          <div className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-2 pb-4 sm:px-3" ref={listRef}>
+
+          <div ref={listRef} className="flex-1 overflow-y-auto overscroll-contain px-2 pb-3">
             {listLoading ? (
-              <BrandLoader size="full" />
+              <div className="space-y-1 px-1 pt-1" aria-label="Loading conversations">
+                {Array.from({ length: 7 }, (_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-1.5 py-2">
+                    <div className="browse-shimmer size-11 shrink-0 rounded-lg bg-neutral-100 lg:size-10 dark:bg-white/5" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="browse-shimmer h-3 w-2/3 rounded-full bg-neutral-100 dark:bg-white/5" />
+                      <div className="browse-shimmer h-2.5 w-1/2 rounded-full bg-neutral-100 dark:bg-white/5" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : conversations.length === 0 ? (
-              <div className="px-4 py-8 text-center">
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">No conversations yet</p>
-                <p className="text-xs text-zinc-500 mt-1">
-                  Open a product and tap “Chat with Seller” to start.
+              <div className="flex flex-col items-center px-6 py-14 text-center">
+                <span className="grid size-12 place-items-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                  <MessagesSquare className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <p className="mt-3 text-[14px] font-semibold text-slate-900 dark:text-white">
+                  {debouncedSearch ? "No matching chats" : "No conversations yet"}
                 </p>
+                <p className="mt-1 text-[12.5px] text-slate-500 dark:text-zinc-400">
+                  {debouncedSearch ? "Try another name or product." : "Open a listing and tap “Chat with seller” to start."}
+                </p>
+              </div>
+            ) : nothingToShow ? (
+              <div className="px-6 py-14 text-center">
+                <p className="text-[14px] font-semibold text-slate-900 dark:text-white">You&apos;re all caught up</p>
+                <p className="mt-1 text-[12.5px] text-slate-500 dark:text-zinc-400">No unread conversations.</p>
+                <button type="button" onClick={() => setUnreadOnly(false)} className="mt-3 text-[13px] font-semibold text-[var(--accent-text)] hover:underline">
+                  Show all chats
+                </button>
               </div>
             ) : (
               <>
-                {proConvs.length > 0 && (
+                {visibleProConvs.length > 0 && (
                   <>
-                    <div className="mx-1 mt-1 mb-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400/25 via-orange-400/15 to-amber-400/25 border border-amber-300/60 text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-widest">
-                      <Crown size={13} strokeWidth={2.5} />
-                      <span className="flex-1">Pro circle · {proConvs.length}</span>
-                    </div>
-                    {proConvs.map((c) => (
-                      <ConversationCard
-                        key={c._id}
-                        conv={c}
-                        selected={String(selectedId) === String(c._id)}
-                        onClick={selectConversation}
-                      />
+                    <p className="flex items-center gap-1.5 px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                      <Crown className="h-3 w-3" aria-hidden="true" />
+                      Priority
+                    </p>
+                    {visibleProConvs.map((c) => (
+                      <ConversationCard key={c._id} conv={c} selected={String(selectedId) === String(c._id)} onClick={openConversation} />
                     ))}
+                    <p className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">All chats</p>
                   </>
                 )}
-                <div className="px-2 py-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                  {proConvs.length > 0 ? "Other conversations" : "Recent Conversations"}
-                </div>
-                {normalConvs.map((c) => (
-                  <ConversationCard
-                    key={c._id}
-                    conv={c}
-                    selected={String(selectedId) === String(c._id)}
-                    onClick={selectConversation}
-                  />
+                {visibleNormalConvs.map((c) => (
+                  <ConversationCard key={c._id} conv={c} selected={String(selectedId) === String(c._id)} onClick={openConversation} />
                 ))}
               </>
             )}
           </div>
         </div>
 
-        {/* Draggable divider: hover the list/thread seam to resize (280–560px, double-click resets) */}
+        {/* Resizable seam (desktop): drag 280–560px, double-click resets */}
         <div
           onPointerDown={onDividerDown}
           onDoubleClick={resetSideW}
           title="Drag to resize · double-click to reset"
-          className="hidden lg:flex w-2 -ml-1 mr-0 shrink-0 cursor-col-resize touch-none items-stretch justify-center group z-10"
+          className="group z-10 -ml-1 hidden w-2 shrink-0 cursor-col-resize touch-none items-stretch justify-center lg:flex"
         >
-          <div className="w-[3px] rounded-full bg-transparent group-hover:bg-[#3838EC]/40 group-active:bg-[#3838EC]/60 transition-colors my-2" />
+          <div className="my-2 w-[3px] rounded-full bg-transparent transition-colors group-hover:bg-[var(--accent-ring)] group-active:bg-[var(--accent)]" />
         </div>
 
-        {/* RIGHT */}
+        {/* ── Thread ── */}
         <div
           key={selectedId || "none"}
-          className={`${
-            !selectedId ? "hidden lg:flex" : "flex"
-          } flex-1 flex-col h-full min-h-0 min-w-0 relative bg-[#F7F9FD] dark:bg-[#131313] animate-chat-in`}
+          className={`${!selectedId ? "hidden lg:flex" : "flex"} animate-chat-in relative h-full min-h-0 min-w-0 flex-1 flex-col bg-[#F7F9FD] dark:bg-[#131313]`}
         >
           {selectedId ? (
             <>
-              {/* Reconnecting banner */}
-              {!socketLive && (
-                <div className="mx-3 sm:mx-6 lg:mx-12 xl:mx-20 mt-3 flex items-center justify-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-[11px] font-bold text-amber-700">
-                  <WifiOff size={14} /> Reconnecting… messages will sync automatically
-                </div>
-              )}
-
-              {/* Product header card */}
-              <div className="mx-3 sm:mx-6 lg:mx-12 xl:mx-20 mt-3 rounded-lg border border-zinc-200 bg-white dark:bg-[#1c1c1c] dark:border-zinc-800 px-3 py-2 min-h-[60px] flex items-center justify-between gap-3 max-lg:mx-0 max-lg:mt-0 max-lg:rounded-none max-lg:border-x-0 max-lg:border-t-0 max-lg:pl-1.5 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))]">
-                <div className="flex items-center gap-3 min-w-0">
+              {/* Header */}
+              <div className="z-20 border-b border-neutral-200/80 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:pt-0 dark:border-neutral-800 dark:bg-[#16181B]/95">
+                <div className="flex h-14 items-center gap-2 px-1.5 lg:px-4">
                   <button
+                    type="button"
                     onClick={() => setSelectedId(null)}
                     aria-label="Back to conversations"
-                    className="lg:hidden grid h-10 w-9 shrink-0 place-items-center rounded-full active:bg-zinc-100 dark:active:bg-white/10"
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-700 active:bg-neutral-100 lg:hidden dark:text-zinc-200 dark:active:bg-white/10"
                   >
-                    <ChevronLeft className="w-6 h-6 text-[#394ff1]" />
+                    <ChevronLeft className="h-6 w-6" />
                   </button>
-                  <img
-                    src={typeof productImg === "string" ? productImg : "/logo.svg"}
-                    alt={productTitle}
-                    loading="lazy"
-                    width={44}
-                    height={44}
-                    className="size-9 sm:size-11 rounded-lg object-cover border border-zinc-100 bg-white shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <h2 className="font-semibold text-sm sm:text-[15px] text-zinc-900 dark:text-white truncate leading-tight">
-                      {productTitle}
-                    </h2>
-                    <p className="text-sm sm:text-[15px] font-bold text-[#3838EC] leading-tight">
-                      ₹{Number(agreedPrice ?? askingPrice ?? headerPrice ?? 0).toLocaleString("en-IN")}
-                      {agreedPrice != null && (
-                        <span className="ml-1.5 text-xs font-semibold text-zinc-400 line-through">
-                          ₹{Number(askingPrice || 0).toLocaleString("en-IN")}
-                        </span>
-                      )}
-                    </p>
-                    <p className="flex min-w-0 items-center gap-1 text-[11px] leading-tight text-zinc-500 dark:text-zinc-400">
-                      {peerOnline && (
-                        <span className="size-1.5 shrink-0 rounded-full bg-[#22c55e]" aria-hidden="true" />
-                      )}
+                  <Link to={productPath(product?._id ? product : detail?.product_id || "")} className="shrink-0" title="View listing">
+                    <img
+                      src={typeof productImg === "string" ? productImg : "/logo.svg"}
+                      alt={productTitle}
+                      loading="lazy"
+                      width={36}
+                      height={36}
+                      className="size-9 rounded-lg border border-black/5 bg-white object-cover dark:border-white/10"
+                    />
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold leading-tight text-slate-900 dark:text-white">{productTitle}</p>
+                    <p className="flex min-w-0 items-center gap-1.5 text-[12px] leading-tight text-slate-500 dark:text-zinc-400">
+                      {peerOnline && <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />}
                       <span className="truncate">
                         {otherName}
-                        {peerOnline ? " · online" : ` · ${agreedPrice != null ? "agreed price" : "asking price"}`}
+                        {peerOnline ? " · online" : peerTyping ? " · typing…" : ""}
+                      </span>
+                      <span className="shrink-0 font-semibold text-slate-700 lg:hidden dark:text-zinc-200">
+                        · ₹{Number(agreedPrice ?? askingPrice ?? headerPrice ?? 0).toLocaleString("en-IN")}
                       </span>
                     </p>
                   </div>
-                </div>
-                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                  {badge && (
-                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${badge.cls}`}>
-                      {badge.label}
+                  <div className="hidden shrink-0 items-baseline gap-1.5 pr-1 lg:flex">
+                    <span className="text-[14px] font-semibold tabular-nums text-slate-900 dark:text-white">
+                      ₹{Number(agreedPrice ?? askingPrice ?? headerPrice ?? 0).toLocaleString("en-IN")}
                     </span>
-                  )}
+                    {agreedPrice != null && (
+                      <span className="text-[12px] text-slate-400 line-through">₹{Number(askingPrice || 0).toLocaleString("en-IN")}</span>
+                    )}
+                  </div>
+                  {badge && <span className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold sm:inline ${badge.cls}`}>{badge.label}</span>}
                   <button
-                    onClick={() => setReportProductOpen(true)}
-                    title="Report product / listing"
-                    aria-label="Report product / listing"
-                    className="p-1.5 sm:p-2 text-zinc-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-lg transition shrink-0"
+                    type="button"
+                    onClick={() => {
+                      setSearchOpen((v) => !v);
+                      setTimeout(() => searchInputRef.current?.focus(), 0);
+                    }}
+                    aria-label="Search in conversation"
+                    aria-pressed={searchOpen}
+                    className={`${iconBtn} ${searchOpen ? "bg-neutral-100 text-slate-900 dark:bg-white/10 dark:text-white" : ""}`}
                   >
-                    <Flag size={18} />
+                    <Search className="h-[18px] w-[18px]" />
                   </button>
-                  <button
-                    onClick={() => setReportOpen(true)}
-                    title="Report user"
-                    aria-label="Report user"
-                    className="p-1.5 sm:p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition shrink-0"
-                  >
-                    <ShieldAlert size={18} />
-                  </button>
+                  <div className="relative" ref={menuRef}>
+                    <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label="More options" aria-expanded={menuOpen} className={iconBtn}>
+                      <MoreVertical className="h-[18px] w-[18px]" />
+                    </button>
+                    {menuOpen && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-800 dark:bg-[#1A1D20]"
+                      >
+                        <Link
+                          role="menuitem"
+                          to={productPath(product?._id ? product : detail?.product_id || "")}
+                          className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-slate-700 hover:bg-neutral-100 dark:text-zinc-200 dark:hover:bg-white/5"
+                        >
+                          <ExternalLink className="h-4 w-4 text-slate-400" /> View listing
+                        </Link>
+                        <button
+                          role="menuitem"
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setDealOpen((v) => !v);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-700 hover:bg-neutral-100 dark:text-zinc-200 dark:hover:bg-white/5"
+                        >
+                          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${dealOpen ? "rotate-180" : ""}`} />
+                          {dealOpen ? "Collapse deal card" : "Expand deal card"}
+                        </button>
+                        {deal && !["completed", "cancelled", "negotiating"].includes(deal.status) && (
+                          <button
+                            role="menuitem"
+                            type="button"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              if (!window.confirm("Cancel this deal? The item becomes available again.")) return;
+                              runDealAction(() => chatApi.cancelDeal(selectedId, "Cancelled from chat"), "Deal cancelled");
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-700 hover:bg-neutral-100 dark:text-zinc-200 dark:hover:bg-white/5"
+                          >
+                            <XCircle className="h-4 w-4 text-slate-400" /> Cancel deal
+                          </button>
+                        )}
+                        <div className="my-1 h-px bg-neutral-100 dark:bg-neutral-800" />
+                        <button
+                          role="menuitem"
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setReportProductOpen(true);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-700 hover:bg-neutral-100 dark:text-zinc-200 dark:hover:bg-white/5"
+                        >
+                          <Flag className="h-4 w-4 text-amber-500" /> Report listing
+                        </button>
+                        <button
+                          role="menuitem"
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setReportOpen(true);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                        >
+                          <ShieldAlert className="h-4 w-4" /> Report {otherName || "user"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* In-thread search */}
+                {searchOpen && (
+                  <div className="flex items-center gap-2 border-t border-neutral-100 px-3 py-2 lg:px-4 dark:border-neutral-800">
+                    <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg bg-neutral-100 px-3 dark:bg-white/5">
+                      <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                      <input
+                        ref={searchInputRef}
+                        type="search"
+                        value={threadQuery}
+                        onChange={(e) => setThreadQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            stepMatch(e.shiftKey ? 1 : -1);
+                          }
+                          if (e.key === "Escape") setSearchOpen(false);
+                        }}
+                        placeholder="Search this conversation"
+                        aria-label="Search this conversation"
+                        className="w-full bg-transparent text-[14px] text-slate-900 outline-none placeholder:text-slate-400 lg:text-[13.5px] dark:text-white"
+                      />
+                    </label>
+                    <span className="w-14 shrink-0 text-center text-[12px] tabular-nums text-slate-500 dark:text-zinc-400" aria-live="polite">
+                      {q.length >= 2 ? (matchIds.length ? `${matchIdx + 1}/${matchIds.length}` : "0/0") : ""}
+                    </span>
+                    <button type="button" onClick={() => stepMatch(-1)} disabled={!matchIds.length} aria-label="Previous match" className={`${iconBtn} disabled:opacity-40`}>
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button type="button" onClick={() => stepMatch(1)} disabled={!matchIds.length} aria-label="Next match" className={`${iconBtn} disabled:opacity-40`}>
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    <button type="button" onClick={() => setSearchOpen(false)} aria-label="Close search" className={iconBtn}>
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {!socketLive && (
+                  <p className="flex items-center justify-center gap-1.5 border-t border-amber-200 bg-amber-50 px-3 py-1.5 text-[12px] font-medium text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                    <WifiOff size={13} /> Reconnecting… messages will sync automatically
+                  </p>
+                )}
               </div>
 
-              {/* Deal progress (both sides; actions gated by role+status) */}
+              {/* Deal card */}
               {deal && (
-                <div className="mx-3 sm:mx-6 lg:mx-12 xl:mx-20 mt-2">
-                <DealProgress
-                  deal={deal}
-                  role={role}
-                  defaultLocation={defaultPickup}
-                  busy={busy}
-                  open={dealOpen}
-                  onToggle={() => setDealOpen((v) => !v)}
-                  onConfirmDeal={(amt) =>
-                    runDealAction(() => chatApi.confirmDeal(selectedId, amt), "Deal locked")
-                  }
-                  onSchedulePickup={(d, loc) =>
-                    runDealAction(() => chatApi.schedulePickup(selectedId, d, loc), "Pickup set")
-                  }
-                  onPayment={() =>
-                    runDealAction(() => chatApi.confirmPayment(selectedId), "Payment confirmed")
-                  }
-                  onReceived={() =>
-                    runDealAction(() => chatApi.confirmItemReceived(selectedId), "Done. Enjoy your buy.")
-                  }
-                />
+                <div className="px-3 pt-2.5 lg:px-6">
+                  <div className="mx-auto max-w-3xl">
+                    <DealProgress
+                      deal={deal}
+                      role={role}
+                      defaultLocation={defaultPickup}
+                      busy={busy}
+                      open={dealOpen}
+                      onToggle={() => setDealOpen((v) => !v)}
+                      onConfirmDeal={(amt) => runDealAction(() => chatApi.confirmDeal(selectedId, amt), "Deal locked")}
+                      onSchedulePickup={(d, loc) => runDealAction(() => chatApi.schedulePickup(selectedId, d, loc), "Pickup set")}
+                      onPayment={() => runDealAction(() => chatApi.confirmPayment(selectedId), "Payment confirmed")}
+                      onReceived={() => runDealAction(() => chatApi.confirmItemReceived(selectedId), "Done. Enjoy your buy.")}
+                      onRevert={() => runDealAction(() => chatApi.revertDeal(selectedId), "Step undone")}
+                    />
+                  </div>
                 </div>
               )}
 
               {/* Messages */}
-              <div
-                ref={threadScrollRef}
-                onScroll={handleThreadScroll}
-                className={`flex-1 overflow-y-auto overscroll-contain px-3 sm:px-6 lg:px-12 xl:px-20 py-4 bg-[#F7F9FD] dark:bg-[#131313] ${wallCls}`}
-              >
-                {!threadLoading && (
-                  <div className="flex justify-center">
-                    <p className="flex max-w-md items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-center text-[12px] leading-5 text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200/90">
-                      <Lock size={13} className="mt-0.5 shrink-0" />
-                      <span>
-                        <span className="font-bold">Safe campus chat.</span>{" "}
-                        Messages are encrypted in transit and only visible
-                        inside this chat. Abuse gets auto-flagged.
-                      </span>
-                    </p>
-                  </div>
-                )}
-                {messages.length > 0 && !threadLoading && (
-                  <div className={`sticky top-1 z-10 flex justify-center pointer-events-none transition-opacity duration-150 ${stickyDay && !stickyHidden ? "opacity-100" : "opacity-0"}`}>
-                    <span className="text-[12.5px] uppercase font-medium text-zinc-500 dark:text-zinc-400 bg-white dark:bg-[#1c1c1c] px-3 py-[5px] rounded-lg shadow">
-                      {stickyDay || dayLabel(messages[0]?.createdAt)}
-                    </span>
-                  </div>
-                )}
-                {threadLoading && messages.length === 0 ? (
-                  <div className="space-y-3 animate-pulse" aria-label="Loading messages">
-                    <div className="h-10 w-2/3 rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
-                    <div className="h-10 w-1/2 rounded-2xl bg-zinc-200 dark:bg-zinc-800 ml-auto" />
-                    <div className="h-6 w-1/3 rounded-full bg-zinc-200 dark:bg-zinc-800 mx-auto" />
-                    <div className="h-10 w-3/5 rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
-                  </div>
-                ) : !threadLoading && messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-14 text-center">
-                    <span className="size-12 rounded-full bg-[#3838EC]/10 text-[#3838EC] flex items-center justify-center">
-                      <Send size={20} />
-                    </span>
-                    <p className="mt-3 text-sm font-bold text-zinc-800 dark:text-zinc-100">
-                      No messages yet
-                    </p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Say hi and lock the deal.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                {hasMore && (
-                  <div className="flex justify-center">
-                    <button
-                      onClick={() => loadOlder()}
-                      disabled={loadingMore}
-                      className={`${SELL_BTN} px-3 py-1.5 text-[11px]`}
-                    >
-                      {loadingMore ? "Loading…" : "Load older messages"}
-                    </button>
-                  </div>
-                )}
-                {(() => {
-                  // Flat node stream: day separators break sender groups,
-                  // consecutive same-sender text bubbles stack tight (2px)
-                  // while everything else breathes (12px), WhatsApp rhythm.
-                  const nodes = [];
-                  let lastDay = "";
-                  let prevGroup = null;
-                  messages.forEach((m, i) => {
-                    const key = dayKey(m.createdAt);
-                    if (key && key !== lastDay) {
-                      lastDay = key;
-                      nodes.push({
-                        t: "day",
-                        id: `day-${key}-${i}`,
-                        label: dayLabel(m.createdAt),
-                      });
-                      prevGroup = null;
-                    }
-                    const group =
-                      m.message_type === "text"
-                        ? `text:${String(m.sender_id)}`
-                        : `solo:${String(m._id)}`;
-                    // Breathing room: only incoming runs stack tight. Everything
-                    // I send (typed or quick chip) gets the full gap, live
-                    // and on reload alike, nothing ever looks merged.
-                    const mineRow = me && String(m.sender_id) === String(me);
-                    const tight =
-                      prevGroup !== null &&
-                      prevGroup === group &&
-                      !m.burst &&
-                      !mineRow;
-                    const next = messages[i + 1];
-                    const lastOfGroup = !(
-                      next &&
-                      next.message_type === "text" &&
-                      String(next.sender_id) === String(m.sender_id)
-                    );
-                    nodes.push({ t: "msg", m, tight, lastOfGroup });
-                    prevGroup = group;
-                  });
-                  return nodes.map((n) =>
-                    n.t === "day" ? (
-                      <div
-                        key={n.id}
-                        data-daylabel={n.label}
-                        className="flex justify-center mt-3 first:mt-0"
-                      >
-                        <span className="text-[12.5px] uppercase font-medium text-zinc-500 dark:text-zinc-400 bg-white dark:bg-[#1c1c1c] px-3 py-[5px] rounded-lg shadow-sm">
-                          {n.label}
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        key={n.m._id}
-                        id={`msg-${n.m._id}`}
-                        className={`${n.tight ? "mt-1" : "mt-3 first:mt-0"} rounded-lg scroll-mt-4 transition-shadow ${
-                          highlightId && String(highlightId) === String(n.m._id)
-                            ? "ring-2 ring-[#3838EC] shadow-lg shadow-indigo-500/20"
-                            : ""
-                        }`}
-                      >
-                        <MessageBubble
-                          msg={n.m}
-                          isMine={me ? String(n.m.sender_id) === String(me) : false}
-                          myId={me}
-                          deal={deal}
-                          otherName={otherName}
-                          acting={actingOffer}
-                          isLastOfGroup={n.lastOfGroup}
-                          onAccept={(msg) => respondOffer(msg, "accept")}
-                          onDecline={(msg) => respondOffer(msg, "decline")}
-                          onCounter={() => {
-                            dismissHint();
-                            setOfferOpen(true);
-                          }}
-                          onReply={startReply}
-                          onJumpTo={jumpToMessage}
-                        />
-                      </div>
-                    ),
-                  );
-                })()}
-                {peerTyping && (
-                  <div className="flex items-start mt-3" aria-label={`${otherName} is typing`}>
-                    <div className="flex items-center gap-1.5 rounded-lg rounded-bl-none bg-white dark:bg-[#1c1c1c] border border-zinc-100 dark:border-zinc-800 px-4 py-3 shadow-sm">
-                      <span className="sr-only">typing</span>
-                      {[0, 1, 2].map((i) => (
-                        <span
-                          key={i}
-                          className="size-2 rounded-full bg-[#3838EC] animate-bounce"
-                          style={{ animationDelay: `${i * 150}ms` }}
-                        />
-                      ))}
+              <div ref={threadScrollRef} onScroll={handleThreadScroll} className={`flex-1 overflow-y-auto overscroll-contain px-3 py-4 lg:px-6 ${wallCls}`}>
+                <div className="mx-auto max-w-3xl">
+                  {!threadLoading && (
+                    <div className="mb-3 flex justify-center">
+                      <p className="flex max-w-sm items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-center text-[11.5px] text-slate-500 shadow-sm ring-1 ring-black/5 dark:bg-[#1A1D20] dark:text-zinc-400 dark:ring-white/5">
+                        <Lock size={11} className="shrink-0" />
+                        Safe campus chat. Abuse is flagged automatically.
+                      </p>
                     </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-                  </>
-                )}
+                  )}
+                  {messages.length > 0 && !threadLoading && (
+                    <div
+                      className={`pointer-events-none sticky top-1 z-10 flex justify-center transition-opacity duration-150 ${
+                        stickyDay && !stickyHidden ? "opacity-100" : "opacity-0"
+                      }`}
+                    >
+                      <span className="rounded-full bg-white px-2.5 py-0.5 text-[11.5px] font-medium text-slate-500 shadow-sm ring-1 ring-black/5 dark:bg-[#1A1D20] dark:text-zinc-400 dark:ring-white/5">
+                        {stickyDay || dayLabel(messages[0]?.createdAt)}
+                      </span>
+                    </div>
+                  )}
+                  {threadLoading && messages.length === 0 ? (
+                    <div className="space-y-3" aria-label="Loading messages">
+                      <div className="browse-shimmer h-9 w-2/3 rounded-2xl bg-neutral-200/70 dark:bg-white/5" />
+                      <div className="browse-shimmer ml-auto h-9 w-1/2 rounded-2xl bg-neutral-200/70 dark:bg-white/5" />
+                      <div className="browse-shimmer h-9 w-3/5 rounded-2xl bg-neutral-200/70 dark:bg-white/5" />
+                      <div className="browse-shimmer ml-auto h-9 w-2/5 rounded-2xl bg-neutral-200/70 dark:bg-white/5" />
+                    </div>
+                  ) : !threadLoading && messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-14 text-center">
+                      <span className="grid size-12 place-items-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                        <Send size={20} />
+                      </span>
+                      <p className="mt-3 text-[14px] font-semibold text-slate-900 dark:text-white">Start the conversation</p>
+                      <p className="mt-1 text-[12.5px] text-slate-500 dark:text-zinc-400">Say hi, ask a question or make an offer.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {hasMore && (
+                        <div className="mb-2 flex justify-center">
+                          <button
+                            type="button"
+                            onClick={() => loadOlder()}
+                            disabled={loadingMore}
+                            className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-[var(--accent-text)] shadow-sm ring-1 ring-black/5 hover:bg-neutral-50 disabled:opacity-60 dark:bg-[#1A1D20] dark:ring-white/5"
+                          >
+                            {loadingMore ? "Loading…" : "Load earlier messages"}
+                          </button>
+                        </div>
+                      )}
+                      {(() => {
+                        // Day separators break sender runs; consecutive
+                        // incoming text bubbles stack tight, the rest breathe.
+                        const nodes = [];
+                        let lastDay = "";
+                        let prevGroup = null;
+                        messages.forEach((m, i) => {
+                          const key = dayKey(m.createdAt);
+                          if (key && key !== lastDay) {
+                            lastDay = key;
+                            nodes.push({ t: "day", id: `day-${key}-${i}`, label: dayLabel(m.createdAt) });
+                            prevGroup = null;
+                          }
+                          if (dividerId && String(m._id) === dividerId) {
+                            nodes.push({ t: "new", id: `new-${m._id}` });
+                            prevGroup = null;
+                          }
+                          const group = m.message_type === "text" ? `text:${String(m.sender_id)}` : `solo:${String(m._id)}`;
+                          const mineRow = me && String(m.sender_id) === String(me);
+                          const tight = prevGroup !== null && prevGroup === group && !m.burst && !mineRow;
+                          const next = messages[i + 1];
+                          const lastOfGroup = !(next && next.message_type === "text" && String(next.sender_id) === String(m.sender_id));
+                          nodes.push({ t: "msg", m, tight, lastOfGroup });
+                          prevGroup = group;
+                        });
+                        return nodes.map((n) =>
+                          n.t === "day" ? (
+                            <div key={n.id} data-daylabel={n.label} className="mt-4 flex justify-center first:mt-0">
+                              <span className="rounded-full bg-white px-2.5 py-0.5 text-[11.5px] font-medium text-slate-500 shadow-sm ring-1 ring-black/5 dark:bg-[#1A1D20] dark:text-zinc-400 dark:ring-white/5">
+                                {n.label}
+                              </span>
+                            </div>
+                          ) : n.t === "new" ? (
+                            <div key={n.id} className="my-3 flex items-center gap-3" role="separator" aria-label="New messages">
+                              <span className="h-px flex-1 bg-[var(--accent-ring)]" />
+                              <span className="text-[11.5px] font-semibold text-[var(--accent-text)]">New messages</span>
+                              <span className="h-px flex-1 bg-[var(--accent-ring)]" />
+                            </div>
+                          ) : (
+                            <div
+                              key={n.m._id}
+                              id={`msg-${n.m._id}`}
+                              className={`${n.tight ? "mt-0.5" : "mt-2.5 first:mt-0"} scroll-mt-20 rounded-2xl transition-shadow ${
+                                highlightId && String(highlightId) === String(n.m._id) ? "ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-transparent" : ""
+                              }`}
+                            >
+                              <MessageBubble
+                                msg={n.m}
+                                isMine={me ? String(n.m.sender_id) === String(me) : false}
+                                myId={me}
+                                deal={deal}
+                                otherName={otherName}
+                                acting={actingOffer}
+                                isLastOfGroup={n.lastOfGroup}
+                                query={searchOpen && q.length >= 2 ? q : ""}
+                                onAccept={(msg) => respondOffer(msg, "accept")}
+                                onDecline={(msg) => respondOffer(msg, "decline")}
+                                onCounter={() => {
+                                  dismissHint();
+                                  setOfferOpen(true);
+                                }}
+                                onReply={(msg) => {
+                                  startReply(msg);
+                                  setTimeout(() => composerRef.current?.focus(), 0);
+                                }}
+                                onJumpTo={jumpToMessage}
+                              />
+                            </div>
+                          ),
+                        );
+                      })()}
+                      {peerTyping && (
+                        <div className="mt-2.5 flex items-start" aria-label={`${otherName} is typing`}>
+                          <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-white px-3.5 py-3 shadow-sm ring-1 ring-black/[0.04] dark:bg-[#1F2226] dark:ring-white/5">
+                            <span className="sr-only">typing</span>
+                            {[0, 1, 2].map((i) => (
+                              <span key={i} className="size-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: `${i * 150}ms` }} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div ref={messagesEndRef} />
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* Jump to latest (shows when reading history + new arrivals) */}
+              {/* Jump to latest */}
               {showJump && (
                 <button
+                  type="button"
                   onClick={() => scrollToBottom()}
                   aria-label="Jump to latest messages"
-                  className="absolute right-4 bottom-36 z-10 size-10 rounded-full bg-white dark:bg-[#1c1c1c] shadow-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:text-[#3838EC]"
+                  className="absolute bottom-32 right-4 z-10 grid size-10 place-items-center rounded-full border border-neutral-200 bg-white text-slate-700 shadow-lg hover:text-[var(--accent-text)] lg:right-8 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-200"
                 >
                   <ChevronDown size={20} />
                   {pendingCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-[#3838EC] text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-bold text-white">
                       {pendingCount > 9 ? "9+" : pendingCount}
                     </span>
                   )}
                 </button>
               )}
 
-              {/* Floating bottom bar: quick chips + input in one blurred card */}
-              <div className="mx-3 sm:mx-6 lg:mx-12 xl:mx-20 mb-[max(0.75rem,env(safe-area-inset-bottom))] rounded-2xl bg-white/90 dark:bg-[#1c1c1c]/90 backdrop-blur-md border border-white/70 dark:border-zinc-700/60 shadow-[0_14px_44px_-12px_rgba(56,56,236,0.35)] max-lg:mx-0 max-lg:mb-0 max-lg:rounded-none max-lg:border-x-0 max-lg:border-b-0 max-lg:border-t-zinc-200 max-lg:bg-white/95 max-lg:pb-[env(safe-area-inset-bottom)] max-lg:shadow-none dark:max-lg:border-t-zinc-800 dark:max-lg:bg-[#16181B]/95">
-              {coolingDown && (
-                <div className="mx-3 mt-2.5 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 px-3 py-2">
-                  <Timer size={14} className="text-red-500 shrink-0" />
-                  <p className="text-[11px] font-bold text-red-600 dark:text-red-400">
-                    Take a breather. Sending unlocks in {fmtCooldown(cooldownMsLeft)}.
-                  </p>
-                </div>
-              )}
-              <div className="px-3 pt-2.5 pb-1 flex gap-2 overflow-x-auto no-scrollbar">
-                {QUICK_CHIPS.map((chip) => (
-                  <button
-                    key={chip}
-                    disabled={coolingDown}
-                    onClick={(e) => handleSend(e, chip)}
-                    className="shrink-0 text-[13px] border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1c1c1c] text-zinc-700 dark:text-zinc-200 px-3.5 py-1.5 rounded-full hover:border-[#3838EC] hover:text-[#3838EC] disabled:opacity-40"
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-
-              {/* Reply quote bar */}
-              {replyingTo && (
-                <div className="mx-3 mt-2 flex items-stretch gap-0 overflow-hidden rounded-lg bg-black/[0.05] dark:bg-white/10">
-                  <span className="w-1 shrink-0 bg-[#3838EC]" />
-                  <div className="min-w-0 flex-1 px-2.5 py-1.5">
-                    <p className="text-[12px] font-semibold text-[#3838EC] dark:text-[#8FA2FF] truncate">
-                      Replying to {replyingTo.senderName}
+              {/* Composer */}
+              <div className="border-t border-neutral-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:border-0 lg:bg-transparent lg:px-6 lg:pb-4 lg:backdrop-blur-none dark:border-neutral-800 dark:bg-[#16181B]/95 lg:dark:bg-transparent">
+                <div className="mx-auto max-w-3xl lg:rounded-2xl lg:border lg:border-neutral-200/80 lg:bg-white lg:shadow-[0_8px_30px_-12px_rgba(15,23,42,0.18)] lg:dark:border-neutral-800 lg:dark:bg-[#1A1D20]">
+                  {coolingDown && (
+                    <p className="mx-3 mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-[12px] font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                      <Timer size={13} className="shrink-0" />
+                      Take a breather. Sending unlocks in {fmtCooldown(cooldownMsLeft)}.
                     </p>
-                    <p className="text-[12px] text-zinc-600 dark:text-zinc-300 truncate">
-                      {replyingTo.text}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setReplyingTo(null)}
-                    aria-label="Cancel reply"
-                    className="px-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-
-              {/* Input + offer */}
-              <div className="px-3 pb-2.5 pt-1 relative">
-                {showOfferHint && (
-                  <div className="absolute left-2 bottom-full mb-2 z-20 flex items-center gap-1 rounded-full bg-zinc-900 text-white pl-3 pr-1.5 py-1.5 shadow-xl">
-                    <button
-                      onClick={() => {
-                        dismissHint();
-                        setOfferOpen(true);
-                      }}
-                      className="text-[11px] font-semibold whitespace-nowrap"
-                    >
-                      Tap ₹ to make an offer
-                    </button>
-                    <button
-                      onClick={dismissHint}
-                      aria-label="Dismiss offer hint"
-                      className="p-1 rounded-full hover:bg-white/15"
-                    >
-                      <X size={12} />
-                    </button>
-                    <span className="absolute -bottom-[3px] left-7 size-2 rotate-45 bg-zinc-900" />
-                  </div>
-                )}
-                {offerOpen && (
-                  <div
-                    ref={offerPopupRef}
-                    className="absolute left-3 bottom-full mb-2 w-[280px] rounded-xl border border-indigo-100 bg-white shadow-2xl overflow-hidden z-20"
-                  >
-                    {!negotiable && (
-                      <div className="flex items-start gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2.5">
-                        <Ban size={14} className="text-amber-600 shrink-0 mt-px" />
-                        <p className="text-[11px] font-semibold leading-5 text-amber-700">
-                          Seller&apos;s not accepting offers on this one, the
-                          price is fixed.
-                        </p>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2.5 px-4 pt-3.5">
-                      <span className="size-9 rounded-full bg-[#3838EC]/10 text-[#3838EC] flex items-center justify-center text-lg font-black shrink-0">
-                        ₹
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-bold text-[15px] text-zinc-900 leading-tight">
-                          Make an Offer
-                        </p>
-                        <p className="text-[11px] text-zinc-500">
-                          Asking{" "}
-                          <span className="font-bold text-[#3838EC]">
-                            ₹{Number(popupAsking || 0).toLocaleString("en-IN")}
-                          </span>{" "}
-                          · offer below this
-                        </p>
-                      </div>
-                    </div>
-                    <div className="p-3.5 flex gap-2">
-                      <label
-                        className={`${INPUT_BASE} flex-1 min-w-0 flex items-center px-3 transition-colors focus-within:border-[#3838EC] ${
-                          !negotiable ? "opacity-50" : ""
-                        }`}
-                      >
-                        <span className="font-bold text-zinc-500 mr-1">₹</span>
-                        <input
-                          value={offerAmount}
-                          onChange={(e) => setOfferAmount(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleMakeOffer();
-                            }
-                          }}
-                          inputMode="numeric"
-                          autoFocus={negotiable}
-                          disabled={!negotiable}
-                          aria-label="Offer amount"
-                          placeholder="Enter amount"
-                          className="w-full bg-transparent py-2.5 text-base sm:text-sm font-bold text-zinc-900 placeholder:font-normal placeholder:text-zinc-400 outline-none disabled:cursor-not-allowed"
-                        />
-                      </label>
+                  )}
+                  <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-3 pb-1 pt-2.5">
+                    {QUICK_CHIPS.map((chip) => (
                       <button
-                        disabled={busy || !negotiable}
-                        onClick={handleMakeOffer}
-                        className={`${SELL_BTN} px-5 py-2.5 text-sm shadow-md shadow-indigo-500/25 shrink-0`}
+                        key={chip}
+                        type="button"
+                        disabled={coolingDown}
+                        onClick={(e) => handleSend(e, chip)}
+                        className="h-7 shrink-0 rounded-full border border-neutral-200 bg-white px-3 text-[12.5px] text-slate-600 transition-colors hover:border-[var(--accent-ring)] hover:text-[var(--accent-text)] disabled:opacity-40 dark:border-neutral-700 dark:bg-transparent dark:text-zinc-300"
                       >
-                        Send
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+
+                  {replyingTo && (
+                    <div className="mx-3 mt-1.5 flex items-stretch overflow-hidden rounded-lg bg-neutral-100 dark:bg-white/5">
+                      <span className="w-[3px] shrink-0 bg-[var(--accent)]" />
+                      <div className="min-w-0 flex-1 px-2.5 py-1.5">
+                        <p className="truncate text-[12px] font-semibold text-[var(--accent-text)]">Replying to {replyingTo.senderName}</p>
+                        <p className="truncate text-[12px] text-slate-600 dark:text-zinc-300">{replyingTo.text}</p>
+                      </div>
+                      <button type="button" onClick={() => setReplyingTo(null)} aria-label="Cancel reply" className="px-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200">
+                        <X size={15} />
                       </button>
                     </div>
+                  )}
+
+                  <div className="relative px-2.5 pb-2.5 pt-1.5">
+                    {showOfferHint && (
+                      <div className="absolute bottom-full left-2.5 z-20 mb-1.5 flex items-center gap-1 rounded-full bg-slate-900 py-1 pl-3 pr-1 text-white shadow-xl dark:bg-white dark:text-slate-900">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            dismissHint();
+                            setOfferOpen(true);
+                          }}
+                          className="whitespace-nowrap text-[12px] font-semibold"
+                        >
+                          Tap ₹ to make an offer
+                        </button>
+                        <button type="button" onClick={dismissHint} aria-label="Dismiss offer hint" className="rounded-full p-1 hover:bg-white/15">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
+                    {offerOpen && (
+                      <div
+                        ref={offerPopupRef}
+                        className="absolute bottom-full left-2.5 z-20 mb-2 w-[290px] overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-[#1A1D20]"
+                      >
+                        {!negotiable && (
+                          <p className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3.5 py-2 text-[12px] font-medium text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                            <Ban size={13} className="mt-0.5 shrink-0" />
+                            The seller isn&apos;t taking offers on this one. The price is fixed.
+                          </p>
+                        )}
+                        <div className="px-3.5 pt-3">
+                          <p className="text-[14px] font-semibold text-slate-900 dark:text-white">Make an offer</p>
+                          <p className="text-[12px] text-slate-500 dark:text-zinc-400">
+                            Asking <span className="font-semibold text-slate-800 dark:text-zinc-100">₹{Number(popupAsking || 0).toLocaleString("en-IN")}</span>
+                          </p>
+                        </div>
+                        <div className="flex gap-2 p-3.5">
+                          <label
+                            className={`flex h-10 min-w-0 flex-1 items-center rounded-lg border border-neutral-200 bg-white px-3 focus-within:border-[var(--accent)] focus-within:ring-4 focus-within:ring-[var(--accent-soft)] dark:border-neutral-700 dark:bg-[#131313] ${
+                              !negotiable ? "opacity-50" : ""
+                            }`}
+                          >
+                            <span className="mr-1 font-semibold text-slate-400">₹</span>
+                            <input
+                              value={offerAmount}
+                              onChange={(e) => setOfferAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleMakeOffer();
+                                }
+                              }}
+                              inputMode="numeric"
+                              autoFocus={negotiable}
+                              disabled={!negotiable}
+                              aria-label="Offer amount"
+                              placeholder="Your offer"
+                              className="w-full bg-transparent text-[15px] font-semibold tabular-nums text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 disabled:cursor-not-allowed dark:text-white"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            disabled={busy || !negotiable}
+                            onClick={handleMakeOffer}
+                            className="inline-flex h-10 shrink-0 items-center rounded-lg bg-[var(--accent)] px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
+                          >
+                            Send offer
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    <form onSubmit={handleSend} className="flex items-end gap-1.5">
+                      <button
+                        ref={rupeeBtnRef}
+                        type="button"
+                        title="Make an offer"
+                        aria-label="Make an offer"
+                        onClick={() => {
+                          // After confirmation the price is locked: say so
+                          // instead of opening a dead popup.
+                          if (deal && !["negotiating", "offer_accepted", "cancelled"].includes(deal.status || "negotiating")) {
+                            toast("Final price is already locked for this deal");
+                            return;
+                          }
+                          setOfferOpen((v) => !v);
+                        }}
+                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-[19px] font-semibold transition-colors ${
+                          offerOpen
+                            ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                            : "text-slate-600 hover:bg-neutral-100 hover:text-[var(--accent-text)] dark:text-zinc-300 dark:hover:bg-white/5"
+                        }`}
+                      >
+                        ₹
+                      </button>
+                      <div className="flex min-w-0 flex-1 items-end rounded-[20px] bg-neutral-100 px-3.5 py-2 focus-within:ring-2 focus-within:ring-[var(--accent-ring)] dark:bg-white/5">
+                        <textarea
+                          ref={composerRef}
+                          rows={1}
+                          value={chatInput}
+                          maxLength={2000}
+                          onChange={(e) => {
+                            setChatInput(e.target.value);
+                            if (typingOn) {
+                              sendTyping(true);
+                              clearTimeout(typingTimeout.current);
+                              typingTimeout.current = setTimeout(() => sendTyping(false), 1200);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            // Enter sends, Shift+Enter adds a line (desktop).
+                            // On touch keyboards Enter inserts a newline.
+                            const coarse = window.matchMedia?.("(pointer: coarse)").matches;
+                            if (e.key === "Enter" && !e.shiftKey && !coarse && !e.nativeEvent.isComposing) {
+                              e.preventDefault();
+                              handleSend(e);
+                            }
+                            if (e.key === "Escape" && replyingTo) setReplyingTo(null);
+                          }}
+                          placeholder={coolingDown ? "Sending paused…" : "Message"}
+                          aria-label="Type a message"
+                          disabled={coolingDown}
+                          onFocus={() => {
+                            // Mobile keyboard pushes the layout; keep the
+                            // latest messages visible once it settles.
+                            setTimeout(() => {
+                              if (nearBottomRef.current) scrollToBottom(false);
+                            }, 350);
+                          }}
+                          className="max-h-[132px] min-h-[24px] w-full resize-none bg-transparent text-[16px] leading-6 text-slate-900 outline-none placeholder:text-slate-400 lg:text-[14px] lg:leading-[22px] dark:text-zinc-100"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={!chatInput.trim() || coolingDown}
+                        aria-label="Send message"
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] disabled:bg-neutral-300 disabled:shadow-none dark:disabled:bg-neutral-700"
+                      >
+                        <Send size={17} className="-ml-0.5" />
+                      </button>
+                    </form>
+                    <div className="mt-1.5 hidden items-center justify-between px-1 text-[11px] text-slate-400 lg:flex dark:text-zinc-500">
+                      <span className="flex items-center gap-1">
+                        <Lock size={10} />
+                        Never share OTPs or passwords.
+                      </span>
+                      <span className="tabular-nums">
+                        {charCount > 1800 ? `${charCount}/2000 · ` : ""}
+                        <kbd className="font-sans">Enter</kbd> to send · <kbd className="font-sans">Shift + Enter</kbd> for a new line
+                      </span>
+                    </div>
                   </div>
-                )}
-                <form onSubmit={handleSend} className="flex items-center gap-1.5">
-                  <button
-                    ref={rupeeBtnRef}
-                    type="button"
-                    title="Make an offer"
-                    aria-label="Make an offer"
-                    onClick={() => {
-                      // Post-confirm the final price is locked, say so
-                      // instead of opening a dead popup. Negotiation-off is
-                      // explained inside the popup with a notice banner.
-                      if (
-                        deal &&
-                        !["negotiating", "offer_accepted", "cancelled"].includes(
-                          deal.status || "negotiating",
-                        )
-                      ) {
-                        toast("Final price is already locked for this deal");
-                        return;
-                      }
-                      setOfferOpen((v) => !v);
-                    }}
-                    className="px-2 text-[22px] leading-none font-normal text-zinc-800 hover:text-[#3838EC] dark:text-zinc-100 shrink-0"
-                  >
-                    ₹
-                  </button>
-                  <input
-                    value={chatInput}
-                    onChange={(e) => {
-                      setChatInput(e.target.value);
-                      if (typingOn) {
-                        sendTyping(true);
-                        clearTimeout(typingTimeout.current);
-                        typingTimeout.current = setTimeout(() => sendTyping(false), 1200);
-                      }
-                    }}
-                    placeholder={coolingDown ? "Sending paused..." : "Type a message..."}
-                    aria-label="Type a message"
-                    disabled={coolingDown}
-                    onFocus={() => {
-                      // Mobile keyboard pushes the layout, keep the latest
-                      // messages visible once it settles.
-                      setTimeout(() => {
-                        if (nearBottomRef.current) scrollToBottom(false);
-                      }, 350);
-                    }}
-                    className="flex-1 min-w-0 rounded-full border border-zinc-200 bg-white px-4 py-2.5 text-base sm:text-[15px] text-zinc-900 placeholder:text-zinc-400 outline-none focus:border-[#3838EC] dark:bg-[#131313] dark:border-zinc-700 dark:text-zinc-100"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!chatInput.trim() || coolingDown}
-                    aria-label="Send message"
-                    className="rounded-full bg-[#3838EC] hover:bg-[#2f2fd9] disabled:opacity-50 p-3 text-[#FCFCFC] transition-all shrink-0 shadow-sm"
-                  >
-                    <Send size={18} />
-                  </button>
-                </form>
-                <p className="flex items-center justify-center gap-1 px-3 pb-1 pt-1 text-center text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
-                  <Lock size={10} className="shrink-0" />
-                  Be kind, abuse gets flagged to admins. Never share OTPs or
-                  passwords.
-                </p>
-              </div>
+                </div>
               </div>
             </>
           ) : (
-            <div className="hidden lg:flex flex-1 flex-col items-center gap-3 justify-center p-8">
-              <img src="/logo.svg" alt="Unideals logo" className="size-12 object-contain" />
-              <h2 className="text-2xl font-bold text-zinc-800 dark:text-white tracking-tight">
-                Welcome to Unideals
-              </h2>
-              <p className="text-sm text-zinc-500 max-w-sm text-center">
-                Select a conversation from the sidebar to start chatting.
+            <div className="hidden flex-1 flex-col items-center justify-center gap-3 p-8 text-center lg:flex">
+              <span className="grid size-14 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                <MessagesSquare className="h-7 w-7" aria-hidden="true" />
+              </span>
+              <h2 className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-white">Your messages</h2>
+              <p className="max-w-xs text-[13px] text-slate-500 dark:text-zinc-400">
+                Pick a conversation to read it, make an offer or set up a pickup.
               </p>
+              <ul className="mt-2 space-y-1.5 text-left text-[12.5px] text-slate-500 dark:text-zinc-400">
+                <li className="flex items-center gap-2">
+                  <Lock className="h-3.5 w-3.5 text-emerald-500" /> Meet on campus and pay at pickup
+                </li>
+                <li className="flex items-center gap-2">
+                  <Search className="h-3.5 w-3.5 text-slate-400" /> Search any conversation from its header
+                </li>
+              </ul>
             </div>
           )}
         </div>
@@ -1658,7 +1872,7 @@ const Chat = () => {
     <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD]">
       <div className="flex h-[calc(100vh-var(--header-h)-var(--tabbar-h))] h-[calc(100dvh-var(--header-h)-var(--tabbar-h))]">
         {/* LEFT: profile menu */}
-        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
+        <div className="hidden shrink-0 md:block">
           <Profile_left_part />
         </div>
 

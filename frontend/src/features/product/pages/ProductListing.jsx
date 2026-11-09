@@ -6,6 +6,7 @@ import { getProductById } from "../api/productApi";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useProductListingContext } from "../context/ProductListingContext";
 import { toast } from "../../../components/ui/toast.js";
+import { productPath } from "../../../utils/productPath.js";
 
 // Inner wrapper that has access to context (so it can call initEditMode).
 const EditModeInitializer = ({ productId, onReady }) => {
@@ -32,13 +33,14 @@ const EditModeInitializer = ({ productId, onReady }) => {
 
     (async () => {
       try {
-        const res = await getProductById(productId, {}, { fresh: true });
+        // view=edit: the owner's form skips buyer-page extras server-side.
+        const res = await getProductById(productId, { view: "edit" }, { fresh: true });
         const product =
           res.data?.data || res.data?.product || res.data;
         if (cancelled) return;
         if (!product?._id) {
           toast.error("Could not load product for editing.");
-          navigate(`/product/${productId}`, { replace: true });
+          navigate(productPath(productId), { replace: true });
           return;
         }
         // Ownership guard: never leak another seller's listing into the form.
@@ -49,7 +51,7 @@ const EditModeInitializer = ({ productId, onReady }) => {
         const me = currentUserId();
         if (me && sellerId && String(sellerId) !== String(me)) {
           toast.error("You can only edit your own listing.");
-          navigate(`/product/${productId}`, { replace: true });
+          navigate(productPath(productId), { replace: true });
           return;
         }
         initEditMode(product);
@@ -70,7 +72,7 @@ const EditModeInitializer = ({ productId, onReady }) => {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#FAFAFA] dark:bg-[#131313]">
+      <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#F7F9FD] dark:bg-[#131313]">
         <BrandLoader size="full" label="Loading product…" />
       </div>
     );

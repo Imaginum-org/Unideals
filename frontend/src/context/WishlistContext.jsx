@@ -10,6 +10,22 @@ import axios from "../services/axiosInstance";
 
 const WishlistContext = createContext(null);
 
+const isAuthenticated = () => {
+  try {
+    return localStorage.getItem("isAuthenticated") === "true";
+  } catch {
+    return false;
+  }
+};
+
+// Same shape axios errors have, so every caller's existing
+// `status === 401 → login` branch handles guests unchanged.
+const authRequiredError = () => {
+  const err = new Error("Please log in to use your wishlist");
+  err.response = { status: 401, data: { message: "Please log in to use your wishlist", code: "AUTH_REQUIRED" } };
+  return err;
+};
+
 export const WishlistProvider = ({ children }) => {
   const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -71,7 +87,10 @@ export const WishlistProvider = ({ children }) => {
    * Toggle Wishlist - optimistic with rollback on failure
    */
   const toggleWishlist = useCallback(async (productId, productData = null) => {
-    const previous = wishlist;
+    // Guests: fail fast with a 401-shaped error BEFORE the optimistic flip,
+    // so the button never shows "Saved" while we redirect to login.
+    if (!isAuthenticated()) throw authRequiredError();
+
     const wasIn = wishlistIds.has(productId);
     // Optimistic update
     setWishlist((prev) => {
@@ -102,16 +121,22 @@ export const WishlistProvider = ({ children }) => {
 
       return isWishlisted;
     } catch (originalError) {
-      // Rollback via server refetch: restoring a captured snapshot would
-      // clobber concurrent optimistic updates from other cards.
-      try {
-        await fetchWishlist();
-      } catch {
-        setWishlist(previous);
-      }
+      // Undo just this product's flip (a captured snapshot would clobber
+      // concurrent optimistic updates from other cards). This runs even
+      // when the refetch below is skipped, e.g. the session expired.
+      setWishlist((prev) => {
+        const has = prev.some((item) => (typeof item === "string" ? item : item?._id) === productId);
+        if (wasIn && !has) return productData ? [...prev, productData] : [...prev, productId];
+        if (!wasIn && has) {
+          return prev.filter((item) => (typeof item === "string" ? item : item?._id) !== productId);
+        }
+        return prev;
+      });
+      // Then reconcile with the server when we still have a session.
+      fetchWishlist().catch(() => {});
       throw originalError;
     }
-  }, [wishlist, wishlistIds, fetchWishlist]);
+  }, [wishlistIds, fetchWishlist]);
 
   /**
    * Remove directly - optimistic with rollback

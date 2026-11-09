@@ -55,6 +55,10 @@ export const ProductListingProvider = ({ children }) => {
   // Edit mode: when editing an existing product, store its id here.
   const [editProductId, setEditProductId] = useState(null);
   const isEditMode = Boolean(editProductId);
+  // Status of the listing being edited. "draft" = a saved draft: it reopens
+  // on Review and its primary action is Publish (draft -> listed).
+  const [editStatus, setEditStatus] = useState(null);
+  const isDraft = isEditMode && editStatus === "draft";
 
   // Guard: don't load draft when edit mode has already seeded the form.
   const editInitialized = useRef(false);
@@ -78,6 +82,8 @@ export const ProductListingProvider = ({ children }) => {
     if (!product?._id) return;
     editInitialized.current = true;
     setEditProductId(product._id);
+    setEditStatus(String(product.status || "").toLowerCase() || null);
+    const draft = String(product.status || "").toLowerCase() === "draft";
 
     // Map existing images to the "imagePreviews" format used by the UI.
     // In edit mode, existing images are stored as { url, fileId } objects
@@ -118,13 +124,15 @@ export const ProductListingProvider = ({ children }) => {
           }
         : null,
       meetupLocation: product.meetup_location || "",
-      termsAccepted: true, // already accepted when originally listed
+      // Listed products accepted terms at publish; drafts only if they did.
+      termsAccepted: draft ? Boolean(product.terms_accepted_at) : true,
       termsVersion: product.terms_version || "v1",
       termsAcceptedAt: product.terms_accepted_at || null,
       isGirlsOnly: Boolean(product.isGirlsOnly),
     });
 
-    setStep(1);
+    // A draft was saved from Review: reopen exactly there.
+    setStep(draft ? 4 : 1);
     setErrors({});
   }, []);
 
@@ -239,6 +247,7 @@ export const ProductListingProvider = ({ children }) => {
       // Edit mode
       editProductId,
       isEditMode,
+      isDraft,
       initEditMode,
     }),
     [
@@ -261,6 +270,7 @@ export const ProductListingProvider = ({ children }) => {
 
       editProductId,
       isEditMode,
+      isDraft,
       initEditMode,
     ],
   );

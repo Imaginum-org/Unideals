@@ -31,6 +31,8 @@ export const chatRank = (tier) => {
 // Search keeps relevance first (title match = 10); the plan breaks ties.
 export const FEED_RANK_WEIGHT = 8;
 export const SEARCH_RANK_WEIGHT = 3;
+// Trending score ≈ log10(views)*10 + freshness(≤20): Pro+ ≈ +10, Pro ≈ +5.
+export const TRENDING_RANK_WEIGHT = 5;
 
 const SUPPORT_PRIORITY = {
   0: { priority: "normal", rank: 1 },

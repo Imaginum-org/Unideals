@@ -1,3 +1,6 @@
+import { normalizeMultiline } from "../../../utils/text.js";
+import { usageConflict } from "../utils/listingSmarts.js";
+
 export const validateBasicInfo = (formData) => {
   const errors = {};
 
@@ -24,9 +27,11 @@ export const validateBasicInfo = (formData) => {
     errors.category = "Please select a category";
   }
 
-  if (!formData.description?.trim()) {
+  // Same normalisation the server applies, so padding never counts.
+  const description = normalizeMultiline(String(formData.description ?? ""));
+  if (!description) {
     errors.description = "Description is required";
-  } else if (formData.description.trim().length < 10) {
+  } else if (description.length < 10) {
     errors.description = "Description must be at least 10 characters";
   }
 
@@ -36,6 +41,10 @@ export const validateBasicInfo = (formData) => {
 
   if (!formData.usageDuration) {
     errors.usageDuration = "Please select usage duration";
+  } else {
+    // Linked specs: usage can't exceed time since purchase; Brand New = unused.
+    const conflict = usageConflict(formData);
+    if (conflict) errors.usageDuration = conflict;
   }
 
   if (!formData.purchaseDate) {

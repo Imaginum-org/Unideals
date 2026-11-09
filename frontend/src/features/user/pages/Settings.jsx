@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Select from "../../../components/ui/Select.jsx";
 import { toast } from "../../../components/ui/toast.js";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BadgeCheck,
   Camera,
@@ -12,20 +12,20 @@ import {
   Phone,
   Plus,
   Shield,
+  ShieldCheck,
   Trash2,
   User,
-  Zap,
 } from "lucide-react";
 import { uploadImage } from "../../../utils/imageUpload.js";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
-import BrandLoader from "../../../components/ui/BrandLoader.jsx";
-import { useUser } from "../../../context/useUserContext.jsx";
+import { useUser, clearAccountScopedStorage } from "../../../context/useUserContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { logoutUser, resendVerification } from "../../auth/api/authApi";
 import { getUserProducts } from "../../product/api/productApi.js";
 import PickupSpotModal from "../components/PickupSpotModal.jsx";
 import AlertDialogDemo from "../components/Deletebutton.jsx";
-import Profile_left_part from "../components/Profile_left_part.jsx";
+import { AccountLayout, Panel, TabBar, btnDanger, btnPrimary, btnSecondary } from "../components/account/AccountKit.jsx";
+import { cn } from "../../../utils/cn.js";
 import SecuritySettings from "../components/SecuritySettings.jsx";
 import ChatSettings from "../components/ChatSettings.jsx";
 import {
@@ -64,7 +64,16 @@ function Settings() {
   const { userDetails: contextUserDetails, updateUserDetails, clearUserData } = useUser();
   const { campuses, campus: activeCampus } = useCampus();
 
-  const [activeTab, setActiveTab] = useState("Profile");
+  // ?tab=security etc. deep-links straight to a section.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabSlug = (t) => t.toLowerCase().split(" ").join("-");
+  const activeTab = tabs.find((t) => tabSlug(t) === searchParams.get("tab")) || "Profile";
+  const setActiveTab = (tab) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === "Profile") next.delete("tab");
+    else next.set("tab", tabSlug(tab));
+    setSearchParams(next, { replace: true });
+  };
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [phone, setPhone] = useState("");
@@ -369,7 +378,7 @@ function Settings() {
         toast.success("Profile photo updated successfully");
       }
     } catch (err) {
-      console.error(err);
+      console.error(err?.response?.status, err?.response?.data?.message || err?.message);
 
       toast.error(
         err?.response?.data?.message || "Failed to update profile photo",
@@ -393,7 +402,7 @@ function Settings() {
         toast.success("Profile photo removed successfully");
       }
     } catch (err) {
-      console.error(err);
+      console.error(err?.response?.status, err?.response?.data?.message || err?.message);
 
       toast.error(
         err?.response?.data?.message || "Failed to remove profile photo",
@@ -491,6 +500,7 @@ function Settings() {
       // Always clear local session regardless of server result.
       try {
         clearUserData();
+        clearAccountScopedStorage();
       } catch {
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("cachedUserDetails");
@@ -500,39 +510,30 @@ function Settings() {
     }
   };
 
+  const header = {
+    seoTitle: "Settings | Unideals",
+    title: "Settings",
+  };
+
   if (loading) {
     return (
-      <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#F5F6FA] dark:bg-[#131313]">
-        <BrandLoader size="full" />
-      </div>
+      <AccountLayout {...header}>
+        <div className="space-y-4" aria-hidden="true">
+          <div className="browse-shimmer h-10 w-80 max-w-full rounded-lg bg-neutral-100 dark:bg-white/5" />
+          <div className="browse-shimmer h-32 rounded-2xl bg-neutral-100 dark:bg-white/5" />
+          <div className="browse-shimmer h-64 rounded-2xl bg-neutral-100 dark:bg-white/5" />
+        </div>
+      </AccountLayout>
     );
   }
 
   const profileRows = [
-    {
-      label: "Full Name",
-      value: userDetails?.name || "User",
-      icon: User,
-    },
-    {
-      label: "Email Address",
-      value: userDetails?.email || "-",
-      icon: Mail,
-    },
-    {
-      label: "Phone",
-      value: formatPhone(userDetails?.mobile),
-      icon: Phone,
-      editable: true,
-      field: "phone",
-    },
+    { label: "Full name", value: userDetails?.name || "User", icon: User },
+    { label: "Email", value: userDetails?.email || "-", icon: Mail },
+    { label: "Phone", value: formatPhone(userDetails?.mobile), icon: Phone, editable: true, field: "phone" },
     {
       label: "Campus",
-      value:
-        campuses.find((c) => c.slug === (campusSlug || activeCampus?.slug))
-          ?.name ||
-        activeCampus?.name ||
-        "Not set",
+      value: campuses.find((c) => c.slug === (campusSlug || activeCampus?.slug))?.name || activeCampus?.name || "Not set",
       icon: MapPin,
       editable: true,
       field: "campus",
@@ -540,638 +541,421 @@ function Settings() {
   ];
 
   const currentCampusSlug =
-    (typeof userDetails?.campus_id === "object" &&
-      userDetails.campus_id?.slug) ||
-    activeCampus?.slug ||
-    "";
+    (typeof userDetails?.campus_id === "object" && userDetails.campus_id?.slug) || activeCampus?.slug || "";
   const campusChanged = Boolean(campusSlug) && campusSlug !== currentCampusSlug;
+  const hasPhoto = Boolean(userDetails?.avatar?.url);
+  const linkBtn = "text-[13px] font-semibold text-[var(--accent-text)] hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline";
+  const mutedBtn = "text-[13px] font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-white";
 
   return (
-    <div className="h-full w-full overflow-hidden bg-[#F7F9FD] font-figtree text-[#111827] dark:bg-[#131313] dark:text-white">
-      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
-        <aside className="hidden bg-[#F7F8FA] dark:bg-[#131313] md:block md:w-auto md:shrink-0 xl:pt-2 xl:pb-0">
-          <Profile_left_part />
-        </aside>
+    <AccountLayout {...header}>
+      <TabBar
+        className="mb-5"
+        ariaLabel="Settings sections"
+        tabs={tabs.map((t) => ({ value: t, label: t }))}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
-        <main className="min-w-0 w-full md:h-full w-full md:overflow-y-auto no-scrollbar bg-[#F5F6FA] px-4 py-6 dark:bg-[#131313] sm:px-6 md:flex-1 lg:p-8 xl:px-[5.7rem] xl:py-6">
-          <div className="mx-auto w-full max-w-5xl pb-8">
-            <header className="mb-5">
-              <h1 className="text-[1.4rem] font-bold leading-tight text-gray-900 dark:text-white lg:text-2xl xl:text-xl">
-                Settings
-              </h1>
-              <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
-                Manage your account preferences
-              </p>
-            </header>
-
-            <nav className="mb-6 flex max-w-fit gap-2 overflow-x-auto rounded-xl border border-[#E4E7EF] bg-[#F1F3F8] p-1 dark:border-[#2A2E35] dark:bg-[#1B1F27]">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`min-w-max rounded-lg px-3.5 py-2 text-sm font-medium transition ${
-                    activeTab === tab
-                      ? "bg-[#F7F8FA] text-[#111827] shadow-sm ring-1 ring-black/5 dark:bg-[#252A35] dark:text-white dark:ring-white/10"
-                      : "text-[#98A1B2] hover:text-[#4B5563] dark:text-[#8F9BAA] dark:hover:text-white"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </nav>
-
-            {activeTab === "Profile" && (
-              <section className="space-y-6">
-                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] px-5 py-5 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-5">
-                      <div className="relative">
-                        <div className=" rounded-xl">
-                          <AvatarComponent
-                            name={userDetails?.name}
-                            imageUrl={userDetails?.avatar?.url}
-                            plan={userDetails?.subscription} role={userDetails?.role} isOwn
-                            showBadge
-                            size="large"
-                            isLoading={loading}
-                            className="rounded-xl object-cover"
-                            shape="square"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          disabled={isUploadingAvatar || isRemovingAvatar}
-                          aria-label={
-                            userDetails?.avatar?.url
-                              ? "Remove profile photo"
-                              : "Upload profile photo"
-                          }
-                          onClick={() => {
-                            if (userDetails?.avatar?.url) {
-                              handleRemoveAvatar();
-                            } else {
-                              fileInputRef.current?.click();
-                            }
-                          }}
-                          className={`
-  absolute
-  -bottom-1.5
-  -right-1.5
-  z-40
-  flex
-  h-8
-  w-8
-  items-center
-  justify-center
-  rounded-full
-  border-[3px]
-  border-white
-  text-white
-  shadow-lg
-  transition-all
-  duration-200
-  hover:scale-105
-  active:scale-95
-  disabled:cursor-not-allowed
-  disabled:opacity-60
-  ${
-    userDetails?.avatar?.url
-      ? "bg-red-500 hover:bg-red-600 shadow-red-500/25"
-      : "bg-[#4F46FF] hover:bg-[#4338CA] shadow-[#4F46FF]/25"
-  }
-`}
-                        >
-                          {isUploadingAvatar || isRemovingAvatar ? (
-                            <BrandLoader size="xs" tone="white" />
-                          ) : userDetails?.avatar?.url ? (
-                            <Trash2 className="h-4 w-4" />
-                          ) : (
-                            <Camera className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <h2 className="text-lg font-bold">
-                            {userDetails?.name || "User"}
-                          </h2>
-                          {userDetails?.is_email_verified && (
-                            <BadgeCheck className="text-[#4F46FF]" size={18} />
-                          )}
-                        </div>
-                        <p className=" text-[0.8rem]  font-medium text-gray-400">
-                          {activeCampus?.short_name ||
-                            activeCampus?.name ||
-                            "Campus not set"}{" "}
-                          · {formatMemberSince(userDetails?.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* <button
-                      type="button"
-                      disabled={isUploadingAvatar || isRemovingAvatar}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-fit rounded-lg bg-[#EEF0FF] px-3.5 py-2 text-xs font-semibold text-[#4F46FF]"
-                    >
-                      <ButtonLoader loading={isUploadingAvatar} loadingText="Uploading…">Change Photo</ButtonLoader>
-                    </button> */}
-                    {/* 
-                    <button
-                      type="button"
-                      onClick={handleRemoveAvatar}
-                      disabled={isUploadingAvatar || isRemovingAvatar}
-                      className="rounded-lg border border-red-500 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50"
-                    >
-                      <ButtonLoader loading={isRemovingAvatar} loadingText="Removing…">Remove Photo</ButtonLoader>
-                    </button> */}
-                  </div>
+      {activeTab === "Profile" && (
+        <div className="flex flex-col gap-4 sm:gap-5">
+          <Panel title="Profile photo">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <AvatarComponent
+                name={userDetails?.name}
+                imageUrl={userDetails?.avatar?.url}
+                plan={userDetails?.subscription}
+                role={userDetails?.role}
+                isOwn
+                showBadge
+                size="large"
+                isLoading={loading}
+                shape="square"
+                className="rounded-xl object-cover"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-[16px] font-semibold text-slate-900 dark:text-white">{userDetails?.name || "User"}</p>
+                  {userDetails?.is_email_verified && <BadgeCheck className="h-4 w-4 text-emerald-500" aria-label="Verified" />}
                 </div>
-
-                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-base font-bold">
-                      Personal Information
-                    </h2>
-                  </div>
-
-                  <div className="divide-y divide-[#EDF0F5]">
-                    {profileRows.map((row) => {
-                      const Icon = row.icon;
-
-                      return (
-                        <div
-                          key={row.label}
-                          className="flex min-h-[74px] items-center justify-between gap-4 py-4"
-                        >
-                          <div className="flex min-w-0 items-center gap-4">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F2F4F9] text-[#98A1B2]">
-                              <Icon size={15} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[0.68rem] font-medium uppercase tracking-normal text-[#98A1B2]">
-                                {row.label}
-                              </div>
-                              {editingField === "phone" && row.field === "phone" ? (
-                                <input
-                                  value={phone}
-                                  onChange={(event) => {
-                                    setPhone(event.target.value);
-                                  }}
-                                  placeholder="10 digit mobile number"
-                                  className="mt-1.5 w-full rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#4F46FF] dark:bg-[#252525] dark:text-white"
-                                />
-                              ) : editingField === "campus" && row.field === "campus" ? (
-                                <>
-                                  <Select
-                                    className="mt-1.5 max-w-xs"
-                                    value={campusSlug}
-                                    onChange={setCampusSlug}
-                                    placeholder="Select campus"
-                                    ariaLabel="Campus"
-                                    options={campuses.map((c) => ({ value: c.slug, label: c.name }))}
-                                  />
-                                  {campusChanged && (
-                                    <p className="mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                      Your live listings move to the new campus
-                                      on save.
-                                    </p>
-                                  )}
-                                </>
-                              ) : (
-                                <div className="mt-1 break-words text-[0.9rem] font-medium">
-                                  {row.value}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          {row.editable ? (
-                            editingField === row.field ? (
-                              <span className="flex shrink-0 items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={cancelEditing}
-                                  disabled={isSavingProfile}
-                                  className="text-sm font-semibold text-[#98A1B2] disabled:opacity-50"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveField(row.field)}
-                                  disabled={isSavingProfile}
-                                  className="text-sm font-semibold text-[#4F46FF] disabled:opacity-50"
-                                >
-                                  <ButtonLoader loading={isSavingProfile} loadingText="Saving…">Save</ButtonLoader>
-                                </button>
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => startEditing(row.field)}
-                                disabled={editingField !== null}
-                                className="text-sm font-semibold text-[#4F46FF] disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                Edit
-                              </button>
-                            )
-                          ) : null}
-                        </div>
-                      );
-                    })}
-
-                    <div className="flex min-h-[74px] items-center justify-between gap-4 py-4">
-                      <div className="flex min-w-0 items-center gap-4">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F2F4F9] text-[#98A1B2]">
-                          <User size={15} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[0.68rem] font-medium uppercase tracking-normal text-[#98A1B2]">
-                            Gender
-                          </div>
-                          {editingField === "gender" && !userDetails?.gender ? (
-                            <Select
-                              className="mt-1.5 max-w-xs"
-                              value={gender}
-                              onChange={setGender}
-                              placeholder="Select gender"
-                              ariaLabel="Gender"
-                              options={[
-                                { value: "male", label: "Male" },
-                                { value: "female", label: "Female" },
-                                { value: "other", label: "Other" },
-                              ]}
-                            />
-                          ) : (
-                            <div className="mt-1 break-words text-[0.9rem] capitalize">
-                              {userDetails?.gender || "Not added"}
-                            </div>
-                          )}
-                          {userDetails?.gender && editingField === "gender" ? (
-                            <div className="mt-2 rounded-lg bg-[#F2F4F9] px-3 py-2 text-[11px] font-medium text-[#526071] dark:bg-[#252525] dark:text-slate-300">
-                              Gender is locked after setup. To change it, request admin approval below.
-                              {genderRequest?.status === "pending" ? (
-                                <span className="mt-1 block font-bold text-amber-600">
-                                  Pending approval for “{genderRequest.requestedGender}”.
-                                </span>
-                              ) : (
-                                <>
-                                  {genderRequest?.status === "rejected" ? (
-                                    <span className="mt-1 block font-bold text-red-500">
-                                      Last request was not approved. You can raise a new one.
-                                    </span>
-                                  ) : null}
-                                  <span className="mt-2 flex flex-wrap items-center gap-2">
-                                    <Select
-                                      className="w-48"
-                                      value={requestedGender}
-                                      onChange={setRequestedGender}
-                                      placeholder="Select new gender"
-                                      ariaLabel="Requested gender"
-                                      options={["male", "female", "other"]
-                                        .filter((g) => g !== userDetails?.gender)
-                                        .map((g) => ({ value: g, label: g.charAt(0).toUpperCase() + g.slice(1) }))}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={handleGenderRequest}
-                                      disabled={!requestedGender || requestSaving}
-                                      className="rounded-lg bg-[#111827] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50 dark:bg-white dark:text-black"
-                                    >
-                                      <ButtonLoader loading={requestSaving} loadingText="Sending…">Request approval</ButtonLoader>
-                                    </button>
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                      {editingField === "gender" ? (
-                        <span className="flex shrink-0 items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={cancelEditing}
-                            disabled={isSavingProfile || requestSaving}
-                            className="text-sm font-semibold text-[#98A1B2] disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
-                          {!userDetails?.gender && (
-                            <button
-                              type="button"
-                              onClick={() => handleSaveField("gender")}
-                              disabled={isSavingProfile || !gender}
-                              className="text-sm font-semibold text-[#4F46FF] disabled:opacity-50"
-                            >
-                              <ButtonLoader loading={isSavingProfile} loadingText="Saving…">Save</ButtonLoader>
-                            </button>
-                          )}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEditing("gender")}
-                          disabled={editingField !== null}
-                          className="text-sm font-semibold text-[#4F46FF] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <AccountCard onLogout={handleLogout} />
-              </section>
-            )}
-
-            {activeTab === "Security" && (
-              <SecuritySettings email={userDetails?.email} />
-            )}
-
-            {activeTab === "Pickup Spots" && (
-              <section className="max-w-[770px]">
-                <div className="mb-5 flex gap-4 rounded-2xl border border-[#CDD2FF] bg-[#F0F1FF] p-3 text-sm leading-7 text-[#526071] dark:border-[#343A5A] dark:bg-[#202438] dark:text-[#C8D1DE]">
-                  <MapPin className="mt-1 shrink-0 text-[#4F46FF]" size={15} />
-                  <p>
-                    Pickup spots are shared with buyers when they message you.
-                    Set familiar campus locations so meetups are easy and safe.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-[#2A2E35] dark:bg-[#181A1F]">
-                  <h2 className="mb-5 text-base font-bold">
-                    Your pickup spots
-                  </h2>
-                  <div className="space-y-4">
-                    {pickupLoading ? (
-                      <div className="space-y-3">
-                        {[0, 1].map((i) => (
-                          <div
-                            key={i}
-                            className="h-[76px] animate-pulse rounded-2xl border border-[#E4E7EF] bg-[#F4F6FB] dark:border-[#303641] dark:bg-[#20242B]"
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                    <>
-                    {pickupSpots.length === 0 && (
-                      <div className="rounded-2xl border border-dashed border-[#D8DDEA] bg-[#FAFBFE] p-6 text-center text-sm font-medium text-[#98A1B2] dark:border-[#303641] dark:bg-[#20242B] dark:text-[#AAB9C5]">
-                        No pickup spots yet. Add a familiar campus location to
-                        share with buyers.
-                      </div>
-                    )}
-                    {pickupSpots.map((spot, index) => (
-                      <div
-                        key={spot._id}
-                        className={`flex items-center justify-between rounded-2xl border p-4 ${
-                          spot.isPrimary
-                            ? "border-[#B8B6FF] bg-[#FAFAFF] dark:border-[#5E58D8] dark:bg-[#202438]"
-                            : "border-[#E4E7EF] bg-[#FAFBFE] dark:border-[#303641] dark:bg-[#20242B]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div
-                            className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-                              spot.isPrimary
-                                ? "bg-[#554BFF] text-white"
-                                : "bg-[#E9ECF3] text-[#98A1B2] dark:bg-[#2C3340] dark:text-[#9AA7B8]"
-                            }`}
-                          >
-                            <MapPin size={16} />
-                          </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-3">
-                              <h3 className="text-sm font-bold">{spot.name}</h3>
-                              {spot.isPrimary && (
-                                <span className="rounded-lg bg-[#5B4DFF] px-2 py-1 text-[0.65rem] font-medium text-white">
-                                  Primary
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-1 text-xs font-medium text-[#98A1B2] dark:text-[#8F9BAA]">
-                              {spot.detail}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-5">
-                          {!spot.isPrimary && (
-                            <button
-                              type="button"
-                              onClick={() => setPendingPrimaryId(spot._id)}
-                              className="text-xs font-semibold text-[#4F46FF]"
-                            >
-                              Set primary
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleEditPickupSpot(index)}
-                            className="text-xs font-semibold text-[#64707D] dark:text-[#B8C2D0]"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPendingDeleteIndex(index)}
-                            className="text-[#98A1B2] transition hover:text-[#EF4444] dark:text-[#8F9BAA] dark:hover:text-[#F87171]"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    </>
-                    )}
-                  </div>
-                </div>
-
+                <p className="text-[13px] text-slate-500 dark:text-zinc-400">
+                  {activeCampus?.short_name || activeCampus?.name || "Campus not set"} · {formatMemberSince(userDetails?.createdAt)}
+                </p>
+              </div>
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={handleAddPickupSpot}
-                  disabled={pickupSpots.length >= 3}
-                  className="mt-5 flex h-10 w-full items-center justify-center rounded-xl bg-[#EEF0FF] text-sm font-semibold text-[#4F46FF] transition hover:bg-[#E3E5FF] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#22263A] dark:text-[#8F8AFF] dark:hover:bg-[#282E4A]"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar || isRemovingAvatar}
+                  className={btnSecondary}
                 >
-                  <Plus size={16} className="mr-1.5" />
+                  <Camera className="h-4 w-4" aria-hidden="true" />
+                  <ButtonLoader loading={isUploadingAvatar} loadingText="Uploading…">
+                    {hasPhoto ? "Change" : "Upload"}
+                  </ButtonLoader>
+                </button>
+                {hasPhoto && (
+                  <button type="button" onClick={handleRemoveAvatar} disabled={isUploadingAvatar || isRemovingAvatar} className={btnDanger}>
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    <ButtonLoader loading={isRemovingAvatar} loadingText="Removing…">
+                      Remove
+                    </ButtonLoader>
+                  </button>
+                )}
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Personal information" padded={false}>
+            <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {profileRows.map((row) => {
+                const Icon = row.icon;
+                const editing = editingField === row.field;
+                return (
+                  <li key={row.label} className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
+                    <div className="flex min-w-0 flex-1 items-start gap-3.5">
+                      <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">{row.label}</p>
+                        {editing && row.field === "phone" ? (
+                          <input
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            inputMode="tel"
+                            autoComplete="tel-national"
+                            placeholder="10 digit mobile number"
+                            className="mt-1.5 h-10 w-full max-w-xs rounded-lg border border-neutral-200 bg-white px-3 text-[14px] text-slate-900 outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] dark:border-neutral-700 dark:bg-[#131313] dark:text-white"
+                          />
+                        ) : editing && row.field === "campus" ? (
+                          <>
+                            <Select
+                              className="mt-1.5 max-w-xs"
+                              value={campusSlug}
+                              onChange={setCampusSlug}
+                              placeholder="Select campus"
+                              ariaLabel="Campus"
+                              options={campuses.map((c) => ({ value: c.slug, label: c.name }))}
+                            />
+                            {campusChanged && (
+                              <p className="mt-1.5 text-[12.5px] font-medium text-amber-600 dark:text-amber-400">
+                                Your live listings move to the new campus when you save.
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="mt-0.5 break-words text-[14.5px] font-medium text-slate-900 dark:text-white">{row.value}</p>
+                        )}
+                      </div>
+                    </div>
+                    {row.editable &&
+                      (editing ? (
+                        <span className="flex shrink-0 items-center gap-3 pt-6">
+                          <button type="button" onClick={cancelEditing} disabled={isSavingProfile} className={mutedBtn}>
+                            Cancel
+                          </button>
+                          <button type="button" onClick={() => handleSaveField(row.field)} disabled={isSavingProfile} className={linkBtn}>
+                            <ButtonLoader loading={isSavingProfile} loadingText="Saving…">
+                              Save
+                            </ButtonLoader>
+                          </button>
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => startEditing(row.field)} disabled={editingField !== null} className={cn(linkBtn, "shrink-0 pt-6")}>
+                          Edit
+                        </button>
+                      ))}
+                  </li>
+                );
+              })}
+
+              {/* Gender: set once, then changes need admin approval */}
+              <li className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
+                <div className="flex min-w-0 flex-1 items-start gap-3.5">
+                  <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
+                    <User className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">Gender</p>
+                    {editingField === "gender" && !userDetails?.gender ? (
+                      <Select
+                        className="mt-1.5 max-w-xs"
+                        value={gender}
+                        onChange={setGender}
+                        placeholder="Select gender"
+                        ariaLabel="Gender"
+                        options={[
+                          { value: "male", label: "Male" },
+                          { value: "female", label: "Female" },
+                          { value: "other", label: "Other" },
+                        ]}
+                      />
+                    ) : (
+                      <p className="mt-0.5 text-[14.5px] font-medium capitalize text-slate-900 dark:text-white">{userDetails?.gender || "Not added"}</p>
+                    )}
+                    {userDetails?.gender && editingField === "gender" && (
+                      <div className="mt-2.5 rounded-lg bg-neutral-50 px-3.5 py-3 text-[12.5px] text-slate-600 dark:bg-white/[0.03] dark:text-zinc-300">
+                        Gender is locked after setup. To change it, request admin approval.
+                        {genderRequest?.status === "pending" ? (
+                          <span className="mt-1 block font-semibold text-amber-600 dark:text-amber-400">
+                            Pending approval for “{genderRequest.requestedGender}”.
+                          </span>
+                        ) : (
+                          <>
+                            {genderRequest?.status === "rejected" && (
+                              <span className="mt-1 block font-semibold text-red-600 dark:text-red-400">
+                                Your last request wasn&apos;t approved. You can send a new one.
+                              </span>
+                            )}
+                            <span className="mt-2.5 flex flex-wrap items-center gap-2">
+                              <Select
+                                className="w-48"
+                                value={requestedGender}
+                                onChange={setRequestedGender}
+                                placeholder="Select new gender"
+                                ariaLabel="Requested gender"
+                                options={["male", "female", "other"]
+                                  .filter((g) => g !== userDetails?.gender)
+                                  .map((g) => ({ value: g, label: g.charAt(0).toUpperCase() + g.slice(1) }))}
+                              />
+                              <button type="button" onClick={handleGenderRequest} disabled={!requestedGender || requestSaving} className={btnPrimary}>
+                                <ButtonLoader loading={requestSaving} loadingText="Sending…">
+                                  Request approval
+                                </ButtonLoader>
+                              </button>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {editingField === "gender" ? (
+                  <span className="flex shrink-0 items-center gap-3 pt-6">
+                    <button type="button" onClick={cancelEditing} disabled={isSavingProfile || requestSaving} className={mutedBtn}>
+                      Cancel
+                    </button>
+                    {!userDetails?.gender && (
+                      <button type="button" onClick={() => handleSaveField("gender")} disabled={isSavingProfile || !gender} className={linkBtn}>
+                        <ButtonLoader loading={isSavingProfile} loadingText="Saving…">
+                          Save
+                        </ButtonLoader>
+                      </button>
+                    )}
+                  </span>
+                ) : (
+                  <button type="button" onClick={() => startEditing("gender")} disabled={editingField !== null} className={cn(linkBtn, "shrink-0 pt-6")}>
+                    {userDetails?.gender ? "Change" : "Add"}
+                  </button>
+                )}
+              </li>
+            </ul>
+          </Panel>
+
+          <AccountCard onLogout={handleLogout} />
+        </div>
+      )}
+
+      {activeTab === "Security" && <SecuritySettings email={userDetails?.email} />}
+
+      {activeTab === "Pickup Spots" && (
+        <div className="flex flex-col gap-4">
+          <Panel
+            title="Pickup spots"
+            description={`${pickupSpots.length}/3`}
+            icon={MapPin}
+            actions={
+              <button type="button" onClick={handleAddPickupSpot} disabled={pickupSpots.length >= 3} className={btnPrimary}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add
+              </button>
+            }
+            padded={false}
+          >
+            {pickupLoading ? (
+              <div className="space-y-3 p-4 sm:p-5" aria-hidden="true">
+                {[0, 1].map((i) => (
+                  <div key={i} className="browse-shimmer h-16 rounded-xl bg-neutral-100 dark:bg-white/5" />
+                ))}
+              </div>
+            ) : pickupSpots.length === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <p className="text-[14px] font-medium text-slate-700 dark:text-zinc-200">No pickup spots yet</p>
+                <p className="mt-1 text-[13px] text-slate-500 dark:text-zinc-400">Add a familiar, public campus spot buyers can find easily.</p>
+                <button type="button" onClick={handleAddPickupSpot} className={cn(btnPrimary, "mt-4")}>
+                  <Plus className="h-4 w-4" aria-hidden="true" />
                   Add pickup spot
                 </button>
-                <p className="mt-5 flex gap-2 text-sm font-medium text-[#98A1B2] dark:text-[#AAB9C5]">
-                  <Zap className="shrink-0 text-[#FF7A30]" size={16} />
-                  Pro tip: Always meet in well-lit public campus areas. Never
-                  share your hostel room or home address.
+              </div>
+            ) : (
+              <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                {pickupSpots.map((spot, index) => (
+                  <li key={spot._id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={cn(
+                          "grid h-9 w-9 shrink-0 place-items-center rounded-lg",
+                          spot.isPrimary ? "bg-[var(--accent)] text-white" : "bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400",
+                        )}
+                      >
+                        <MapPin className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-2 text-[14px] font-semibold text-slate-900 dark:text-white">
+                          <span className="truncate">{spot.name}</span>
+                          {spot.isPrimary && (
+                            <span className="shrink-0 rounded-md bg-[var(--accent-soft)] px-1.5 py-px text-[11px] font-semibold text-[var(--accent-text)]">Primary</span>
+                          )}
+                        </p>
+                        <p className="truncate text-[12.5px] text-slate-500 dark:text-zinc-400">{spot.detail}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      {!spot.isPrimary && (
+                        <button type="button" onClick={() => setPendingPrimaryId(spot._id)} className={cn(linkBtn, "max-sm:hidden")}>
+                          Make primary
+                        </button>
+                      )}
+                      <button type="button" onClick={() => handleEditPickupSpot(index)} className={mutedBtn}>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteIndex(index)}
+                        aria-label={`Delete ${spot.name}`}
+                        className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+          <p className="flex items-center gap-1.5 text-[12px] text-slate-500 dark:text-zinc-400" title="Never share your hostel room or home address">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
+            Public campus spots only
+          </p>
+        </div>
+      )}
+
+      {activeTab === "Chat" && (
+        <ChatSettings
+          user={userDetails}
+          onSaved={(chat_settings) => {
+            setUserDetails((prev) => (prev ? { ...prev, chat_settings } : prev));
+            updateUserDetails({ chat_settings });
+          }}
+        />
+      )}
+
+      {activeTab === "Verification" && (
+        <Panel title="Email verification">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3.5">
+              <span
+                className={cn(
+                  "grid h-10 w-10 place-items-center rounded-xl",
+                  userDetails?.is_email_verified
+                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300",
+                )}
+              >
+                <Shield className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-[15px] font-semibold text-slate-900 dark:text-white">
+                  {userDetails?.is_email_verified ? "Your email is verified" : "Verification pending"}
                 </p>
-              </section>
-            )}
-
-            {activeTab === "Chat" && (
-              <ChatSettings
-                user={userDetails}
-                onSaved={(chat_settings) => {
-                  setUserDetails((prev) =>
-                    prev ? { ...prev, chat_settings } : prev,
-                  );
-                  updateUserDetails({ chat_settings });
-                }}
-              />
-            )}
-
-            {activeTab === "Verification" && (
-              <section className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                        userDetails?.is_email_verified
-                          ? "bg-[#DCFCE7] text-[#16A34A]"
-                          : "bg-amber-100 text-amber-600"
-                      }`}
-                    >
-                      <Shield size={18} />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-bold">
-                        {userDetails?.is_email_verified
-                          ? "Email verified"
-                          : "Verification pending"}
-                      </h2>
-                      <p className="text-xs text-[#98A1B2]">
-                        {userDetails?.email || "No email on file"}
-                      </p>
-                    </div>
-                  </div>
-                  {!userDetails?.is_email_verified && (
-                    <button
-                      type="button"
-                      onClick={handleResendVerification}
-                      className="rounded-lg bg-[#4F46FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#4338CA]"
-                    >
-                      Resend verification email
-                    </button>
-                  )}
-                </div>
-              </section>
-            )}
-
-            <PickupSpotModal
-              isOpen={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
-              onSave={handleSavePickupSpot}
-              initialData={
-                editingIndex !== null
-                  ? pickupSpots[editingIndex]
-                  : { name: "", detail: "", isPrimary: false }
-              }
-              mode={editingIndex !== null ? "update" : "create"}
-              pickupSpotId={
-                editingIndex !== null ? pickupSpots[editingIndex]?._id : null
-              }
-            />
-
-            {/* Campus-move confirm (same theme) */}
-            {showCampusConfirm && (
-              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-                <div className="w-full max-w-[420px] rounded-[20px] border border-white/80 bg-[#F7F8FA] p-6 shadow-2xl dark:border-[#2A2E35] dark:bg-[#181A1F]">
-                  <h2 className="text-lg font-bold text-[#111827] dark:text-white">
-                    Change campus?
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-[#64748B] dark:text-[#AAB9C5]">
-                    {listingsToMove !== null
-                      ? `Move ${listingsToMove} active listing${listingsToMove === 1 ? "" : "s"} to the new campus?`
-                      : "Move your live listings to the new campus?"}{" "}
-                    Buyers on your old campus will no longer see them.
-                  </p>
-                  <div className="mt-6 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowCampusConfirm(false)}
-                      className="flex-1 rounded-lg bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
-                    >
-                      Keep campus
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isSavingProfile}
-                      onClick={() => handleSaveField("campus", true)}
-                      className="flex-1 rounded-lg bg-[#4F46FF] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                      <ButtonLoader loading={isSavingProfile} loadingText="Moving…">Move listings</ButtonLoader>
-                    </button>
-                  </div>
-                </div>
+                <p className="text-[13px] text-slate-500 dark:text-zinc-400">{userDetails?.email || "No email on file"}</p>
               </div>
-            )}
-
-            {/* Pickup spot delete confirm */}
-            {pendingDeleteIndex !== null && (
-              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-                <div className="w-full max-w-[400px] rounded-[20px] bg-[#F7F8FA] p-6 shadow-2xl dark:bg-[#181A1F]">
-                  <h2 className="text-base font-bold text-[#111827] dark:text-white">
-                    Delete pickup spot?
-                  </h2>
-                  <p className="mt-2 text-sm text-[#64748B] dark:text-[#AAB9C5]">
-                    “{pickupSpots[pendingDeleteIndex]?.name}” will be removed.
-                    Listings using it keep their saved snapshot.
-                  </p>
-                  <div className="mt-6 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPendingDeleteIndex(null)}
-                      className="flex-1 rounded-lg bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePickupSpot(pendingDeleteIndex)}
-                      className="flex-1 rounded-lg bg-[#EF4444] py-2.5 text-sm font-semibold text-white"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Set-primary confirm */}
-            {pendingPrimaryId !== null && (
-              <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-                <div className="w-full max-w-[400px] rounded-[20px] bg-[#F7F8FA] p-6 shadow-2xl dark:bg-[#181A1F]">
-                  <h2 className="text-base font-bold text-[#111827] dark:text-white">
-                    Set as primary?
-                  </h2>
-                  <p className="mt-2 text-sm text-[#64748B] dark:text-[#AAB9C5]">
-                    New listings will use this spot by default.
-                  </p>
-                  <div className="mt-6 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPendingPrimaryId(null)}
-                      className="flex-1 rounded-lg bg-[#E5E7EB] py-2.5 text-sm font-semibold text-[#334155] dark:bg-[#262B34] dark:text-[#D7DEE8]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSetPrimaryPickupSpot(pendingPrimaryId)}
-                      className="flex-1 rounded-lg bg-[#4F46FF] py-2.5 text-sm font-semibold text-white"
-                    >
-                      Set primary
-                    </button>
-                  </div>
-                </div>
-              </div>
+            </div>
+            {!userDetails?.is_email_verified && (
+              <button type="button" onClick={handleResendVerification} className={btnPrimary}>
+                Resend verification email
+              </button>
             )}
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={handleAvatarChange}
-          />
-        </main>
+        </Panel>
+      )}
+
+      <PickupSpotModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSavePickupSpot}
+        initialData={editingIndex !== null ? pickupSpots[editingIndex] : { name: "", detail: "", isPrimary: false }}
+        mode={editingIndex !== null ? "update" : "create"}
+        pickupSpotId={editingIndex !== null ? pickupSpots[editingIndex]?._id : null}
+      />
+
+      <ConfirmDialog
+        open={showCampusConfirm}
+        title="Change campus?"
+        message={`${
+          listingsToMove !== null
+            ? `Move ${listingsToMove} active listing${listingsToMove === 1 ? "" : "s"} to the new campus?`
+            : "Move your live listings to the new campus?"
+        } Buyers on your old campus will no longer see them.`}
+        cancelLabel="Keep campus"
+        confirmLabel="Move listings"
+        loading={isSavingProfile}
+        loadingLabel="Moving…"
+        onCancel={() => setShowCampusConfirm(false)}
+        onConfirm={() => handleSaveField("campus", true)}
+      />
+      <ConfirmDialog
+        open={pendingDeleteIndex !== null}
+        title="Delete pickup spot?"
+        message={`“${pickupSpots[pendingDeleteIndex]?.name || ""}” will be removed. Listings using it keep their saved copy.`}
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setPendingDeleteIndex(null)}
+        onConfirm={() => handleDeletePickupSpot(pendingDeleteIndex)}
+      />
+      <ConfirmDialog
+        open={pendingPrimaryId !== null}
+        title="Make this your primary spot?"
+        message="New listings will use this spot by default."
+        confirmLabel="Make primary"
+        onCancel={() => setPendingPrimaryId(null)}
+        onConfirm={() => handleSetPrimaryPickupSpot(pendingPrimaryId)}
+      />
+
+      <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleAvatarChange} />
+    </AccountLayout>
+  );
+}
+
+function ConfirmDialog({ open, title, message, confirmLabel, cancelLabel = "Cancel", danger, loading, loadingLabel, onCancel, onConfirm }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[999] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:px-4" onClick={onCancel}>
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[420px] rounded-t-3xl border border-neutral-200 bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl sm:p-6 dark:border-neutral-800 dark:bg-[#1A1D20]"
+      >
+        <h2 className="text-[17px] font-semibold text-slate-900 dark:text-white">{title}</h2>
+        <p className="mt-1.5 text-[13.5px] leading-relaxed text-slate-500 dark:text-zinc-400">{message}</p>
+        <div className="mt-5 grid grid-cols-2 gap-2.5">
+          <button type="button" onClick={onCancel} disabled={loading} className={cn(btnSecondary, "h-11")}>
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className={cn(btnPrimary, "h-11", danger && "!bg-red-600 hover:!bg-red-700")}
+          >
+            <ButtonLoader loading={loading} loadingText={loadingLabel || "Working…"}>
+              {confirmLabel}
+            </ButtonLoader>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1179,38 +963,25 @@ function Settings() {
 
 function AccountCard({ onLogout }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
-      <h2 className="mb-5 text-base font-bold">Account</h2>
-
-      <div className="flex items-center justify-between border-b border-[#E1E5EE] pb-5">
+    <Panel title="Account" padded={false}>
+      <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-5">
         <div>
-          <h3 className="text-base font-medium">Sign out</h3>
-          <p className="mt-1 text-xs font-medium text-[#98A1B2]">
-            Sign out from all devices
-          </p>
+          <p className="text-[14.5px] font-medium text-slate-900 dark:text-white">Sign out</p>
+          <p className="text-[12.5px] text-slate-500 dark:text-zinc-400">All devices</p>
         </div>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex items-center gap-2 rounded-lg border border-[#E2E6EF] px-5 py-2.5 text-sm font-semibold text-[#4B5563]"
-        >
-          <LogOut size={17} />
+        <button type="button" onClick={onLogout} className={btnSecondary}>
+          <LogOut className="h-4 w-4" aria-hidden="true" />
           Sign out
         </button>
       </div>
-
-      <div className="flex items-center justify-between pt-5">
+      <div className="flex items-center justify-between gap-4 border-t border-red-100 bg-red-50/40 px-4 py-4 sm:px-5 dark:border-red-900/30 dark:bg-red-950/10">
         <div>
-          <h3 className="text-base font-medium text-[#EF4444]">
-            Delete account
-          </h3>
-          <p className="mt-1 text-xs font-medium text-[#98A1B2]">
-            Permanent and irreversible
-          </p>
+          <p className="text-[14.5px] font-medium text-red-700 dark:text-red-400">Delete account</p>
+          <p className="text-[12.5px] text-slate-500 dark:text-zinc-400">Permanent</p>
         </div>
         <AlertDialogDemo />
       </div>
-    </div>
+    </Panel>
   );
 }
 

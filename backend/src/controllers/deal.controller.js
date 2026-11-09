@@ -127,6 +127,19 @@ export const confirmItemReceived = async (req, res, next) => {
   }
 };
 
+// POST /api/conversations/:id/revert, seller only: step the deal back one stage
+export const revertDealStage = async (req, res, next) => {
+  try {
+    const deal = await dealService.revertDealStage({
+      conversationId: req.params.id,
+      userId: req.userId,
+    });
+    return res.status(200).json({ success: true, message: "Step undone", data: deal });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
 // POST /api/conversations/:id/cancel { reason? }, either party, before completion
 export const cancelDeal = async (req, res, next) => {
   try {

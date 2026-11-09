@@ -1,27 +1,37 @@
-import Profile_left_part from "../../../features/user/components/Profile_left_part.jsx";
 import OrderCard from "../../../features/user/components/OrderCard.jsx";
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   boostProduct,
   getBoostSummary,
   getUserProducts,
 } from "../api/productApi.js";
 import { toast } from "../../../components/ui/toast.js";
-import BrandLoader from "../../../components/ui/BrandLoader.jsx";
-import { FiPlus } from "react-icons/fi";
-import {
-  EyeIcon,
-  HeartIcon,
-  MessageCircleIcon,
-} from "@animateicons/react/lucide";
 import EmptyState from "../../../components/ui/EmptyState.jsx";
-import { Plus } from "lucide-react";
+import { Eye, FileClock, Package, Plus, Rocket } from "lucide-react";
+import {
+  AccountLayout,
+  ErrorState,
+  ListSkeleton,
+  StatTile,
+  TabBar,
+  btnPrimary,
+} from "../../user/components/account/AccountKit.jsx";
 // Custom Tabs matching the new screenshot
 const tabs = ["All", "Active", "Unlisted", "Sold"];
 
 function ProductListed() {
-  const [activeTab, setActiveTab] = useState("All");
+  // ?tab=unlisted (e.g. after "Save as draft") opens that tab directly.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = tabs.find((t) => t.toLowerCase() === (searchParams.get("tab") || "").toLowerCase());
+  const [activeTab, setActiveTabState] = useState(tabFromUrl || "All");
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    const next = new URLSearchParams(searchParams);
+    if (tab === "All") next.delete("tab");
+    else next.set("tab", tab.toLowerCase());
+    setSearchParams(next, { replace: true });
+  };
   const [products, setProducts] = useState([]);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -38,18 +48,6 @@ function ProductListed() {
     [products],
   );
 
-  const totalWishlisted = useMemo(
-    () =>
-      products.reduce(
-        (sum, p) =>
-          sum +
-          Number(
-            p.wishlist_count ?? p.wishlisted_count ?? p.wishlist?.length ?? 0,
-          ),
-        0,
-      ),
-    [products],
-  );
 
   const fetchUserProducts = async () => {
     try {
@@ -95,9 +93,23 @@ function ProductListed() {
         (productStatus === "listed" || productStatus === "active")
       )
         return true;
+      // Drafts live with unlisted items: both are private to the seller.
+      if (tab === "unlisted" && productStatus === "draft") return true;
       return productStatus === tab;
     });
   }, [activeTab, products]);
+
+  // Badge counts per tab (from the list already in memory, no extra calls).
+  const tabCounts = useMemo(() => {
+    const c = { All: products.length, Active: 0, Unlisted: 0, Sold: 0 };
+    for (const p of products) {
+      const st = (p.status || "").toLowerCase();
+      if (st === "listed" || st === "active") c.Active += 1;
+      else if (st === "unlisted" || st === "draft") c.Unlisted += 1;
+      else if (st === "sold" || st === "delivered") c.Sold += 1;
+    }
+    return c;
+  }, [products]);
 
   const handleProductDeleted = (productId) => {
     setProducts((prev) => prev.filter((p) => p._id !== productId));
@@ -148,195 +160,97 @@ function ProductListed() {
     fetchBoostSummary();
   };
 
+  const fmtDate = (d) =>
+    d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
+
   return (
-    <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
-      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
-        {/* LEFT PANEL */}
-        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2  xl:pb-0   ">
-          <Profile_left_part />
-        </div>
-
-        {/* RIGHT PANEL */}
-        <div className="min-w-0 w-full md:h-full md:flex-1 md:overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] px-4 py-5 sm:p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
-          <div className="max-w-4xl mx-auto">
-            {/* 1. Page Header */}
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h1 className="text-[1.4rem] lg:text-2xl font-bold text-gray-900 dark:text-white mb-1 xl:text-xl">
-                  My Listings
-                </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                  {
-                    products.filter(
-                      (p) =>
-                        p.status?.toLowerCase() === "listed" ||
-                        p.status?.toLowerCase() === "active",
-                    ).length
-                  }{" "}
-                  active · {products.length} total
-                </p>
-              </div>
-              <div className="hidden md:block">
-                <button
-                  onClick={() => navigate("/upload")}
-                  className="bg-[#3838EC] hover:bg-blue-700 text-white px-3 py-2.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-sm shadow-blue-500/20"
-                >
-                  <FiPlus size={18} />
-                  List New Product
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Stats Grid */}
-            <div className="grid grid-cols-3 gap-2 md:grid-cols-4 md:gap-5 mb-5">
-              <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
-                <div className="text-gray-400 dark:text-gray-500">
-                  <EyeIcon size={20} className="text-black" />
-                </div>
-                <div>
-                  <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                    {totalImpressions.toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Impressions
-                  </div>
-                </div>
-              </div>
-              <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
-                <div className="text-gray-400 dark:text-gray-500">
-                  <HeartIcon size={20} className="text-pink-600" />
-                </div>
-                <div>
-                  <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                    {totalWishlisted.toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Saves
-                  </div>
-                </div>
-              </div>
-              <div className="bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
-                <div className="text-gray-400 dark:text-gray-500">
-                  <MessageCircleIcon size={20} className="text-blue-600" />
-                </div>
-                <div>
-                  <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                    -
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Chats
-                  </div>
-                </div>
-              </div>
-              <div className="col-span-3 md:col-span-1 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-4 flex items-center justify-between md:block shadow-sm">
-                <div>
-                  <div className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                    {boostSummary
-                      ? `${boostSummary.monthlyRemaining}/${boostSummary.monthlyLimit}`
-                      : "--"}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Boosts left
-                  </div>
-                </div>
-                <div className="text-right md:text-left md:mt-2 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
-                  {boostSummary
-                    ? `${boostSummary.activeBoosts}/${boostSummary.maxActiveBoosts} active`
-                    : "Plan quota"}
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Tabs */}
-            <div className="flex gap-2 mb-6">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-[0.45rem] rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === tab
-                      ? "bg-[#1A1D20] text-white dark:bg-white dark:text-black shadow-md"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* 4. Products List */}
-            <div className="flex flex-col gap-5 pb-10">
-              {loading ? (
-                <BrandLoader size="full" />
-              ) : error ? (
-                <div className="py-8 text-center text-red-500 dark:text-red-400 bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-gray-800">
-                  {error}
-                </div>
-              ) : filteredProducts.length === 0 ? (
-                <EmptyState
-                  variant="listings"
-                  title={
-                    activeTab === "All"
-                      ? "You haven't listed anything yet"
-                      : activeTab === "Active"
-                        ? "No live listings right now"
-                        : activeTab === "Unlisted"
-                          ? "No unlisted items"
-                          : "Nothing sold yet"
-                  }
-                  description={
-                    activeTab === "All" || activeTab === "Active"
-                      ? "Turn the stuff gathering dust in your hostel room into cash. Listing takes about 2 minutes, and every student on your campus sees it."
-                      : activeTab === "Unlisted"
-                        ? "Listings you hide from buyers show up here, so you can relist them anytime."
-                        : "Once you complete a deal with a buyer, the item moves here."
-                  }
-                  primaryAction={
-                    activeTab === "Unlisted" || activeTab === "Sold"
-                      ? { label: "View all listings", onClick: () => setActiveTab("All") }
-                      : { label: "List an item", to: "/upload", icon: Plus }
-                  }
-                />
-              ) : (
-                filteredProducts.map((p) => (
-                  <OrderCard
-                    key={p._id}
-                    orderId={p._id}
-                    placedOn={new Date(p.createdAt)
-                      .toLocaleDateString("en-GB")
-                      .replace(/\//g, "-")}
-                    imageUrl={
-                      p.images?.[0]?.url ||
-                      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=150&q=80"
-                    } // Fallback image
-                    name={p.title}
-                    color={p.attributes?.color || "N/A"}
-                    attr={p.attributes?.usage_duration || "Wireless"}
-                    status={p.status}
-                    price={p.selling_price}
-                    viewsCount={p.views_count || 0}
-                    wishlistedCount={
-                      p.wishlist_count ??
-                      p.wishlisted_count ??
-                      p.wishlist?.length ??
-                      0
-                    }
-                    onProductDeleted={handleProductDeleted}
-                    onProductUnlisted={handleProductUnlisted}
-                    onProductRelisted={handleProductRelisted}
-                    isBoosted={Boolean(p.is_boosted)}
-                    boostExpiresAt={p.boost_expires_at}
-                    boostTier={p.boost_tier}
-                    onBoostProduct={handleBoostProduct}
-                    onBoostApplied={handleBoostApplied}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+    <AccountLayout
+      seoTitle="My listings | Unideals"
+      title="My listings"
+      description={`${tabCounts.Active} active · ${products.length} total`}
+      actions={
+        <button type="button" onClick={() => navigate("/upload")} className={btnPrimary}>
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          List an item
+        </button>
+      }
+    >
+      {/* Stats: real numbers only */}
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile icon={Eye} label="Total views" value={totalImpressions.toLocaleString("en-IN")} />
+        <StatTile icon={Package} label="Active" value={tabCounts.Active} tone="emerald" hint={`${tabCounts.Sold} sold`} />
+        <StatTile icon={FileClock} label="Drafts & unlisted" value={tabCounts.Unlisted} tone="slate" />
+        <StatTile
+          icon={Rocket}
+          label="Boosts left"
+          value={boostSummary ? `${boostSummary.monthlyRemaining}/${boostSummary.monthlyLimit}` : "—"}
+          tone="amber"
+          hint={boostSummary ? `${boostSummary.activeBoosts}/${boostSummary.maxActiveBoosts} running` : undefined}
+        />
       </div>
-    </div>
+
+      <TabBar
+        className="mb-4"
+        ariaLabel="Filter listings"
+        tabs={tabs.map((t) => ({ value: t, label: t, count: loading ? 0 : tabCounts[t] }))}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
+
+      {loading ? (
+        <ListSkeleton rows={3} />
+      ) : error ? (
+        <ErrorState message={error} onRetry={fetchUserProducts} />
+      ) : filteredProducts.length === 0 ? (
+        <EmptyState
+          variant="listings"
+          title={
+            activeTab === "All"
+              ? "You haven't listed anything yet"
+              : activeTab === "Active"
+                ? "No live listings right now"
+                : activeTab === "Unlisted"
+                  ? "No unlisted items or drafts"
+                  : "Nothing sold yet"
+          }
+          description={
+            activeTab === "All" || activeTab === "Active"
+              ? "Turn the stuff in your hostel room into cash. Listing takes about 2 minutes, and every student on your campus sees it."
+              : activeTab === "Unlisted"
+                ? "Drafts you save and listings you hide from buyers show up here. Pick up where you left off any time."
+                : "Once you complete a deal with a buyer, the item moves here."
+          }
+          primaryAction={
+            activeTab === "Unlisted" || activeTab === "Sold"
+              ? { label: "View all listings", onClick: () => setActiveTab("All") }
+              : { label: "List an item", to: "/upload", icon: Plus }
+          }
+        />
+      ) : (
+        <div className="flex flex-col gap-3 sm:gap-4">
+          {filteredProducts.map((p) => (
+            <OrderCard
+              key={p._id}
+              orderId={p._id}
+              placedOn={fmtDate((p.status || "").toLowerCase() === "draft" ? p.updatedAt || p.createdAt : p.createdAt)}
+              imageUrl={p.images?.[0]?.url || "/logo.svg"}
+              name={p.title}
+              status={p.status}
+              price={p.selling_price}
+              viewsCount={p.views_count || 0}
+              onProductDeleted={handleProductDeleted}
+              onProductUnlisted={handleProductUnlisted}
+              onProductRelisted={handleProductRelisted}
+              isBoosted={Boolean(p.is_boosted)}
+              boostExpiresAt={p.boost_expires_at}
+              boostTier={p.boost_tier}
+              onBoostProduct={handleBoostProduct}
+              onBoostApplied={handleBoostApplied}
+            />
+          ))}
+        </div>
+      )}
+    </AccountLayout>
   );
 }
 

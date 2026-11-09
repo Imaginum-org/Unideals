@@ -21,6 +21,7 @@ const MainLayout = () => {
     "/productlisted",
     "/settings",
     "/contact",
+    "/faq",
     "/wishlist",
     "/termscondition",
     "/subscription",

@@ -1,13 +1,11 @@
 import { useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { CircleAlert, ImagePlus, Monitor, Smartphone, Star, Trash2, Upload } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
-import { HiOutlineTrash } from "react-icons/hi";
 import useProductListing from "../hooks/useProductListing";
 import PhoneHandoffCard from "../../handoff/components/PhoneHandoffCard.jsx";
-import { RiCameraAiLine } from "react-icons/ri";
-import { IoArrowForward } from "react-icons/io5";
-import { FaDesktop, FaMobileAlt } from "react-icons/fa";
 import { validateImages } from "../validations";
+import { FormSection, StepFooter } from "../components/listing/ListingKit.jsx";
+import { cn } from "../../../utils/cn.js";
 
 const MAX_IMAGES = 3;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -16,7 +14,7 @@ const MAX_TOTAL_SIZE = 30 * 1024 * 1024;
 const ImagesStep = () => {
   const fileInputRef = useRef(null);
 
-  const { formData, updateField, nextStep, errors, validateAndProceed } =
+  const { formData, updateField, nextStep, prevStep, errors, validateAndProceed } =
     useProductListing();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -259,194 +257,54 @@ const ImagesStep = () => {
     fileInputRef.current?.click();
   };
 
+  const previews = formData.imagePreviews || [];
+  const emptySlots = Math.max(0, MAX_IMAGES - previews.length);
+
   return (
-    <div className="w-full rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none dark:max-sm:bg-transparent">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
-          Product Images
-        </h1>
-
-        <p className="mt-2 xl:mt-1 text-[#475569] dark:text-[#A1A1AA] text-sm md:text-base">
-          Upload 1-3 high-quality photos to give buyers a complete view.
-        </p>
-      </div>
-
-      <div data-field="images">
-        {/* Source tabs — Sell-button language, single dashed box below */}
-        <div className="mt-4 flex flex-wrap items-end gap-3 pl-2" role="tablist" aria-label="Choose how to upload photos">
-          {/* PC tab — active tab sits flush on the box (folder-tab joint) */}
-          <div className={`relative transition-all duration-200 ${uploadSource === "pc" ? "" : "mb-[6px]"}`}>
-            <motion.button
-              type="button"
-              role="tab"
-              aria-selected={uploadSource === "pc"}
-              onClick={() => setUploadSource("pc")}
-              initial={false}
-              animate={{
-                borderBottomLeftRadius: uploadSource === "pc" ? 0 : 8,
-                borderBottomRightRadius: uploadSource === "pc" ? 0 : 8,
-              }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className={`flex shrink-0 items-center gap-2 rounded-t-lg px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:scale-[1.02] active:scale-[0.98] md:px-5 md:text-base ${
-                uploadSource === "pc"
-                  ? "bg-[#3838EC] text-[#FCFCFC] shadow-lg shadow-indigo-200"
-                  : "rounded-b-lg border border-[#3838EC]/25 bg-white text-[#3838EC] hover:border-[#3838EC]/60 hover:bg-[#EEF2FF] dark:border-[#6366F1]/40 dark:bg-transparent dark:text-[#A5B0FF] dark:hover:bg-[#6366F1]/10"
-              }`}
-            >
-              <FaDesktop className="size-4" />
-              <span>Browse files</span>
-            </motion.button>
-            {/* Concave corner notches: ease the tab's bottom corners into
-                the box's top dashed border so both read as one closed shape. */}
-            <AnimatePresence>
-              {uploadSource === "pc" && (
-                <>
-                  <motion.svg
-                    key="pc-notch-l"
-                    viewBox="0 0 10 10"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="pointer-events-none absolute -left-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
-                    aria-hidden="true"
-                  >
-                    <motion.path
-                      d="M10 0 Q10 10 0 10"
-                      fill="none"
-                      stroke="#3838EC"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  </motion.svg>
-                  <motion.svg
-                    key="pc-notch-r"
-                    viewBox="0 0 10 10"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="pointer-events-none absolute -right-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
-                    aria-hidden="true"
-                  >
-                    <motion.path
-                      d="M0 0 Q0 10 10 10"
-                      fill="none"
-                      stroke="#3838EC"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  </motion.svg>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Mobile tab — active tab sits flush on the box (folder-tab joint) */}
-          <div className={`relative transition-all duration-200 ${uploadSource === "mobile" ? "" : "mb-[6px]"}`}>
-            <motion.button
-              type="button"
-              role="tab"
-              aria-selected={uploadSource === "mobile"}
-              onClick={() => setUploadSource("mobile")}
-              initial={false}
-              animate={{
-                borderBottomLeftRadius: uploadSource === "mobile" ? 0 : 8,
-                borderBottomRightRadius: uploadSource === "mobile" ? 0 : 8,
-              }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className={`flex shrink-0 items-center gap-2 rounded-t-lg px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:scale-[1.02] active:scale-[0.98] md:px-5 md:text-base ${
-                uploadSource === "mobile"
-                  ? "bg-[#3838EC] text-[#FCFCFC] shadow-lg shadow-indigo-200"
-                  : "rounded-b-lg border border-[#3838EC]/25 bg-white text-[#3838EC] hover:border-[#3838EC]/60 hover:bg-[#EEF2FF] dark:border-[#6366F1]/40 dark:bg-transparent dark:text-[#A5B0FF] dark:hover:bg-[#6366F1]/10"
-              }`}
-            >
-              <FaMobileAlt className="size-4" />
-              <span>Scan with phone</span>
-            </motion.button>
-            {/* Concave corner notches: ease the tab's bottom corners into
-                the box's top dashed border so both read as one closed shape. */}
-            <AnimatePresence>
-              {uploadSource === "mobile" && (
-                <>
-                  <motion.svg
-                    key="mobile-notch-l"
-                    viewBox="0 0 10 10"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="pointer-events-none absolute -left-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
-                    aria-hidden="true"
-                  >
-                    <motion.path
-                      d="M10 0 Q10 10 0 10"
-                      fill="none"
-                      stroke="#3838EC"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  </motion.svg>
-                  <motion.svg
-                    key="mobile-notch-r"
-                    viewBox="0 0 10 10"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="pointer-events-none absolute -right-[10px] bottom-0 h-[10px] w-[10px] overflow-visible"
-                    aria-hidden="true"
-                  >
-                    <motion.path
-                      d="M0 0 Q0 10 10 10"
-                      fill="none"
-                      stroke="#3838EC"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  </motion.svg>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Single dashed box — content swaps by tab */}
-        <div
-          role="tabpanel"
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={handleBoxClick}
-          className={`mt-0 rounded-[28px] border-2 bg-[#F8FAFC] border-dashed p-8 transition-all duration-200 md:p-10 dark:bg-neutral-900/40
-        ${
-          uploadSource === "pc" ? "cursor-pointer" : "cursor-default"
+    <div className="flex flex-col gap-4 sm:gap-5">
+      <FormSection
+        icon={ImagePlus}
+        title="Photos"
+        description="Add 1 to 3 clear photos. The first one is your cover."
+        aside={
+          <span className="shrink-0 rounded-full bg-neutral-100 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-slate-600 dark:bg-white/5 dark:text-zinc-300">
+            {previews.length}/{MAX_IMAGES}
+          </span>
         }
-        ${
-          errors.images
-            ? "border-red-500"
-            : isDragging && uploadSource === "pc"
-              ? "border-[#4F46E5]"
-              : "border-[#D1D5DB] dark:border-neutral-700"
-        }`}
-        >
+      >
+        <div data-field="images">
+          {/* Upload source: segmented control */}
+          <div
+            role="tablist"
+            aria-label="Choose how to upload photos"
+            className="inline-flex w-full rounded-lg bg-neutral-100 p-1 sm:w-auto dark:bg-white/5"
+          >
+            {[
+              { id: "pc", label: "Upload files", icon: Monitor },
+              { id: "mobile", label: "Use your phone", icon: Smartphone },
+            ].map(({ id, label, icon: Icon }) => {
+              const active = uploadSource === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setUploadSource(id)}
+                  className={cn(
+                    "inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md px-4 text-[13.5px] font-semibold transition-colors sm:flex-none",
+                    active
+                      ? "bg-white text-slate-900 shadow-sm dark:bg-[#1A1D20] dark:text-white"
+                      : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200",
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -456,205 +314,156 @@ const ImagesStep = () => {
             onChange={handleInputChange}
           />
 
-          {/* PC pane */}
-          {uploadSource === "pc" && (
-            <motion.div
-              key="pc-pane"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="flex flex-col items-center justify-center text-center"
+          {/* Upload files: drop zone (hidden once all slots are full) */}
+          {uploadSource === "pc" && emptySlots > 0 && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleBoxClick}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleBoxClick();
+                }
+              }}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={cn(
+                "mt-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-9 text-center transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]",
+                isDragging
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                  : errors.images
+                    ? "border-red-300 bg-red-50/40 dark:border-red-500/50 dark:bg-red-950/10"
+                    : "border-neutral-300 bg-neutral-50 hover:border-[var(--accent-ring)] hover:bg-[var(--accent-soft)] dark:border-neutral-700 dark:bg-white/[0.02]",
+              )}
             >
-              {/* Icon */}
-              <div className="w-14 h-14 rounded-3xl bg-[#EEF2FF] flex items-center justify-center text-[#4F46E5]">
-                <RiCameraAiLine size={25} />
-              </div>
-
-              {/* Heading */}
-              <h3 className="mt-2 text-base xl:text-lg font-bold text-[#181C1F] dark:text-white">
-                Drag & drop or click to browse
-              </h3>
-
-              {/* Description */}
-              <p className="mt-1 max-w-md text-sm md:text-base text-[#6B7280] leading-7">
-                Supports JPG, PNG and WEBP up to 10MB each · 30MB total
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-white text-[var(--accent-text)] shadow-sm dark:bg-[#1A1D20]">
+                <Upload className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <p className="mt-3 text-[14.5px] font-semibold text-slate-900 dark:text-white">
+                {isDragging ? (
+                  "Drop to add"
+                ) : (
+                  <>
+                    <span className="text-[var(--accent-text)]">Click to upload</span>
+                    <span className="max-sm:hidden"> or drag and drop</span>
+                  </>
+                )}
               </p>
-
-              {/* Info */}
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                <div className="rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-semibold text-[#4F46E5]">
-                  Max {MAX_IMAGES} images
-                </div>
-              </div>
-            </motion.div>
+              <p className="mt-1 text-[12.5px] text-slate-500 dark:text-zinc-400">
+                JPG, PNG or WEBP · up to 10 MB each · {emptySlots} slot{emptySlots === 1 ? "" : "s"} left
+              </p>
+            </div>
           )}
 
-          {/* Mobile pane — always mounted so the QR session / polling
-              survives tab switches; only hidden with display:none. */}
-          <div
-            className={uploadSource === "mobile" ? "block" : "hidden"}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <motion.div
-              initial={false}
-              animate={
-                uploadSource === "mobile"
-                  ? { opacity: 1, y: 0 }
-                  : { opacity: 0, y: 12 }
-              }
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            >
+          {/* Use your phone: QR handoff. Always mounted so the session and
+              polling survive tab switches; hidden with display:none. */}
+          <div className={uploadSource === "mobile" ? "mt-4 block" : "hidden"}>
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 sm:p-6 dark:border-neutral-800 dark:bg-white/[0.02]">
               <PhoneHandoffCard
                 bare
                 onPhotos={handlePhonePhotos}
-                attachedCount={formData.imagePreviews?.length || 0}
-                remainingSlots={MAX_IMAGES - (formData.imagePreviews?.length || 0)}
+                attachedCount={previews.length}
+                remainingSlots={MAX_IMAGES - previews.length}
               />
-            </motion.div>
+            </div>
           </div>
-        </div>
 
-        {errors.images && (
-          <p className="mt-3 text-sm text-red-500">{errors.images}</p>
-        )}
-        {fileErrors.length > 0 && (
-          <ul className="mt-3 space-y-1.5 rounded-xl border border-red-200 bg-red-50 p-3">
-            {fileErrors.map((msg, i) => (
-              <li key={i} className="text-xs font-medium leading-5 text-red-600">
-                • {msg}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Uploaded Images */}
-      {formData.imagePreviews?.length > 0 && (
-        <div className="mt-5">
-          {/* Top */}
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-[#111827]">
-              Uploaded Images
-            </h3>
-
-            <p className="text-sm text-[#6B7280]">
-              {formData.imagePreviews.length}/{MAX_IMAGES}
+          {errors.images && (
+            <p role="alert" className="mt-3 text-[12.5px] font-medium text-red-600 dark:text-red-400">
+              {errors.images}
             </p>
-          </div>
+          )}
+          {fileErrors.length > 0 && (
+            <ul className="mt-3 space-y-1 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 dark:border-red-900/50 dark:bg-red-950/20">
+              {fileErrors.map((msg, i) => (
+                <li key={i} className="flex items-start gap-2 text-[12.5px] font-medium leading-5 text-red-700 dark:text-red-300">
+                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {msg}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-          {/* Grid */}
-          <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-4">
-            {formData.imagePreviews.map((imageItem, index) => (
-              <div
-                key={imageItem.id}
-                className="group relative rounded-[24px] overflow-hidden border border-[#ECECEC] cursor-pointer"
+        {/* Slots: filled photos + empty placeholders. Actions are always
+            visible (hover-only controls were unreachable on touch screens). */}
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          {previews.map((imageItem, index) => (
+            <div
+              key={imageItem.id || index}
+              className={cn(
+                "relative aspect-square overflow-hidden rounded-xl border bg-neutral-100 dark:bg-white/5",
+                index === 0 ? "border-[var(--accent)] ring-2 ring-[var(--accent-soft-strong)]" : "border-neutral-200 dark:border-neutral-700",
+              )}
+            >
+              {imageItem?.preview ? (
+                <img
+                  src={imageItem.preview}
+                  alt={`Photo ${index + 1}`}
+                  loading="lazy"
+                  draggable={false}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/logo.svg";
+                  }}
+                  className="h-full w-full select-none object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[12px] font-semibold text-slate-400">No preview</div>
+              )}
+
+              {index === 0 ? (
+                <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-md bg-[var(--accent)] px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-white sm:left-2 sm:top-2">
+                  <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                  Cover
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSetCover(index)}
+                  className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[10.5px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/75 sm:left-2 sm:top-2"
+                  aria-label={`Make photo ${index + 1} the cover`}
+                >
+                  <Star className="h-3 w-3" aria-hidden="true" />
+                  <span className="max-sm:hidden">Make cover</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleRemoveImage(index)}
+                aria-label={`Remove photo ${index + 1}`}
+                className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-md bg-white/90 text-red-600 shadow-sm backdrop-blur-sm transition hover:bg-white sm:right-2 sm:top-2"
               >
-                {/* Cover Badge */}
-                {index === 0 && (
-                  <div className="absolute top-3 left-3 z-20 rounded-full bg-[#4F46E5] px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                    Cover
-                  </div>
-                )}
-
-                {/* Hover Badge */}
-                {index !== 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-
-                      handleSetCover(index);
-                    }}
-                    className="absolute top-3 left-3 z-20 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white opacity-0 group-hover:opacity-100 transition-all duration-200"
-                  >
-                    Set as cover
-                  </button>
-                )}
-
-                {/* Image (guarded: a missing URL renders a tile, never the logo fallback) */}
-                {imageItem?.preview ? (
-                  <img
-                    src={imageItem.preview}
-                    alt={`Preview ${index}`}
-                    loading="lazy"
-                    draggable={false}
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = "/logo.svg";
-                    }}
-                    className="w-full aspect-square object-cover select-none"
-                  />
-                ) : (
-                  <div className="w-full aspect-square bg-[#F1F3F6] dark:bg-zinc-800 flex items-center justify-center text-xs font-semibold text-[#9CA3AF] select-none">
-                    No preview
-                  </div>
-                )}
-
-                {/* Overlay */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-
-                      handleRemoveImage(index);
-                    }}
-                    className="w-12 h-12 rounded-full bg-[#F7F8FA] text-red-500 flex items-center justify-center shadow-lg"
-                  >
-                    <HiOutlineTrash size={22} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Helper Text */}
-          <p className="mt-3 text-sm text-[#6B7280]">
-            Tap or hover on an image to make it the cover photo.
-          </p>
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          {Array.from({ length: emptySlots }, (_, i) => (
+            <button
+              key={`empty-${i}`}
+              type="button"
+              onClick={() => (uploadSource === "pc" ? handleBoxClick() : setUploadSource("pc"))}
+              className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-neutral-300 text-slate-400 transition-colors hover:border-[var(--accent-ring)] hover:text-[var(--accent-text)] dark:border-neutral-700 dark:text-zinc-500"
+              aria-label="Add a photo"
+            >
+              <ImagePlus className="h-5 w-5" aria-hidden="true" />
+              <span className="text-[11.5px] font-medium">{previews.length === 0 && i === 0 ? "Cover" : "Add"}</span>
+            </button>
+          ))}
         </div>
-      )}
+        {previews.length > 1 && (
+          <p className="mt-2.5 text-[12.5px] text-slate-500 dark:text-zinc-400">Use “Make cover” on any photo to show it first.</p>
+        )}
+      </FormSection>
 
-      {/* Warning Card */}
-      <div className="mt-7 rounded-[24px] border border-[#FDE68A] bg-[#FEFCE8] p-5">
-        <h3 className="text-sm font-bold uppercase tracking-wide text-[#92400E]">
-          Important
-        </h3>
-
-        <p className="mt-3 text-sm leading-7 text-[#78350F]">
-          Upload atleast 1 clear and authentic product photos. Listings with
-          high-quality images receive significantly better engagement and buyer
-          trust.
-        </p>
-      </div>
-
-      {/* Footer */}
-      <div className="mt-10 flex items-center justify-between max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-50 max-sm:mt-0 max-sm:border-t max-sm:border-neutral-200/80 max-sm:bg-white/95 max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:backdrop-blur-xl dark:max-sm:border-neutral-800 dark:max-sm:bg-[#16181B]/95">
-        {/* Pagination */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-[#9CA3AF]">Step 2 of 4</span>
-
-          <div className="flex gap-1">
-            <div className="w-3 h-[4px] rounded-full bg-[#16A34A]" />
-
-            <div className="w-7 h-[4px] rounded-full bg-[#4F46E5]" />
-
-            <div className="w-3 h-[4px] rounded-full bg-[#D1D5DB]" />
-
-            <div className="w-3 h-[4px] rounded-full bg-[#D1D5DB]" />
-          </div>
-        </div>
-
-        {/* Buttons */}
-        <div className="flex items-center gap-2 lg:gap-3">
-          {/* Continue */}
-          <button
-            onClick={() => validateAndProceed(validateImages, nextStep)}
-            className="h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-lg flex justify-center items-center gap-2 font-semibold transition-all duration-200 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
-          >
-            <span>Continue</span>
-            <IoArrowForward className="size-5" />
-          </button>
-        </div>
-      </div>
+      <StepFooter
+        onBack={prevStep}
+        onNext={() => validateAndProceed(validateImages, nextStep)}
+        nextLabel="Continue to pricing"
+      />
     </div>
   );
 };

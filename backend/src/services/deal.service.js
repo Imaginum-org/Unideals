@@ -515,6 +515,73 @@ export const confirmItemReceived = async ({ conversationId, userId }) => {
 };
 
 /**
+ * Step a deal back ONE stage (seller only: these are the seller's own
+ * actions). Mistakes happen: wrong pickup, payment ticked too early, or the
+ * reservation should be released without cancelling the whole thread.
+ *
+ *   payment_confirmed → pickup_scheduled   (payment not actually received)
+ *   pickup_scheduled  → deal_confirmed     (pickup plan dropped)
+ *   deal_confirmed    → negotiating        (reservation released, item free)
+ *
+ * Completed deals are final (the listing is already marked sold) and
+ * cancelled deals restart with a new offer. The status flip is a single
+ * conditional update on the expected stage, so two taps (or a race with the
+ * buyer confirming) can never skip two stages.
+ */
+const REVERT_RULES = {
+  [DEAL_STATUS.PAYMENT_CONFIRMED]: {
+    to: DEAL_STATUS.PICKUP_SCHEDULED,
+    update: { $set: { "payment_confirmed.is_confirmed": false, "payment_confirmed.confirmed_at": null } },
+    text: "Seller marked the payment as not received yet.",
+  },
+  [DEAL_STATUS.PICKUP_SCHEDULED]: {
+    to: DEAL_STATUS.DEAL_CONFIRMED,
+    update: { $unset: { pickup: "" } },
+    text: "Seller cleared the pickup plan. A new time will be set.",
+  },
+  [DEAL_STATUS.DEAL_CONFIRMED]: {
+    to: DEAL_STATUS.NEGOTIATING,
+    update: { $unset: { deal_confirmed_at: "", reserved_at: "" } },
+    text: "Seller reopened the deal. The item is no longer reserved.",
+  },
+};
+
+export const revertDealStage = async ({ conversationId, userId }) => {
+  const conversation = await loadConversation(conversationId);
+  const role = roleOf(conversation, userId);
+  if (role !== "seller") throw new AppError("Only the seller can undo a deal step", 403);
+
+  const deal = await ensureDeal(conversation);
+  if (deal.status === DEAL_STATUS.COMPLETED) {
+    throw new AppError("Completed deals can't be undone", 400);
+  }
+  const rule = REVERT_RULES[deal.status];
+  if (!rule) throw new AppError("There's no step to undo yet", 400);
+
+  const updated = await Deal.findOneAndUpdate(
+    { _id: deal._id, status: deal.status },
+    { ...rule.update, $set: { ...(rule.update.$set || {}), status: rule.to } },
+    { returnDocument: "after" },
+  );
+  if (!updated) throw new AppError("This deal just changed. Refresh and try again.", 409);
+
+  // Released reservation: the chat list shows the listing's real price again.
+  if (rule.to === DEAL_STATUS.NEGOTIATING) {
+    const product = await Product.findById(conversation.product_id).select("selling_price").lean();
+    if (product?.selling_price != null) {
+      await Conversation.updateOne(
+        { _id: conversation._id },
+        { $set: { "product_snapshot.selling_price": product.selling_price } },
+      );
+    }
+  }
+
+  await pushSystemMessage({ conversation, senderId: userId, text: rule.text, deal: updated });
+  broadcastDeal(conversation, updated.toObject());
+  return updated;
+};
+
+/**
  * Cancel a deal before completion (either party, e.g. buyer ghosts or seller
  * re-lists). Frees the reservation so the orders page and chat fall back to
  * `cancelled` together. Completed deals are terminal and cannot be cancelled.

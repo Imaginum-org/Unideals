@@ -100,7 +100,9 @@ const PickupSpotModal = ({
       async (pos) => {
         try {
           const res = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&localityLanguage=en`,
+            // Only the locality is needed: send ~100 m precision, never the exact fix.
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.coords.latitude.toFixed(3)}&longitude=${pos.coords.longitude.toFixed(3)}&localityLanguage=en`,
+            { referrerPolicy: "no-referrer", credentials: "omit" },
           );
 
           const data = await res.json();

@@ -229,7 +229,7 @@ export const getWishlist = async (req, res) => {
       wishlistIds.length > 0
         ? Product.find(match)
             .select(
-              "_id title images category selling_price original_price seller_id location is_boosted boost_tier boost_expires_at campus_id status",
+              "_id title images category selling_price original_price seller_id location is_boosted boost_tier boost_expires_at campus_id status hot_until createdAt slug",
             )
             .populate({
               path: "seller_id",

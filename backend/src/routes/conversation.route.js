@@ -31,6 +31,7 @@ import {
   confirmPayment,
   confirmItemReceived,
   cancelDeal,
+  revertDealStage,
 } from "../controllers/deal.controller.js";
 
 const router = express.Router();
@@ -92,5 +93,6 @@ router.post("/:id/pickup", auth, dealActionLimiter, validate(schedulePickupSchem
 router.post("/:id/payment-confirm", auth, dealActionLimiter, confirmPayment);
 router.post("/:id/item-received", auth, dealActionLimiter, confirmItemReceived);
 router.post("/:id/cancel", auth, dealActionLimiter, validate(cancelDealSchema), cancelDeal);
+router.post("/:id/revert", auth, dealActionLimiter, revertDealStage);
 
 export default router;

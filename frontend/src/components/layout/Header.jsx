@@ -25,7 +25,7 @@ import { IoIosHeartEmpty } from "react-icons/io";
 import { MdOutlineLogout } from "react-icons/md";
 import { IoChevronBackOutline } from "react-icons/io5";
 import AvatarComponent from "../common/AvatarComponent.jsx";
-import { useUser } from "../../context/useUserContext.jsx";
+import { useUser, clearAccountScopedStorage } from "../../context/useUserContext.jsx";
 import { useCampus } from "../../context/CampusContext.jsx";
 import { ikFirstThumb } from "../../utils/imageTransform.js";
 import { logoutUser } from "../../features/auth/api/authApi.js";
@@ -47,6 +47,7 @@ import {
   Megaphone,
   ShieldAlert,
 } from "lucide-react";
+import { productPath } from "../../utils/productPath.js";
 
 const ProfileDropdown = ({
   userDetails,
@@ -923,14 +924,20 @@ const Header = () => {
     };
   }, [debouncedQuery, campusSlug]);
 
-  // Trending for the empty-query dropdown state (fetched once, lazily).
+  // Trending for the empty-query dropdown state. Re-checked every time the
+  // search opens so the list keeps up with the server ranking; the request
+  // cache makes repeat opens within its TTL free. Only the first load shows
+  // skeletons, later refreshes swap the list in silently.
   const ensureTrending = () => {
-    if (trending.length > 0 || trendingLoading) return;
-    setTrendingLoading(true);
+    if (trendingLoading) return;
+    const firstLoad = trending.length === 0;
+    if (firstLoad) setTrendingLoading(true);
     getTrendingProducts(campusSlug ? { campus_slug: campusSlug } : undefined)
       .then((res) => setTrending(res.data?.data || []))
       .catch(() => {})
-      .finally(() => setTrendingLoading(false));
+      .finally(() => {
+        if (firstLoad) setTrendingLoading(false);
+      });
   };
 
   // Sync trending with the active campus: a switch drops stale picks and
@@ -1266,6 +1273,7 @@ const Header = () => {
 
       if (response.data.success) {
         clearUserData();
+        clearAccountScopedStorage();
         setShowmenu(false);
 
         toast.success("Logged out successfully");
@@ -1273,7 +1281,7 @@ const Header = () => {
         navigate("/");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Logout failed:", err?.response?.status, err?.response?.data?.message || err?.message);
       toast.error("Logout failed");
     }
   };
@@ -1637,7 +1645,7 @@ const Header = () => {
                               <button
                                 key={item._id}
                                 onClick={() => {
-                                  navigate(`/product/${item._id}`);
+                                  navigate(productPath(item));
                                   setShowMobileSearch(false);
                                   setShowDropdown(false);
                                 }}
@@ -1873,7 +1881,7 @@ const Header = () => {
                       selectedIndex >= 0 &&
                       selectedIndex < visibleResults.length
                     ) {
-                      navigate(`/product/${visibleResults[selectedIndex]._id}`);
+                      navigate(productPath(visibleResults[selectedIndex]));
                       setShowDropdown(false);
                       return;
                     }

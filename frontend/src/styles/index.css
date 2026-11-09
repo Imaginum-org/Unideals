@@ -568,6 +568,17 @@
     --tabbar-h: 0px;
   }
 }
+/* Phones: pushed screens (account sub-pages, the sell flow) own the top
+   of the screen with their own app bar (back + title), like native apps.
+   Set by useAppScreen() via html[data-app-screen]. */
+@media (max-width: 639.98px) {
+  html[data-app-screen] {
+    --header-h: 0px;
+  }
+  html[data-app-screen] .site-header {
+    display: none;
+  }
+}
 /* Phones/tablets with an open thread: the conversation owns the screen,
    with its own back button, like native messaging apps. */
 @media (max-width: 1023.98px) {

@@ -14,7 +14,9 @@ import { useCampus } from "../context/CampusContext.jsx";
 // One delegated listener on document — no per-link wiring needed.
 
 const HOVER_INTENT_MS = 80;
-const PRODUCT_RE = /^\/product\/([a-f0-9]{24})\/?$/i;
+// Slug (/product/casio-fx-991-a1b2c3) or legacy ObjectId link. The captured
+// ref is the same param the product page fetches with, so the cache hits.
+const PRODUCT_RE = /^\/product\/([a-z0-9_-]{3,160})\/?$/i;
 
 const constrainedNetwork = () => {
   const c = typeof navigator !== "undefined" ? navigator.connection : null;

@@ -86,6 +86,7 @@ const Subscription = page(() => import("../features/user/pages/Subscription.jsx"
 const Wishlist = page(() => import("../features/user/pages/Wishlist.jsx"));
 const Myorders = page(() => import("../features/user/pages/Myorders.jsx"));
 const ContactUs = page(() => import("../features/user/pages/ContactUs.jsx"));
+const FAQ = page(() => import("../features/help/pages/FAQ.jsx"));
 const Termscondition = page(() => import("../features/user/pages/Termscondition.jsx"));
 const PrivacyPolicy = page(() => import("../features/legal/pages/PrivacyPolicy.jsx"));
 const Chat = page(() => import("../features/chat/pages/Chat.jsx"));
@@ -118,6 +119,7 @@ const PREFETCH_TABLE = [
   ["/login", Login],
   ["/signup", Signup],
   ["/contact", ContactUs],
+  ["/faq", FAQ],
 ];
 
 /** Start downloading the JS for the page at `pathname` (no-op if cached). */
@@ -149,6 +151,8 @@ export default function AppRoutes() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
+          {/* Token is stripped from the URL after it is read; a refresh lands here. */}
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/checkEmail" element={<CheckEmail />} />
         </Route>
@@ -164,6 +168,7 @@ export default function AppRoutes() {
           <Route path="/termscondition" element={<Termscondition />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/contact" element={<ContactUs />} />
+          <Route path="/faq" element={<FAQ />} />
         </Route>
 
         {/* PROTECTED WITH HEADER */}

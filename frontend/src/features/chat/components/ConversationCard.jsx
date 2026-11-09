@@ -1,30 +1,30 @@
 import { memo } from "react";
+import { Crown } from "lucide-react";
 import userdp from "/userdp.webp";
 import { avatarUrl, formatName } from "../utils/display.js";
 
 export const timeAgo = (iso) => {
   if (!iso) return "";
-  const diff = Date.now() - new Date(iso).getTime();
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "now";
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days} days`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo`;
-  return `${Math.floor(months / 12)}y`;
+  if (days === 1) return "Yesterday";
+  if (days < 7) return d.toLocaleDateString("en-IN", { weekday: "short" });
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 };
 
 const isProTier = (sub) => sub === "pro" || sub === "pro_plus";
 
 /**
- * Conversation row — messaging-app layout (WhatsApp / iMessage style):
- *   [product thumb + seller avatar]  Title ............ time
- *                                     Buying · Name: last message   (n)
- * Borderless rows on the list surface; unread rows go bold with an accent
- * time + count. Pro / Pro+ counterparts keep the signature green row.
+ * Conversation row (inbox list). Product thumb with the other person's
+ * avatar tucked in the corner, title + time, role chip + name + last
+ * message, unread count. Pro / Pro+ counterparts get a crown (their chats
+ * are also sorted first: "Chat priority" plan perk).
  */
 const ConversationCard = ({ conv, selected, onClick }) => {
   const product = conv?.product || {};
@@ -40,90 +40,73 @@ const ConversationCard = ({ conv, selected, onClick }) => {
   const unread = conv?.unread || 0;
   const hasUnread = unread > 0;
 
-  const surface = pro
-    ? "bg-[#22c55e] hover:brightness-[0.97]"
-    : selected
-      ? "bg-[var(--accent-soft)]"
-      : "hover:bg-zinc-100/80 active:bg-zinc-100 dark:hover:bg-white/5 dark:active:bg-white/5";
-
   return (
     <button
       type="button"
       onClick={() => onClick?.(conv)}
       aria-current={selected ? "true" : undefined}
-      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-figtree transition-colors ${surface} ${
-        selected && pro ? "ring-2 ring-[#15803d] ring-offset-1" : ""
+      className={`relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left font-figtree transition-colors ${
+        selected
+          ? "bg-[var(--accent-soft)]"
+          : "hover:bg-neutral-100 active:bg-neutral-100 dark:hover:bg-white/5 dark:active:bg-white/5"
       }`}
     >
-      {/* Product thumb with the other person's avatar tucked in the corner */}
+      {selected && <span aria-hidden="true" className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-[var(--accent)]" />}
       <span className="relative shrink-0">
         <img
           src={img}
           alt=""
           loading="lazy"
-          width={52}
-          height={52}
-          className="size-[52px] rounded-xl border border-black/5 bg-white object-cover dark:border-white/10"
+          width={44}
+          height={44}
+          className="size-11 rounded-lg border border-black/5 bg-white object-cover lg:size-10 dark:border-white/10"
         />
         <span
-          className={`absolute -bottom-1 -right-1 grid size-[22px] place-items-center overflow-hidden rounded-full text-[10px] font-bold ring-2 ${
-            pro ? "ring-[#22c55e]" : selected ? "ring-[#EEF0FF] dark:ring-[#1E2140]" : "ring-white dark:ring-[#131313]"
-          } ${photo ? "bg-zinc-100" : pro ? "bg-white text-[#16a34a]" : "bg-[#3838EC] text-white"}`}
+          className={`absolute -bottom-1 -right-1 grid size-5 place-items-center overflow-hidden rounded-full text-[9px] font-bold ring-2 ${
+            selected ? "ring-[#EEEEFD] dark:ring-[#1E1F35]" : "ring-white dark:ring-[#16181B]"
+          } ${photo ? "bg-neutral-100" : "bg-[var(--accent)] text-white"}`}
         >
-          {photo ? (
-            <img src={photo} alt="" loading="lazy" width={22} height={22} className="size-full object-cover" />
-          ) : (
-            name.charAt(0)
-          )}
+          {photo ? <img src={photo} alt="" loading="lazy" width={20} height={20} className="size-full object-cover" /> : name.charAt(0)}
         </span>
       </span>
 
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
-          <span
-            className={`truncate text-[15px] leading-5 ${hasUnread ? "font-semibold" : "font-medium"} ${
-              pro ? "text-white" : "text-zinc-900 dark:text-white"
-            }`}
-          >
+          <span className={`truncate text-[14px] leading-5 lg:text-[13.5px] ${hasUnread ? "font-semibold" : "font-medium"} text-slate-900 dark:text-white`}>
             {isGirls ? "🌸 " : ""}
             {title}
           </span>
           <span
-            className={`shrink-0 text-[12px] leading-none tabular-nums ${
-              pro ? "text-white/85" : hasUnread ? "font-semibold text-[var(--accent-text)]" : "text-zinc-400"
+            className={`shrink-0 text-[11.5px] leading-none tabular-nums ${
+              hasUnread ? "font-semibold text-[var(--accent-text)]" : "text-slate-400 dark:text-zinc-500"
             }`}
           >
             {timeAgo(conv?.last_activity_at)}
           </span>
         </span>
 
-        <span className="mt-1 flex items-center gap-2">
+        <span className="mt-0.5 flex items-center gap-2">
           <span
-            className={`min-w-0 flex-1 truncate text-[13.5px] leading-5 ${
-              pro ? "text-white/95" : hasUnread ? "text-zinc-800 dark:text-zinc-200" : "text-zinc-500 dark:text-zinc-400"
+            className={`min-w-0 flex-1 truncate text-[13px] leading-5 lg:text-[12.5px] ${
+              hasUnread ? "text-slate-800 dark:text-zinc-200" : "text-slate-500 dark:text-zinc-400"
             }`}
           >
             <span
-              className={`mr-1.5 inline-block rounded px-1 py-px align-[1px] text-[10px] font-bold uppercase tracking-wide ${
-                pro
-                  ? "bg-white/20 text-white"
-                  : buying
-                    ? "bg-[#E6F9EC] text-[#15803d] dark:bg-emerald-950/40 dark:text-emerald-300"
-                    : "bg-[#EEF0FF] text-[#3838EC] dark:bg-indigo-950/40 dark:text-indigo-300"
+              className={`mr-1.5 inline-block rounded px-1 align-[1px] text-[9.5px] font-bold uppercase tracking-wide ${
+                buying
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "bg-[var(--accent-soft)] text-[var(--accent-text)]"
               }`}
             >
               {buying ? "Buying" : "Selling"}
             </span>
-            <span className={pro ? "text-white" : "font-medium text-zinc-700 dark:text-zinc-300"}>{name}</span>
+            <span className="font-medium text-slate-700 dark:text-zinc-300">{name}</span>
+            {pro && <Crown className="mx-0.5 inline h-3 w-3 align-[-1px] text-amber-500" aria-label="Pro member" />}
             {": "}
             {conv?.last_message || "Say hi"}
           </span>
           {hasUnread && (
-            <span
-              className={`grid h-5 min-w-5 shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-bold ${
-                pro ? "bg-white text-[#16a34a]" : "bg-[var(--accent)] text-white"
-              }`}
-            >
+            <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-[var(--accent)] px-1 text-[10.5px] font-bold text-white">
               {unread > 9 ? "9+" : unread}
             </span>
           )}

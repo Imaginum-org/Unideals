@@ -7,6 +7,7 @@ import { Trash2 } from "lucide-react";
 
 import { deleteAccount } from "../../../features/user/api/userApi.js";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
+import { clearAccountScopedStorage } from "../../../context/useUserContext.jsx";
 
 function AlertDialogDemo() {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ function AlertDialogDemo() {
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("cachedUserDetails");
         localStorage.removeItem("accessToken");
+        clearAccountScopedStorage();
 
         toast.success("Your account has been permanently deleted.");
 

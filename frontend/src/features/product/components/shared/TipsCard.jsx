@@ -1,88 +1,62 @@
-import { MdStars } from "react-icons/md";
-import { BsFillLightbulbFill } from "react-icons/bs";
+import { Lightbulb, Check } from "lucide-react";
+import { CARD } from "../listing/ListingKit.jsx";
+import { cn } from "../../../../utils/cn.js";
 
-const TIPS_DATA = {
+// Short, specific advice per step. No invented statistics.
+const TIPS = {
   1: {
-    icon: <BsFillLightbulbFill size={18} />,
-    title: "PRO TIP",
-
+    title: "Write a title buyers search for",
     tips: [
-      "Use a descriptive product title.",
-      "Mention important product details.",
-      "Add honest usage information.",
-      "Clear descriptions increase trust.",
+      "Lead with brand + model, e.g. “Casio fx-991ES Plus”.",
+      "Mention what's included (box, charger, cover).",
+      "Be upfront about scratches or faults.",
     ],
   },
-
   2: {
-    icon: <BsFillLightbulbFill size={18} />,
-    title: "PRO TIP",
-
+    title: "Photos sell the item",
     tips: [
-      "Use natural lighting.",
-      "Show all product angles.",
-      "Keep background clean.",
-      "Avoid blurry images.",
+      "Shoot in daylight against a plain background.",
+      "Use the cover for the clearest, front-facing shot.",
+      "Show any wear up close, it builds trust.",
     ],
   },
-
   3: {
-    icon: <BsFillLightbulbFill size={18} />,
-    title: "PRO TIP",
-
+    title: "Price it to sell",
     tips: [
-      "Keep pricing realistic.",
-      "Competitive prices sell faster.",
-      "Mention negotiable pricing carefully.",
-      "Clear meetup locations help buyers.",
+      "Check what similar items go for on your campus.",
+      "Negotiable listings usually get more chats.",
+      "Pick a busy, public pickup spot on campus.",
     ],
   },
-
   4: {
-    icon: <BsFillLightbulbFill size={18} />,
-    title: "PRO TIP",
-
+    title: "Final check",
     tips: [
-      "Review all details carefully.",
-      "Ensure images are correct.",
-      "Check payment information.",
-      "Preview exactly as buyers will see it.",
+      "Make sure the cover photo is the right one.",
+      "Double-check price and pickup spot.",
+      "You can edit the listing any time after publishing.",
     ],
   },
 };
 
-const TipsCard = ({ step }) => {
-  const currentTip = TIPS_DATA[step];
-
+const TipsCard = ({ step, className }) => {
+  const data = TIPS[step] || TIPS[1];
   return (
-    <div className="w-full rounded-xl border border-[#ECECEC] bg-[#F1F1FF] py-5 px-6 font-figtree dark:bg-[#1A1D20] dark:text-white dark:border-0">
-      {/* Top */}
-      <div className="flex items-center gap-2 text-[#3838EC]">
-        {currentTip.icon}
-
-        <h2 className="text-sm font-bold text-[#000000] uppercase tracking-wide dark:text-white">
-          {currentTip.title}
-        </h2>
-      </div>
-
-      <p className="text-xl font-semibold pr-14 lg:pr-9 mt-3">
-        Products with clear, descriptive titles receive{" "}
-        <span className="text-[#3838EC]">40% more interest</span> from potential
-        buyers.
+    <section className={cn(CARD, "p-4", className)} aria-label="Tips">
+      <p className="flex items-center gap-2 text-[13.5px] font-semibold text-slate-900 dark:text-white">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300">
+          <Lightbulb className="h-4 w-4" aria-hidden="true" />
+        </span>
+        {data.title}
       </p>
-
-      {/* Tips */}
-      <div className="mt-4 flex flex-col justify-center gap-2">
-        {currentTip.tips.map((tip, index) => (
-          <div key={index} className="flex items-center gap-3 ">
-            <MdStars className="text-[#3838EC]" />
-            <p className="text-[15px] leading-7 text-[#111827] dark:text-white">
-              {tip}
-            </p>
-          </div>
+      <ul className="mt-3 space-y-2">
+        {data.tips.map((tip) => (
+          <li key={tip} className="flex items-start gap-2 text-[13px] leading-relaxed text-slate-600 dark:text-zinc-300">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" strokeWidth={3} aria-hidden="true" />
+            {tip}
+          </li>
         ))}
-      </div>
-    </div>
+      </ul>
+    </section>
   );
 };
 

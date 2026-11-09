@@ -50,7 +50,7 @@ export const shouldShowTabBar = (pathname = "") =>
 // Account sub-pages (settings, orders, …) keep the Profile tab highlighted.
 const ACCOUNT_PREFIXES = [
   "/profile", "/settings", "/myorders", "/productlisted", "/wishlist", "/notification",
-  "/achievements", "/badge", "/subscription", "/contact", "/termscondition",
+  "/achievements", "/badge", "/subscription", "/contact", "/faq", "/termscondition",
 ];
 
 function Tab({ to, label, icon: Icon, badge = 0, end = false, activeFor, children }) {

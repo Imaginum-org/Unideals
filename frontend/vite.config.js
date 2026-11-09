@@ -20,10 +20,19 @@ const stripAnimateIconsDisplayName = {
   },
 };
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react(), stripAnimateIconsDisplayName],
+  // Production builds ship a clean browser console: no debug noise, and no
+  // error objects that carry request payloads (axios errors include the
+  // request body, e.g. a signup password). Dev keeps full logging.
+  esbuild: command === "build" ? { drop: ["console", "debugger"] } : undefined,
   server: {
     host: true,
+    // Backend CORS + FRONTEND_URL expect exactly :5173. Fail loudly if another
+    // dev server (e.g. Unideals_Marketing) already holds it, instead of
+    // silently ending up beside it and serving the wrong app on localhost.
+    port: 5173,
+    strictPort: true,
   },
   build: {
     chunkSizeWarningLimit: 600,
@@ -47,4 +56,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

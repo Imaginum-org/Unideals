@@ -536,8 +536,10 @@ const Home = () => {
             <h2 className="font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white">
               Shop by Category
             </h2>
-            <p className="mt-0.5 font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
-              Textbooks, gadgets, cycles and hostel must-haves, all from your campus.
+            {/* Phones get a shorter line so it never wraps. */}
+            <p className="mt-0.5 truncate font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
+              <span className="sm:hidden">Textbooks, gadgets, cycles &amp; more</span>
+              <span className="hidden sm:inline">Textbooks, gadgets, cycles and hostel must-haves, all from your campus.</span>
             </p>
           </div>
           {/* <div
@@ -695,8 +697,9 @@ const Home = () => {
               <h2 className="font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white">
                 Trending Items
               </h2>
-              <p className="mt-0.5 font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
-                What students on your campus are checking out right now 🔥
+              <p className="mt-0.5 truncate font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
+                <span className="sm:hidden">Hot on your campus right now 🔥</span>
+                <span className="hidden sm:inline">What students on your campus are checking out right now 🔥</span>
               </p>
             </div>
           </div>

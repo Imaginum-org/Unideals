@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
+import { FAQ_COUNT, POPULAR_QUESTIONS } from "../../help/faqData.js";
 import Select from "../../../components/ui/Select.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
-import Profile_left_part from "../components/Profile_left_part.jsx";
+import { AccountLayout, CARD, FLUSH_ON_PHONE, PageHeader, btnPrimary, btnSecondary } from "../components/account/AccountKit.jsx";
+import { cn } from "../../../utils/cn.js";
 import { toast } from "../../../components/ui/toast.js";
 import axios from "../../../services/axiosInstance.js";
 import {
@@ -19,79 +22,12 @@ import {
 } from "lucide-react";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
-// FAQ Data Structure
-const faqData = [
-  {
-    id: "transactions",
-    title: "TRANSACTIONS",
-    questions: [
-      {
-        q: "How do I track the status of a deal?",
-        a: "Go to Orders in your profile to see your deals and their current status. You and the seller both get notifications when something changes.",
-      },
-      {
-        q: "Can I return an item after buying it?",
-        a: "UniDeals connects students directly. There is no platform-level returns system. We strongly recommend inspecting all items before completing a deal. Once marked as done, transactions cannot be reversed.",
-      },
-      {
-        q: "What if I got scammed or the item is not as described?",
-        a: "Report the issue using the Report option on this page with details of what happened. Our safety team reviews every report and will contact you via email.",
-      },
-    ],
-  },
-  {
-    id: "safety",
-    title: "SAFETY",
-    questions: [
-      {
-        q: "Is it safe to meet a seller on campus?",
-        a: "All users on UniDeals are verified students. Always meet in public, well-lit campus areas: the canteen, library lobby, or main gate. Never share home addresses or pay before inspecting the item.",
-      },
-      {
-        q: "What if a seller stops responding?",
-        a: "If a seller stops responding, we recommend canceling the deal and looking for alternative listings.",
-      },
-    ],
-  },
-  {
-    id: "account",
-    title: "ACCOUNT & VERIFICATION",
-    questions: [
-      {
-        q: "How does Campus Verification Works ?",
-        a: "Go to Settings and complete the verification steps shown there. Once verified, your profile shows a badge which increases buyer trust.",
-      },
-      {
-        q: "How do I delete my account ?",
-        a: 'Go to Settings → Profile and scroll to the Account section. Click "Delete account". This is permanent and cannot be undone. All your listings will be removed.',
-      },
-      {
-        q: "Can I change my campus or pickup location ?",
-        a: "Yes. Go to Settings → Pickup Spots to update your preferred campus meetup locations. To change your campus, update it under Settings → Profile.",
-      },
-    ],
-  },
-  {
-    id: "listings",
-    title: "LISTINGS",
-    questions: [
-      {
-        q: "How do I create a listing",
-        a: 'Tap "Sell" in the navigation bar. Add photos, set a price, write a clear description, and choose a category. Your listing goes live immediately after submission.',
-      },
-      {
-        q: "How does Boost work",
-        a: "Boosting a listing promotes it to the top of search results and category feeds for 3 or 7 days depending on the plan you pick. You can boost any active listing from My Listings → Boost.",
-      },
-    ],
-  },
-];
 
 function ContactUs() {
   const { userDetails } = useUser();
-  const [activeForm, setActiveForm] = useState(null); // 'contact', 'report', 'suggest'
-  const [openCategory, setOpenCategory] = useState(null);
-  const [openQuestion, setOpenQuestion] = useState(null);
+  // The first form is open by default: most visitors come here to contact us.
+  const [activeForm, setActiveForm] = useState("contact"); // 'contact' | 'report' | 'suggest' | null
+  const navigate = useNavigate();
   const [helpQuery, setHelpQuery] = useState("");
 
   // Guest email: prefilled when logged in, editable input when guest.
@@ -113,15 +49,6 @@ function ContactUs() {
     whyUseful: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const toggleCategory = (id) => {
-    setOpenCategory(openCategory === id ? null : id);
-    setOpenQuestion(null);
-  };
-
-  const toggleQuestion = (q) => {
-    setOpenQuestion(openQuestion === q ? null : q);
-  };
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
@@ -258,636 +185,352 @@ function ContactUs() {
     }
   };
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.1 } },
+
+  const input =
+    "w-full rounded-lg border border-neutral-200 bg-white px-3 text-[14px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] dark:border-neutral-700 dark:bg-[#131313] dark:text-white dark:placeholder:text-zinc-500";
+  const label = "mb-1.5 block text-[13px] font-semibold text-slate-800 dark:text-zinc-200";
+  const ACTIONS = [
+    { id: "contact", icon: MessageSquare, title: "Contact support", hint: "Account or deal help", tone: "bg-[var(--accent-soft)] text-[var(--accent-text)]" },
+    { id: "report", icon: ShieldAlert, title: "Report an issue", hint: "Safety, fraud or bugs", tone: "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300" },
+    { id: "suggest", icon: Lightbulb, title: "Suggest a feature", hint: "Share your ideas", tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300" },
+  ];
+  const submitTone = {
+    contact: "",
+    report: "!bg-red-600 hover:!bg-red-700",
+    suggest: "!bg-emerald-600 hover:!bg-emerald-700",
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-  };
+  const emailField = (
+    <div>
+      <label htmlFor="support-email" className={label}>
+        Your email
+      </label>
+      <input
+        id="support-email"
+        type="email"
+        value={guestEmail}
+        onChange={(e) => setGuestEmail(e.target.value)}
+        placeholder="you@college.edu"
+        required
+        maxLength={254}
+        autoComplete="email"
+        className={`${input} h-11`}
+      />
+    </div>
+  );
 
-  return (
-    <div className="h-full w-full dark:bg-[#131313] flex flex-col bg-[#F7F9FD] font-figtree text-black dark:text-white">
-      <div className="flex md:h-[calc(100dvh-var(--header-h))]">
-        {/* LEFT PANEL */}
-        {userDetails?._id ? (
-          <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
-            <Profile_left_part />
-          </div>
-        ) : null}
-
-        {/* RIGHT PANEL */}
-        <div
-          className={`min-w-0 w-full md:h-full md:overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-4 xl:px-[5.7rem] xl:py-6 ${
-            userDetails?._id ? "w-full md:flex-1" : "mx-auto w-full max-w-5xl"
-          }`}
-        >
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="max-w-3xl mx-auto pb-10"
-          >
-            {/* Header */}
-            <motion.div variants={itemVariants} className="mb-6">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
-                Help & Support
-              </h1>
-              <p className="text-sm text-gray-500">
-                Find answers, report issues, or reach our team.
-              </p>
-            </motion.div>
-
-            {/* Search Bar */}
-            <motion.div variants={itemVariants} className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                value={helpQuery}
-                onChange={(e) => setHelpQuery(e.target.value)}
-                placeholder="Search help articles..."
-                aria-label="Search help articles"
-                className="w-full pl-9 pr-4 py-2 text-sm border bg-[#F7F8FA] border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-[#1f1f1f] dark:border-gray-700 dark:text-white transition-all"
-              />
-            </motion.div>
-
-            {/* Action Cards */}
-            <motion.div
-              variants={itemVariants}
-              className="grid grid-cols-1 md:grid-cols-3 gap-2.5 md:gap-3 mb-6"
-            >
-              <button
-                onClick={() => setActiveForm("contact")}
-                className={`group p-4 text-left border rounded-2xl transition-all duration-300 max-md:grid max-md:grid-cols-[auto_1fr] max-md:items-center max-md:gap-x-3 max-md:px-4 max-md:py-3.5 ${
-                  activeForm === "contact"
-                    ? "border-indigo-500 shadow-sm"
-                    : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
-              >
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-4 max-md:row-span-2 max-md:mb-0 max-md:h-10 max-md:w-10 transition-all duration-300 group-hover:bg-[#4F46E5] group-hover:scale-105 group-hover:shadow-md">
-                  <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400 transition-colors duration-300 group-hover:text-white" />
-                </div>
-                <h3 className="text-sm font-bold  text-gray-900 dark:text-white transition-colors">
-                  Contact support
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 max-md:mt-0.5">Reach our team</p>
-              </button>
-
-              <button
-                onClick={() => setActiveForm("report")}
-                className={`group p-4 text-left border rounded-2xl transition-all duration-300 max-md:grid max-md:grid-cols-[auto_1fr] max-md:items-center max-md:gap-x-3 max-md:px-4 max-md:py-3.5 ${
-                  activeForm === "report"
-                    ? "border-red-500 shadow-sm"
-                    : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
-              >
-                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center mb-4 max-md:row-span-2 max-md:mb-0 max-md:h-10 max-md:w-10 transition-all duration-300 group-hover:bg-[#EF4444] group-hover:scale-105 group-hover:shadow-md">
-                  <ShieldAlert className="w-4 h-4 text-red-500 transition-colors duration-300 group-hover:text-white" />
-                </div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white transition-colors">
-                  Report an issue
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 max-md:mt-0.5">
-                  Safety, fraud or bugs
-                </p>
-              </button>
-
-              <button
-                onClick={() => setActiveForm("suggest")}
-                className={`group p-4 text-left border rounded-2xl transition-all duration-300 max-md:grid max-md:grid-cols-[auto_1fr] max-md:items-center max-md:gap-x-3 max-md:px-4 max-md:py-3.5 ${
-                  activeForm === "suggest"
-                    ? "border-green-500 shadow-sm"
-                    : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                } bg-[#F7F8FA] dark:bg-[#1f1f1f] dark:border-gray-700`}
-              >
-                <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-4 max-md:row-span-2 max-md:mb-0 max-md:h-10 max-md:w-10 transition-all duration-300 group-hover:bg-[#22C55E] group-hover:scale-105 group-hover:shadow-md">
-                  <Lightbulb className="w-4 h-4 text-green-600 dark:text-green-400 transition-colors duration-300 group-hover:text-white" />
-                </div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white transition-colors">
-                  Suggest a feature
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 max-md:mt-0.5">Share your ideas</p>
-              </button>
-            </motion.div>
-
-            {/* Dynamic Content Area */}
-            <AnimatePresence mode="wait">
-              {activeForm ? (
-                <motion.div
-                  key="form-view"
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                  className="border border-gray-200 dark:border-gray-700 rounded-xl bg-[#F7F8FA] dark:bg-[#1f1f1f] p-5 relative mb-6"
-                >
-                  <button
-                    onClick={() => setActiveForm(null)}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-
-                  {/* CONTACT FORM */}
-                  {activeForm === "contact" && (
-                    <motion.form
-                      onSubmit={handleEmailSubmit}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.1 }}
-                    >
-                      <h2 className="text-base font-semibold mb-1 dark:text-white">
-                        Contact support
-                      </h2>
-                      <p className="text-xs text-gray-500 mb-4">
-                        Fill in the details below and we will follow up.
-                      </p>
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Your email
-                      </label>
-                      <input
-                        type="email"
-                        value={guestEmail}
-                        onChange={(e) => setGuestEmail(e.target.value)}
-                        placeholder="you@college.edu"
-                        required
-                        maxLength={254}
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                      />
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Topic
-                      </label>
-                      <Select
-                        className="mb-4"
-                        value={contactForm.topic}
-                        onChange={(v) => setContactForm({ ...contactForm, topic: v })}
-                        placeholder="Select a topic"
-                        ariaLabel="Select a topic"
-                        options={[{ value: "Account assistance", label: "Account assistance" }, { value: "Deal inquiries", label: "Deal inquiries" }, { value: "Other", label: "Other" }]}
-                      />
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Message
-                      </label>
-                      <textarea
-                        rows="3"
-                        value={contactForm.message}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            message: e.target.value,
-                          })
-                        }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                        placeholder="Describe your issue in as much detail as possible..."
-                        required
-                      ></textarea>
-
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
-                        >
-                          Back
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
-                        >
-                          <MessageSquare className="w-4 h-4" />{" "}
-                          <ButtonLoader loading={isSubmitting} loadingText="Sending…">Send message</ButtonLoader>
-                        </button>
-                      </div>
-                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
-                        Need to share a screenshot? Submit first, then email it
-                        to{" "}
-                        <a
-                          href="mailto:hi@unideals.in"
-                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-                        >
-                          hi@unideals.in
-                        </a>{" "}
-                        with your ticket ID.
-                      </p>
-                    </motion.form>
-                  )}
-
-                  {/* REPORT FORM */}
-                  {activeForm === "report" && (
-                    <motion.form
-                      onSubmit={handleEmailSubmit}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.1 }}
-                    >
-                      <h2 className="text-base font-semibold mb-1 dark:text-white">
-                        Report an issue or bug
-                      </h2>
-                      <p className="text-xs text-gray-500 mb-4">
-                        Let us know what's wrong so we can fix it.
-                      </p>
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Your email
-                      </label>
-                      <input
-                        type="email"
-                        value={guestEmail}
-                        onChange={(e) => setGuestEmail(e.target.value)}
-                        placeholder="you@college.edu"
-                        required
-                        maxLength={254}
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
-                      />
-
-                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-3 mb-4 flex gap-2">
-                        <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-yellow-800 dark:text-yellow-500">
-                          For immediate safety emergencies on campus, contact
-                          campus security first. UniDeals reports are reviewed
-                          within 24 hours.
-                        </p>
-                      </div>
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        What are you reporting?
-                      </label>
-                      <Select
-                        className="mb-4"
-                        value={reportForm.category}
-                        onChange={(v) => setReportForm({ ...reportForm, category: v })}
-                        placeholder="Select category…"
-                        ariaLabel="Select category…"
-                        options={[{ value: "Fraud or Scam Seller", label: "Fraud or Scam Seller" }, { value: "Safety Concern", label: "Safety Concern" }, { value: "App Bug / Glitch", label: "App Bug / Glitch" }, { value: "Harassment or abuse", label: "Harassment or abuse" }, { value: "Spam or Bot account", label: "Spam or Bot account" }, { value: "Inappropriate Content", label: "Inappropriate Content" }, { value: "Payment / Deal Dispute", label: "Payment / Deal Dispute" }, { value: "Account or Login Issue", label: "Account or Login Issue" }, { value: "Fake or Misleading Product", label: "Fake or Misleading Product" }, { value: "Other Issue", label: "Other Issue" }]}
-                      />
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Link, User ID, or Page Section (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={reportForm.link}
-                        onChange={(e) =>
-                          setReportForm({ ...reportForm, link: e.target.value })
-                        }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
-                        placeholder="e.g. Paste a link, user ID, or type 'My Listings'"
-                      />
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Tell us what happened / Steps to reproduce
-                      </label>
-                      <textarea
-                        rows="3"
-                        value={reportForm.description}
-                        onChange={(e) =>
-                          setReportForm({
-                            ...reportForm,
-                            description: e.target.value,
-                          })
-                        }
-                        required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
-                        placeholder="Be as specific as possible. Include dates, messages, or steps to trigger the bug..."
-                      ></textarea>
-
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
-                        >
-                          Back
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="flex-1 flex items-center justify-center gap-2 bg-[#EF4444] hover:bg-red-600 disabled:bg-red-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
-                        >
-                          <ShieldAlert className="w-4 h-4" />{" "}
-                          <ButtonLoader loading={isSubmitting} loadingText="Submitting…">Submit report</ButtonLoader>
-                        </button>
-                      </div>
-                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
-                        Need to share a screenshot? Submit first, then email it
-                        to{" "}
-                        <a
-                          href="mailto:hi@unideals.in"
-                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-                        >
-                          hi@unideals.in
-                        </a>{" "}
-                        with your ticket ID.
-                      </p>
-                    </motion.form>
-                  )}
-
-                  {/* SUGGEST FEATURE FORM */}
-                  {activeForm === "suggest" && (
-                    <motion.form
-                      onSubmit={handleEmailSubmit}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.1 }}
-                    >
-                      <h2 className="text-base font-semibold mb-1 dark:text-white">
-                        Suggest a feature
-                      </h2>
-                      <p className="text-xs text-gray-500 mb-4">
-                        Fill in the details below and we will review your idea.
-                      </p>
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Your email
-                      </label>
-                      <input
-                        type="email"
-                        value={guestEmail}
-                        onChange={(e) => setGuestEmail(e.target.value)}
-                        placeholder="you@college.edu"
-                        required
-                        maxLength={254}
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
-                      />
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Feature title
-                      </label>
-                      <input
-                        type="text"
-                        value={suggestForm.title}
-                        onChange={(e) =>
-                          setSuggestForm({
-                            ...suggestForm,
-                            title: e.target.value,
-                          })
-                        }
-                        required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
-                        placeholder="e.g. Filter by hostel block"
-                      />
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Describe the feature
-                      </label>
-                      <textarea
-                        rows="2"
-                        value={suggestForm.description}
-                        onChange={(e) =>
-                          setSuggestForm({
-                            ...suggestForm,
-                            description: e.target.value,
-                          })
-                        }
-                        required
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
-                        placeholder="What should it do? How would it work?"
-                      ></textarea>
-
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Why is it useful? (optional)
-                      </label>
-                      <textarea
-                        rows="2"
-                        value={suggestForm.whyUseful}
-                        onChange={(e) =>
-                          setSuggestForm({
-                            ...suggestForm,
-                            whyUseful: e.target.value,
-                          })
-                        }
-                        className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 mb-4 bg-[#F7F8FA] dark:bg-[#131313] dark:text-white resize-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
-                        placeholder="Who benefits and how?"
-                      ></textarea>
-
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setActiveForm(null)}
-                          className="px-5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg dark:text-white hover:bg-[#F7F8FA] dark:hover:bg-gray-800 transition-colors font-medium"
-                        >
-                          Back
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="flex-1 flex items-center justify-center gap-2 bg-[#22C55E] hover:bg-green-600 disabled:bg-green-400 text-white py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
-                        >
-                          <Lightbulb className="w-4 h-4" />{" "}
-                          <ButtonLoader loading={isSubmitting} loadingText="Submitting…">Submit idea</ButtonLoader>
-                        </button>
-                      </div>
-                      <p className="mt-3 text-[11px] leading-5 text-gray-500 dark:text-gray-400">
-                        Need to share a mockup? Submit first, then email it to{" "}
-                        <a
-                          href="mailto:hi@unideals.in"
-                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-                        >
-                          hi@unideals.in
-                        </a>{" "}
-                        with your ticket ID.
-                      </p>
-                    </motion.form>
-                  )}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="faq-view"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {/* Response Time Banner */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 mb-6 bg-[#F7F8FA] shadow-sm border border-gray-100 rounded-xl dark:bg-[#1a1a1a] dark:border-gray-800">
-                    <div className="flex items-center text-xs text-gray-600 dark:text-gray-300">
-                      <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg mr-3">
-                        <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                      </div>
-                      <span>
-                        Avg response:{" "}
-                        <strong className="text-gray-900 dark:text-white font-semibold">
-                          under 2 hours
-                        </strong>{" "}
-                        during campus hours (9 AM – 9 PM)
-                        {userDetails?.subscription === "pro_plus" ? (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-[#4B45FF]/10 px-2 py-0.5 text-[11px] font-semibold text-[#2E40DC] dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]">
-                            Pro Plus · your tickets are handled first
-                          </span>
-                        ) : userDetails?.subscription === "pro" ? (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-[#4B45FF]/10 px-2 py-0.5 text-[11px] font-semibold text-[#2E40DC] dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF]">
-                            Pro · priority queue
-                          </span>
-                        ) : null}
-                      </span>
-                    </div>
-                    <a
-                      href="mailto:hi@unideals.in"
-                      className="flex items-center mt-3 sm:mt-0 px-3 py-1.5 bg-[#F7F8FA] dark:bg-[#252525] rounded-lg text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors font-medium"
-                    >
-                      <Mail className="w-3.5 h-3.5 mr-1.5" /> hi@unideals.in
-                    </a>
-                  </div>
-
-                  {/* FAQ Section */}
-                  <div className="bg-[#F7F8FA] border border-gray-200 rounded-2xl dark:bg-[#1f1f1f] dark:border-gray-700 p-4 lg:p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
-                      <h3 className="text-xs font-bold text-gray-400 tracking-wider">
-                        FREQUENTLY ASKED
-                      </h3>
-                      <Headphones className="w-4 h-4 text-gray-400" />
-                    </div>
-
-                    <div className="">
-                      {faqData
-                        .map((category) => {
-                          const q = helpQuery.trim().toLowerCase();
-                          if (!q) return category;
-                          const matched = category.questions.filter(
-                            (item) =>
-                              item.q.toLowerCase().includes(q) ||
-                              item.a.toLowerCase().includes(q),
-                          );
-                          if (
-                            category.title.toLowerCase().includes(q) &&
-                            matched.length === 0
-                          )
-                            return category;
-                          return { ...category, questions: matched };
-                        })
-                        .filter((category) => category.questions.length > 0)
-                        .map((category) => (
-                        <div
-                          key={category.id}
-                          className="border-b border-gray-50 last:border-0 dark:border-gray-800/50 pb-1"
-                        >
-                          <button
-                            onClick={() => toggleCategory(category.id)}
-                            className="w-full flex items-center justify-between py-3 text-left focus:outline-none group"
-                          >
-                            <span className="text-[13px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                              {category.title}
-                            </span>
-                            <motion.div
-                              animate={{
-                                rotate: openCategory === category.id ? 180 : 0,
-                              }}
-                              transition={{ duration: 0.2 }}
-                            >
-                              <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
-                            </motion.div>
-                          </button>
-
-                          {/* Nested Questions */}
-                          <AnimatePresence>
-                            {openCategory === category.id && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{
-                                  duration: 0.25,
-                                  ease: "easeInOut",
-                                }}
-                                className="overflow-hidden"
-                              >
-                                <div className="pl-1 pb-4 space-y-2 pt-1">
-                                  {category.questions.length > 0 ? (
-                                    category.questions.map((item, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="bg-[#F7F8FA]/80 dark:bg-[#171717] rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 transition-all"
-                                      >
-                                        <button
-                                          onClick={() => toggleQuestion(item.q)}
-                                          className="w-full flex items-center justify-between p-3.5 text-left focus:outline-none group"
-                                        >
-                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                                            {item.q}
-                                          </span>
-                                          <motion.div
-                                            animate={{
-                                              rotate:
-                                                openQuestion === item.q
-                                                  ? 180
-                                                  : 0,
-                                            }}
-                                            transition={{ duration: 0.2 }}
-                                          >
-                                            <ChevronDown
-                                              className={`w-4 h-4 flex-shrink-0 ml-2 transition-colors ${
-                                                openQuestion === item.q
-                                                  ? "text-indigo-500"
-                                                  : "text-gray-400 group-hover:text-gray-600"
-                                              }`}
-                                            />
-                                          </motion.div>
-                                        </button>
-
-                                        <AnimatePresence>
-                                          {openQuestion === item.q && (
-                                            <motion.div
-                                              initial={{
-                                                height: 0,
-                                                opacity: 0,
-                                              }}
-                                              animate={{
-                                                height: "auto",
-                                                opacity: 1,
-                                              }}
-                                              exit={{ height: 0, opacity: 0 }}
-                                              transition={{ duration: 0.2 }}
-                                              className="overflow-hidden"
-                                            >
-                                              <div className="p-3.5 pt-0 text-[13px] text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-100/50 dark:border-gray-800/50 mt-1">
-                                                {item.a}
-                                              </div>
-                                            </motion.div>
-                                          )}
-                                        </AnimatePresence>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="text-xs text-gray-400 p-2 italic">
-                                      No articles in this category yet.
-                                    </p>
-                                  )}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      ))}
-                      {helpQuery.trim() &&
-                      faqData.every((category) => {
-                        const q = helpQuery.trim().toLowerCase();
-                        return !(
-                          category.questions.some(
-                            (item) =>
-                              item.q.toLowerCase().includes(q) ||
-                              item.a.toLowerCase().includes(q),
-                          ) || category.title.toLowerCase().includes(q)
-                        );
-                      }) ? (
-                        <p className="text-xs text-gray-400 p-2 italic">
-                          No help articles match “{helpQuery.trim()}”.
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </div>
+  const formFooter = (submitLabel, Icon) => (
+    <>
+      <div className="flex gap-2.5 pt-1">
+        <button type="button" onClick={() => setActiveForm(null)} className={cn(btnSecondary, "h-11")}>
+          Back
+        </button>
+        <button type="submit" disabled={isSubmitting} className={cn(btnPrimary, "h-11 flex-1", submitTone[activeForm])}>
+          <Icon className="h-4 w-4" aria-hidden="true" />
+          <ButtonLoader loading={isSubmitting} loadingText="Sending…">
+            {submitLabel}
+          </ButtonLoader>
+        </button>
       </div>
+      <a
+        href="mailto:hi@unideals.in"
+        className="inline-flex items-center gap-1.5 self-start text-[12px] font-medium text-slate-500 hover:text-[var(--accent-text)] dark:text-zinc-400"
+        title="Submit first, then email screenshots with your ticket ID"
+      >
+        <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+        Screenshots? Email us
+      </a>
+    </>
+  );
+
+  const content = (
+    <div className="flex flex-col gap-4 sm:gap-5">
+      {!userDetails?._id && (
+        <PageHeader title="Help & support" description="Find answers, report a problem or reach our team." />
+      )}
+
+      {/* Search: answers live in the FAQ tab */}
+      <form
+        className="relative"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = helpQuery.trim();
+          navigate(q ? `/faq?q=${encodeURIComponent(q)}` : "/faq");
+        }}
+      >
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+        <input
+          type="search"
+          value={helpQuery}
+          onChange={(e) => setHelpQuery(e.target.value)}
+          placeholder="Search answers, e.g. “boost” or “cancel deal”"
+          aria-label="Search the FAQ"
+          enterKeyHint="search"
+          className={`${input} h-11 pl-10`}
+        />
+      </form>
+
+      {/* Actions */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {ACTIONS.map(({ id, icon: Icon, title, hint, tone }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveForm(activeForm === id ? null : id)}
+            aria-pressed={activeForm === id}
+            className={cn(
+              CARD,
+              "flex items-center gap-3 p-4 text-left transition-colors sm:flex-col sm:items-start",
+              activeForm === id ? "border-[var(--accent)] ring-2 ring-[var(--accent-soft-strong)]" : "hover:border-[var(--accent-ring)]",
+            )}
+          >
+            <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl", tone)}>
+              <Icon className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span>
+              <span className="block text-[14.5px] font-semibold text-slate-900 dark:text-white">{title}</span>
+              <span className="block text-[12.5px] text-slate-500 dark:text-zinc-400">{hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {activeForm ? (
+          <motion.section
+            key={activeForm}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
+            className={cn(CARD, FLUSH_ON_PHONE, "relative p-4 sm:p-6")}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveForm(null)}
+              aria-label="Close form"
+              className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-neutral-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {activeForm === "contact" && (
+              <form onSubmit={handleEmailSubmit} className="flex flex-col gap-4">
+                <div>
+                  <h2 className="text-[17px] font-semibold text-slate-900 dark:text-white">Contact support</h2>
+                </div>
+                {emailField}
+                <div>
+                  <span className={label}>Topic</span>
+                  <Select
+                    value={contactForm.topic}
+                    onChange={(v) => setContactForm({ ...contactForm, topic: v })}
+                    placeholder="Select a topic"
+                    ariaLabel="Select a topic"
+                    options={[
+                      { value: "Account assistance", label: "Account assistance" },
+                      { value: "Deal inquiries", label: "Deal inquiries" },
+                      { value: "Other", label: "Other" },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="support-message" className={label}>
+                    Message
+                  </label>
+                  <textarea
+                    id="support-message"
+                    rows={4}
+                    value={contactForm.message}
+                    onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                    className={`${input} resize-y py-2.5`}
+                    placeholder="Describe your issue in as much detail as possible…"
+                    required
+                  />
+                </div>
+                {formFooter("Send message", MessageSquare)}
+              </form>
+            )}
+
+            {activeForm === "report" && (
+              <form onSubmit={handleEmailSubmit} className="flex flex-col gap-4">
+                <div>
+                  <h2 className="text-[17px] font-semibold text-slate-900 dark:text-white">Report an issue</h2>
+                </div>
+                <p className="flex gap-2 rounded-lg bg-amber-50 px-3.5 py-3 text-[12.5px] leading-relaxed text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  Emergency? Contact campus security first.
+                </p>
+                {emailField}
+                <div>
+                  <span className={label}>What are you reporting?</span>
+                  <Select
+                    value={reportForm.category}
+                    onChange={(v) => setReportForm({ ...reportForm, category: v })}
+                    placeholder="Select a category"
+                    ariaLabel="Report category"
+                    options={[
+                      "Fraud or Scam Seller",
+                      "Safety Concern",
+                      "App Bug / Glitch",
+                      "Harassment or abuse",
+                      "Spam or Bot account",
+                      "Inappropriate Content",
+                      "Payment / Deal Dispute",
+                      "Account or Login Issue",
+                      "Fake or Misleading Product",
+                      "Other Issue",
+                    ].map((v) => ({ value: v, label: v }))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="report-link" className={label}>
+                    Link, user or page <span className="font-normal text-slate-400">(optional)</span>
+                  </label>
+                  <input
+                    id="report-link"
+                    type="text"
+                    value={reportForm.link}
+                    onChange={(e) => setReportForm({ ...reportForm, link: e.target.value })}
+                    className={`${input} h-11`}
+                    placeholder="Paste a link or describe where it happened"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="report-description" className={label}>
+                    What happened?
+                  </label>
+                  <textarea
+                    id="report-description"
+                    rows={4}
+                    value={reportForm.description}
+                    onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })}
+                    required
+                    className={`${input} resize-y py-2.5`}
+                    placeholder="Be specific: dates, messages, or steps to trigger the bug…"
+                  />
+                </div>
+                {formFooter("Submit report", ShieldAlert)}
+              </form>
+            )}
+
+            {activeForm === "suggest" && (
+              <form onSubmit={handleEmailSubmit} className="flex flex-col gap-4">
+                <div>
+                  <h2 className="text-[17px] font-semibold text-slate-900 dark:text-white">Suggest a feature</h2>
+                </div>
+                {emailField}
+                <div>
+                  <label htmlFor="suggest-title" className={label}>
+                    Feature title
+                  </label>
+                  <input
+                    id="suggest-title"
+                    type="text"
+                    value={suggestForm.title}
+                    onChange={(e) => setSuggestForm({ ...suggestForm, title: e.target.value })}
+                    required
+                    className={`${input} h-11`}
+                    placeholder="e.g. Filter by hostel block"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="suggest-description" className={label}>
+                    Describe it
+                  </label>
+                  <textarea
+                    id="suggest-description"
+                    rows={3}
+                    value={suggestForm.description}
+                    onChange={(e) => setSuggestForm({ ...suggestForm, description: e.target.value })}
+                    required
+                    className={`${input} resize-y py-2.5`}
+                    placeholder="What should it do? How would it work?"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="suggest-why" className={label}>
+                    Why is it useful? <span className="font-normal text-slate-400">(optional)</span>
+                  </label>
+                  <textarea
+                    id="suggest-why"
+                    rows={2}
+                    value={suggestForm.whyUseful}
+                    onChange={(e) => setSuggestForm({ ...suggestForm, whyUseful: e.target.value })}
+                    className={`${input} resize-y py-2.5`}
+                    placeholder="Who benefits and how?"
+                  />
+                </div>
+                {formFooter("Submit idea", Lightbulb)}
+              </form>
+            )}
+          </motion.section>
+        ) : null}
+      </AnimatePresence>
+
+      {/* Response time */}
+      <div className={cn(CARD, FLUSH_ON_PHONE, "flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between")}>
+        <p className="flex items-center gap-3 text-[13px] text-slate-600 dark:text-zinc-300">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
+            <Clock className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <strong className="font-semibold text-slate-900 dark:text-white" title="During campus hours, 9 AM – 9 PM">
+              Replies in ~2h
+            </strong>
+            {(userDetails?.subscription === "pro_plus" || userDetails?.subscription === "pro") && (
+              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-text)]">Priority</span>
+            )}
+          </span>
+        </p>
+        <a href="mailto:hi@unideals.in" className={cn(btnSecondary, "shrink-0")}>
+          <Mail className="h-4 w-4" aria-hidden="true" />
+          hi@unideals.in
+        </a>
+      </div>
+
+      {/* Popular questions → full FAQ tab */}
+      <section className={cn(CARD, FLUSH_ON_PHONE, "overflow-hidden")}>
+        <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3.5 sm:px-5 dark:border-neutral-800">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900 dark:text-white">
+            <Headphones className="h-4 w-4 text-slate-400" aria-hidden="true" />
+            Popular questions
+          </h2>
+          <Link to="/faq" className="text-[13px] font-semibold text-[var(--accent-text)] hover:underline">
+            Browse all {FAQ_COUNT}
+          </Link>
+        </div>
+        <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+          {POPULAR_QUESTIONS.map((item) => (
+            <details key={item.q} className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-[13.5px] font-medium text-slate-800 hover:text-[var(--accent-text)] sm:px-5 dark:text-zinc-100 [&::-webkit-details-marker]:hidden">
+                {item.q}
+                <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <p className="px-4 pb-4 text-[13px] leading-relaxed text-slate-600 sm:px-5 dark:text-zinc-400">{item.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+
+  // Signed in: account shell. Signed out: plain public page (the account
+  // sidebar would bounce guests to /login).
+  if (userDetails?._id) {
+    return (
+      <AccountLayout
+        seoTitle="Help & support | Unideals"
+        width="md"
+        title="Help & support"
+      >
+        {content}
+      </AccountLayout>
+    );
+  }
+  return (
+    <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#F7F9FD] font-figtree dark:bg-[#131313]">
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:py-8">{content}</div>
     </div>
   );
 }

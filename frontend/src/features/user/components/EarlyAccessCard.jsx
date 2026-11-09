@@ -13,7 +13,7 @@ export default function EarlyAccessCard() {
   const enabledCount = labs.filter((f) => f.enabled).length;
 
   return (
-    <section className="rounded-2xl border border-[#E3E8F1] bg-[#F7F8FA] p-5 shadow-[0_8px_26px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-[#1c1c1c]">
+    <section className="rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-neutral-800 dark:bg-[#1A1D20]">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-[14px] font-extrabold text-[#09111F] dark:text-white">
           <Sparkles size={15} className="text-[#4A3CFF]" />

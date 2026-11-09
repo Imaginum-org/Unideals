@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Bell,
   ChevronRight,
+  CircleHelp,
   Crown,
   FileText,
   Heart,
@@ -13,7 +14,7 @@ import {
   ShoppingBag,
   Trophy,
 } from "lucide-react";
-import { useUser } from "../../../context/useUserContext.jsx";
+import { useUser, clearAccountScopedStorage } from "../../../context/useUserContext.jsx";
 import { useNotification } from "../../../context/NotificationContext.jsx";
 import { logoutUser } from "../../auth/api/authApi.js";
 import { toast } from "../../../components/ui/toast.js";
@@ -45,6 +46,7 @@ const GROUPS = [
   {
     title: "Support",
     items: [
+      { to: "/faq", label: "FAQ", icon: CircleHelp },
       { to: "/contact", label: "Help & support", icon: LifeBuoy },
       { to: "/termscondition", label: "Terms & privacy", icon: FileText },
     ],
@@ -84,6 +86,7 @@ export default function MobileAccountMenu() {
       const res = await logoutUser();
       if (res?.data?.success) {
         clearUserData();
+        clearAccountScopedStorage();
         toast.success("Logged out successfully");
         navigate("/");
         return;

@@ -103,7 +103,7 @@ const ChatSettings = ({ user, onSaved }) => {
 
   return (
     <section className="max-w-[770px] space-y-6">
-      <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+      <div className="rounded-2xl border border-neutral-200/80 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-[#1A1D20]">
         <h2 className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white">
           <MessageSquareText size={18} className="text-[#3838EC]" />
           Chat wallpaper
@@ -154,7 +154,7 @@ const ChatSettings = ({ user, onSaved }) => {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] px-5 py-2 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+      <div className="rounded-2xl border border-neutral-200/80 bg-white px-5 py-2 shadow-sm dark:border-neutral-800 dark:bg-[#1A1D20]">
         <h2 className="pt-3 text-base font-bold text-gray-900 dark:text-white">
           Privacy
         </h2>

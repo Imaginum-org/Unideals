@@ -6,6 +6,29 @@ import { safeErrorMessage } from "../utils/response.js";
 import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges } from "../services/badgeService.js";
 import { clearAuthCookies } from "../services/auth.service.js";
 
+// The signed-in user's own profile: never ship credentials or internal
+// session/token bookkeeping, and never the precise GPS fix (the client caches
+// this object). Secrets with select:false stay excluded as well.
+const SELF_PROFILE_EXCLUDE = [
+  "-password",
+  "-refresh_token",
+  "-refresh_token_prev",
+  "-refresh_token_prev_expires_at",
+  "-verifyTokenEmail",
+  "-verifyTokenEmailExpiry",
+  "-tokenVersion",
+  "-reset_password_token",
+  "-reset_password_expiry",
+  "-forgot_password_otp",
+  "-forgot_password_expiry",
+  "-oauth_login_token",
+  "-oauth_login_expiry",
+  "-current_lat",
+  "-current_long",
+  "-location_updated_at",
+  "-gamification.rewards_claimed",
+].join(" ");
+
 // GET USER PROFILE
 export const getUserProfile = async (req, res) => {
   try {
@@ -13,7 +36,7 @@ export const getUserProfile = async (req, res) => {
 
     const user = await userModel
       .findById(userId)
-      .select("-password -refresh_token -verifyTokenEmail")
+      .select(SELF_PROFILE_EXCLUDE)
       .populate("campus_id", "slug name short_name city state is_active")
       .lean();
 
@@ -136,7 +159,7 @@ export const updateUserProfile = async (req, res) => {
         new: true,
         runValidators: true,
       })
-      .select("-password -refresh_token")
+      .select(SELF_PROFILE_EXCLUDE)
       .populate("campus_id", "slug name short_name city state is_active")
       .lean();
 
@@ -304,7 +327,7 @@ export const updateUserAvatar = async (req, res) => {
 
     const updatedUser = await userModel
       .findById(userId)
-      .select("-password -refresh_token")
+      .select(SELF_PROFILE_EXCLUDE)
       .lean();
 
     computeAndAwardBadges(userId).catch((err) =>
@@ -368,7 +391,7 @@ export const removeUserAvatar = async (req, res) => {
 
     const safeUser = await userModel
       .findById(userId)
-      .select("-password -refresh_token -verifyTokenEmail")
+      .select(SELF_PROFILE_EXCLUDE)
       .lean();
 
     return res.status(200).json({

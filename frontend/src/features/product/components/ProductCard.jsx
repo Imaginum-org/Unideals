@@ -9,7 +9,10 @@ import { toast } from "../../../components/ui/toast.js";
 import { IoLocationOutline } from "react-icons/io5";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import { MdOutlineChatBubbleOutline } from "react-icons/md";
+import HotDealChip from "../../../components/ui/HotDealChip.jsx";
+import { isHotDeal } from "../../../utils/hotDeal.js";
 import { useNavigate } from "react-router-dom";
+import { productPath } from "../../../utils/productPath.js";
 
 const FALLBACK_IMAGE = "/logo.svg";
 
@@ -295,7 +298,7 @@ const ProductCard = memo(
         <>
         <Link
           ref={ref}
-          to={`/product/${_id}`}
+          to={productPath(product)}
           onClick={handleClick}
           className={`
 group
@@ -365,6 +368,12 @@ ${tierStyles.cardShadow}
 ease-[cubic-bezier(0.22,1,0.36,1)]
 group-hover:scale-[1.05]"
               />
+
+              {/* Hot deal: server-granted, time-boxed (see utils/hotDeal.js).
+                  Top-left, opposite the wishlist heart. */}
+              {isHotDeal(product) && (
+                <HotDealChip className="pointer-events-none absolute left-2.5 top-2.5 z-20" />
+              )}
 
               {/* Chat Now Button */}
               <div
