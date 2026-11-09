@@ -27,9 +27,6 @@ import conversationRouter from "./routes/conversation.route.js";
 import dealRouter from "./routes/deal.route.js";
 import orderRouter from "./routes/order.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
-// [SITE-LOCK] testing gate — delete these 2 imports to remove the lock
-import siteGateRouter from "./routes/siteGate.routes.js";
-import { requireSiteGate } from "./middlewares/siteGate.middleware.js";
 import { verifyOrigin } from "./middlewares/csrf.middleware.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
@@ -62,43 +59,10 @@ app.use(
 );
 
 
-// Prevent NoSQL injection - deep sanitize body, params, query, cookies
-app.use((req, res, next) => {
-  const sanitize = (obj, seen = new WeakSet()) => {
-    if (!obj || typeof obj !== "object" || seen.has(obj)) return;
-    seen.add(obj);
-
-    for (const key of Object.keys(obj)) {
-      if (key.includes("$") || key.includes(".")) {
-        delete obj[key];
-        continue;
-      }
-      const val = obj[key];
-      if (typeof val === "object" && val !== null) {
-        sanitize(val, seen);
-      }
-    }
-  };
-
-  sanitize(req.body);
-  sanitize(req.params);
-  // req.query is a getter in Express 5 - sanitize in place when possible,
-  // otherwise replace with a cleaned copy.
-  try {
-    if (req.query && typeof req.query === "object") {
-      sanitize(req.query);
-    }
-  } catch {
-    // ignore - query validation happens downstream
-  }
-  if (req.cookies && typeof req.cookies === "object") {
-    sanitize(req.cookies);
-  }
-
-  next();
-});
-
-// Prevent XSS attacks - deep sanitize strings in body/params/query
+// Escape HTML in URL params + query strings (reflected-XSS hardening).
+// Deliberately runs BEFORE body parsing so stored text (descriptions, chat)
+// is never HTML-escaped: React escapes on output, and escaping on input
+// would show users "&lt;3" instead of "<3". Bodies are validated by zod.
 app.use((req, res, next) => {
   const sanitizeStrings = (obj, seen = new WeakSet()) => {
     if (!obj || typeof obj !== "object" || seen.has(obj)) return;
@@ -190,6 +154,46 @@ app.use(express.json({ limit: "10kb" })); // To prevent large payload attacks
 app.use(express.urlencoded({ extended: true, limit: "10kb" })); // Handles form data from frontend
 app.use(cookieParser());
 
+// Prevent NoSQL operator injection ({"$gt": ""}, "a.b" paths) in body,
+// params, query and cookies. MUST run after express.json/urlencoded and
+// cookieParser: before them req.body/req.cookies don't exist yet, so the
+// old placement silently never sanitized a single request body.
+app.use((req, res, next) => {
+  const sanitize = (obj, seen = new WeakSet()) => {
+    if (!obj || typeof obj !== "object" || seen.has(obj)) return;
+    seen.add(obj);
+
+    for (const key of Object.keys(obj)) {
+      if (key.includes("$") || key.includes(".")) {
+        delete obj[key];
+        continue;
+      }
+      const val = obj[key];
+      if (typeof val === "object" && val !== null) {
+        sanitize(val, seen);
+      }
+    }
+  };
+
+  sanitize(req.body);
+  sanitize(req.params);
+  // req.query is a getter in Express 5 - sanitize in place when possible,
+  // otherwise replace with a cleaned copy.
+  try {
+    if (req.query && typeof req.query === "object") {
+      sanitize(req.query);
+    }
+  } catch {
+    // ignore - query validation happens downstream
+  }
+  if (req.cookies && typeof req.cookies === "object") {
+    sanitize(req.cookies);
+  }
+
+  next();
+});
+
+
 // Logging in Development mode only - redact secrets from URLs
 if (process.env.NODE_ENV !== "production") {
   morgan.token("redacted-url", (req) => {
@@ -213,14 +217,6 @@ app.get("/health", (req, res) => {
 
 // Gzip JSON + thumbs metadata (threshold keeps tiny auth payloads fast).
 app.use(compression({ threshold: 1024 }));
-
-// [SITE-LOCK] testing gate — delete this block to remove the lock
-// (must run after cookieParser, before every router).
-// Exempts itself, /health, and the Razorpay webhook. Kill-switch via
-// SITE_GATE_ENABLED=false.
-app.use("/api/site-gate", siteGateRouter);
-app.use(requireSiteGate);
-// [/SITE-LOCK]
 
 // Routes
 app.use(verifyOrigin);
@@ -288,7 +284,11 @@ app.use((err, req, res, next) => {
   return res.status(statusCode).json({
     success: false,
     message,
-    ...(err.code ? { code: err.code } : {}),
+    // Only expose app-level codes on client errors; 5xx codes can be driver
+    // internals (ECONNREFUSED, Mongo error numbers).
+    ...(err.code && statusCode < 500 && typeof err.code === "string"
+      ? { code: err.code }
+      : {}),
     ...(typeof err.retryAfterMs === "number"
       ? { retryAfterMs: err.retryAfterMs }
       : {}),

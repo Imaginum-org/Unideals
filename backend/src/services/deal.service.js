@@ -63,6 +63,29 @@ export const ensureDeal = async (conversation) => {
   return deal;
 };
 
+// Atomic preview + unread bump (mirrors message.service). Read-modify-save
+// on unread_count lost increments under concurrent sends.
+const touchConversation = async (conversation, { text, type, senderId, receiverId }) => {
+  const at = new Date();
+  const side = String(conversation.buyer_id) === String(receiverId) ? "buyer" : "seller";
+  const preview = String(text || "").slice(0, 500);
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    {
+      $set: {
+        last_message: preview,
+        last_message_type: type,
+        last_message_sender: senderId,
+        last_activity_at: at,
+      },
+      $inc: { [`unread_count.${side}`]: 1 },
+    },
+  );
+  conversation.last_message = preview;
+  conversation.last_message_type = type;
+  conversation.last_activity_at = at;
+};
+
 const pushSystemMessage = async ({ conversation, senderId, text, deal }) => {
   const receiverId = otherPartyOf(conversation, senderId);
   const msg = await Message.create({
@@ -74,16 +97,12 @@ const pushSystemMessage = async ({ conversation, senderId, text, deal }) => {
     deal_id: deal?._id || null,
     message_status: MESSAGE_STATUS.SENT,
   });
-  conversation.last_message = text.slice(0, 500);
-  conversation.last_message_type = MESSAGE_TYPE.SYSTEM;
-  conversation.last_message_sender = senderId;
-  conversation.last_activity_at = new Date();
-  if (String(conversation.buyer_id) === String(receiverId)) {
-    conversation.unread_count.buyer += 1;
-  } else {
-    conversation.unread_count.seller += 1;
-  }
-  await conversation.save();
+  await touchConversation(conversation, {
+    text,
+    type: MESSAGE_TYPE.SYSTEM,
+    senderId,
+    receiverId,
+  });
   const payload = msg.toObject();
   emitToConversation(conversation._id, "message:new", payload);
   return msg;
@@ -199,16 +218,12 @@ export const makeOffer = async ({ conversationId, userId, amount }) => {
   }
   await deal.save();
 
-  conversation.last_message = `Offered ${inr(amt)}`;
-  conversation.last_message_type = MESSAGE_TYPE.OFFER;
-  conversation.last_message_sender = userId;
-  conversation.last_activity_at = new Date();
-  if (String(conversation.buyer_id) === String(receiverId)) {
-    conversation.unread_count.buyer += 1;
-  } else {
-    conversation.unread_count.seller += 1;
-  }
-  await conversation.save();
+  await touchConversation(conversation, {
+    text: `Offered ${inr(amt)}`,
+    type: MESSAGE_TYPE.OFFER,
+    senderId: userId,
+    receiverId,
+  });
 
   emitToConversation(conversation._id, "message:new", offerMsg.toObject());
   broadcastDeal(conversation, deal.toObject());
@@ -360,8 +375,11 @@ export const confirmDeal = async ({ conversationId, userId, amount }) => {
   await deal.save();
 
   // Keep header snapshot in sync so the list shows reserved price.
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    { $set: { "product_snapshot.selling_price": amt } },
+  );
   conversation.product_snapshot.selling_price = amt;
-  await conversation.save();
 
   await pushSystemMessage({
     conversation,
@@ -494,6 +512,73 @@ export const confirmItemReceived = async ({ conversationId, userId }) => {
   const fresh = await Deal.findById(deal._id);
   broadcastDeal(conversation, fresh.toObject());
   return fresh;
+};
+
+/**
+ * Step a deal back ONE stage (seller only: these are the seller's own
+ * actions). Mistakes happen: wrong pickup, payment ticked too early, or the
+ * reservation should be released without cancelling the whole thread.
+ *
+ *   payment_confirmed → pickup_scheduled   (payment not actually received)
+ *   pickup_scheduled  → deal_confirmed     (pickup plan dropped)
+ *   deal_confirmed    → negotiating        (reservation released, item free)
+ *
+ * Completed deals are final (the listing is already marked sold) and
+ * cancelled deals restart with a new offer. The status flip is a single
+ * conditional update on the expected stage, so two taps (or a race with the
+ * buyer confirming) can never skip two stages.
+ */
+const REVERT_RULES = {
+  [DEAL_STATUS.PAYMENT_CONFIRMED]: {
+    to: DEAL_STATUS.PICKUP_SCHEDULED,
+    update: { $set: { "payment_confirmed.is_confirmed": false, "payment_confirmed.confirmed_at": null } },
+    text: "Seller marked the payment as not received yet.",
+  },
+  [DEAL_STATUS.PICKUP_SCHEDULED]: {
+    to: DEAL_STATUS.DEAL_CONFIRMED,
+    update: { $unset: { pickup: "" } },
+    text: "Seller cleared the pickup plan. A new time will be set.",
+  },
+  [DEAL_STATUS.DEAL_CONFIRMED]: {
+    to: DEAL_STATUS.NEGOTIATING,
+    update: { $unset: { deal_confirmed_at: "", reserved_at: "" } },
+    text: "Seller reopened the deal. The item is no longer reserved.",
+  },
+};
+
+export const revertDealStage = async ({ conversationId, userId }) => {
+  const conversation = await loadConversation(conversationId);
+  const role = roleOf(conversation, userId);
+  if (role !== "seller") throw new AppError("Only the seller can undo a deal step", 403);
+
+  const deal = await ensureDeal(conversation);
+  if (deal.status === DEAL_STATUS.COMPLETED) {
+    throw new AppError("Completed deals can't be undone", 400);
+  }
+  const rule = REVERT_RULES[deal.status];
+  if (!rule) throw new AppError("There's no step to undo yet", 400);
+
+  const updated = await Deal.findOneAndUpdate(
+    { _id: deal._id, status: deal.status },
+    { ...rule.update, $set: { ...(rule.update.$set || {}), status: rule.to } },
+    { returnDocument: "after" },
+  );
+  if (!updated) throw new AppError("This deal just changed. Refresh and try again.", 409);
+
+  // Released reservation: the chat list shows the listing's real price again.
+  if (rule.to === DEAL_STATUS.NEGOTIATING) {
+    const product = await Product.findById(conversation.product_id).select("selling_price").lean();
+    if (product?.selling_price != null) {
+      await Conversation.updateOne(
+        { _id: conversation._id },
+        { $set: { "product_snapshot.selling_price": product.selling_price } },
+      );
+    }
+  }
+
+  await pushSystemMessage({ conversation, senderId: userId, text: rule.text, deal: updated });
+  broadcastDeal(conversation, updated.toObject());
+  return updated;
 };
 
 /**

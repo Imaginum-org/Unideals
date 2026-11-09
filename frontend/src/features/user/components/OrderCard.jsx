@@ -1,33 +1,24 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  FiEye,
-  FiHeart,
-  FiMessageSquare,
-  FiEdit2,
-  FiEyeOff,
-  FiTrash2,
-  FiRefreshCw,
-} from "react-icons/fi";
-import { IoRocketOutline } from "react-icons/io5";
-
+import { CheckCircle2, Crown, Eye, EyeOff, Lock, Pencil, RefreshCw, Rocket, Trash2 } from "lucide-react";
 import DeleteProductModal from "../../product/components/DeleteProductModal.jsx";
 import UnlistProductModal from "../../product/components/UnlistProductModal.jsx";
 import RelistProductModal from "../../product/components/RelistProductModal.jsx";
-import {
-  deleteProduct,
-  unlistProduct,
-  relistProduct,
-  getProductById,
-} from "../../product/api/productApi.js";
-import {
-  createPaymentOrder,
-  verifyPayment,
-} from "../../payment/api/paymentApi.js";
+import { deleteProduct, unlistProduct, relistProduct, getProductById } from "../../product/api/productApi.js";
+import { createPaymentOrder, verifyPayment } from "../../payment/api/paymentApi.js";
 import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
 import LimitModal from "../../../components/ui/LimitModal.jsx";
 import { toast } from "../../../components/ui/toast.js";
+import { productPath } from "../../../utils/productPath.js";
+import { CARD, FLUSH_ON_PHONE, btnPrimary } from "./account/AccountKit.jsx";
+import { cn } from "../../../utils/cn.js";
 
+/*
+ * One of the seller's own listings (My listings). Active: boost, paid
+ * boosts, edit, unlist, delete. Unlisted: relist. Draft: continue to
+ * publish. Sold: read-only. Clicking the card opens the listing (drafts
+ * open the editor, since they aren't public).
+ */
 const BOOST_ADDONS = [
   { id: "boost_3day", label: "3-day", price: 29 },
   { id: "boost_7day", label: "7-day", price: 49 },
@@ -38,12 +29,9 @@ const OrderCard = ({
   placedOn,
   imageUrl,
   name,
-  color,
-  attr,
   status,
   price,
   viewsCount = 0,
-  wishlistedCount = 0,
   onProductDeleted,
   onProductUnlisted,
   onProductRelisted,
@@ -54,8 +42,11 @@ const OrderCard = ({
   boostTier,
 }) => {
   const navigate = useNavigate();
+  // Drafts are private and not on the public page yet: open the editor,
+  // which restores the exact saved state (photos included) on Review.
   const handleCardClick = () => {
-    navigate(`/product/${orderId}`);
+    const st = (status || "").toLowerCase().trim();
+    navigate(st === "draft" ? `/upload/${orderId}` : productPath(orderId));
   };
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
@@ -87,6 +78,7 @@ const OrderCard = ({
     normalized === "active" ||
     normalized === "in progress";
   const isUnlisted = normalized === "unlisted";
+  const isDraft = normalized === "draft";
   const isDelivered = normalized === "delivered" || normalized === "sold";
   // Parent props are the source of truth; localBoost (set at purchase)
   // paints instantly and yields once props catch up or the boost lapses.
@@ -103,47 +95,9 @@ const OrderCard = ({
         minute: "2-digit",
       })
     : "";
-  const boostLabel = boostActive
-    ? `Boosted till ${boostEndText}`
-    : "Boost Visibility";
   const normalizedBoostTier = (effTier || "").toLowerCase();
   const isProPlusBoost = normalizedBoostTier === "pro_plus";
   const isProBoost = normalizedBoostTier === "pro";
-  const boostTone = isProPlusBoost
-    ? {
-        card:
-          "border-amber-300 ring-2 ring-amber-400/30 shadow-[0_12px_30px_rgba(245,158,11,0.16)] dark:border-amber-400/70 dark:ring-amber-300/20",
-        strip: "bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-600",
-        header:
-          "bg-gradient-to-r from-amber-50 via-yellow-50 to-[#F7F8FA] border-amber-100 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-[#1c1c1c]",
-        badge:
-          "bg-amber-400 text-amber-950 shadow-sm shadow-amber-500/25 ring-1 ring-amber-200",
-        button:
-          "bg-amber-500 text-amber-950 shadow-amber-500/20 disabled:opacity-95",
-        image: "ring-2 ring-amber-300/70 shadow-md shadow-amber-500/10",
-      }
-    : isProBoost
-      ? {
-          card:
-            "border-blue-300 ring-2 ring-blue-500/20 shadow-[0_12px_30px_rgba(37,99,235,0.12)] dark:border-blue-500/70 dark:ring-blue-400/20",
-          strip: "bg-gradient-to-r from-blue-700 via-[#3838EC] to-cyan-400",
-          header:
-            "bg-gradient-to-r from-blue-50 via-indigo-50 to-[#F7F8FA] border-blue-100 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-[#1c1c1c]",
-          badge:
-            "bg-blue-600 text-white shadow-sm shadow-blue-500/25 ring-1 ring-blue-300",
-          button: "bg-blue-600 text-white shadow-blue-500/20 disabled:opacity-95",
-          image: "ring-2 ring-blue-300/70 shadow-md shadow-blue-500/10",
-        }
-      : {
-          card:
-            "border-indigo-300 ring-2 ring-indigo-500/20 shadow-indigo-500/10 dark:border-indigo-500/60 dark:ring-indigo-400/20",
-          strip: "bg-gradient-to-r from-[#3838EC] via-violet-500 to-indigo-400",
-          header: "bg-indigo-50 border-indigo-100 dark:bg-indigo-950/20",
-          badge: "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20",
-          button: "bg-emerald-600 text-white disabled:opacity-90",
-          image: "ring-2 ring-indigo-300/60 shadow-md shadow-indigo-500/10",
-        };
-
   const handleDeleteProduct = async () => {
     try {
       setIsDeleting(true);
@@ -235,7 +189,7 @@ const OrderCard = ({
         plan: addon.id,
         productId: orderId,
       });
-      const { orderId: rzpOrderId, amount, currency } = orderRes.data?.data || {};
+      const { orderId: rzpOrderId, amount, currency, keyId } = orderRes.data?.data || {};
       if (!rzpOrderId) throw new Error("Unable to initiate payment");
 
       const paymentRes = await openCheckout({
@@ -243,6 +197,8 @@ const OrderCard = ({
         amount,
         currency,
         planName: `${addon.label} Boost`,
+        description: `${addon.label} Listing Boost`,
+        keyId,
       });
 
       const verifyRes = await verifyPayment({
@@ -259,7 +215,7 @@ const OrderCard = ({
         let updated = verifyRes.data?.data?.product;
         if (!updated?._id) {
           try {
-            const fresh = await getProductById(orderId);
+            const fresh = await getProductById(orderId, {}, { fresh: true });
             updated = fresh.data?.data || fresh.data?.product;
           } catch {
             updated = null;
@@ -286,270 +242,163 @@ const OrderCard = ({
     }
   };
 
+  const statusPill = isDelivered
+    ? { label: "Sold", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" }
+    : isDraft
+      ? { label: "Draft", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" }
+      : isUnlisted
+        ? { label: "Unlisted", cls: "bg-neutral-100 text-slate-600 dark:bg-white/5 dark:text-zinc-300" }
+        : { label: "Active", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" };
+  const boostRing = isProPlusBoost
+    ? "ring-2 ring-amber-400/50 border-amber-300 dark:border-amber-500/60"
+    : "ring-2 ring-[var(--accent-ring)] border-[var(--accent-soft-strong)]";
+  const stop = (fn) => (e) => {
+    e.stopPropagation();
+    fn(e);
+  };
+
   return (
-    <div
+    <article
       onClick={handleCardClick}
-      className={`relative bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-2xl border shadow-sm overflow-hidden font-figtree cursor-pointer transition-all hover:shadow-md ${
-        boostActive ? boostTone.card : "border-gray-100 dark:border-gray-800"
-      }`}
+      className={cn(CARD, FLUSH_ON_PHONE, "group cursor-pointer overflow-hidden transition-shadow hover:shadow-md", boostActive && boostRing)}
     >
       {boostActive && (
         <div
-          className={`pointer-events-none absolute inset-x-0 top-0 h-1.5 ${boostTone.strip}`}
-        />
+          className={cn(
+            "flex items-center justify-between gap-2 px-4 py-1.5 text-[12px] font-semibold sm:px-5",
+            isProPlusBoost
+              ? "bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-800 dark:from-amber-950/40 dark:to-transparent dark:text-amber-200"
+              : "bg-[var(--accent-soft)] text-[var(--accent-text)]",
+          )}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
+            {isProPlusBoost ? "Pro+ boost" : isProBoost ? "Pro boost" : "Boosted"}
+          </span>
+          <span className="font-medium opacity-80">Ends {boostEndText}</span>
+        </div>
       )}
 
-      {/* 1. HEADER */}
-      <div
-        className={`px-4 sm:px-6 py-3.5 border-b dark:border-gray-800/50 flex flex-wrap items-center justify-between gap-3 ${
-          boostActive ? boostTone.header : "bg-gray-100 border-gray-50 dark:bg-[#242424] dark:border-gray-800/50"
-        }`}
-      >
-        <div className="text-[12px] sm:text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate flex-1 pr-2">
-          {isActive ? `#product id : ${orderId}` : `#Order id : ${orderId}`}
-        </div>
-
-        {isActive ? (
-          <div className="flex items-center gap-2 shrink-0">
-            {boostActive && (
-              <div
-                className={`${boostTone.badge} px-3 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase`}
-              >
-                {isProPlusBoost ? "PRO+ BOOSTED" : isProBoost ? "PRO BOOSTED" : "BOOSTED"}
-              </div>
-            )}
-            <div className="bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400 px-3 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase">
-              ACTIVE
-            </div>
-          </div>
-        ) : (
-          <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 shrink-0">
-            Listed on : {placedOn}
-          </div>
-        )}
-      </div>
-
-      {/* 2. BODY */}
-      <div className="p-4 sm:p-6 pb-4 sm:pb-5 flex flex-col sm:flex-row justify-between gap-4">
-        <div className="flex items-start gap-3 sm:gap-4 w-full sm:w-auto">
-          <img
-            className={`w-[72px] h-[72px] sm:w-[84px] sm:h-[84px] shrink-0 rounded-xl object-cover bg-gray-100 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 ${
-              boostActive ? boostTone.image : ""
-            }`}
-            src={imageUrl}
-            alt={name || "product"}
-          />
-          <div className="flex flex-col justify-center flex-1">
-            <h3 className="text-[15px] sm:text-base font-bold text-gray-900 dark:text-white leading-tight">
+      <div className="flex items-start gap-3.5 px-4 py-4 sm:px-5">
+        <img
+          src={imageUrl}
+          alt={name || "Listing"}
+          loading="lazy"
+          className="h-16 w-16 shrink-0 rounded-xl border border-neutral-100 bg-neutral-100 object-cover sm:h-[72px] sm:w-[72px] dark:border-neutral-800 dark:bg-white/5"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-slate-900 group-hover:text-[var(--accent-text)] dark:text-white">
               {name}
             </h3>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {color} | {attr}
-            </div>
-
-            {/* Dynamic Status Row below title */}
-            {isActive ? (
-              <div className="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 mt-2 sm:mt-3 font-medium">
-                <span className="flex items-center gap-1 sm:gap-1.5">
-                  <FiEye size={14} /> {viewsCount || 0}
-                </span>
-                <span className="flex items-center gap-1 sm:gap-1.5">
-                  <FiHeart size={14} /> {wishlistedCount || 0}
-                </span>
-              </div>
-            ) : (
-              <div className="mt-2 sm:mt-3">
-                <span
-                  className={`px-3 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold ${
-                    isDelivered
-                      ? "bg-[#E6FFEB] text-[#008526] dark:bg-emerald-900/20 dark:text-emerald-400"
-                      : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                  }`}
-                >
-                  {isDelivered ? "Delivered" : "Unlisted"}
-                </span>
-              </div>
-            )}
+            <p className="shrink-0 text-[16px] font-bold tabular-nums text-slate-900 dark:text-white">
+              ₹{Number(price || 0).toLocaleString("en-IN")}
+            </p>
           </div>
-        </div>
-
-        {/* NEW PRICE LAYOUT: 
-          On mobile -> flex-row with split ends and a top border to separate it cleanly.
-          On desktop -> stacks vertically aligned to the right. 
-        */}
-        <div className="flex sm:block flex-row items-center justify-between w-full sm:w-auto mt-1 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-gray-100 dark:border-gray-800/50">
-          <div className="text-left sm:text-right">
-            <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5 sm:mb-1">
-              Total Price
-            </div>
-            {isActive && (
-              <div className="text-[10px] text-gray-400 dark:text-gray-500 block sm:hidden mt-0.5">
-                1 week ago
-              </div>
-            )}
-          </div>
-
-          <div className="text-right sm:text-right">
-            <div className="text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white">
-              ₹{price}
-            </div>
-            {isActive && (
-              <div className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block mt-1">
-                1 week ago
-              </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-slate-500 dark:text-zinc-400">
+            <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-semibold", statusPill.cls)}>{statusPill.label}</span>
+            <span>
+              {isDraft ? "Saved" : "Listed"} {placedOn}
+            </span>
+            {(isActive || isUnlisted || isDelivered) && (
+              <span className="inline-flex items-center gap-1">
+                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                {Number(viewsCount || 0).toLocaleString("en-IN")} views
+              </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* 3. FOOTER ACTIONS */}
+      {/* Actions */}
       <div
-        className={`px-4 sm:px-6 py-4 bg-[#F7F8FA]/30 dark:bg-[#1A1D20]/30 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row items-center gap-3 ${
-          isActive || isDelivered ? "sm:justify-between" : "sm:justify-end"
-        }`}
+        className="flex flex-wrap items-center gap-2 border-t border-neutral-100 bg-neutral-50/60 px-4 py-3 sm:px-5 dark:border-neutral-800 dark:bg-white/[0.02]"
+        onClick={(e) => e.stopPropagation()}
       >
         {isActive && (
           <>
-            {/* Boost button full width on mobile, normal on desktop */}
             <button
+              type="button"
               onClick={handleBoostProduct}
               disabled={isBoosting || boostActive}
-              className={`w-full sm:w-auto px-4 py-2.5 sm:py-2 text-white rounded-lg text-[13px] font-medium transition-colors shadow-sm shadow-blue-500/20 flex justify-center items-center gap-2 shrink-0 disabled:cursor-not-allowed ${
-                boostActive
-                  ? boostTone.button
-                  : "bg-[#3838EC] hover:bg-blue-700 disabled:opacity-60"
-              }`}
+              className={cn(btnPrimary, boostActive && "!bg-emerald-600 !opacity-100")}
             >
-              <IoRocketOutline size={16} />
-              <span>{isBoosting ? "Boosting..." : boostLabel}</span>
+              <Rocket className="h-4 w-4" aria-hidden="true" />
+              {isBoosting ? "Boosting…" : boostActive ? "Boost active" : "Boost"}
             </button>
-
-            {/* One-time paid boosts: always visible so buyers never hunt
-                for them; quota errors also reveal this block. */}
             {!boostActive && (
-              <div className="flex w-full sm:w-auto flex-col gap-2">
-                <div className="flex w-full sm:w-auto items-center gap-2">
-                  {BOOST_ADDONS.map((addon) => (
-                    <button
-                      key={addon.id}
-                      onClick={(e) => handleBuyAddon(e, addon)}
-                      disabled={buyingAddon !== null}
-                      className="flex-1 sm:flex-none justify-center px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <IoRocketOutline size={14} />
-                      {buyingAddon === addon.id
-                        ? "..."
-                        : `${addon.label} · ₹${addon.price}`}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate("/price");
-                  }}
-                  className="text-[11px] font-semibold text-[#4A3CFF] hover:underline self-start"
-                >
-                  or get monthly boosts with Pro →
-                </button>
-              </div>
+              <>
+                {BOOST_ADDONS.map((addon) => (
+                  <button
+                    key={addon.id}
+                    type="button"
+                    onClick={(e) => handleBuyAddon(e, addon)}
+                    disabled={buyingAddon !== null}
+                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[12.5px] font-semibold text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+                    title={`One-time ${addon.label} boost`}
+                  >
+                    {buyingAddon === addon.id ? "…" : `${addon.label} · ₹${addon.price}`}
+                  </button>
+                ))}
+              </>
             )}
-
-            {/* Secondary actions span evenly on mobile, group right on desktop */}
-            <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/upload/${orderId}`);
-                }}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2"
-              >
-                <FiEdit2 size={14} />
-                <span className="sm:hidden text-xs">Edit</span>
-                <span className="hidden sm:inline">Edit Details</span>
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setUnlistModalOpen(true);
-                }}
-                disabled={isUnlisting}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
-              >
-                <FiEyeOff size={14} />
-                <span className="text-xs sm:text-[13px]">
-                  {isUnlisting ? "..." : "Unlist"}
-                </span>
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteModalOpen(true);
-                }}
-                disabled={isDeleting}
-                className="flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg text-[13px] font-medium hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
-              >
-                <FiTrash2 size={14} />
-                <span className="text-xs sm:text-[13px]">Delete</span>
-              </button>
+            <div className="ml-auto flex items-center gap-1.5">
+              <IconAction icon={Pencil} label="Edit" onClick={stop(() => navigate(`/upload/${orderId}`))} />
+              <IconAction icon={EyeOff} label={isUnlisting ? "…" : "Unlist"} onClick={stop(() => setUnlistModalOpen(true))} disabled={isUnlisting} />
+              <IconAction icon={Trash2} label="Delete" danger onClick={stop(() => setDeleteModalOpen(true))} disabled={isDeleting} />
             </div>
           </>
         )}
 
         {isUnlisted && (
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/upload/${orderId}`);
-              }}
-              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-[13px] font-medium hover:bg-[#F7F8FA] dark:hover:bg-[#252525] transition-colors flex items-center gap-2"
-            >
-              <FiEdit2 size={14} />
-              Edit Details
+          <>
+            <button type="button" onClick={stop(() => setRelistModalOpen(true))} disabled={isRelisting} className={btnPrimary}>
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              {isRelisting ? "Relisting…" : "Relist"}
             </button>
+            <div className="ml-auto flex items-center gap-1.5">
+              <IconAction icon={Pencil} label="Edit" onClick={stop(() => navigate(`/upload/${orderId}`))} />
+              <IconAction icon={Trash2} label="Delete" danger onClick={stop(() => setDeleteModalOpen(true))} disabled={isDeleting} />
+            </div>
+          </>
+        )}
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setRelistModalOpen(true);
-              }}
-              disabled={isRelisting}
-              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              <FiRefreshCw size={14} />
-              {isRelisting ? "..." : "Relist Product"}
+        {isDraft && (
+          <>
+            <button type="button" onClick={stop(() => navigate(`/upload/${orderId}`))} className={btnPrimary}>
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              Continue &amp; publish
             </button>
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeleteModalOpen(true);
-              }}
-              disabled={isDeleting}
-              className="w-full sm:w-auto justify-center py-2.5 sm:p-2.5 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              <FiTrash2 size={16} />
-              <span className="sm:hidden text-[13px]">Delete</span>
-            </button>
-          </div>
+            <span className="inline-flex items-center gap-1 text-[12px] text-slate-400 dark:text-zinc-500" title="Drafts are private until you publish">
+              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+              Private
+            </span>
+            <div className="ml-auto">
+              <IconAction icon={Trash2} label="Delete" danger onClick={stop(() => setDeleteModalOpen(true))} disabled={isDeleting} />
+            </div>
+          </>
         )}
 
         {isDelivered && (
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:justify-between">
-            <div className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 italic text-center sm:text-left w-full sm:w-auto">
-              This order is completed. Actions are limited.
-            </div>
-            <button className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-[#F7F8FA] dark:bg-[#1c1c1c] border border-gray-200 dark:border-gray-700 text-[#364EF2] dark:text-blue-400 rounded-lg text-[13px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center gap-2">
-              View Delivery Details
-            </button>
-          </div>
+          <p className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+            Sold
+          </p>
+        )}
+
+        {isActive && !boostActive && (
+          <button
+            type="button"
+            onClick={stop(() => navigate("/price"))}
+            title="Monthly boosts come with Pro"
+            className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/30"
+          >
+            <Crown className="h-3.5 w-3.5" aria-hidden="true" />
+            Pro
+          </button>
         )}
       </div>
 
-      {/* MODALS */}
       <DeleteProductModal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
@@ -571,15 +420,30 @@ const OrderCard = ({
         productName={name}
         isLoading={isRelisting}
       />
-      {limitInfo && (
-        <LimitModal
-          title="You're out of listings"
-          message={limitInfo.message}
-          onClose={() => setLimitInfo(null)}
-        />
-      )}
-    </div>
+      {limitInfo && <LimitModal title="You're out of listings" message={limitInfo.message} onClose={() => setLimitInfo(null)} />}
+    </article>
   );
 };
+
+function IconAction({ icon: Icon, label, onClick, danger, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 text-[13px] font-medium transition-colors disabled:opacity-50 dark:border-neutral-700 dark:bg-[#1A1D20]",
+        danger
+          ? "text-red-600 hover:border-red-200 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+          : "text-slate-600 hover:bg-neutral-50 hover:text-slate-900 dark:text-zinc-300 dark:hover:bg-white/5",
+      )}
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" />
+      <span className="max-sm:hidden">{label}</span>
+    </button>
+  );
+}
 
 export default OrderCard;

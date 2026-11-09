@@ -87,7 +87,7 @@ function PasswordStrengthMeter({ password, email, onSuggest, className = "" }) {
         <button
           type="button"
           onClick={onSuggest}
-          className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#393AF2]/40 bg-[#393AF2]/5 px-3 py-1.5 text-xs font-semibold text-[#393AF2] transition hover:bg-[#393AF2]/10 dark:text-[#8FA2FF]"
+          className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#393AF2]/40 bg-[#393AF2]/5 px-3 py-1.5 text-xs font-semibold text-[#393AF2] transition hover:bg-[#393AF2]/10 dark:text-[#8FA2FF]"
         >
           <Sparkles size={14} />
           Suggest a strong password for me

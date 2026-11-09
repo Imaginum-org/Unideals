@@ -19,9 +19,23 @@ import {
   setAuthCookies,
 } from "../services/auth.service.js";
 import { safeErrorMessage } from "../utils/response.js";
+import escapeHtml from "../utils/escapeHtml.js";
 
 const sha256 = (value) =>
   crypto.createHash("sha256").update(String(value)).digest("hex");
+
+// The Google callback is a top-level browser navigation: answering with
+// JSON left users staring at a raw JSON page. Send them back to /login with
+// a short error code the Login page turns into a friendly message.
+const redirectOAuthError = (res, code) => {
+  const base = String(process.env.FRONTEND_URL || "").split(",")[0].trim();
+  if (!base) {
+    return res.status(400).json({ success: false, error: true, message: "Google login failed." });
+  }
+  const url = new URL(`${base.replace(/\/$/, "")}/login`);
+  url.searchParams.set("oauth_error", code);
+  return res.redirect(url.toString());
+};
 
 // Per-target-email send throttle (in-memory, no new deps): max 3/hr per
 // email across forgot/resend/register-resend. Throttled callers still get
@@ -40,7 +54,17 @@ const isEmailSendThrottled = (normalizedEmail) => {
   return entry.count >= EMAIL_SEND_LIMIT;
 };
 
+const pruneEmailSendThrottle = () => {
+  // Bound memory: drop expired entries (previously grew forever).
+  if (emailSendThrottle.size < 1000) return;
+  const now = Date.now();
+  for (const [key, entry] of emailSendThrottle) {
+    if (!entry || entry.expiresAt <= now) emailSendThrottle.delete(key);
+  }
+};
+
 const recordEmailSend = (normalizedEmail) => {
+  pruneEmailSendThrottle();
   const now = Date.now();
   const entry = emailSendThrottle.get(normalizedEmail);
   if (!entry || entry.expiresAt <= now) {
@@ -111,7 +135,15 @@ const findOrCreateGoogleUser = async (payload) => {
     }
 
     if (!user.is_email_verified) {
+      // Pre-account-takeover guard: an unverified account may have been
+      // registered by someone else (with a password they know) before the
+      // real owner signed in with Google. Google just proved inbox
+      // ownership, so discard that unproven password and any sessions.
       user.is_email_verified = true;
+      user.password = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+      user.verifyTokenEmail = "";
+      user.verifyTokenEmailExpiry = null;
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
     }
 
     await user.save();
@@ -124,9 +156,23 @@ export const registerUserController = async (req, res) => {
   try {
     let { name, email, password, gender } = req.body;
 
-    if (!name || !email || !password) {
+    if (
+      typeof name !== "string" ||
+      typeof email !== "string" ||
+      !name.trim() ||
+      !email.trim() ||
+      !password
+    ) {
       return res.status(400).json({
         message: "Please provide your name, email, and password.",
+        error: true,
+        success: false,
+      });
+    }
+    name = name.trim().slice(0, 100);
+    if (!/^\S+@\S+\.\S+$/.test(email.trim()) || email.length > 254) {
+      return res.status(400).json({
+        message: "Please provide a valid email address.",
         error: true,
         success: false,
       });
@@ -183,9 +229,15 @@ export const registerUserController = async (req, res) => {
     const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?code=${verifyToken}`;
 
     if (existingUser) {
+      // Unverified re-register: the latest registrant's password wins and
+      // the old verification link dies. Previously the FIRST registrant's
+      // password was kept, so anyone could pre-register a victim's email
+      // and log in once the real owner clicked the verification link.
       await userModel.findByIdAndUpdate(existingUser._id, {
+        password: await bcrypt.hash(password, 10),
         verifyTokenEmail: hashedVerifyToken,
         verifyTokenEmailExpiry: verifyExpiry,
+        $inc: { tokenVersion: 1 },
       });
 
       recordEmailSend(normalizedEmail);
@@ -295,7 +347,9 @@ export const googleAuthRedirectController = async (req, res) => {
       path: "/",
     });
     const authorizeUrl = oauth2Client.generateAuthUrl({
-      access_type: "offline",
+      // "online": we only need the ID token once; never request a Google
+      // refresh token we don't store or use.
+      access_type: "online",
       scope: ["openid", "email", "profile"],
       prompt: "select_account",
       state,
@@ -315,21 +369,13 @@ export const googleAuthRedirectController = async (req, res) => {
 export const googleAuthCallbackController = async (req, res) => {
   try {
     const { code, state } = req.query;
-    if (!code) {
-      return res.status(400).json({
-        message: "Google authorization code is missing.",
-        success: false,
-        error: true,
-      });
+    if (!code || typeof code !== "string") {
+      return redirectOAuthError(res, "missing_code");
     }
     // State must match the cookie set at redirect time — otherwise this
     // login was planted by someone else (login CSRF / session fixation).
     if (!state || state !== req.cookies?.oauth_state) {
-      return res.status(403).json({
-        message: "Google login session mismatch. Please try again.",
-        success: false,
-        error: true,
-      });
+      return redirectOAuthError(res, "session_mismatch");
     }
     // Clear with the same flags used at set time or the cookie survives.
     res.clearCookie("oauth_state", {
@@ -341,11 +387,7 @@ export const googleAuthCallbackController = async (req, res) => {
 
     const { tokens } = await oauth2Client.getToken(code);
     if (!tokens?.id_token) {
-      return res.status(400).json({
-        message: "Unable to verify Google identity.",
-        success: false,
-        error: true,
-      });
+      return redirectOAuthError(res, "verify_failed");
     }
 
     const ticket = await oauth2Client.verifyIdToken({
@@ -359,15 +401,12 @@ export const googleAuthCallbackController = async (req, res) => {
       .select("status")
       .lean();
     if (previewUser && previewUser.status !== USER_STATUS.ACTIVE) {
-      const statusLabel =
-        previewUser.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
-      return res.status(403).json({
-        message: `Your account is ${statusLabel}. Please contact support.`,
-        success: false,
-        error: true,
-        accountBlocked: true,
-        accountStatus: previewUser.status,
-      });
+      return redirectOAuthError(
+        res,
+        previewUser.status === USER_STATUS.SUSPENDED
+          ? "account_suspended"
+          : "account_inactive",
+      );
     }
     const user = await findOrCreateGoogleUser(payload);
 
@@ -387,12 +426,8 @@ export const googleAuthCallbackController = async (req, res) => {
 
     return res.redirect(redirectUrl.toString());
   } catch (error) {
-    console.error("Google auth callback error:", error);
-    return res.status(500).json({
-      message: "Google authentication failed.",
-      success: false,
-      error: true,
-    });
+    console.error("Google auth callback error:", error?.message || error);
+    return redirectOAuthError(res, "failed");
   }
 };
 
@@ -445,9 +480,12 @@ export const googleOneTapController = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Google One Tap error:", error);
-    return res.status(error.statusCode || 500).json({
-      message: error.message || "Google login failed",
+    console.error("Google One Tap error:", error?.message || error);
+    // Invalid/expired Google credentials are client errors; anything else
+    // is masked (library/DB messages never reach the client).
+    const status = error.statusCode || (/token|audience|signature|expired/i.test(String(error?.message)) ? 401 : 500);
+    return res.status(status).json({
+      message: status < 500 && error.statusCode ? error.message : "Google login failed",
       success: false,
       error: true,
     });
@@ -574,7 +612,7 @@ export const verifyEmailController = async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({
-      message: err.message || err,
+      message: safeErrorMessage(err, "Unable to verify email right now"),
       success: false,
       error: true,
     });
@@ -789,6 +827,13 @@ export const resetPasswordController = async (req, res) => {
       });
     }
 
+    if (typeof token !== "string" || !/^[a-f0-9]{64}$/i.test(token)) {
+      return res.status(400).json({
+        message: "This password reset link is invalid or has expired.",
+        success: false,
+        error: true,
+      });
+    }
     const hashedToken = crypto.createHash("sha256").update(String(token)).digest("hex");
     const user = await userModel.findOne({
       reset_password_token: hashedToken,
@@ -810,6 +855,10 @@ export const resetPasswordController = async (req, res) => {
       password: hashedPassword,
       reset_password_token: "",
       reset_password_expiry: null,
+      // Clicking the emailed reset link proves inbox ownership.
+      is_email_verified: true,
+      verifyTokenEmail: "",
+      verifyTokenEmailExpiry: null,
       refresh_token: null,
       refresh_token_prev: null,
       refresh_token_prev_expires_at: null,
@@ -821,7 +870,7 @@ export const resetPasswordController = async (req, res) => {
       await sendEmail({
         sendTo: user.email,
         subject: "Your Unideals password was changed",
-        html: `<p>Hi ${user.name || "there"},</p><p>Your Unideals password was just changed. If this wasn't you, please reset your password immediately or contact support.</p>`,
+        html: `<p>Hi ${escapeHtml(user.name || "there")},</p><p>Your Unideals password was just changed. If this wasn't you, please reset your password immediately or contact support.</p>`,
       });
     } catch {
       // ignore notify failures

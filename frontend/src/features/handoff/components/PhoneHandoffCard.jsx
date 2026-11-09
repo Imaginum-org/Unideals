@@ -179,7 +179,7 @@ const PhoneHandoffCard = ({
             startSession();
           }}
           disabled={disabled || creating}
-          className="mt-4 inline-flex h-[46px] items-center gap-2 rounded-xl bg-[#4F46E5] px-6 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-4 inline-flex h-[46px] items-center gap-2 rounded-lg bg-[#4F46E5] px-6 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {creating ? "Creating…" : expired ? (
             <>

@@ -1,187 +1,153 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
+import { Check, Lock, Sparkles, X } from "lucide-react";
 import { getBadgeMeta, TIER_STYLES } from "../../../utils/badgeConfig.js";
+import { cn } from "../../../utils/cn.js";
+
+const TIER_DOT = { bronze: "#CD7F32", silver: "#9CA3AF", gold: "#F5B301", special: "#6366F1" };
 
 /**
- * BadgeCard — displays a single badge in earned or locked state.
- *
- * Props:
- *   badge_id    {string}  — e.g. "power_seller"
- *   tier        {string}  — "bronze" | "silver" | "gold" | "special"
- *   earned_at   {string}  — ISO date string (null if locked)
- *   xp_granted  {number}
- *   locked      {boolean}
- *   progress    {object}  — { current, required, unit } for locked badges
- *   isNew       {boolean} — show sparkle pulse if earned within 3 days
+ * One badge, earned or locked. Earned: colour icon, tier, XP. Locked: muted
+ * icon with progress (or the first requirement). Tap for details.
  */
-export default function BadgeCard({
-  badge_id,
-  tier = "bronze",
-  earned_at = null,
-  xp_granted = 0,
-  locked = false,
-  progress = null,
-  isNew = false,
-}) {
-  const [showModal, setShowModal] = useState(false);
+export default function BadgeCard({ badge_id, tier = "bronze", earned_at = null, xp_granted = 0, locked = false, progress = null, isNew = false }) {
+  const [open, setOpen] = useState(false);
   const meta = getBadgeMeta(badge_id);
-  if (!meta) return null;
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  if (!meta) return null;
   const tierStyle = TIER_STYLES[tier] || TIER_STYLES.special;
   const earnedDate = earned_at
     ? new Date(earned_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
     : null;
+  const pct = progress?.required ? Math.min(100, Math.round((progress.current / progress.required) * 100)) : 0;
+  const reachedIdx = locked ? -1 : meta.tiers.findIndex((t) => t.tier === tier);
 
   return (
     <>
-      {/* Card */}
       <button
-        onClick={() => setShowModal(true)}
-        className={`
-          relative group text-left w-full rounded-2xl p-4 border transition-all duration-200
-          ${locked
-            ? "border-gray-200 dark:border-gray-700 bg-[#F7F8FA] dark:bg-[#1a1a1a] opacity-60 grayscale cursor-pointer hover:opacity-80"
-            : "border-gray-100 dark:border-gray-800 bg-[#F7F8FA] dark:bg-[#1c1c1c] hover:scale-[1.02] hover:-translate-y-0.5 cursor-pointer"
-          }
-          ${isNew ? "animate-pulse-border" : ""}
-        `}
-        style={
-          locked
-            ? {}
-            : { boxShadow: `0 2px 12px ${tierStyle.glow?.split("rgba")[1] ? "rgba" + tierStyle.glow.split("rgba")[1].split(")")[0] + ", 0.15)" : "transparent"}` }
-        }
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(
+          "group relative flex w-full flex-col rounded-2xl border bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md dark:bg-[#1A1D20]",
+          locked ? "border-dashed border-neutral-300 dark:border-neutral-700" : "border-neutral-200/80 dark:border-neutral-800",
+        )}
       >
-        {/* Tier ribbon */}
-        {!locked && (
-          <div
-            className="absolute top-0 right-0 px-2 py-0.5 rounded-bl-xl rounded-tr-xl text-[10px] font-bold text-white"
-            style={{ background: tierStyle.gradient }}
-          >
-            {tierStyle.label}
-          </div>
-        )}
-
-        {/* Lock icon */}
-        {locked && (
-          <div className="absolute top-2 right-2 text-gray-400 dark:text-gray-600">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 1C9.24 1 7 3.24 7 6v2H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6c0-2.76-2.24-5-5-5zm0 2c1.66 0 3 1.34 3 3v2H9V6c0-1.66 1.34-3 3-3zm0 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/>
-            </svg>
-          </div>
-        )}
-
-        {/* New sparkle */}
         {isNew && !locked && (
-          <span className="absolute -top-1 -left-1 text-base">✨</span>
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <Sparkles className="h-2.5 w-2.5" aria-hidden="true" /> New
+          </span>
         )}
+        {locked && <Lock className="absolute right-3 top-3 h-3.5 w-3.5 text-slate-400 dark:text-zinc-500" aria-label="Locked" />}
 
-        {/* Icon */}
-        <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-3 shadow-sm"
+        <span
+          className={cn("grid h-12 w-12 place-items-center rounded-xl text-[26px] ring-1 ring-black/5", locked && "grayscale opacity-60")}
           style={{ background: locked ? "#F3F4F6" : meta.color.bg }}
+          aria-hidden="true"
         >
           {meta.icon}
-        </div>
+        </span>
+        <p className="mt-3 truncate text-[14px] font-semibold text-slate-900 dark:text-white">{meta.name}</p>
 
-        {/* Name */}
-        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{meta.name}</p>
-
-        {/* Sublabel */}
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-          {locked && progress
-            ? `${progress.current} / ${progress.required} ${progress.unit}`
-            : locked
-            ? "Keep going to unlock"
-            : earnedDate
-            ? `Earned ${earnedDate}`
-            : "Earned"}
-        </p>
-
-        {/* XP chip */}
-        {!locked && (
-          <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-            style={{ background: tierStyle.bg, color: tierStyle.text }}>
-            +{xp_granted} XP
+        {locked ? (
+          progress?.required ? (
+            <div className="mt-2">
+              <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-white/5">
+                <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
+              </div>
+              <p className="mt-1 text-[11.5px] tabular-nums text-slate-500 dark:text-zinc-400">
+                {progress.current}/{progress.required} {progress.unit}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-1 line-clamp-2 text-[12px] text-slate-500 dark:text-zinc-400">{meta.tiers[0]?.label}</p>
+          )
+        ) : (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-white/5 dark:text-zinc-200">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: TIER_DOT[tier] || TIER_DOT.special }} />
+              {tierStyle.label}
+            </span>
+            <span className="text-[11.5px] font-semibold text-[var(--accent-text)]">+{xp_granted} XP</span>
           </div>
         )}
       </button>
 
-      {/* Modal */}
-      {showModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={() => setShowModal(false)}
-        >
+      {open && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setOpen(false)}>
           <div
-            className="bg-[#F7F8FA] dark:bg-[#1c1c1c] rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-gray-800"
+            role="dialog"
+            aria-modal="true"
+            aria-label={meta.name}
             onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-sm rounded-t-3xl border border-neutral-200 bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl dark:border-neutral-800 dark:bg-[#1A1D20]"
           >
-            {/* Big icon */}
-            <div className="flex justify-center mb-4">
-              <div
-                className="w-20 h-20 rounded-2xl flex items-center justify-center text-5xl shadow-md"
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+              className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-neutral-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-white"
+            >
+              <X className="h-[18px] w-[18px]" />
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <span
+                className={cn("grid h-20 w-20 place-items-center rounded-2xl text-[44px] ring-1 ring-black/5", locked && "grayscale opacity-60")}
                 style={{ background: meta.color.bg, boxShadow: locked ? "none" : tierStyle.glow }}
+                aria-hidden="true"
               >
                 {meta.icon}
-              </div>
+              </span>
+              <h2 className="mt-4 text-[18px] font-semibold text-slate-900 dark:text-white">{meta.name}</h2>
+              <p className="mt-1 text-[13px] text-slate-500 dark:text-zinc-400">{meta.description}</p>
+              <p className="mt-2 text-[12px] font-medium text-slate-400 dark:text-zinc-500">
+                {locked ? "Not earned yet" : earnedDate ? `Earned ${earnedDate}` : "Earned"}
+              </p>
             </div>
 
-            {/* Tier badge */}
-            {!locked && (
-              <div className="flex justify-center mb-3">
-                <span
-                  className="px-3 py-1 rounded-full text-xs font-bold text-white"
-                  style={{ background: tierStyle.gradient }}
-                >
-                  {tierStyle.label} Tier
-                </span>
-              </div>
-            )}
+            <ul className="mt-5 space-y-1.5">
+              {meta.tiers.map((t, i) => {
+                const reached = reachedIdx >= i;
+                return (
+                  <li
+                    key={t.tier}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-[12.5px]",
+                      reached ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-neutral-50 dark:bg-white/[0.03]",
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-2 text-slate-700 dark:text-zinc-200">
+                      {reached ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" strokeWidth={3} />
+                      ) : (
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TIER_DOT[t.tier] || TIER_DOT.special }} />
+                      )}
+                      <span className="truncate">{t.label}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold text-[var(--accent-text)]">+{t.xp} XP</span>
+                  </li>
+                );
+              })}
+            </ul>
 
-            <h2 className="text-xl font-extrabold text-center text-gray-900 dark:text-white mb-2">
-              {meta.name}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-4">
-              {meta.description}
-            </p>
-
-            {/* Tiers list */}
-            <div className="space-y-2 mb-4">
-              {meta.tiers.map((t) => (
-                <div
-                  key={t.tier}
-                  className="flex items-center justify-between text-xs rounded-xl px-3 py-2 bg-[#F7F8FA] dark:bg-[#252525]"
-                >
-                  <span className="text-gray-600 dark:text-gray-300">{t.label}</span>
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400">+{t.xp} XP</span>
-                </div>
-              ))}
-            </div>
-
-            {earnedDate && (
-              <p className="text-xs text-center text-gray-400 mb-4">Earned on {earnedDate}</p>
-            )}
-
-            {locked && progress && (
-              <div className="mb-4">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
+            {locked && progress?.required ? (
+              <div className="mt-4">
+                <div className="mb-1 flex justify-between text-[12px] text-slate-500 dark:text-zinc-400">
                   <span>Progress</span>
-                  <span>{progress.current} / {progress.required}</span>
+                  <span className="tabular-nums">
+                    {progress.current}/{progress.required}
+                  </span>
                 </div>
-                <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-indigo-500"
-                    style={{ width: `${Math.min(100, (progress.current / progress.required) * 100)}%` }}
-                  />
+                <div className="h-2 overflow-hidden rounded-full bg-neutral-100 dark:bg-white/5">
+                  <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
                 </div>
               </div>
-            )}
-
-            <button
-              onClick={() => setShowModal(false)}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors"
-            >
-              Close
-            </button>
+            ) : null}
           </div>
         </div>
       )}

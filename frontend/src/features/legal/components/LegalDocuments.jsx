@@ -526,7 +526,7 @@ function LegalDocument({ initialType = "privacy" }) {
       <div className="mb-4 inline-flex items-center p-1 bg-gray-100 dark:bg-[#1A1D20] rounded-2xl border border-gray-100 dark:border-gray-800">
         <button
           onClick={() => setActiveTab("privacy")}
-          className={`flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition-all duration-200 ${
+          className={`flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm transition-all duration-200 ${
             isPrivacy
               ? "bg-[#F7F8FA] font-medium text-gray-900 shadow-sm dark:bg-[#25282c] dark:text-white"
               : "bg-transparent font-medium text-[#9AA4B2] hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -544,7 +544,7 @@ function LegalDocument({ initialType = "privacy" }) {
 
         <button
           onClick={() => setActiveTab("terms")}
-          className={`flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition-all duration-200 ${
+          className={`flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm transition-all duration-200 ${
             !isPrivacy
               ? "bg-[#F7F8FA] font-medium text-gray-900 shadow-sm dark:bg-[#25282c] dark:text-white"
               : "bg-transparent font-medium text-[#9AA4B2] hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"

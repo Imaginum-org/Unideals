@@ -1,10 +1,33 @@
 import bcrypt from "bcrypt";
 import userModel from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
-import { deleteImage } from "../utils/imagekit.js";
+import { deleteImageSafely, getFileOwnership } from "../utils/imagekit.js";
 import { safeErrorMessage } from "../utils/response.js";
 import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges } from "../services/badgeService.js";
 import { clearAuthCookies } from "../services/auth.service.js";
+
+// The signed-in user's own profile: never ship credentials or internal
+// session/token bookkeeping, and never the precise GPS fix (the client caches
+// this object). Secrets with select:false stay excluded as well.
+const SELF_PROFILE_EXCLUDE = [
+  "-password",
+  "-refresh_token",
+  "-refresh_token_prev",
+  "-refresh_token_prev_expires_at",
+  "-verifyTokenEmail",
+  "-verifyTokenEmailExpiry",
+  "-tokenVersion",
+  "-reset_password_token",
+  "-reset_password_expiry",
+  "-forgot_password_otp",
+  "-forgot_password_expiry",
+  "-oauth_login_token",
+  "-oauth_login_expiry",
+  "-current_lat",
+  "-current_long",
+  "-location_updated_at",
+  "-gamification.rewards_claimed",
+].join(" ");
 
 // GET USER PROFILE
 export const getUserProfile = async (req, res) => {
@@ -13,7 +36,7 @@ export const getUserProfile = async (req, res) => {
 
     const user = await userModel
       .findById(userId)
-      .select("-password -refresh_token -verifyTokenEmail")
+      .select(SELF_PROFILE_EXCLUDE)
       .populate("campus_id", "slug name short_name city state is_active")
       .lean();
 
@@ -136,7 +159,7 @@ export const updateUserProfile = async (req, res) => {
         new: true,
         runValidators: true,
       })
-      .select("-password -refresh_token")
+      .select(SELF_PROFILE_EXCLUDE)
       .populate("campus_id", "slug name short_name city state is_active")
       .lean();
 
@@ -232,7 +255,10 @@ export const updateUserAvatar = async (req, res) => {
         message: "Avatar service unavailable",
       });
     }
-    const isImageKit = avatar.url.startsWith(endpoint);
+    // Compare with a trailing slash so "https://ik.imagekit.io/abc" does not
+    // also accept another account's "https://ik.imagekit.io/abcdef/...".
+    const endpointPrefix = endpoint.endsWith("/") ? endpoint : `${endpoint}/`;
+    const isImageKit = avatar.url.startsWith(endpointPrefix);
     const isGoogle = /^https:\/\/lh\d*\.googleusercontent\.com\//.test(avatar.url);
     if (!isImageKit && !isGoogle) {
       return res.status(400).json({
@@ -257,6 +283,23 @@ export const updateUserAvatar = async (req, res) => {
       }
     }
 
+    // Ownership: the new avatar file must be the caller's own upload.
+    // Otherwise a user could adopt someone else's fileId and have it
+    // purged on their next avatar change.
+    if (isImageKit && avatar.fileId) {
+      const ownership = await getFileOwnership(avatar.fileId);
+      if (
+        !ownership.exists ||
+        (ownership.ownerId && ownership.ownerId !== String(userId).toLowerCase())
+      ) {
+        return res.status(403).json({
+          success: false,
+          error: true,
+          message: "Avatar file must be your own upload",
+        });
+      }
+    }
+
     const user = await userModel.findById(userId);
 
     if (!user) {
@@ -267,9 +310,12 @@ export const updateUserAvatar = async (req, res) => {
       });
     }
 
-    // Delete previous uploaded avatar (don't delete the default avatar)
-    if (user.avatar?.fileId) {
-      await deleteImage(user.avatar.fileId);
+    // Delete previous uploaded avatar (ownership + reference checked).
+    if (user.avatar?.fileId && user.avatar.fileId !== avatar.fileId) {
+      await deleteImageSafely(user.avatar.fileId, {
+        ownerId: userId,
+        excludeUserId: userId,
+      });
     }
 
     user.avatar = {
@@ -281,7 +327,7 @@ export const updateUserAvatar = async (req, res) => {
 
     const updatedUser = await userModel
       .findById(userId)
-      .select("-password -refresh_token")
+      .select(SELF_PROFILE_EXCLUDE)
       .lean();
 
     computeAndAwardBadges(userId).catch((err) =>
@@ -329,7 +375,10 @@ export const removeUserAvatar = async (req, res) => {
 
     // Delete custom avatar from ImageKit
     if (user.avatar?.fileId) {
-      await deleteImage(user.avatar.fileId);
+      await deleteImageSafely(user.avatar.fileId, {
+        ownerId: userId,
+        excludeUserId: userId,
+      });
     }
 
     // Remove custom avatar
@@ -342,7 +391,7 @@ export const removeUserAvatar = async (req, res) => {
 
     const safeUser = await userModel
       .findById(userId)
-      .select("-password -refresh_token -verifyTokenEmail")
+      .select(SELF_PROFILE_EXCLUDE)
       .lean();
 
     return res.status(200).json({

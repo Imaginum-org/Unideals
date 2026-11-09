@@ -50,7 +50,7 @@ function LegalAgreementModal({ activeTab, onTabChange, onClose, onAccept }) {
           <button
             type="button"
             onClick={onAccept}
-            className="h-10 rounded-xl bg-[#393AF2] px-5 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
+            className="h-10 rounded-lg bg-[#393AF2] px-5 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
           >
             Accept
           </button>

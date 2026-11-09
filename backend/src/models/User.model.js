@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
-import bcrypt from "bcrypt";
+import { clearUserCache, invalidateUser } from "../utils/userCache.js";
+import { subscriptionFromUpdate, syncSellerTier } from "../utils/sellerTierSync.js";
 import { USER_ROLES, USER_STATUS, USER_TIER } from "../config/constants.js";
 
 const userSchema = new Schema(
@@ -17,7 +18,8 @@ const userSchema = new Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
+      // unique already builds the index; index:true duplicated it
+      // (Mongoose "Duplicate schema index" warning).
       match: [
         /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.[A-Za-z]{2,})+$/,
         "Please provide a valid email address",
@@ -315,6 +317,49 @@ userSchema.index(
     partialFilterExpression: { is_email_verified: false }
   }
 );
+
+// ── Auth cache invalidation ──
+// Any write to a user evicts its cached auth document (utils/userCache.js),
+// so session revocation / status / plan changes are visible immediately.
+const evictFromQuery = function () {
+  const filter = this.getFilter?.() || {};
+  const id = filter._id;
+  if (id && (typeof id !== "object" || id._bsontype === "ObjectId" || id instanceof mongoose.Types.ObjectId)) {
+    invalidateUser(id);
+  } else {
+    clearUserCache();
+  }
+};
+userSchema.post("save", (doc) => invalidateUser(doc?._id));
+userSchema.post(
+  ["updateOne", "findOneAndUpdate", "findOneAndReplace", "replaceOne", "deleteOne", "findOneAndDelete"],
+  { document: false, query: true },
+  evictFromQuery,
+);
+userSchema.post("updateOne", { document: true, query: false }, function () {
+  invalidateUser(this._id);
+});
+userSchema.post("deleteOne", { document: true, query: false }, function () {
+  invalidateUser(this._id);
+});
+userSchema.post(["updateMany", "deleteMany"], () => clearUserCache());
+userSchema.post("bulkWrite", () => clearUserCache());
+
+// ── Plan changes → listing rank (search ranking perk) ──
+// Any write that sets `subscription` re-stamps the seller's listings.
+userSchema.pre(["findOneAndUpdate", "updateOne"], { document: false, query: true }, function () {
+  const tier = subscriptionFromUpdate(this.getUpdate());
+  if (tier !== undefined) this._planSync = { id: this.getFilter()?._id, tier };
+});
+userSchema.post(["findOneAndUpdate", "updateOne"], { document: false, query: true }, async function () {
+  if (this._planSync?.id) await syncSellerTier(this._planSync.id, this._planSync.tier);
+});
+userSchema.pre("save", function () {
+  this._planChanged = !this.isNew && this.isModified("subscription");
+});
+userSchema.post("save", async function (doc) {
+  if (doc._planChanged) await syncSellerTier(doc._id, doc.subscription);
+});
 
 const User = mongoose.model("User", userSchema);
 

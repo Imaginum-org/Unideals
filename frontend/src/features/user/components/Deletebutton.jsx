@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { Trash2 } from "lucide-react";
 
 import { deleteAccount } from "../../../features/user/api/userApi.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
+import { clearAccountScopedStorage } from "../../../context/useUserContext.jsx";
 
 function AlertDialogDemo() {
   const navigate = useNavigate();
@@ -28,6 +30,7 @@ function AlertDialogDemo() {
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("cachedUserDetails");
         localStorage.removeItem("accessToken");
+        clearAccountScopedStorage();
 
         toast.success("Your account has been permanently deleted.");
 
@@ -44,7 +47,7 @@ function AlertDialogDemo() {
     <>
       <AlertDialog.Root>
         <AlertDialog.Trigger asChild>
-          <button className="flex items-center gap-2 rounded-xl bg-[#FFE0E0] px-5 py-2.5 text-sm font-semibold text-[#EF4444] transition-all duration-300 hover:bg-[#f9c7c7]">
+          <button className="flex items-center gap-2 rounded-lg bg-[#FFE0E0] px-5 py-2.5 text-sm font-semibold text-[#EF4444] transition-all duration-300 hover:bg-[#f9c7c7]">
             <Trash2 size={17} />
             Delete
           </button>
@@ -111,7 +114,7 @@ function AlertDialogDemo() {
                   disabled={loading}
                   className="Button red"
                 >
-                  {loading ? "Deleting..." : "Yes, delete account"}
+                  <ButtonLoader loading={loading} loadingText="Deleting…">Yes, delete account</ButtonLoader>
                 </button>
               </AlertDialog.Action>
             </div>

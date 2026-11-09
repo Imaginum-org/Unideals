@@ -4,6 +4,7 @@ import Report from "../models/Report.model.js";
 import Product from "../models/Product.model.js";
 import User from "../models/User.model.js";
 import { PRODUCT_STATUS, REPORT_STATUS } from "../config/constants.js";
+import { supportPriorityFor } from "../utils/planPerks.js";
 import { notifyModerationWarning } from "./notification.service.js";
 
 const MAX_REPORTS_PER_HOUR = 10;
@@ -203,7 +204,25 @@ export const reportUser = async (targetUserId, data, user) => {
   }
 };
 
-export const reportSupport = async (data, user) => {
+export const reportSupport = async (rawData, user) => {
+  // Coerce every field to a bounded string: arrays/objects from the body
+  // used to crash .trim() (500) instead of a clean 400.
+  const str = (v, max) => (typeof v === "string" ? v.slice(0, max) : "");
+  const data = {
+    email: str(rawData?.email, 254),
+    name: str(rawData?.name, 100),
+    reason: str(rawData?.reason, 200),
+    topic: str(rawData?.topic, 200),
+    category: str(rawData?.category, 200),
+    description: str(rawData?.description, 3000),
+    message: str(rawData?.message, 3000),
+    reference: str(rawData?.reference, 1000),
+    link: str(rawData?.link, 1000),
+    support_type: str(rawData?.support_type, 40),
+  };
+  // Plan perk "Customer support": priority comes from the requester's plan
+  // (the client-sent priority is ignored — anyone could claim "High").
+  const { priority, rank: priorityRank } = supportPriorityFor(user?.subscription, data.support_type);
   const reporterEmail = (data.email || user?.email || "").trim().toLowerCase();
   if (!reporterEmail || !reporterEmail.includes("@")) {
     throw badRequest("A valid email address is required");
@@ -221,7 +240,9 @@ export const reportSupport = async (data, user) => {
     description,
     reference: (data.reference || data.link || "").trim(),
     support_type: data.support_type || "contact",
-    priority: (data.priority || "normal").toLowerCase(),
+    priority,
+    priority_rank: priorityRank,
+    reporter_plan: user?.subscription || "guest",
     status: REPORT_STATUS.PENDING,
   });
 
@@ -287,7 +308,12 @@ export const getReportQueue = async ({ page = 1, limit = 20, status, target_mode
   const [data, total] = await Promise.all([
     Report.find(match)
       .populate("reporter_id", "name email avatar")
-      .sort({ createdAt: -1 })
+      // Pending support tickets: highest plan priority first, then newest.
+      .sort(
+        target_model === "Support" || sort === "priority"
+          ? { priority_rank: -1, createdAt: -1 }
+          : { createdAt: -1 },
+      )
       .skip(skip)
       .limit(limit)
       .lean(),

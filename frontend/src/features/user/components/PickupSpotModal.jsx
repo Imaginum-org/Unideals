@@ -7,6 +7,7 @@ import {
   createPickupSpot,
   updatePickupSpot,
 } from "../../../features/user/api/userApi.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 const PickupSpotModal = ({
   isOpen,
@@ -99,7 +100,9 @@ const PickupSpotModal = ({
       async (pos) => {
         try {
           const res = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&localityLanguage=en`,
+            // Only the locality is needed: send ~100 m precision, never the exact fix.
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.coords.latitude.toFixed(3)}&longitude=${pos.coords.longitude.toFixed(3)}&localityLanguage=en`,
+            { referrerPolicy: "no-referrer", credentials: "omit" },
           );
 
           const data = await res.json();
@@ -158,10 +161,10 @@ const PickupSpotModal = ({
               type="button"
               onClick={handleCurrentLocation}
               disabled={loadingLocation}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#D8DDEA] bg-[#F7F8FA] py-3 text-sm font-semibold text-[#334155] transition-colors hover:border-[#B8B6FF] hover:bg-[#F7F7FF] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#303641] dark:bg-[#20242B] dark:text-[#D7DEE8] dark:hover:border-[#4F46FF]/60 dark:hover:bg-[#252A35] lg:text-[15px]"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#D8DDEA] bg-[#F7F8FA] py-3 text-sm font-semibold text-[#334155] transition-colors hover:border-[#B8B6FF] hover:bg-[#F7F7FF] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#303641] dark:bg-[#20242B] dark:text-[#D7DEE8] dark:hover:border-[#4F46FF]/60 dark:hover:bg-[#252A35] lg:text-[15px]"
             >
               <MapPin size={18} />
-              {loadingLocation ? "Locating..." : "Select Current Location"}
+              <ButtonLoader loading={loadingLocation} loadingText="Locating…">Select Current Location</ButtonLoader>
             </button>
 
             <input
@@ -209,7 +212,7 @@ const PickupSpotModal = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl bg-[#E5E7EB] py-3 text-sm font-semibold text-[#334155] transition-colors hover:bg-[#DDE1E8] dark:bg-[#262B34] dark:text-[#D7DEE8] dark:hover:bg-[#303642]"
+              className="flex-1 rounded-lg bg-[#E5E7EB] py-3 text-sm font-semibold text-[#334155] transition-colors hover:bg-[#DDE1E8] dark:bg-[#262B34] dark:text-[#D7DEE8] dark:hover:bg-[#303642]"
             >
               Cancel
             </button>
@@ -217,9 +220,9 @@ const PickupSpotModal = ({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="flex-1 rounded-xl bg-[#4d4ef2] py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-colors hover:bg-[#3b3be0] disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-blue-950/30"
+              className="flex-1 rounded-lg bg-[#4d4ef2] py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-colors hover:bg-[#3b3be0] disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-blue-950/30"
             >
-              {isSubmitting ? "Saving..." : "Save"}
+              <ButtonLoader loading={isSubmitting} loadingText="Saving…">Save</ButtonLoader>
             </button>
           </div>
         </motion.div>

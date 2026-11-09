@@ -6,6 +6,7 @@ import { useUser } from "../../../context/useUserContext.jsx";
 import { logoutUser } from "../../auth/api/authApi.js";
 import { updateProfile } from "../api/userApi.js";
 import { toast } from "../../../components/ui/toast.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 /**
  * GenderGate — logged-in onboarding takeover (same UI language as CampusGate).
@@ -124,9 +125,9 @@ const GenderGate = memo(function GenderGate() {
           type="button"
           onClick={handleContinue}
           disabled={!selected || saving}
-          className="mt-6 w-full rounded-xl bg-[#3938EC] py-3.5 text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#3938EC]/25 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-6 w-full rounded-lg bg-[#3938EC] py-3.5 text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#3938EC]/25 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Continue"}
+          <ButtonLoader loading={saving} loadingText="Saving…">Continue</ButtonLoader>
         </button>
 
         <div className="mt-4 flex items-center gap-4 text-xs text-[#64748B] dark:text-slate-400">

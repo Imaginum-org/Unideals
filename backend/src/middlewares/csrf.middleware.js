@@ -42,9 +42,19 @@ export const verifyOrigin = (req, res, next) => {
   // bricking every mutation.
   if (allowed.length === 0) return next();
 
-  const ok =
-    (origin && allowed.includes(origin)) ||
-    allowed.some((a) => origin === a || (referer && referer.startsWith(a)));
+  // Compare exact origins. A prefix match on the Referer let
+  // "https://app.example.com.evil.com/..." pass for "https://app.example.com".
+  let refererOrigin = "";
+  if (referer) {
+    try {
+      refererOrigin = normalize(new URL(referer).origin);
+    } catch {
+      refererOrigin = "";
+    }
+  }
+  const ok = origin
+    ? allowed.includes(origin)
+    : Boolean(refererOrigin) && allowed.includes(refererOrigin);
 
   if (!ok) {
     return res.status(403).json({

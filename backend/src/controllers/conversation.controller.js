@@ -25,6 +25,17 @@ export const createConversation = async (req, res, next) => {
 };
 
 // GET /api/conversations?role=all|buying|selling&search=&page=&limit=
+// GET /api/conversations/unread-count — navbar badge (single aggregation).
+export const getUnreadCount = async (req, res, next) => {
+  try {
+    const unreadTotal = await conversationService.getUnreadTotal(req.userId);
+    res.set("Cache-Control", "private, no-store");
+    return res.status(200).json({ success: true, data: { unreadTotal } });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
 export const listConversations = async (req, res, next) => {
   try {
     const { role = "all", search = "", page = "1", limit = "30" } = req.query;

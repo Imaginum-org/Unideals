@@ -1,5 +1,6 @@
 import * as React from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 import "../../../styles/deletestyle.css";
 
 function RelistProductModal({
@@ -60,7 +61,7 @@ function RelistProductModal({
                 disabled={isLoading}
                 className="Button violet dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
               >
-                {isLoading ? "Relisting..." : "Yes, relist product"}
+                <ButtonLoader loading={isLoading} loadingText="Relisting…">Yes, relist product</ButtonLoader>
               </button>
             </AlertDialog.Action>
           </div>

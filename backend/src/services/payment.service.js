@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import Payment from "../models/Payment.model.js";
 import {
   ACTIVE_SUBSCRIPTION_TYPE,
+  getPlanPriceForUser,
   getSubscriptionPlan,
   isPaidPlan,
   PAYMENT_CONFIG,
@@ -83,7 +84,10 @@ const validateAddonTarget = async ({ productId, user }) => {
 
 export const createOrder = async ({ plan, productId, user }) => {
   const { kind, def } = toPaidPlanOrThrow(plan);
-  const amount = def.amountInPaise;
+  // Plans are priced per user (Girls Founder offer); add-ons are flat.
+  // Always server-computed — the client never supplies an amount.
+  const pricing = kind === "plan" ? getPlanPriceForUser(plan, user) : null;
+  const amount = pricing ? pricing.amountInPaise : def.amountInPaise;
 
   if (kind === "plan") {
     // Already on this tier (or higher)? No new order — prevents double purchase.
@@ -114,9 +118,12 @@ export const createOrder = async ({ plan, productId, user }) => {
   }
 
   // Idempotent reuse: return the fresh unpaid order instead of minting another.
+  // Only resume a pending order at the CURRENT price for this user, so an
+  // order created before an offer applied (or expired) is never reused.
   const existing = await Payment.findOne({
     user_id: user._id,
     plan,
+    amount,
     ...(kind === "addon" ? { product_id: productId } : {}),
     status: PAYMENT_STATUS.CREATED,
     createdAt: { $gte: new Date(Date.now() - ORDER_REUSE_WINDOW_MS) },
@@ -147,7 +154,10 @@ export const createOrder = async ({ plan, productId, user }) => {
         plan,
         ...(kind === "addon"
           ? { productId: String(productId), durationHours: String(def.durationHours) }
-          : { subscriptionType: ACTIVE_SUBSCRIPTION_TYPE }),
+          : {
+              subscriptionType: ACTIVE_SUBSCRIPTION_TYPE,
+              ...(pricing?.offer ? { offer: pricing.offer } : {}),
+            }),
       },
     });
   } catch (err) {
@@ -180,6 +190,30 @@ export const createOrder = async ({ plan, productId, user }) => {
     plan,
     ...(kind === "addon" ? { productId: String(productId) } : {}),
     reused: false,
+  };
+};
+
+/**
+ * Viewer-specific plan prices for the pricing page (display only — orders
+ * re-derive the amount server-side in createOrder).
+ */
+export const getPricingForViewer = (user) => {
+  const view = (tier) => {
+    const price = getPlanPriceForUser(tier, user);
+    if (!price) return null;
+    return {
+      amount: price.amountInPaise / 100,
+      baseAmount: price.baseAmountInPaise / 100,
+      offer: price.offer,
+    };
+  };
+  const pro = view(USER_TIER.PRO);
+  const proPlus = view(USER_TIER.PRO_PLUS);
+  return {
+    subscriptionType: ACTIVE_SUBSCRIPTION_TYPE,
+    currency: PAYMENT_CONFIG.currency,
+    offer: pro?.offer || proPlus?.offer || null,
+    plans: { pro, pro_plus: proPlus },
   };
 };
 
@@ -457,20 +491,23 @@ export const handleWebhookEvent = async (event) => {
     return { handled: true };
   }
 
-  // Refund + dispute events: money left the merchant account, so the
-  // entitlement is revoked — payment marked REFUNDED, buyer downgraded to
-  // Free, and live boosts revoked (best-effort, idempotent).
-  // Covered: refund.created, refund.processed (entity may be a refund with
-  // payment_id, or a payment entity), payment.dispute.* (entity carries
-  // payment_id).
-  if (
-    type === "refund.created" ||
-    type === "refund.processed" ||
-    type.startsWith("refund.") ||
-    type.startsWith("payment.dispute.")
-  ) {
+  // Refund + dispute events: revoke ONLY what this payment bought, and only
+  // once the money has actually left the merchant account in full.
+  //  - refund.processed / payment.refunded: full refund completed.
+  //    (refund.created can still fail, and refund.failed means nothing was
+  //    returned; both previously downgraded the buyer.)
+  //  - payment.dispute.lost: chargeback decided against us.
+  //    (dispute.created/under_review can still be won.)
+  //  - Partial refunds keep the entitlement (goodwill credit, not a reversal).
+  //  - A boost add-on refund revokes that listing's boost; it no longer
+  //    downgrades the buyer's subscription plan.
+  //  - A plan refund downgrades only if the buyer is still on that plan
+  //    (refunding an old Pro payment must not strip a later-paid Pro+).
+  const REVOKING_EVENTS = ["refund.processed", "payment.refunded", "payment.dispute.lost"];
+  if (REVOKING_EVENTS.includes(type)) {
     try {
-      const paymentRef = entity.payment_id || entity.id;
+      const paymentRef =
+        type === "payment.refunded" ? entity.id : entity.payment_id || entity.id;
       const orderRef = entity.order_id;
       const query = paymentRef
         ? { razorpay_payment_id: paymentRef }
@@ -483,15 +520,55 @@ export const handleWebhookEvent = async (event) => {
       if (payment.status === PAYMENT_STATUS.REFUNDED) {
         return { handled: true, deduped: true };
       }
-      await Payment.updateOne(
-        { _id: payment._id },
+
+      const refundedAmount =
+        type === "payment.refunded"
+          ? Number(entity.amount_refunded || 0)
+          : type === "refund.processed"
+            ? Number(entity.amount || 0)
+            : Number(payment.amount); // lost dispute = full reversal
+      if (refundedAmount < Number(payment.amount)) {
+        console.warn(
+          `[Billing] partial refund on ${payment.razorpay_order_id} (${refundedAmount}/${payment.amount}) — entitlement kept`,
+        );
+        return { handled: true, partial: true };
+      }
+
+      // Atomic claim so a duplicate delivery can't revoke twice.
+      const claimed = await Payment.findOneAndUpdate(
+        { _id: payment._id, status: { $ne: PAYMENT_STATUS.REFUNDED } },
         { $set: { status: PAYMENT_STATUS.REFUNDED, refunded_at: new Date() } },
+        { new: true },
       );
-      try {
-        const { downgradeToFree } = await import("./subscription.service.js");
-        await downgradeToFree(payment.user_id, `refund:${type}`);
-      } catch (downgradeErr) {
-        console.error("Refund downgrade failed (best-effort):", downgradeErr?.message);
+      if (!claimed) return { handled: true, deduped: true };
+
+      if (isBoostAddon(payment.plan)) {
+        try {
+          const [{ default: Boost }, { default: Product }] = await Promise.all([
+            import("../models/Boost.model.js"),
+            import("../models/Product.model.js"),
+          ]);
+          if (payment.product_id) {
+            await Boost.deleteMany({ product_id: payment.product_id, status: "active" });
+            await Product.updateOne(
+              { _id: payment.product_id },
+              { $set: { is_boosted: false }, $unset: { boost_expires_at: "", boost_tier: "" } },
+            );
+          }
+        } catch (boostErr) {
+          console.error("Refund boost revoke failed (best-effort):", boostErr?.message);
+        }
+      } else {
+        try {
+          const { default: UserModel } = await import("../models/User.model.js");
+          const buyer = await UserModel.findById(payment.user_id).select("subscription").lean();
+          if (buyer?.subscription === payment.plan) {
+            const { downgradeToFree } = await import("./subscription.service.js");
+            await downgradeToFree(payment.user_id, `refund:${type}`);
+          }
+        } catch (downgradeErr) {
+          console.error("Refund downgrade failed (best-effort):", downgradeErr?.message);
+        }
       }
     } catch (refundErr) {
       console.error("Refund webhook handling failed:", refundErr?.message);

@@ -1,5 +1,6 @@
 import express from "express";
 import { createProductSchema } from "../validations/product.validation.js";
+import { priceInsights } from "../controllers/labs.controller.js";
 import { validate } from "../middlewares/validation.middleware.js";
 import auth, { optionalAuth } from "../middlewares/auth.middleware.js";
 import rateLimit from "express-rate-limit";
@@ -11,6 +12,7 @@ import {
   getBoostedProducts,
   getSearchSuggestions,
   getTrendingProducts,
+  recordProductView,
   searchProducts,
   getMyProducts,
   getMyDraftProducts,
@@ -27,7 +29,10 @@ const router = express.Router();
 const createProductLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
-  message: "Too many product listings, please try later",
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  // JSON like every other limiter (a bare string broke client parsing).
+  message: { success: false, message: "Too many product listings, please try later" },
 });
 
 // Feed/detail guards: generous for browsing, bounded against view farming
@@ -49,6 +54,13 @@ const detailLimiter = rateLimit({
 });
 
 // Public aggregation endpoints: generous but bounded (per-keystroke traffic).
+const viewLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const searchLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -65,6 +77,8 @@ router.get("/trending", searchLimiter, optionalAuth, getTrendingProducts);
 
 // User's products (must be before :id)
 router.get("/user/my-products", auth, getMyProducts);
+// Labs (early access): campus price + demand stats for the Sell flow.
+router.get("/price-insights", searchLimiter, auth, priceInsights);
 
 // Draft
 router.get("/user/drafts", auth, getMyDraftProducts);
@@ -88,6 +102,8 @@ router.patch("/:id/sold", auth, markProductSold);
 // partial-update validator (privileged keys are stripped server-side).
 router.patch("/:id", auth, validate(createProductSchema), updateProduct);
 
+// One call per product-page open; dedupe is per viewer per 24h server-side.
+router.post("/:id/view", viewLimiter, optionalAuth, recordProductView);
 router.get("/:id", detailLimiter, optionalAuth, getSingleProduct);
 
 export default router;

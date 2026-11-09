@@ -16,3 +16,10 @@ export const verifyPayment = (data) => {
 export const getBilling = () => {
   return axios.get(`${BILLING_BASE_PATH}/me`);
 };
+
+// GET /api/payments/plans — display prices for the current viewer (guests get
+// list prices; eligible accounts get the Girls Founder offer). The server
+// re-derives the real amount when creating an order.
+export const getPlanPricing = () => {
+  return axios.get(`${BILLING_BASE_PATH}/plans`);
+};

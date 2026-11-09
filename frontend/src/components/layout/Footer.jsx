@@ -36,7 +36,7 @@ const FOOTER_LINKS = [
       { label: "Contact Us", href: "/contact" },
       { label: "Report a Bug", href: "/contact" },
       { label: "Suggest a Feature", href: "/contact" },
-      { label: "FAQ", href: "/contact" },
+      { label: "FAQ", href: "/faq" },
     ],
   },
 ];
@@ -70,7 +70,7 @@ const Footer = () => {
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
           }}
-          className="w-full overflow-hidden rounded-[30px] px-4 pt-4 font-figtree"
+          className="w-full overflow-hidden rounded-[30px] px-5 pt-4 font-figtree sm:px-4"
         >
           <div
             className="rounded-[30px] bg-[#F7F8FA] dark:bg-[#131313] dark:text-white px-6

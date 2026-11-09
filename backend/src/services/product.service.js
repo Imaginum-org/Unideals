@@ -1,5 +1,35 @@
 import Product from "../models/Product.model.js";
 import Campus from "../models/Campus.model.js";
+import ProductView from "../models/ProductView.model.js";
+import { HOT_DEAL } from "../config/hotDeals.js";
+import crypto from "crypto";
+import { createTtlCache, keyOf } from "../utils/ttlCache.js";
+import { FEED_RANK_WEIGHT, SEARCH_RANK_WEIGHT, TRENDING_RANK_WEIGHT, sellerRank } from "../utils/planPerks.js";
+
+// Aggregate results that don't need to be real-time: total counts and price
+// bounds for a given filter. Each feed/search page used to run 2 extra
+// aggregations on every request (including infinite-scroll pages 2, 3, …).
+// A short TTL keeps them fresh enough while cutting those DB calls ~90%.
+const feedMetaCache = createTtlCache({ max: 2000 });
+const COUNT_TTL_MS = 30 * 1000;
+const PRICE_META_TTL_MS = 60 * 1000;
+const cachedCount = (pipeline) =>
+  feedMetaCache.memo(`count:${keyOf(pipeline)}`, COUNT_TTL_MS, async () => {
+    const r = await Product.aggregate([...pipeline, { $count: "total" }]);
+    return r[0]?.total || 0;
+  });
+
+// Seller join: pull only the 3 public fields instead of the whole user
+// document (wishlist, gamification, tokens…) for every card.
+const sellerLookup = {
+  $lookup: {
+    from: "users",
+    localField: "seller_id",
+    foreignField: "_id",
+    as: "seller",
+    pipeline: [{ $project: { name: 1, avatar: 1, subscription: 1 } }],
+  },
+};
 import Conversation from "../models/conversation.model.js";
 import Deal from "../models/deal.model.js";
 import mongoose from "mongoose";
@@ -8,9 +38,10 @@ import {
   PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
   GIRLS_ONLY_CATEGORIES,
+  PRODUCT_CONDITION,
 } from "../config/constants.js";
 import { getListingLimit } from "../config/subscriptionPlans.js";
-import { deleteImage } from "../utils/imagekit.js";
+import { deleteImageSafely } from "../utils/imagekit.js";
 import { notifyPriceDrop } from "./notification.service.js";
 import {
   isEligibleGender,
@@ -20,6 +51,52 @@ import {
   girlsCornerError,
   GIRLS_ERRORS,
 } from "../utils/girlsCorner.js";
+
+// ── Shared browse facets (feed + search) ─────────────────────────────
+// condition: one or more whitelisted values ("like_new,gently_used").
+// posted_within: "1" | "7" | "30" days; the cutoff is floored to the
+// minute so identical requests share a cache key (feedMetaCache).
+// negotiable: "true" → only listings open to offers.
+const VALID_CONDITIONS = new Set(Object.values(PRODUCT_CONDITION));
+const POSTED_WITHIN_DAYS = { 1: 1, 7: 7, 30: 30 };
+
+const applyFacetFilters = (match, { condition, posted_within, negotiable } = {}) => {
+  const conds = [
+    ...new Set(
+      String(condition || "")
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => VALID_CONDITIONS.has(c)),
+    ),
+  ];
+  if (conds.length === 1) match.condition = conds[0];
+  else if (conds.length > 1) match.condition = { $in: conds };
+
+  const days = POSTED_WITHIN_DAYS[String(posted_within || "")];
+  if (days) {
+    const minute = 60 * 1000;
+    match.createdAt = { $gte: new Date(Math.floor((Date.now() - days * 864e5) / minute) * minute) };
+  }
+
+  if (negotiable === true || negotiable === "true") match.is_negotiable = true;
+};
+
+// Price range from query strings. Swaps a reversed range instead of
+// returning nothing; ignores non-numbers / negatives.
+const buildPriceRange = (min_price, max_price) => {
+  const num = (v) => {
+    if (v === undefined || v === null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  let lo = num(min_price);
+  let hi = num(max_price);
+  if (lo != null && hi != null && lo > hi) [lo, hi] = [hi, lo];
+  const range = {};
+  if (lo != null) range.$gte = lo;
+  if (hi != null) range.$lte = hi;
+  return Object.keys(range).length ? range : null;
+};
 
 const campusError = (statusCode, message, code) => {
   const error = new Error(message);
@@ -336,6 +413,7 @@ export const createProduct = async (data, user) => {
     delete data.terms_accepted_at;
   }
 
+  data.seller_tier = sellerRank(user?.subscription);
   const created = await Product.create(data);
 
   // Atomic post-check (race guard, same pattern as boost): a parallel
@@ -385,14 +463,20 @@ export const getBoostedProducts = async (campusId, viewerGender = null, viewerRo
     filter.category = { $nin: [...GIRLS_ONLY_CATEGORIES] };
   }
 
-  return await Product.find(filter)
-    .sort({ boost_expires_at: -1 })
-    .limit(10)
-    .select(
-      "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier isGirlsOnly",
-    )
-    .populate("seller_id", "name avatar subscription role")
-    .lean();
+  // Boosted rail renders on every Home view: share one query per campus +
+  // audience for 30s. The key omits `now` on purpose (it changes every ms);
+  // the same filter is re-evaluated on each refresh.
+  const cacheKey = `boosted:${keyOf({ ...filter, boost_expires_at: null })}`;
+  return feedMetaCache.memo(cacheKey, 30 * 1000, () =>
+    Product.find(filter)
+      .sort({ boost_expires_at: -1 })
+      .limit(10)
+      .select(
+        "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier isGirlsOnly hot_until status slug",
+      )
+      .populate("seller_id", "name avatar subscription role")
+      .lean(),
+  );
 };
 
 export const getAllProducts = async (query, campusId, viewerGender = null, viewerRole = null) => {
@@ -406,6 +490,8 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     max_price,
     sort = "recommended",
     audience,
+    posted_within,
+    negotiable,
   } = query;
 
   // Clamp pagination to prevent DoS via huge limit / negative skip
@@ -451,32 +537,20 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     }
   }
 
-  if (typeof condition === "string" && condition) {
-    baseMatch.condition = condition;
-  }
+  applyFacetFilters(baseMatch, { condition, posted_within, negotiable });
 
-  if (min_price !== undefined || max_price !== undefined) {
-    baseMatch.selling_price = {};
-
-    if (min_price !== undefined && min_price !== "") {
-      const minNum = Number(min_price);
-      if (Number.isFinite(minNum)) baseMatch.selling_price.$gte = minNum;
-    }
-
-    if (max_price !== undefined && max_price !== "") {
-      const maxNum = Number(max_price);
-      if (Number.isFinite(maxNum)) baseMatch.selling_price.$lte = maxNum;
-    }
-    if (Object.keys(baseMatch.selling_price).length === 0) {
-      delete baseMatch.selling_price;
-    }
-  }
+  // Price bounds are computed over every filter EXCEPT price, so the
+  // slider keeps the full campus range while a price is selected (it used
+  // to collapse to the chosen range and could never be widened again).
+  const priceBoundsMatch = { ...baseMatch };
+  const priceRange = buildPriceRange(min_price, max_price);
+  if (priceRange) baseMatch.selling_price = priceRange;
 
   const pipeline = [{ $match: baseMatch }];
 
   const priceMetaPipeline = [
     {
-      $match: baseMatch,
+      $match: priceBoundsMatch,
     },
   ];
 
@@ -554,6 +628,8 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
             { $multiply: ["$recencyScore", 30] },
             { $multiply: ["$popularityScore", 10] },
             "$trendingScore",
+            // Plan perk: "Search ranking" Normal / Higher / Highest.
+            { $multiply: [{ $ifNull: ["$seller_tier", 0] }, FEED_RANK_WEIGHT] },
           ],
         },
       },
@@ -594,14 +670,7 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
 
   // JOIN SELLER
   pipeline.push(
-    {
-      $lookup: {
-        from: "users",
-        localField: "seller_id",
-        foreignField: "_id",
-        as: "seller",
-      },
-    },
+    sellerLookup,
     {
       $unwind: {
         path: "$seller",
@@ -610,8 +679,9 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     },
     {
       $project: {
+        // description intentionally omitted: cards never render it and it is
+        // the largest field on a listing (detail page fetches it).
         title: 1,
-        description: 1,
         images: 1,
         selling_price: 1,
         original_price: 1,
@@ -622,6 +692,9 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
         is_boosted: 1,
         boost_expires_at: 1,
         boost_tier: 1,
+        hot_until: 1,
+        status: 1,
+        slug: 1,
         score: 1,
         isGirlsOnly: 1,
 
@@ -648,13 +721,13 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     },
   });
 
-  const [products, totalResult, priceMeta] = await Promise.all([
+  const [products, total, priceMeta] = await Promise.all([
     Product.aggregate(pipeline),
-    Product.aggregate([...totalPipeline, { $count: "total" }]),
-    Product.aggregate(priceMetaPipeline),
+    cachedCount(totalPipeline),
+    feedMetaCache.memo(`price:${keyOf(priceMetaPipeline)}`, PRICE_META_TTL_MS, () =>
+      Product.aggregate(priceMetaPipeline),
+    ),
   ]);
-
-  const total = totalResult[0]?.total || 0;
 
   const filterMeta = {
     price: {
@@ -677,30 +750,123 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
   };
 };
 
-// View anti-farm: at most 1 counted view per product per IP per 10 min.
-// In-memory Map (single-process best-effort; a restart only resets the
-// cooldown, never corrupts counts). Bounded to avoid memory growth.
-const viewCooldown = new Map();
-const VIEW_COOLDOWN_MS = 10 * 60 * 1000;
+const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
+// slugify(strict) output + "-" + nanoid(6), lowercased by the schema.
+const SLUG_RE = /^[a-z0-9_-]{3,160}$/i;
 
-const shouldCountView = (productId, clientIp) => {
-  if (!clientIp) return true;
-  const key = `${String(productId)}:${String(clientIp)}`;
-  const now = Date.now();
-  const last = viewCooldown.get(key);
-  if (last && now - last < VIEW_COOLDOWN_MS) return false;
-  viewCooldown.set(key, now);
-  if (viewCooldown.size > 5000) {
-    for (const [k, at] of viewCooldown) {
-      if (now - at >= VIEW_COOLDOWN_MS) viewCooldown.delete(k);
-      if (viewCooldown.size <= 4000) break;
-    }
-  }
-  return true;
+/* ── Views + Hot deal ──────────────────────────────────────────────────
+ * A view = one unique person opening the product page, at most once per
+ * 24h. Identity, best first: logged-in user id → anonymous visitor cookie
+ * → hashed IP+user-agent (a whole campus often shares ONE Wi-Fi IP, so IP
+ * alone would merge hundreds of students into one viewer). Dedupe lives in
+ * MongoDB (ProductView unique index + 24h TTL): survives restarts and works
+ * across instances, unlike the old in-memory 10-minute IP map.
+ */
+const BOT_UA =
+  /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|discord|embedly|headless|lighthouse|pingdom|curl|wget|python-requests|axios\/|node-fetch|postman/i;
+
+const viewerKeyFor = ({ userId, visitorId, ip, userAgent }) => {
+  if (userId) return `u:${String(userId)}`;
+  if (visitorId && /^[A-Za-z0-9_-]{16,64}$/.test(visitorId)) return `v:${visitorId}`;
+  if (!ip) return null;
+  const hash = crypto.createHash("sha256").update(`${ip}|${userAgent || ""}`).digest("base64url").slice(0, 32);
+  return `ip:${hash}`;
 };
 
-export const getSingleProduct = async (id, campusId, requesterId = null, clientIp = null, viewerGender = null, viewerRole = null) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Grant the hot-deal tag once, if the listing is young, has enough unique
+ * viewers and the campus has a free slot. Atomic on hot_until so two
+ * concurrent views can't double-grant. Best-effort: never throws.
+ */
+const maybeMarkHot = async (product, viewsCount) => {
+  try {
+    if (product.hot_until) return null; // earned once, never re-granted
+    const ageMs = Date.now() - new Date(product.createdAt).getTime();
+    if (ageMs > HOT_DEAL.QUALIFY_WINDOW_HOURS * HOUR_MS) return null;
+    if (viewsCount < HOT_DEAL.MIN_UNIQUE_VIEWS) return null;
+
+    const now = new Date();
+    const activeHot = await Product.countDocuments({
+      campus_id: product.campus_id,
+      hot_until: { $gt: now },
+      status: PRODUCT_STATUS.LISTED,
+      is_deleted: false,
+    });
+    if (activeHot >= HOT_DEAL.MAX_PER_CAMPUS) return null;
+
+    const hotUntil = new Date(now.getTime() + HOT_DEAL.DURATION_HOURS * HOUR_MS);
+    const res = await Product.updateOne(
+      { _id: product._id, hot_until: { $exists: false } },
+      { $set: { hot_until: hotUntil } },
+    );
+    return res.modifiedCount ? hotUntil : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Record one product-page view. Returns { counted, views_count, hot_until }.
+ * Never counts: the owner, bots, hidden/unlisted listings, other campuses,
+ * girls-only listings for ineligible viewers, or a repeat within 24h.
+ */
+export const recordProductView = async (
+  id,
+  campusId,
+  { userId = null, visitorId = null, ip = null, userAgent = "", viewerGender = null, viewerRole = null } = {},
+) => {
+  if (!OBJECT_ID_RE.test(String(id || ""))) throw new Error("Product not found");
+  const viewerCampusId = requireCampusId(campusId);
+
+  const product = await Product.findOne({ _id: id })
+    .select("seller_id campus_id status is_deleted isGirlsOnly createdAt views_count hot_until")
+    .lean();
+  if (!product || String(product.campus_id) !== String(viewerCampusId)) {
+    throw new Error("Product not found");
+  }
+
+  const unchanged = { counted: false, views_count: product.views_count || 0, hot_until: product.hot_until || null };
+  const isOwner = userId && String(product.seller_id) === String(userId);
+  if (
+    isOwner ||
+    product.is_deleted ||
+    product.status !== PRODUCT_STATUS.LISTED ||
+    (product.isGirlsOnly && !canSeeGirlsProduct(viewerGender, viewerRole)) ||
+    BOT_UA.test(String(userAgent || ""))
+  ) {
+    return unchanged;
+  }
+
+  const viewerKey = viewerKeyFor({ userId, visitorId, ip, userAgent });
+  if (!viewerKey) return unchanged;
+
+  try {
+    await ProductView.create({ product_id: product._id, viewer_key: viewerKey });
+  } catch (err) {
+    if (err?.code === 11000) return unchanged; // already viewed in the last 24h
+    throw err;
+  }
+
+  const updated = await Product.findOneAndUpdate(
+    { _id: product._id },
+    { $inc: { views_count: 1 } },
+    { returnDocument: "after", projection: { views_count: 1 } },
+  ).lean();
+  const viewsCount = updated?.views_count ?? (product.views_count || 0) + 1;
+  const hotUntil = product.hot_until || (await maybeMarkHot(product, viewsCount));
+
+  return { counted: true, views_count: viewsCount, hot_until: hotUntil || null };
+};
+
+export const getSingleProduct = async (id, campusId, requesterId = null, clientIp = null, viewerGender = null, viewerRole = null, { forEdit = false } = {}) => {
+  // Public URLs use the listing slug (/product/casio-fx-991-a1b2c3); old
+  // links with the raw ObjectId keep working. isValid() alone is not used:
+  // it accepts ANY 12-character string as an ObjectId.
+  const ref = String(id || "").trim();
+  const byId = OBJECT_ID_RE.test(ref);
+  if (!byId && !SLUG_RE.test(ref)) {
     throw new Error("Product not found");
   }
   const viewerCampusId = requireCampusId(campusId);
@@ -708,8 +874,13 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
   // Read first so cross-campus views never increment views_count.
   // Soft-deleted docs are fetched too, gated below so sellers and deal
   // participants keep their history while everyone else gets a 404.
-  const product = await Product.findOne({ _id: id })
-    .populate("seller_id", "name avatar subscription role")
+  const product = await Product.findOne(byId ? { _id: ref } : { slug: ref.toLowerCase() })
+    // Public seller trust signals for the product page seller card:
+    // member since, verified email, level/rank. Nothing private.
+    .populate(
+      "seller_id",
+      "name avatar subscription role createdAt is_email_verified gamification.level gamification.rank_title",
+    )
     .populate("campus_id", "slug name short_name")
     .lean();
 
@@ -736,16 +907,15 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
   if (product.isGirlsOnly && !isOwnerEarly && !canSeeGirlsProduct(viewerGender, viewerRole)) {
     throw campusError(404, "Product not found", "PRODUCT_NOT_FOUND");
   }
-
-  // Anti-farm: the seller's own views never count, and each IP counts at
-  // most once per product per 10 minutes. Hidden (deleted) listings never
-  // count views at all.
-  const sellerIdStr = String(product.seller_id?._id || product.seller_id || "");
-  const isOwnerView = !!requesterId && sellerIdStr && String(requesterId) === sellerIdStr;
-  if (!product.is_deleted && !isOwnerView && shouldCountView(id, clientIp)) {
-    await Product.updateOne({ _id: id }, { $inc: { views_count: 1 } });
-    product.views_count = (product.views_count || 0) + 1;
+  // Drafts are private to their seller (same 404 as a missing listing).
+  if (product.status === PRODUCT_STATUS.DRAFT && !isOwnerEarly) {
+    throw campusError(404, "Product not found", "PRODUCT_NOT_FOUND");
   }
+
+  // Views are NOT counted here: this GET also serves hover prefetch, the
+  // owner's edit screen and order cards. The product page records a view
+  // explicitly via recordProductView (POST /:id/view).
+  const sellerIdStr = String(product.seller_id?._id || product.seller_id || "");
 
   // Pickup snapshot carries seller mobile/pincode, visible to the owner
   // only. Buyers keep the public meetup fields (spot name/city).
@@ -766,7 +936,7 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
     const isParty =
       !!req &&
       (await Conversation.exists({
-        product_id: id,
+        product_id: product._id,
         $or: [{ buyer_id: requesterId }, { seller_id: requesterId }],
       }));
     if (!isSeller && !isParty) {
@@ -779,7 +949,27 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
   // Live reservation flag, same Deal statuses the chat treats as reserved.
   // Drives the product page CTA (Reserved vs Chat with Seller) so it can
   // never disagree with chat/orders. Cancelling the deal clears it.
-  product.reservation = await getProductReservation(id);
+  // Owner loading the edit form (or any draft): reservation and seller
+  // stats are buyer-page extras; skip both queries.
+  if (isOwnerEarly && (forEdit || product.status === PRODUCT_STATUS.DRAFT)) {
+    product.reservation = { reserved: false, buyerId: null };
+    return product;
+  }
+
+  const [reservation, activeListings] = await Promise.all([
+    getProductReservation(product._id),
+    // Seller card "N active listings" (seller_id index; best-effort).
+    sellerId
+      ? Product.countDocuments({
+          seller_id: sellerId,
+          campus_id: viewerCampusId,
+          is_deleted: false,
+          status: PRODUCT_STATUS.LISTED,
+        }).catch(() => null)
+      : null,
+  ]);
+  product.reservation = reservation;
+  product.seller_stats = { active_listings: activeListings };
 
   return product;
 };
@@ -938,6 +1128,8 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
     min_price,
     max_price,
     audience,
+    posted_within,
+    negotiable,
   } = options;
   let { page = 1, limit = 20 } = options;
 
@@ -964,7 +1156,9 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
   const rawTokens = sanitizedQuery.split(/\s+/).slice(0, 5);
   const tokens = rawTokens.map(escapeRegex);
   const typoVariants = [
-    ...new Set(tokens.flatMap(transpositionVariants)),
+    // Raw tokens: transpositionVariants escapes its own output (passing the
+    // already-escaped tokens double-escaped them, e.g. "c++" never matched).
+    ...new Set(rawTokens.flatMap(transpositionVariants)),
   ].slice(0, 12);
   // Similar-meaning + stemming expansion for the fallback matcher.
   const synonymClauses = synonymVariants(rawTokens);
@@ -996,21 +1190,10 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
       baseMatch.category = category;
     }
   }
-  if (typeof condition === "string" && condition) {
-    baseMatch.condition = condition;
-  }
-  const priceRange = {};
-  if (min_price !== undefined && min_price !== "") {
-    const minNum = Number(min_price);
-    if (Number.isFinite(minNum)) priceRange.$gte = minNum;
-  }
-  if (max_price !== undefined && max_price !== "") {
-    const maxNum = Number(max_price);
-    if (Number.isFinite(maxNum)) priceRange.$lte = maxNum;
-  }
-  if (Object.keys(priceRange).length > 0) {
-    baseMatch.selling_price = priceRange;
-  }
+  applyFacetFilters(baseMatch, { condition, posted_within, negotiable });
+  // Price is applied after candidate scoping so the price bounds (below)
+  // can be computed over the same result set without the price filter.
+  const priceRange = buildPriceRange(min_price, max_price);
 
   // Speed: indexed $text first pass scopes candidates (stemming included).
   // Falls back to the full set when $text finds nothing (typos live there).
@@ -1031,6 +1214,8 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
       // Malformed $text input or missing index: full regex scan below.
     }
   }
+  const boundsScope = matchScope;
+  if (priceRange) matchScope = { ...matchScope, selling_price: priceRange };
 
   const relevanceAdds = [
     {
@@ -1145,7 +1330,12 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
     {
       $addFields: {
         finalScore: {
-          $add: ["$relevanceScore", { $multiply: ["$recencyScore", 30] }],
+          $add: [
+            "$relevanceScore",
+            { $multiply: ["$recencyScore", 30] },
+            // Plan perk: higher plans win ties between equally relevant results.
+            { $multiply: [{ $ifNull: ["$seller_tier", 0] }, SEARCH_RANK_WEIGHT] },
+          ],
         },
       },
     },
@@ -1175,17 +1365,30 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
         createdAt: 1,
         is_boosted: 1,
         boost_tier: 1,
+        hot_until: 1,
+        status: 1,
+        slug: 1,
       },
     },
   );
 
   // Total from match stages only (same pattern as the feed).
   const totalPipeline = pipeline.filter((stage) => stage.$match);
-  const [products, totalResult] = await Promise.all([
+  // Price bounds: same query + facets, minus the price filter (so the
+  // slider always spans the real range of matching listings).
+  const textMatch = pipeline[1]?.$match ? [pipeline[1]] : [];
+  const boundsPipeline = [
+    { $match: boundsScope },
+    ...textMatch,
+    { $group: { _id: null, minPrice: { $min: "$selling_price" }, maxPrice: { $max: "$selling_price" } } },
+  ];
+  const [products, total, priceMeta] = await Promise.all([
     Product.aggregate(pipeline),
-    Product.aggregate([...totalPipeline, { $count: "total" }]),
+    cachedCount(totalPipeline),
+    feedMetaCache.memo(`sprice:${keyOf(boundsPipeline)}`, PRICE_META_TTL_MS, () =>
+      Product.aggregate(boundsPipeline),
+    ),
   ]);
-  const total = totalResult[0]?.total || 0;
 
   return {
     products,
@@ -1195,14 +1398,17 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
     },
+    filterMeta: {
+      price: { min: priceMeta[0]?.minPrice ?? 0, max: priceMeta[0]?.maxPrice ?? 0 },
+    },
     matchedCategories,
   };
 };
 
-// Trending searches fallback: most-viewed live listings, cached 10 minutes
+// Trending searches fallback: views + freshness + plan rank, cached 5 minutes
 // per campus (a global cache would leak one campus's trends into another's).
 const trendingCache = new Map();
-const TRENDING_TTL_MS = 10 * 60 * 1000;
+const TRENDING_TTL_MS = 5 * 60 * 1000;
 
 export const getTrendingProducts = async (limit = 8, campusId, viewerGender = null, viewerRole = null) => {
   const campusObjectId = requireCampusId(campusId);
@@ -1223,11 +1429,51 @@ export const getTrendingProducts = async (limit = 8, campusId, viewerGender = nu
     // Girls-only categories never trend outside Girls Mode.
     filter.category = { $nin: [...GIRLS_ONLY_CATEGORIES] };
   }
-  const products = await Product.find(filter)
-    .select("title images selling_price category views_count")
-    .sort({ views_count: -1, createdAt: -1 })
-    .limit(8)
-    .lean();
+  // Trending = popularity that fades with age, plus the plan perk, so the
+  // list keeps moving as new listings pick up views instead of freezing on
+  // the all-time most-viewed. Candidates: the 100 most-viewed live listings.
+  const nowDate = new Date(now);
+  const products = await Product.aggregate([
+    { $match: filter },
+    { $sort: { views_count: -1, createdAt: -1 } },
+    { $limit: 100 },
+    {
+      $addFields: {
+        _ageDays: {
+          $divide: [{ $subtract: [nowDate, "$createdAt"] }, 1000 * 60 * 60 * 24],
+        },
+      },
+    },
+    {
+      $addFields: {
+        _trendScore: {
+          $add: [
+            // views: 10 → 10, 100 → 20, 1000 → 30
+            { $multiply: [{ $log10: { $add: [{ $ifNull: ["$views_count", 0] }, 1] } }, 10] },
+            // freshness: today ≈ 20, 1 day old = 10, a week old ≈ 2.5
+            { $divide: [20, { $add: [{ $max: ["$_ageDays", 0] }, 1] }] },
+            // Plan perk: Pro / Pro+ listings rank higher in trending too.
+            { $multiply: [{ $ifNull: ["$seller_tier", 0] }, TRENDING_RANK_WEIGHT] },
+          ],
+        },
+      },
+    },
+    { $sort: { _trendScore: -1, createdAt: -1 } },
+    { $limit: 8 },
+    {
+      $project: {
+        title: 1,
+        images: 1,
+        selling_price: 1,
+        category: 1,
+        views_count: 1,
+        is_boosted: 1,
+        hot_until: 1,
+        status: 1,
+        slug: 1,
+      },
+    },
+  ]);
   trendingCache.set(cacheKey, { data: products, at: now });
   // Bound memory: campuses are few, but never grow unbounded.
   if (trendingCache.size > 100) trendingCache.clear();
@@ -1235,11 +1481,20 @@ export const getTrendingProducts = async (limit = 8, campusId, viewerGender = nu
 };
 
 // GET USER PRODUCTS
+// Seller's own listings (My listings, profile, plan checks). Card fields
+// only + the cover photo: descriptions, pickup snapshots (with phone) and
+// extra photos stay in the DB until a single listing is opened. Served by
+// the { seller_id, ... } index.
+const MY_PRODUCT_CARD_FIELDS =
+  "title slug status category selling_price original_price views_count createdAt updatedAt " +
+  "attributes.color attributes.usage_duration is_boosted boost_expires_at boost_tier isGirlsOnly";
+
 export const getUserProducts = async (userId) => {
-  return await Product.find({
-    seller_id: userId,
-    is_deleted: false,
-  })
+  return await Product.find(
+    { seller_id: userId, is_deleted: false },
+    { images: { $slice: 1 } },
+  )
+    .select(MY_PRODUCT_CARD_FIELDS)
     .sort({ createdAt: -1 })
     .lean();
 };
@@ -1264,7 +1519,12 @@ export const deleteProduct = async (productId, userId) => {  const product = awa
   await Promise.allSettled(
     product.images
       .filter((image) => image.fileId)
-      .map((image) => deleteImage(image.fileId)),
+      .map((image) =>
+        deleteImageSafely(image.fileId, {
+          ownerId: userId,
+          excludeProductId: product._id,
+        }),
+      ),
   );
 
   // Soft delete product + revoke any live boost exposure.
@@ -1272,6 +1532,7 @@ export const deleteProduct = async (productId, userId) => {  const product = awa
   product.is_boosted = false;
   product.boost_expires_at = undefined;
   product.boost_tier = undefined;
+  product.hot_until = undefined; // tag ends with the listing's live run
   const saved = await product.save();
   await revokeBoostsForProduct(product._id);
   return saved;
@@ -1292,6 +1553,9 @@ export const updateProduct = async (productId, userId, data = {}) => {
   delete data.slug;
   delete data.location;
   delete data.campus_id;
+  // The only client-driven status change is publishing a draft
+  // (draft → listed). Every other transition has its own endpoint.
+  const wantsPublish = data.status === PRODUCT_STATUS.LISTED;
   delete data.status;
 
   const product = await Product.findOne({
@@ -1303,6 +1567,7 @@ export const updateProduct = async (productId, userId, data = {}) => {
   if (!product) {
     throw new Error("Product not found or you don't have permission to edit it");
   }
+  const publishing = wantsPublish && product.status === PRODUCT_STATUS.DRAFT;
 
   const ALLOWED = new Set([
     "title",
@@ -1400,8 +1665,76 @@ export const updateProduct = async (productId, userId, data = {}) => {
 
   const oldSellingPrice = Number(product.selling_price);
   Object.assign(product, updates);
+
+  // Publish a draft: same gates as creating a live listing (photos, plan
+  // cap, 24h duplicate guard). Required-field validation comes free: the
+  // schema's `required` rules switch on once status !== draft. Still ONE
+  // write: status + fresh createdAt go out with the edits in this save(),
+  // so a draft saved last week publishes as new (feed recency, "Listed
+  // just now", Hot deal window).
+  let publisher = null;
+  if (publishing) {
+    if (!product.images || product.images.length === 0) {
+      throw campusError(400, "Add at least one photo before publishing.", "IMAGES_REQUIRED");
+    }
+    const { default: UserModel } = await import("../models/User.model.js");
+    publisher = await UserModel.findById(userId).select("subscription").lean();
+    const listingLimit = getListingLimit(publisher?.subscription);
+    const titleRe = `^${escapeRegex(String(product.title || "").trim())}$`;
+    const price = Number(product.selling_price);
+    const [activeCount, duplicate] = await Promise.all([
+      typeof listingLimit === "number"
+        ? Product.countDocuments({ seller_id: userId, status: PRODUCT_STATUS.LISTED, is_deleted: false })
+        : 0,
+      Product.exists({
+        _id: { $ne: product._id },
+        seller_id: userId,
+        status: PRODUCT_STATUS.LISTED,
+        category: product.category,
+        title: { $regex: titleRe, $options: "i" },
+        selling_price: { $gte: price * 0.9, $lte: price * 1.1 },
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        is_deleted: false,
+      }),
+    ]);
+    if (typeof listingLimit === "number" && activeCount >= listingLimit) {
+      throw campusError(
+        403,
+        `Listing limit reached (${listingLimit} active listings on your plan). Upgrade to list more.`,
+        "LISTING_LIMIT",
+      );
+    }
+    if (duplicate) {
+      throw campusError(400, "You already listed a similar product recently.", "DUPLICATE_LISTING");
+    }
+    product.status = PRODUCT_STATUS.LISTED;
+    product.seller_tier = sellerRank(publisher?.subscription);
+    product.set("createdAt", new Date(), { overwriteImmutable: true });
+  }
+
   try {
     const saved = await product.save();
+    // Race guard (same as createProduct): a parallel publish may have taken
+    // the last plan slot between the pre-check and this save. Rare, and the
+    // extra count only runs for capped plans.
+    if (publishing) {
+      const listingLimit = getListingLimit(publisher?.subscription);
+      if (typeof listingLimit === "number") {
+        const activeCount = await Product.countDocuments({
+          seller_id: userId,
+          status: PRODUCT_STATUS.LISTED,
+          is_deleted: false,
+        });
+        if (activeCount > listingLimit) {
+          await Product.updateOne({ _id: saved._id }, { $set: { status: PRODUCT_STATUS.DRAFT } });
+          throw campusError(
+            403,
+            `Listing limit reached (${listingLimit} active listings on your plan). Upgrade to list more.`,
+            "LISTING_LIMIT",
+          );
+        }
+      }
+    }
     // Fire price-drop wishlist alerts when price genuinely drops — fire-and-forget
     const newSellingPrice = Number(saved.selling_price);
     if (
@@ -1453,6 +1786,7 @@ export const markProductSold = async (productId, userId) => {
   product.is_boosted = false;
   product.boost_expires_at = undefined;
   product.boost_tier = undefined;
+  product.hot_until = undefined; // tag ends with the listing's live run
   const saved = await product.save();
   await revokeBoostsForProduct(product._id);
   return saved;
@@ -1481,6 +1815,7 @@ export const unlistProduct = async (productId, userId) => {
   product.is_boosted = false;
   product.boost_expires_at = undefined;
   product.boost_tier = undefined;
+  product.hot_until = undefined; // tag ends with the listing's live run
   const saved = await product.save();
   await revokeBoostsForProduct(product._id);
   return saved;

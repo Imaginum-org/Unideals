@@ -1,10 +1,12 @@
 import * as productService from "../services/product.service.js";
 import { resolveRequestCampus } from "../services/campus.service.js";
-import { deleteImage } from "../utils/imagekit.js";
+import { deleteImageSafely } from "../utils/imagekit.js";
 import { forwardServiceError } from "../utils/response.js";
 import Product from "../models/Product.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
 import { computeAndAwardBadges } from "../services/badgeService.js";
+import { getAuthCookieOptions } from "../services/auth.service.js";
+import crypto from "crypto";
 
 // CREATE PRODUCT
 export const createProduct = async (req, res) => {
@@ -53,7 +55,11 @@ export const createProduct = async (req, res) => {
   } catch (error) {
     // Cleanup uploaded images if product fails (best-effort, never fails request)
     if (fileIds.length > 0) {
-      await Promise.allSettled(fileIds.map((id) => deleteImage(id)));
+      // Ownership-checked: a failed create must never purge files that
+      // belong to someone else (fileIds come straight from the request).
+      await Promise.allSettled(
+        fileIds.map((id) => deleteImageSafely(id, { ownerId: req.user?._id })),
+      );
     }
 
     const clientErrors = [
@@ -120,21 +126,47 @@ export const getAllProducts = async (req, res, next) => {
 };
 
 // GET SINGLE PRODUCT
+// POST /api/product/:id/view, called once by the product page on open.
+// Anonymous visitors get a long-lived random id cookie so students behind
+// one campus Wi-Fi IP still count as different people.
+const VISITOR_COOKIE = "ud_vid";
+const VISITOR_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
+
+export const recordProductView = async (req, res, next) => {
+  try {
+    const campus = await resolveRequestCampus(req);
+    let visitorId = req.cookies?.[VISITOR_COOKIE] || null;
+    if (!req.userId && !visitorId) {
+      visitorId = crypto.randomBytes(18).toString("base64url");
+      res.cookie(VISITOR_COOKIE, visitorId, { ...getAuthCookieOptions(), maxAge: VISITOR_MAX_AGE });
+    }
+    const result = await productService.recordProductView(req.params.id, campus._id, {
+      userId: req.userId || null,
+      visitorId,
+      ip: req.ip || null,
+      userAgent: req.get("user-agent") || "",
+      viewerGender: req.user?.gender ?? null,
+      viewerRole: req.user?.role ?? null,
+    });
+    res.set("Cache-Control", "no-store");
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
 export const getSingleProduct = async (req, res, next) => {
   try {
     const campus = await resolveRequestCampus(req);
-    const clientIp =
-      req.ip ||
-      (typeof req.headers?.["x-forwarded-for"] === "string"
-        ? req.headers["x-forwarded-for"].split(",")[0].trim()
-        : null);
     const product = await productService.getSingleProduct(
       req.params.id,
       campus._id,
       req.userId || null,
-      clientIp || null,
+      null, // views are recorded by POST /:id/view, not this GET
       req.user?.gender ?? null,
       req.user?.role ?? null,
+      // ?view=edit: the owner's edit form skips buyer-page extras.
+      { forEdit: req.query?.view === "edit" },
     );
 
     // Owner sees extra snapshot fields — never share across users.
@@ -208,6 +240,8 @@ export const searchProducts = async (req, res, next) => {
       min_price,
       max_price,
       audience,
+      posted_within,
+      negotiable,
     } = req.query;
 
     if (!q || String(q).trim().length === 0) {
@@ -229,6 +263,8 @@ export const searchProducts = async (req, res, next) => {
         min_price,
         max_price,
         audience,
+        posted_within,
+        negotiable,
       },
       (await resolveRequestCampus(req))._id,
       req.user?.gender ?? null,

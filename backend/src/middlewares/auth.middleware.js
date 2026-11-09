@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
+import { loadAuthUser } from "../utils/userCache.js";
 import { USER_STATUS } from "../config/constants.js";
 
 const auth = async (req, res, next) => {
@@ -25,9 +26,7 @@ const auth = async (req, res, next) => {
       algorithms: ["HS256"],
     });
 
-    const user = await User.findById(decoded.id)
-      .select("-password -refresh_token")
-      .lean();
+    const user = await loadAuthUser(User, decoded.id);
 
     if (!user) {
       return res.status(401).json({
@@ -115,9 +114,7 @@ export const optionalAuth = async (req, res, next) => {
       algorithms: ["HS256"],
     });
 
-    const user = await User.findById(decoded.id)
-      .select("-password -refresh_token")
-      .lean();
+    const user = await loadAuthUser(User, decoded.id);
 
     if (!user) return next();
 

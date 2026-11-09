@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { customAlphabet } from "nanoid";
 import PhotoHandoff from "../models/PhotoHandoff.model.js";
-import { uploadImageBuffer } from "../utils/imagekit.js";
+import { uploadImageBuffer, userUploadFolder } from "../utils/imagekit.js";
 
 const HANDOFF_TTL_MS = 15 * 60 * 1000;
 const MAX_HANDOFF_IMAGES = 3;
@@ -140,7 +140,13 @@ export const addHandoffPhotos = async ({ code, secret, files }) => {
     const safeName = String(file.originalname || "photo.jpg")
       .replace(/[^a-zA-Z0-9._-]/g, "_")
       .slice(0, 100);
-    return uploadImageBuffer(file.buffer, `${Date.now()}_${safeName}`);
+    // Upload into the owner's folder so ownership checks (delete endpoint,
+    // avatar/product cleanup) recognise these files as theirs.
+    return uploadImageBuffer(
+      file.buffer,
+      `${Date.now()}_${safeName}`,
+      userUploadFolder(session.user),
+    );
   };
   const uploaded = await Promise.all(incoming.map(uploadOne));
 

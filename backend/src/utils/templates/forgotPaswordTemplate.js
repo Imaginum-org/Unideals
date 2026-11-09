@@ -1,3 +1,5 @@
+import escapeHtml from "../escapeHtml.js";
+
 const forgotPasswordTemplate = ({ name, resetUrl }) => {
   return `
     <div style="font-family: 'Inter', 'Poppins', Arial, sans-serif; max-width: 480px; margin: 0 auto; background-color: #ffffff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);">
@@ -22,10 +24,10 @@ const forgotPasswordTemplate = ({ name, resetUrl }) => {
         </h2>
 
         <p style="color: #64748B; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
-          Hi <strong>${name}</strong>,<br/> We received a request to reset your password. If you didn't make this request, you can safely ignore this email.
+          Hi <strong>${escapeHtml(name)}</strong>,<br/> We received a request to reset your password. If you didn't make this request, you can safely ignore this email.
         </p>
 
-        <a href="${resetUrl}" target="_blank" style="display: inline-block; background-color: #4F46E5; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 6px; margin-bottom: 24px;">
+        <a href="${escapeHtml(resetUrl)}" target="_blank" style="display: inline-block; background-color: #4F46E5; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 6px; margin-bottom: 24px;">
           Reset Password
         </a>
 
@@ -35,7 +37,7 @@ const forgotPasswordTemplate = ({ name, resetUrl }) => {
           </p>
           <div style="background-color: #ffffff; border: 1px solid #E2E8F0; border-radius: 4px; padding: 10px;">
             <p style="color: #64748B; font-size: 12px; margin: 0;">
-              You can also <a href="${resetUrl}" style="color: #4F46E5; font-weight: 700; text-decoration: underline; word-break: break-all;">reset your password here.</a>
+              You can also <a href="${escapeHtml(resetUrl)}" style="color: #4F46E5; font-weight: 700; text-decoration: underline; word-break: break-all;">reset your password here.</a>
             </p>
           </div>
         </div>

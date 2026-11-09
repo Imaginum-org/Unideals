@@ -13,6 +13,23 @@
 @tailwind utilities;
 
 @layer components {
+  /* ── Dropdowns: one look everywhere, taken from the profile menu ──
+     Panel: #F7F8FA surface, neutral-200 border, rounded-2xl, soft shadow.
+     Item hover / keyboard highlight: #4B45FF @10% + #2E40DC text
+     (dark: @20% + #C3C9FF). Selected item: same accent text + check. */
+  .dd-panel {
+    @apply overflow-hidden rounded-2xl border border-neutral-200 bg-[#F7F8FA] shadow-[0_14px_34px_rgba(15,23,42,0.12)] dark:border-neutral-800 dark:bg-[#1A1D20] dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)];
+  }
+  .dd-item {
+    @apply flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13.5px] font-medium text-[#4B5563] outline-none transition-colors duration-150 hover:bg-[#4B45FF]/10 hover:text-[#2E40DC] active:bg-[#4B45FF]/[0.15] dark:text-neutral-200 dark:hover:bg-[#4B45FF]/20 dark:hover:text-[#C3C9FF] dark:active:bg-[#4B45FF]/25;
+  }
+  .dd-item[data-highlighted="true"] {
+    @apply bg-[#4B45FF]/10 text-[#2E40DC] dark:bg-[#4B45FF]/20 dark:text-[#C3C9FF];
+  }
+  .dd-item[aria-selected="true"] {
+    @apply font-semibold text-[#2E40DC] dark:text-[#C3C9FF];
+  }
+
   .contact-input {
     @apply h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#364EF2] focus:ring-4 focus:ring-[#364EF2]/10 dark:border-[#2A2D35] dark:bg-[#1A1D20] dark:text-white dark:placeholder:text-slate-500;
   }
@@ -160,21 +177,51 @@
     radial-gradient(ellipse 60% 22% at 50% -4%, rgba(236, 72, 153, 0.1), transparent 70%),
     radial-gradient(ellipse 30% 18% at 8% 12%, rgba(236, 72, 153, 0.06), transparent 70%);
 }
-.girls-mode .bg-\[\#F7F8FA\] {
+
+/* Light surfaces → pink wash. LIGHT MODE ONLY: these !important rules used
+   to beat the `dark:` classes too, painting dark-mode pages light pink with
+   white text on top (unreadable). */
+.girls-mode:not(.dark) .bg-\[\#F7F8FA\],
+.girls-mode:not(.dark) .bg-\[\#F7F9FD\] {
   background-color: #fdf2f8 !important;
 }
-.girls-mode .bg-\[\#F7F9FD\] {
-  background-color: #fdf2f8 !important;
-}
+
+/* Brand fills → pink (white text stays readable in both modes). */
 .girls-mode .bg-\[\#4B45FF\],
 .girls-mode .bg-\[\#2E4BFF\],
 .girls-mode .bg-\[\#1E1E1E\] {
   background-color: var(--girls-pink-deep) !important;
 }
-.girls-mode .text-\[\#4B45FF\],
-.girls-mode .text-\[\#2E40DC\],
-.girls-mode .text-\[\#2E4BFF\] {
+
+/* Brand accent text → deep pink in light mode only. */
+.girls-mode:not(.dark) .text-\[\#4B45FF\],
+.girls-mode:not(.dark) .text-\[\#2E40DC\],
+.girls-mode:not(.dark) .text-\[\#2E4BFF\] {
   color: var(--girls-pink-deep) !important;
+}
+
+/* ── Girl Mode + dark: a real dark palette with a subtle plum tint ── */
+.dark.girls-mode body,
+.dark.girls-mode #root {
+  background-image:
+    radial-gradient(ellipse 60% 22% at 50% -4%, rgba(236, 72, 153, 0.14), transparent 70%),
+    radial-gradient(ellipse 30% 18% at 8% 12%, rgba(236, 72, 153, 0.08), transparent 70%);
+}
+.dark.girls-mode .dark\:bg-\[\#131313\] {
+  background-color: #150d12 !important;
+}
+.dark.girls-mode .dark\:bg-\[\#181818\] {
+  background-color: #190f15 !important;
+}
+.dark.girls-mode .dark\:bg-\[\#1A1D20\],
+.dark.girls-mode .dark\:bg-\[\#1a1d20\] {
+  background-color: #1e131a !important;
+}
+/* Accent text: light pink is readable on near-black (deep pink isn't). */
+.dark.girls-mode .dark\:text-\[\#A5B0FF\],
+.dark.girls-mode .dark\:text-\[\#C3C9FF\],
+.dark.girls-mode .dark\:text-\[\#8FA2FF\] {
+  color: #f9a8d4 !important;
 }
 .girls-mode .border-\[\#4B45FF\],
 .girls-mode .ring-\[\#3838EC\] {
@@ -352,4 +399,247 @@
   filter: none;
   background-color: #ffffff;
   color: #09090b;
+}
+
+/* BrandLoader pulse (was a <style> tag injected by every loader instance) */
+@keyframes brandLoaderPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.94; }
+}
+.brand-loader-pulse {
+  animation: brandLoaderPulse 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader-pulse { animation: none; }
+}
+
+/* ── EmptyState illustration tokens (components/ui/EmptyState.jsx).
+   Light / dark / Girl Mode variants so empty states always match the theme. ── */
+.es-tint { fill: #eef0ff; }
+.es-ring { stroke: #c7caf8; }
+.es-ring-solid { stroke: #e2e5f0; }
+.es-accent { fill: #3838ec; }
+.es-stroke { stroke: #3838ec; fill: none; }
+.es-stroke-soft { stroke: #a5a8f5; fill: none; }
+.es-heart { fill: #ec4899; }
+.es-card { fill: #ffffff; }
+.es-shadow { fill: rgba(15, 23, 42, 0.08); }
+.es-tile { fill: #f4f5fb; }
+.es-bar { fill: #e2e5ee; }
+.es-bar--soft { fill: #eef0f5; }
+.dark .es-tint { fill: #22244a; }
+.dark .es-ring { stroke: #3a3d78; }
+.dark .es-ring-solid { stroke: #34363d; }
+.dark .es-accent { fill: #6d6df5; }
+.dark .es-stroke { stroke: #6d6df5; }
+.dark .es-card { fill: #26282d; }
+.dark .es-shadow { fill: rgba(0, 0, 0, 0.35); }
+.dark .es-tile { fill: #2f3238; }
+.dark .es-bar { fill: #3a3d44; }
+.dark .es-bar--soft { fill: #33363c; }
+.girls-mode .es-tint { fill: #fce7f3; }
+.girls-mode .es-ring { stroke: #f9a8d4; }
+.girls-mode .es-accent { fill: #ec4899; }
+.girls-mode .es-stroke { stroke: #db2777; }
+.girls-mode .es-stroke-soft { stroke: #f9a8d4; }
+.girls-mode .es-primary {
+  background-color: #db2777 !important;
+  box-shadow: 0 8px 20px -8px rgba(219, 39, 119, 0.65) !important;
+}
+.girls-mode .es-primary:hover { background-color: #be185d !important; }
+.girls-mode .es-secondary:hover,
+.girls-mode .es-chip:hover { border-color: #f9a8d4 !important; color: #db2777 !important; }
+.girls-mode .es-glow {
+  background-image: radial-gradient(60% 100% at 50% 0%, rgba(236, 72, 153, 0.1), transparent 70%) !important;
+}
+
+/* ── Girl Mode panel character animation (components/ui/GirlsEntryPill.jsx).
+   transform-box: fill-box makes transform-origin relative to each shape. ── */
+@keyframes gm-wave {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(-16deg); }
+  30% { transform: rotate(8deg); }
+  45% { transform: rotate(-12deg); }
+  60% { transform: rotate(4deg); }
+  75% { transform: rotate(0deg); }
+}
+@keyframes gm-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.08); }
+}
+@keyframes gm-float {
+  0% { transform: translateY(6px) scale(0.8); opacity: 0; }
+  18% { opacity: 1; }
+  100% { transform: translateY(-34px) scale(1); opacity: 0; }
+}
+@keyframes gm-twinkle {
+  0%, 100% { transform: scale(0.55) rotate(0deg); opacity: 0.35; }
+  50% { transform: scale(1) rotate(20deg); opacity: 1; }
+}
+@keyframes gm-sway {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(2.5deg); }
+}
+@keyframes gm-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.gm-wave { transform-box: fill-box; transform-origin: 8% 92%; animation: gm-wave 2.6s ease-in-out infinite; }
+.gm-blink { transform-box: fill-box; transform-origin: center; animation: gm-blink 4.2s ease-in-out infinite; }
+.gm-float { transform-box: fill-box; transform-origin: center; animation: gm-float 3.8s ease-in infinite; }
+.gm-twinkle { transform-box: fill-box; transform-origin: center; animation: gm-twinkle 2.4s ease-in-out infinite; }
+.gm-sway { transform-box: fill-box; transform-origin: 50% 0%; animation: gm-sway 3.4s ease-in-out infinite; }
+.gm-bob { animation: gm-bob 3.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .gm-wave, .gm-blink, .gm-float, .gm-twinkle, .gm-sway, .gm-bob { animation: none !important; }
+  .gm-float { opacity: 0.9; }
+}
+.dark .gm-blob { opacity: 0.1; }
+/* EmptyState tokens for Girl Mode + dark */
+.dark.girls-mode .es-tint { fill: #3a1530; }
+.dark.girls-mode .es-ring { stroke: #6b2150; }
+.dark.girls-mode .es-accent { fill: #f472b6; }
+.dark.girls-mode .es-stroke { stroke: #f472b6; }
+.dark.girls-mode .es-stroke-soft { stroke: #9d3a6d; }
+.dark.girls-mode .es-glow {
+  background-image: radial-gradient(60% 100% at 50% 0%, rgba(236, 72, 153, 0.14), transparent 70%) !important;
+}
+.dark.girls-mode .es-secondary:hover,
+.dark.girls-mode .es-chip:hover { border-color: #9d3a6d !important; color: #f9a8d4 !important; }
+/* Girl Mode: pink arrow chip on secondary pill buttons (e.g. Home "View more") */
+.girls-mode .es-secondary .bg-\[\#3838EC\]\/10 { background-color: rgba(236, 72, 153, 0.12) !important; }
+.girls-mode .es-secondary .text-\[\#3838EC\] { color: #db2777 !important; }
+
+/* ── Accent tokens (browse UI, sliders, chips). One place decides the accent:
+   brand blue by default, pink in Girl Mode, lighter text tones in dark. ── */
+:root {
+  --accent: #3838ec;
+  --accent-hover: #2f2fd9;
+  --accent-text: #3838ec;
+  --accent-soft: rgba(56, 56, 236, 0.08);
+  --accent-soft-strong: rgba(56, 56, 236, 0.14);
+  --accent-ring: rgba(56, 56, 236, 0.35);
+}
+.dark {
+  --accent-text: #a5b0ff;
+  --accent-soft: rgba(109, 109, 245, 0.14);
+  --accent-soft-strong: rgba(109, 109, 245, 0.24);
+}
+.girls-mode {
+  --accent: #db2777;
+  --accent-hover: #be185d;
+  --accent-text: #db2777;
+  --accent-soft: rgba(236, 72, 153, 0.09);
+  --accent-soft-strong: rgba(236, 72, 153, 0.16);
+  --accent-ring: rgba(236, 72, 153, 0.35);
+}
+.dark.girls-mode {
+  --accent-text: #f9a8d4;
+  --accent-soft: rgba(236, 72, 153, 0.14);
+  --accent-soft-strong: rgba(236, 72, 153, 0.24);
+}
+@keyframes browse-shimmer {
+  100% { transform: translateX(100%); }
+}
+.browse-shimmer { position: relative; overflow: hidden; }
+.browse-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: browse-shimmer 1.4s ease-in-out infinite;
+}
+.dark .browse-shimmer::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .browse-shimmer::after { animation: none; }
+}
+
+/* ── Mobile app shell ───────────────────────────────────────────── */
+/* Shared chrome sizes so full-height screens (chat) fit exactly between
+   the sticky header and the phone tab bar at every device size. */
+:root {
+  --header-h: calc(3.5rem + 1px + env(safe-area-inset-top));
+  --tabbar-h: calc(4rem + env(safe-area-inset-bottom));
+}
+@media (max-width: 639.98px) and (max-height: 480px) {
+  :root {
+    --tabbar-h: calc(3rem + env(safe-area-inset-bottom));
+  }
+}
+@media (min-width: 640px) {
+  :root {
+    --header-h: 4.75rem;
+    --tabbar-h: 0px;
+  }
+}
+/* Phones: pushed screens (account sub-pages, the sell flow) own the top
+   of the screen with their own app bar (back + title), like native apps.
+   Set by useAppScreen() via html[data-app-screen]. */
+@media (max-width: 639.98px) {
+  html[data-app-screen] {
+    --header-h: 0px;
+  }
+  html[data-app-screen] .site-header {
+    display: none;
+  }
+}
+/* Phones/tablets with an open thread: the conversation owns the screen,
+   with its own back button, like native messaging apps. */
+@media (max-width: 1023.98px) {
+  html[data-chat-thread] {
+    --header-h: 0px;
+    --tabbar-h: 0px;
+  }
+  html[data-chat-thread] .site-header {
+    display: none;
+  }
+}
+
+/* An open chat thread takes the whole phone screen (like any messaging
+   app), so the bottom tabs and their spacer step aside. */
+html[data-chat-thread] .mobile-tabbar,
+html[data-chat-thread] .tabbar-spacer {
+  display: none;
+}
+
+/* react-select (listing form) reads its colors from these, so the
+   inline-styled control follows light/dark like the rest of the form. */
+:root {
+  --select-bg: #f8fafc;
+  --select-menu-bg: #f7f8fa; /* = .dd-panel */
+  --select-border: #e5e7eb;
+  --select-text: #4b5563;
+  --select-value: #111827;
+  --select-option-hover: rgba(75, 69, 255, 0.1); /* = .dd-item hover */
+  --select-option-hover-text: #2e40dc;
+}
+.dark {
+  --select-bg: #1a1d20;
+  --select-menu-bg: #1a1d20;
+  --select-border: #2e3238;
+  --select-text: #e5e5e5;
+  --select-value: #f4f4f5;
+  --select-option-hover: rgba(75, 69, 255, 0.2);
+  --select-option-hover-text: #c3c9ff;
+}
+
+/* Product card price row: the struck MRP is the first thing to go when a
+   card is narrow (2-up on small phones), so "price · % off" never wraps or
+   truncates into a stray "₹…". Sized by the card itself (container query),
+   not the viewport, so it works in every grid and rail. */
+.pc-content {
+  container-type: inline-size;
+}
+@container (max-width: 148px) {
+  .pc-mrp {
+    display: none;
+  }
+}
+@container (max-width: 182px) {
+  .pc-mrp-long {
+    display: none;
+  }
 }

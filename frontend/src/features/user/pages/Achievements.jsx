@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { Info, Sparkles, Trophy } from "lucide-react";
-import Profile_left_part from "../components/Profile_left_part.jsx";
+import { useEffect, useState, useMemo } from "react";
+import { Info, RefreshCw, Sparkles, Target, Trophy } from "lucide-react";
+import { AccountLayout, CARD, ErrorState, TabBar, btnSecondary } from "../components/account/AccountKit.jsx";
 import LevelCard from "../components/LevelCard.jsx";
 import BadgeCard from "../components/BadgeCard.jsx";
 import RankGuideModal from "../components/RankGuideModal.jsx";
 import { fetchMyBadges, recomputeBadges } from "../api/badgeApi.js";
-import { BADGE_CATALOGUE, BADGE_MAP, getBadgeMeta } from "../../../utils/badgeConfig.js";
+import { BADGE_CATALOGUE, BADGE_MAP } from "../../../utils/badgeConfig.js";
 
 const CATEGORIES = [
   { id: "all",           label: "All" },
@@ -33,7 +33,7 @@ export default function Achievements() {
         setLoading(true);
         const res = await fetchMyBadges();
         if (!cancelled && res.data.success) setData(res.data.data);
-      } catch (err) {
+      } catch {
         if (!cancelled) setError("Failed to load your achievements.");
       } finally {
         if (!cancelled) setLoading(false);
@@ -50,8 +50,11 @@ export default function Achievements() {
       setRecomputing(true);
       const res = await recomputeBadges();
       if (res.data.success) setData(res.data.data);
-    } catch (_) {}
-    finally { setRecomputing(false); }
+    } catch {
+      // Sync is best-effort; the current badges stay on screen.
+    } finally {
+      setRecomputing(false);
+    }
   };
 
   // Build earned map: badge_id -> earned badge object
@@ -85,128 +88,119 @@ export default function Achievements() {
     });
   }, [data, earnedMap, activeCategory]);
 
+  const earnedBadges = badgeGrid.filter((b) => !b.locked);
+  const lockedBadges = badgeGrid
+    .filter((b) => b.locked)
+    .sort((a, b) => {
+      const pa = a.progress?.required ? a.progress.current / a.progress.required : 0;
+      const pb = b.progress?.required ? b.progress.current / b.progress.required : 0;
+      return pb - pa;
+    });
+
+  const reload = () => {
+    setError(null);
+    setLoading(true);
+    fetchMyBadges()
+      .then((res) => {
+        if (res.data.success) setData(res.data.data);
+      })
+      .catch(() => setError("Failed to load your achievements."))
+      .finally(() => setLoading(false));
+  };
+
+  const earnedIn = (cat) =>
+    (data?.badges || []).filter((b) => cat === "all" || (b.category || BADGE_MAP[b.badge_id]?.category) === cat).length;
+
   return (
-    <div className="w-full h-full overflow-hidden dark:bg-[#131313] bg-[#F7F9FD] font-figtree">
-      <div className="flex h-[calc(100vh-70px)]">
-        {/* Left panel */}
-        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2">
-          <Profile_left_part />
+    <AccountLayout
+      seoTitle="Achievements | Unideals"
+      width="xl"
+      title="Achievements"
+      description="Earn XP. Unlock badges."
+      actions={
+        <>
+          <button type="button" onClick={() => setShowGuideModal(true)} className={btnSecondary}>
+            <Info className="h-4 w-4" aria-hidden="true" />
+            How ranks work
+          </button>
+          <button type="button" onClick={handleRecompute} disabled={recomputing || loading} className={btnSecondary}>
+            <RefreshCw className={`h-4 w-4 ${recomputing ? "animate-spin" : ""}`} aria-hidden="true" />
+            {recomputing ? "Syncing…" : "Sync badges"}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        {loading ? (
+          <div className="browse-shimmer h-44 rounded-2xl bg-neutral-100 dark:bg-white/5" />
+        ) : error ? (
+          <ErrorState message={error} onRetry={reload} />
+        ) : data ? (
+          <LevelCard
+            total_xp={data.total_xp}
+            level={data.level}
+            rank_title={data.rank_title}
+            xp_to_next_level={data.xp_to_next_level}
+            next_level={data.next_level}
+            progress_percent={data.progress_percent}
+            badge_count={(data.badges || []).length}
+          />
+        ) : null}
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabBar
+            ariaLabel="Badge category"
+            tabs={CATEGORIES.map((c) => ({ value: c.id, label: c.label, count: data ? earnedIn(c.id) : 0 }))}
+            value={activeCategory}
+            onChange={setActiveCategory}
+          />
         </div>
 
-        {/* Main content */}
-        <div className="h-full md:flex-1 overflow-y-auto no-scrollbar bg-[#F7F9FD] dark:bg-[#131313] p-6 lg:p-8 xl:px-[5.7rem] xl:py-6">
-          <div className="max-w-5xl mx-auto space-y-6 pb-6">
-
-            {/* Page header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h1 className="text-xl font-extrabold text-gray-900 dark:text-white">Achievements</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Earn XP and unlock badges by being an active campus trader.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowGuideModal(true)}
-                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 px-3 py-1.5 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors flex items-center gap-1.5 shadow-xs"
-                >
-                  <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-black">!</span>
-                  <span>How Ranks Work</span>
-                </button>
-                <button
-                  onClick={handleRecompute}
-                  disabled={recomputing || loading}
-                  className="text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800 px-3 py-1.5 rounded-lg hover:bg-[#F7F8FA] dark:hover:bg-[#202020] transition-colors disabled:opacity-50"
-                >
-                  {recomputing ? "Syncing..." : "Sync Badges"}
-                </button>
-              </div>
-            </div>
-
-            {/* Level card */}
-            {loading ? (
-              <div className="h-40 rounded-2xl bg-[#F7F8FA] dark:bg-[#1c1c1c] animate-pulse border border-gray-100 dark:border-gray-800" />
-            ) : error ? (
-              <div className="flex flex-col items-start gap-3 p-4">
-                <div className="text-sm text-red-500">{error}</div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError(null);
-                    setLoading(true);
-                    fetchMyBadges()
-                      .then((res) => {
-                        if (res.data.success) setData(res.data.data);
-                      })
-                      .catch(() =>
-                        setError("Failed to load your achievements."),
-                      )
-                      .finally(() => setLoading(false));
-                  }}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : data ? (
-              <LevelCard
-                total_xp={data.total_xp}
-                level={data.level}
-                rank_title={data.rank_title}
-                xp_to_next_level={data.xp_to_next_level}
-                next_level={data.next_level}
-                progress_percent={data.progress_percent}
-                badge_count={(data.badges || []).length}
-              />
-            ) : null}
-
-            {/* Category filter tabs */}
-            <div className="flex gap-2 flex-wrap">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
-                    activeCategory === cat.id
-                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                      : "bg-[#F7F8FA] dark:bg-[#1c1c1c] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-600"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Badge grid */}
-            {loading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-36 rounded-2xl bg-[#F7F8FA] dark:bg-[#1c1c1c] animate-pulse border border-gray-100 dark:border-gray-800"
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {badgeGrid.map((b) => (
-                  <BadgeCard key={b.badge_id} {...b} />
-                ))}
-              </div>
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="browse-shimmer h-36 rounded-2xl bg-neutral-100 dark:bg-white/5" />
+            ))}
+          </div>
+        ) : badgeGrid.length > 0 ? (
+          <div className="space-y-6">
+            {earnedBadges.length > 0 && (
+              <section>
+                <h2 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-slate-900 dark:text-white">
+                  <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
+                  Earned
+                  <span className="text-[12.5px] font-normal text-slate-400">{earnedBadges.length}</span>
+                </h2>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+                  {earnedBadges.map((b) => (
+                    <BadgeCard key={b.badge_id} {...b} />
+                  ))}
+                </div>
+              </section>
             )}
-
-            {/* Empty state */}
-            {!loading && badgeGrid.length === 0 && (
-              <div className="text-center py-16 text-gray-400 dark:text-gray-600">
-                <p className="text-4xl mb-3">🏅</p>
-                <p className="text-sm font-medium">No badges in this category yet.</p>
-              </div>
+            {lockedBadges.length > 0 && (
+              <section>
+                <h2 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-slate-900 dark:text-white">
+                  <Target className="h-4 w-4 text-[var(--accent-text)]" aria-hidden="true" />
+                  Up next
+                  <span className="text-[12.5px] font-normal text-slate-400">{lockedBadges.length}</span>
+                </h2>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+                  {lockedBadges.map((b) => (
+                    <BadgeCard key={b.badge_id} {...b} />
+                  ))}
+                </div>
+              </section>
             )}
           </div>
-        </div>
+        ) : (
+          <div className={`${CARD} px-6 py-12 text-center`}>
+            <Sparkles className="mx-auto h-7 w-7 text-slate-300 dark:text-zinc-600" aria-hidden="true" />
+            <p className="mt-2 text-[14px] font-medium text-slate-500 dark:text-zinc-400">No badges in this category yet.</p>
+          </div>
+        )}
       </div>
 
-      {/* Ranks & Levels Guide Modal */}
       <RankGuideModal
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}
@@ -214,6 +208,6 @@ export default function Achievements() {
         currentLevel={data?.level || 1}
         currentXp={data?.total_xp || 0}
       />
-    </div>
+    </AccountLayout>
   );
 }

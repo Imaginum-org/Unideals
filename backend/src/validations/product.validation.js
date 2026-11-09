@@ -7,6 +7,7 @@ import {
   PRODUCT_USAGE_DURATION,
   PRODUCT_STATUS,
 } from "../config/constants.js";
+import { normalizeMultiline } from "../utils/text.js";
 
 export const createProductSchema = z
   .object({
@@ -21,11 +22,16 @@ export const createProductSchema = z
       .max(120, "Title cannot exceed 120 characters")
       .optional(),
 
+    // Whitespace is normalised BEFORE the length checks, so 10 characters
+    // of padding can't pass as a description and never reach the DB.
     description: z
-      .string()
-      .trim()
-      .min(10, "Description must be at least 10 characters")
-      .max(2000, "Description cannot exceed 2000 characters")
+      .preprocess(
+        normalizeMultiline,
+        z
+          .string()
+          .min(10, "Description must be at least 10 characters")
+          .max(2000, "Description cannot exceed 2000 characters"),
+      )
       .optional(),
 
     category: z.enum(Object.values(PRODUCT_CATEGORIES)).optional(),

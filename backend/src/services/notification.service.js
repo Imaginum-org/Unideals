@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Notification, { NotificationReceipt } from "../models/Notification.model.js";
 import User from "../models/User.model.js";
 import Campus from "../models/Campus.model.js";
-import Deal from "../models/deal.model.js";
+import Conversation from "../models/conversation.model.js";
 import Product from "../models/Product.model.js";
 import { USER_STATUS } from "../config/constants.js";
 import {
@@ -30,7 +30,7 @@ export const estimateRecipients = async ({ targetAudience = "all", targetCampus 
 
   if (targetAudience === "buyers" || targetAudience === "sellers") {
     const ids = targetAudience === "buyers"
-      ? await Deal.distinct("buyer_id")
+      ? await Conversation.distinct("buyer_id")
       : await Product.distinct("seller_id");
     return User.countDocuments({
       _id: { $in: ids },
@@ -75,7 +75,7 @@ export const dispatchNotificationDocument = async (notification) => {
   let targetUserIds = null;
   if (notification.target_audience === "buyers") {
     targetUserIds = await User.find({
-      _id: { $in: await Deal.distinct("buyer_id") },
+      _id: { $in: await Conversation.distinct("buyer_id") },
       status: USER_STATUS.ACTIVE,
     }).distinct("_id");
   } else if (notification.target_audience === "sellers") {
@@ -120,6 +120,41 @@ export const dispatchNotificationDocument = async (notification) => {
   return notification;
 };
 
+const NOTIFICATION_TYPES = ["general", "promotion", "order", "announcement", "message"];
+const NOTIFICATION_AUDIENCES = ["all", "buyers", "sellers", "campus"];
+
+// action_url is followed by the client on click. Only allow in-app paths
+// ("/deals") or absolute https links — never javascript:, data:, or
+// protocol-relative "//host" URLs.
+const sanitizeActionUrl = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") throw new AppError("Invalid action URL", 400);
+  const v = value.trim().slice(0, 500);
+  if (!v) return null;
+  if (v.startsWith("/") && !v.startsWith("//") && !v.includes("\\")) return v;
+  try {
+    const u = new URL(v);
+    if (u.protocol === "https:") return u.toString();
+  } catch {
+    // fall through
+  }
+  throw new AppError("Action URL must be an in-app path (/...) or an https:// link", 400);
+};
+
+const sanitizeImageUrl = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") throw new AppError("Invalid image URL", 400);
+  const v = value.trim().slice(0, 2048);
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    if (u.protocol === "https:") return u.toString();
+  } catch {
+    // fall through
+  }
+  throw new AppError("Image URL must be an https:// link", 400);
+};
+
 /**
  * Create a new notification campaign from the admin portal
  */
@@ -136,8 +171,24 @@ export const createAdminNotification = async ({
   scheduled_at = null,
   sent_by = null,
 }) => {
-  if (!title?.trim()) throw new AppError("Notification title is required", 400);
-  if (!message?.trim()) throw new AppError("Notification message is required", 400);
+  if (typeof title !== "string" || !title.trim()) {
+    throw new AppError("Notification title is required", 400);
+  }
+  if (typeof message !== "string" || !message.trim()) {
+    throw new AppError("Notification message is required", 400);
+  }
+  if (title.trim().length > 100) throw new AppError("Title cannot exceed 100 characters", 400);
+  if (message.trim().length > 500) throw new AppError("Message cannot exceed 500 characters", 400);
+  if (!NOTIFICATION_TYPES.includes(type)) throw new AppError("Invalid notification type", 400);
+  if (!NOTIFICATION_AUDIENCES.includes(target_audience)) {
+    throw new AppError("Invalid notification audience", 400);
+  }
+  const safeActionUrl = sanitizeActionUrl(action_url);
+  const safeImageUrl = sanitizeImageUrl(image_url);
+  const safeActionLabel =
+    typeof action_label === "string" && action_label.trim()
+      ? action_label.trim().slice(0, 40)
+      : "View Offers";
 
   let campusId = null;
   if (target_audience === "campus") {
@@ -162,9 +213,9 @@ export const createAdminNotification = async ({
     type,
     target_audience,
     target_campus: campusId,
-    image_url: image_url?.trim() || null,
-    action_url: action_url?.trim() || null,
-    action_label: action_label?.trim() || "View Offers",
+    image_url: safeImageUrl,
+    action_url: safeActionUrl,
+    action_label: safeActionLabel,
     schedule_type: isScheduled ? "scheduled" : "now",
     scheduled_at: scheduledDate,
     status: isScheduled ? "scheduled" : "draft",
@@ -175,8 +226,6 @@ export const createAdminNotification = async ({
   await notification.save();
 
   if (!isScheduled) {
-    notification.status = "draft";
-    await notification.save();
     await dispatchNotificationDocument(notification);
   }
 
@@ -188,15 +237,25 @@ export const createAdminNotification = async ({
  */
 export const dispatchDueScheduledNotifications = async () => {
   try {
-    const dueList = await Notification.find({
-      status: "scheduled",
-      scheduled_at: { $lte: new Date() },
-    });
-
-    for (const notif of dueList) {
-      await dispatchNotificationDocument(notif);
+    // Claim each due row atomically (scheduled -> draft) before sending, so
+    // an overlapping cron tick or a second server instance can never
+    // dispatch the same campaign twice.
+    let count = 0;
+    for (let i = 0; i < 100; i++) {
+      const notif = await Notification.findOneAndUpdate(
+        { status: "scheduled", scheduled_at: { $lte: new Date() } },
+        { $set: { status: "draft" } },
+        { new: true, sort: { scheduled_at: 1 } },
+      );
+      if (!notif) break;
+      try {
+        await dispatchNotificationDocument(notif);
+        count += 1;
+      } catch (err) {
+        console.error("Scheduled notification dispatch failed:", err?.message);
+      }
     }
-    return dueList.length;
+    return count;
   } catch (error) {
     console.error("Failed to dispatch scheduled notifications:", error);
     return 0;
@@ -284,11 +343,18 @@ export const getUserNotificationFeed = async (userId) => {
   };
   const matchedBroadcastQuery = await getUserBroadcastQuery(user);
 
-  const [broadcasts, directNotifications, receipts] = await Promise.all([
+  const [broadcasts, directNotifications] = await Promise.all([
     Notification.find(matchedBroadcastQuery).sort({ createdAt: -1 }).limit(50).lean(),
     Notification.find(directQuery).sort({ createdAt: -1 }).limit(50).lean(),
-    NotificationReceipt.find({ user_id: userId }).lean(),
   ]);
+  // Only the receipts for the broadcasts being shown (was: every receipt
+  // the user ever had, unbounded).
+  const receipts = broadcasts.length
+    ? await NotificationReceipt.find({
+        user_id: userId,
+        notification_id: { $in: broadcasts.map((b) => b._id) },
+      }).lean()
+    : [];
 
   const readReceiptMap = new Map();
   receipts.forEach((r) => {
@@ -363,7 +429,10 @@ const getUserBroadcastQuery = async (user) => {
   }
 
   const [isBuyer, isSeller] = await Promise.all([
-    Deal.exists({ buyer_id: user._id }),
+    // Deal docs have no buyer_id (they hang off conversations), so the old
+    // Deal.exists({ buyer_id }) never matched and "buyers" campaigns
+    // reached nobody. Buyers = users who started a conversation.
+    Conversation.exists({ buyer_id: user._id }),
     Product.exists({ seller_id: user._id }),
   ]);
   if (isBuyer) audiences.push({ target_audience: "buyers" });
@@ -572,6 +641,10 @@ export const getAdminNotificationStats = async () => {
  * Fetch history of sent notifications
  */
 export const getAdminNotificationHistory = async ({ page = 1, limit = 20 }) => {
+  // NaN / negative / huge values from the query string used to reach
+  // .skip()/.limit() directly.
+  page = Math.min(Math.max(Number.parseInt(page, 10) || 1, 1), 1000);
+  limit = Math.min(Math.max(Number.parseInt(limit, 10) || 20, 1), 100);
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
     Notification.find({ is_broadcast: true, status: "sent" })

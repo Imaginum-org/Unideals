@@ -57,6 +57,8 @@ const boostSchema = new Schema(
 );
 
 boostSchema.index({ user_id: 1, createdAt: -1 });
+// expireStaleBoosts (every 10 min): { status: "active", expires_at <= now }.
+boostSchema.index({ status: 1, expires_at: 1 });
 boostSchema.index({ product_id: 1, status: 1, expires_at: -1 });
 boostSchema.index({ user_id: 1, status: 1, expires_at: -1 });
 

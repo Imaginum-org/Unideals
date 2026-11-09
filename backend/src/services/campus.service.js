@@ -1,6 +1,13 @@
 import mongoose from "mongoose";
 import Campus from "../models/Campus.model.js";
 import User from "../models/User.model.js";
+import { createTtlCache } from "../utils/ttlCache.js";
+
+// Campus docs change only via admin writes (which call invalidateCampusCache),
+// yet resolveRequestCampus ran a findById/findOne on EVERY feed, search and
+// detail request. Cache by id and slug; misses (null) are cached briefly too.
+const campusDocCache = createTtlCache({ max: 500 });
+const CAMPUS_TTL_MS = 5 * 60 * 1000;
 
 /**
  * Campus service — single place that turns "which campus?" into a Campus
@@ -21,6 +28,7 @@ const DIRECTORY_TTL_MS = 5 * 60 * 1000;
 
 export const invalidateCampusCache = () => {
   directoryCache = { data: [], at: 0 };
+  campusDocCache.clear();
 };
 
 export const listActiveCampuses = async () => {
@@ -38,7 +46,10 @@ export const listActiveCampuses = async () => {
 
 export const getCampusBySlug = async (slug) => {
   if (typeof slug !== "string" || !slug.trim()) return null;
-  return await Campus.findOne({ slug: slug.trim().toLowerCase() }).lean();
+  const key = slug.trim().toLowerCase();
+  return campusDocCache.memo(`slug:${key}`, CAMPUS_TTL_MS, async () =>
+    (await Campus.findOne({ slug: key }).lean()) ?? null,
+  );
 };
 
 export const getActiveCampusBySlug = async (slug) => {
@@ -64,7 +75,9 @@ export const resolveRequestCampus = async (req) => {
   const userCampusId = req.user?.campus_id;
   if (userCampusId) {
     const id = userCampusId._id || userCampusId;
-    const campus = await Campus.findById(id).lean();
+    const campus = await campusDocCache.memo(`id:${String(id)}`, CAMPUS_TTL_MS, async () =>
+      (await Campus.findById(id).lean()) ?? null,
+    );
     if (campus && campus.is_active) return campus;
     // Profile points at a paused/removed campus — force re-pick downstream.
     throw err(400, "Your campus is unavailable. Please pick your campus again.", "CAMPUS_INACTIVE");

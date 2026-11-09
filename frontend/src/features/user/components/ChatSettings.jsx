@@ -4,6 +4,7 @@ import { Check, Crown, Lock, MessageSquareText, X } from "lucide-react";
 import { WALLPAPERS, chatSettingsOf } from "../../chat/utils/wallpapers.js";
 import { updateChatSettings } from "../api/userApi.js";
 import { toast } from "../../../components/ui/toast.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 const Toggle = ({ checked, onChange, label, hint }) => (
   <button
@@ -102,7 +103,7 @@ const ChatSettings = ({ user, onSaved }) => {
 
   return (
     <section className="max-w-[770px] space-y-6">
-      <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] p-6 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+      <div className="rounded-2xl border border-neutral-200/80 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-[#1A1D20]">
         <h2 className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white">
           <MessageSquareText size={18} className="text-[#3838EC]" />
           Chat wallpaper
@@ -153,7 +154,7 @@ const ChatSettings = ({ user, onSaved }) => {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-[#F7F8FA] px-5 py-2 shadow-sm dark:border-gray-800 dark:bg-[#1c1c1c]">
+      <div className="rounded-2xl border border-neutral-200/80 bg-white px-5 py-2 shadow-sm dark:border-neutral-800 dark:bg-[#1A1D20]">
         <h2 className="pt-3 text-base font-bold text-gray-900 dark:text-white">
           Privacy
         </h2>
@@ -204,7 +205,7 @@ const ChatSettings = ({ user, onSaved }) => {
             disabled={!dirty || saving}
             className="rounded-lg bg-[#3838EC] px-5 py-2.5 text-sm font-medium text-[#FCFCFC] transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
           >
-            {saving ? "Saving…" : "Save changes"}
+            <ButtonLoader loading={saving} loadingText="Saving…">Save changes</ButtonLoader>
           </button>
         </div>
       </div>

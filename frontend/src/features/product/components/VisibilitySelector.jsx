@@ -1,96 +1,81 @@
 import { useEffect } from "react";
+import { Check } from "lucide-react";
 import useProductListing from "../hooks/useProductListing";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { GIRLS_ONLY_CATEGORIES } from "../constants/productOptions.js";
+import { CARD, FLUSH_ON_PHONE, Switch } from "./listing/ListingKit.jsx";
+import { cn } from "../../../utils/cn.js";
 
 /**
- * Girls Corner 🌸 step-1 visibility toggle — "List this only for Girls".
- * Rendered ONLY in the /upload creation flow for logged-in female +
- * admin sellers (zero hint to anyone else).
- * Same switch as Negotiation (PricingStep), only color (pink) + text differ.
- * Backed by formData.isGirlsOnly.
+ * Girls Corner 🌸 visibility toggle, "List this only for Girls".
+ * Rendered ONLY in the listing flow for logged-in female + admin sellers
+ * (zero hint to anyone else). Backed by formData.isGirlsOnly.
  */
 export default function VisibilitySelector() {
   const { formData, updateField } = useProductListing();
   const { userDetails, isLoggedIn } = useUser();
 
-  const role = userDetails?.role ?? null;
-  const eligible =
-    isLoggedIn &&
-    (userDetails?.gender === "female" || role === "admin");
-  if (!eligible) return null;
-
+  const eligible = isLoggedIn && (userDetails?.gender === "female" || userDetails?.role === "admin");
   const on = Boolean(formData.isGirlsOnly);
-  // Girls-only categories lock Girl-only ON — the seller is told why.
+  // Girls-only categories lock Girl-only ON; the seller is told why.
   const lockedByCategory = GIRLS_ONLY_CATEGORIES.includes(formData.category);
   const shown = lockedByCategory || on;
 
   // Belt-and-braces: a girls-only category always carries Girl-only ON,
-  // even for drafts created before this rule existed.
+  // even for drafts created before this rule existed. (Hooks run before the
+  // eligibility early-return: calling them conditionally broke React's
+  // rules of hooks when eligibility changed mid-session.)
   useEffect(() => {
-    if (lockedByCategory && !on) updateField("isGirlsOnly", true);
-  }, [lockedByCategory, on, updateField]);
+    if (eligible && lockedByCategory && !on) updateField("isGirlsOnly", true);
+  }, [eligible, lockedByCategory, on, updateField]);
+
+  if (!eligible) return null;
 
   return (
     <section
       aria-label="Girls Corner visibility"
-      className={`relative mt-4 w-full overflow-hidden rounded-2xl p-5 transition-colors duration-300 ${
-        shown
-          ? "bg-gradient-to-br from-[#FCE7F3] via-[#FDF2F8] to-[#FCE7F3] shadow-[0_14px_36px_-20px_rgba(236,72,153,0.55)] dark:from-pink-950/50 dark:via-[#1c1c1c] dark:to-pink-950/30"
-          : "bg-gradient-to-br from-[#FDF2F8] to-[#F9FAFB] shadow-[0_10px_28px_-22px_rgba(236,72,153,0.4)] dark:from-pink-950/20 dark:to-[#1c1c1c]"
-      }`}
+      className={cn(
+        CARD,
+        FLUSH_ON_PHONE,
+        "p-4 transition-colors sm:p-6",
+        shown && "border-pink-200 bg-pink-50/60 dark:border-pink-900/50 dark:bg-pink-950/20",
+      )}
     >
-      {/* soft glow blob, decorative */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-pink-200/40 blur-2xl dark:bg-pink-500/10"
-      />
-      <div className="relative flex items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-[#111827] dark:text-white">
-            <span
-              aria-hidden="true"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-base shadow-sm dark:bg-pink-950"
-            >
-              🌸
-            </span>
-            Girls Corner
-          </h3>
-          <p className="mt-1.5 text-sm text-[#6B7280] dark:text-zinc-400">
-            List this only for Girls
-          </p>
-          <ul className="mt-2 max-w-xl list-disc space-y-1 pl-5 text-xs leading-6 text-zinc-500 marker:text-pink-400 dark:text-zinc-400">
-            <li>Only girls in your campus can see this.</li>
-            <li>Hidden from boys everywhere: home, search, category and chat.</li>
-            <li>No message spam. Boys can&apos;t start a chat on this, ever.</li>
-            {lockedByCategory && (
-              <li className="font-semibold text-[#9D174D] dark:text-pink-300">
-                Locked ON — this category is Girls-only.
-              </li>
-            )}
-          </ul>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-pink-100 text-base dark:bg-pink-950">
+            🌸
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-[16px] font-semibold tracking-tight text-slate-900 sm:text-[17px] dark:text-white">Girls Corner</h2>
+            <p className="mt-0.5 text-[13px] text-slate-500 dark:text-zinc-400">List this only for girls on your campus.</p>
+          </div>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={shown}
-          aria-label="List this only for Girls"
-          onClick={() => {
-            if (!lockedByCategory) updateField("isGirlsOnly", !on);
-          }}
+        <Switch
+          checked={shown}
+          onChange={(next) => !lockedByCategory && updateField("isGirlsOnly", next)}
           disabled={lockedByCategory}
-          title={lockedByCategory ? "Always on for Girls-only categories" : undefined}
-          className={`relative w-[56px] h-[32px] rounded-full transition-all duration-300
-
-      ${shown ? "bg-[#EC4899]" : "bg-[#D1D5DB]"}`}
-        >
-          <div
-            className={`absolute left-0 top-1 w-6 h-6 rounded-full bg-[#F7F8FA] transition-all duration-300
-
-          ${shown ? "translate-x-7" : "translate-x-1"}`}
-          />
-        </button>
+          label="List this only for Girls"
+          tone="pink"
+        />
       </div>
+      <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+        {[
+          "Only girls on your campus can see it.",
+          "Hidden from boys in home, search and chat.",
+          "Boys can never start a chat on it.",
+        ].map((t) => (
+          <li key={t} className="flex items-start gap-2 text-[12.5px] leading-relaxed text-slate-600 dark:text-zinc-300">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pink-500" strokeWidth={3} aria-hidden="true" />
+            {t}
+          </li>
+        ))}
+      </ul>
+      {lockedByCategory && (
+        <p className="mt-3 text-[12.5px] font-semibold text-pink-700 dark:text-pink-300">
+          Always on: this category is Girls-only.
+        </p>
+      )}
     </section>
   );
 }

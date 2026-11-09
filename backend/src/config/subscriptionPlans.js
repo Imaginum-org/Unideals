@@ -166,6 +166,58 @@ export const SUBSCRIPTION_PLANS = Object.freeze({
 });
 
 /**
+ * Girls Founder offer 🌸
+ *
+ * Female accounts get a reduced FOUNDER price (lifetime plans only; never on
+ * semester plans or boost add-ons). Enforced server-side in createOrder —
+ * the client only displays what GET /api/payments/plans returns.
+ * Gender is set once at onboarding and later changes need admin approval
+ * (user.controller), so the offer can't be toggled freely.
+ */
+export const GIRLS_FOUNDER_OFFER = Object.freeze({
+  id: "girls_founder",
+  label: "Girls Founder offer",
+  amountsInPaise: Object.freeze({
+    [USER_TIER.PRO]: 7900,
+    [USER_TIER.PRO_PLUS]: 15900,
+  }),
+});
+
+export const isGirlsFounderEligible = (
+  user,
+  subscriptionType = ACTIVE_SUBSCRIPTION_TYPE,
+) =>
+  subscriptionType === SUBSCRIPTION_TYPE.FOUNDER &&
+  String(user?.gender || "").toLowerCase() === "female";
+
+/**
+ * Single source of truth for what a given user pays for a paid tier.
+ * Returns { amountInPaise, baseAmountInPaise, offer } (offer null = list price).
+ */
+export const getPlanPriceForUser = (
+  tier,
+  user,
+  subscriptionType = ACTIVE_SUBSCRIPTION_TYPE,
+) => {
+  const plan = getSubscriptionPlan(tier, subscriptionType);
+  if (!plan) return null;
+  const baseAmountInPaise = plan.amountInPaise;
+  const offerAmount = GIRLS_FOUNDER_OFFER.amountsInPaise[tier];
+  if (
+    offerAmount &&
+    offerAmount < baseAmountInPaise &&
+    isGirlsFounderEligible(user, subscriptionType)
+  ) {
+    return {
+      amountInPaise: offerAmount,
+      baseAmountInPaise,
+      offer: GIRLS_FOUNDER_OFFER.id,
+    };
+  }
+  return { amountInPaise: baseAmountInPaise, baseAmountInPaise, offer: null };
+};
+
+/**
  * Helpers
  */
 

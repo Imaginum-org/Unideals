@@ -1,33 +1,39 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, BadgePercent, Building2, CheckCircle2, IndianRupee, MapPin, Plus, ShieldCheck, Sparkles, Wallet } from "lucide-react";
+import Select from "../../../components/ui/Select.jsx";
+import PriceInsights from "../components/PriceInsights.jsx";
 import { toast } from "../../../components/ui/toast.js";
-import { HiOutlineLocationMarker, HiOutlineCash } from "react-icons/hi";
-import { FaRupeeSign } from "react-icons/fa";
 import axios from "../../../services/axiosInstance";
 import useProductListing from "../hooks/useProductListing";
 import { PRODUCT_PAYMENT_OPTIONS } from "../constants/productOptions";
-import { IoArrowForward } from "react-icons/io5";
-import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
 import { validatePricing } from "../validations";
-import FormError from "../components/shared/FormError";
 import LegalAgreementModal from "../../auth/components/LegalAgreementModal";
 import PickupSpotModal from "../../user/components/PickupSpotModal.jsx";
 import { createPickupSpot } from "../../user/api/userApi.js";
 import { useCampus } from "../../../context/CampusContext.jsx";
-import { FiPlus } from "react-icons/fi";
+import { CARD, ChoiceChips, FLUSH_ON_PHONE, Field, FormSection, StepFooter, Switch, inputClass } from "../components/listing/ListingKit.jsx";
+import { readLastPayment, rememberPayment, suggestPrice } from "../utils/listingSmarts.js";
 
 const MAX_SPOTS = 3;
 
 const PricingStep = () => {
-  const { formData, updateField, nextStep, errors, validateAndProceed } =
+  const { formData, updateField, nextStep, prevStep, errors, validateAndProceed } =
     useProductListing();
   const { campus } = useCampus();
-const [legalTab, setLegalTab] = useState(null);
+  const [legalTab, setLegalTab] = useState(null);
   const [loadingPickupSpot, setLoadingPickupSpot] = useState(false);
   const [pickupSpots, setPickupSpots] = useState([]);
   const [showSpotModal, setShowSpotModal] = useState(false);
   const [isSavingSpot, setIsSavingSpot] = useState(false);
+
+  // Payment: pre-select the seller's last choice on this device, else the
+  // most flexible option. Still a normal, changeable choice.
+  useEffect(() => {
+    if (!formData.paymentMethod) updateField("paymentMethod", readLastPayment() || "both");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // FETCH PICKUP SPOTS
   useEffect(() => {
@@ -61,9 +67,15 @@ const [legalTab, setLegalTab] = useState(null);
         .then((res) => {
           const spots = res.data?.pickupSpots || [];
           setPickupSpots(spots);
-          const stillThere =
-            formData.address?._id &&
-            spots.some((s) => String(s._id) === String(formData.address._id));
+          // Edits/drafts restore the pickup SNAPSHOT (name + detail, no _id):
+          // match it back to the seller's spot instead of silently swapping
+          // it for the primary one.
+          const a = formData.address || {};
+          const match =
+            spots.find((s) => a._id && String(s._id) === String(a._id)) ||
+            spots.find((s) => s.name === (a.name || a.address_line) && s.detail === (a.detail || a.city));
+          if (match && !a._id) updateField("address", match);
+          const stillThere = Boolean(match);
           if (!stillThere) {
             updateField(
               "address",
@@ -129,6 +141,31 @@ const [legalTab, setLegalTab] = useState(null);
     }
   };
 
+  const selling = Number(formData.sellingPrice || 0);
+  const original = Number(formData.originalPrice || 0);
+  const discount = original > selling && selling > 0 ? Math.round(((original - selling) / original) * 100) : 0;
+  const onlyDigits = (v) => v.replace(/[^0-9]/g, "").slice(0, 8);
+  const suggested = suggestPrice(formData);
+  const showSuggestion = suggested && Number(formData.sellingPrice) !== suggested;
+
+  const priceInput = (field, id, placeholder) => (
+    <div className="relative">
+      <span className="pointer-events-none absolute inset-y-0 left-0 grid w-10 place-items-center text-[15px] font-semibold text-slate-400 dark:text-zinc-500">
+        ₹
+      </span>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        value={formData[field]}
+        onChange={(e) => updateField(field, onlyDigits(e.target.value))}
+        placeholder={placeholder}
+        className={`${inputClass(errors[field])} h-12 pl-9 text-[17px] font-semibold tabular-nums`}
+      />
+    </div>
+  );
+
   return (
     <>
       {legalTab && (
@@ -144,396 +181,206 @@ const [legalTab, setLegalTab] = useState(null);
           }}
         />
       )}
-      <div className="w-full text-black dark:text-white rounded-[28px] border border-[#ECECEC] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-xl md:text-2xl xl:text-2xl font-bold text-[#0F172A] dark:text-white leading-tight">
-            Pricing & Pickup
-          </h1>
 
-          <p className="mt-2 xl:mt-1 text-[#475569] dark:text-[#A1A1AA] text-sm md:text-base">
-            Set your fair pricing and pickup preferences.
-          </p>
-        </div>
-
-        {/* Main Content */}
-        <div className="mt-7 flex flex-col gap-6">
-          {/* Price Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Selling Price */}
-            <div data-field="sellingPrice">
-              <label className="text-sm font-bold uppercase tracking-wide text-[#111827]">
-                Set Your Price
-                <RequiredAsterisk />
-              </label>
-
-              <div
-                className={`mt-2 flex items-center rounded-xl border ${
-                  errors.sellingPrice ? "border-red-500" : "border-[#E5E7EB]"
-                } overflow-hidden h-[64px]`}
-              >
-                <div className="w-14 h-full bg-[#F9FAFB] flex items-center justify-center">
-                  <FaRupeeSign className="text-[#181C1F] size-5" />
-                </div>
-
-                <input
-                  type="text"
-                  value={formData.sellingPrice}
-                  onChange={(e) =>
-                    updateField(
-                      "sellingPrice",
-                      e.target.value.replace(/[^0-9]/g, ""),
-                    )
-                  }
-                  placeholder="999"
-                  className="flex-1 bg-[#F7F8FA] -ml-2 h-full outline-none text-lg xl:text-xl font-semibold"
-                />
-              </div>
-              {errors.sellingPrice && <FormError error={errors.sellingPrice} />}
-            </div>
-
-            {/* Original Price */}
-            <div data-field="originalPrice">
-              <label className="text-sm font-bold uppercase tracking-wide text-[#111827]">
-                Original Price
-                <RequiredAsterisk />
-              </label>
-
-              <div className="mt-2 flex items-center rounded-2xl border border-[#E5E7EB] overflow-hidden h-[64px]">
-                <div className="w-14 h-full bg-[#F9FAFB] flex items-center justify-center">
-                  <FaRupeeSign className="text-[#181C1F] size-5" />
-                </div>
-
-                <input
-                  type="text"
-                  value={formData.originalPrice}
-                  onChange={(e) =>
-                    updateField(
-                      "originalPrice",
-                      e.target.value.replace(/[^0-9]/g, ""),
-                    )
-                  }
-                  placeholder="1499"
-                  className="flex-1 bg-[#F7F8FA] h-full -ml-2 outline-none text-lg xl:text-xl font-semibold"
-                />
-              </div>
-              {errors.originalPrice && (
-                <FormError error={errors.originalPrice} />
+      <div className="flex flex-col gap-4 sm:gap-5">
+        <FormSection icon={IndianRupee} title="Price" description="Set a fair price. You can change it later.">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="Your price" htmlFor="listing-price" required field="sellingPrice" error={errors.sellingPrice}>
+              {priceInput("sellingPrice", "listing-price", suggested ? `e.g. ${suggested}` : "e.g. 800")}
+              {showSuggestion && (
+                <button
+                  type="button"
+                  onClick={() => updateField("sellingPrice", String(suggested))}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-soft-strong)]"
+                >
+                  <Sparkles className="h-3 w-3" aria-hidden="true" />
+                  Use suggested ₹{suggested.toLocaleString("en-IN")}
+                </button>
               )}
-            </div>
-          </div>
-
-          {/* Negotiation */}
-          <div className="mt-4 flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-[#111827]">
-                Allow Negotiation
-              </h3>
-
-              <p className="mt-1 text-sm text-[#6B7280]">
-                Let buyers negotiate your price.
-              </p>
-            </div>
-
-            <button
-              onClick={() => updateField("negotiable", !formData.negotiable)}
-              aria-label="Allow negotiation"
-              className={`relative w-[56px] h-[32px] rounded-full transition-all duration-300
-      
-      ${formData.negotiable ? "bg-[#2E3FDC]" : "bg-[#D1D5DB]"}`}
+            </Field>
+            <Field
+              label="Original price"
+              htmlFor="listing-original"
+              required
+              field="originalPrice"
+              error={errors.originalPrice}
+              hint="What you paid when it was new."
             >
-              <div
-                className={`absolute top-1 w-6 h-6 rounded-full bg-[#F7F8FA] transition-all duration-300
-          
-          ${formData.negotiable ? "translate-x-7" : "translate-x-1"}`}
-              />
-            </button>
+              {priceInput("originalPrice", "listing-original", "e.g. 1,200")}
+            </Field>
           </div>
 
-          {/* Negotiation nudge — fixed-height slot so swapping messages never
-              shifts the layout below. */}
-          <div className="mt-2 min-h-[34px] sm:min-h-[22px]" aria-live="polite">
+          {discount > 0 && (
+            <p className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-[13px] font-medium text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+              <BadgePercent className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Buyers will see <span className="font-bold">{discount}% off</span>, saving ₹{(original - selling).toLocaleString("en-IN")}.
+            </p>
+          )}
+
+          {/* Labs: smart price suggestion / demand meter (or locked teaser) */}
+          <div className="mt-4">
+            <PriceInsights
+              category={formData.category}
+              condition={formData.condition}
+              onUsePrice={(value) => updateField("sellingPrice", String(value))}
+            />
+          </div>
+        </FormSection>
+
+        <FormSection icon={Wallet} title="Payment" description="How buyers can pay you at pickup.">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[14px] font-semibold text-slate-900 dark:text-white">Open to offers</p>
+              <p className="mt-0.5 text-[13px] text-slate-500 dark:text-zinc-400">Let buyers send you a price in chat.</p>
+            </div>
+            <Switch checked={Boolean(formData.negotiable)} onChange={(v) => updateField("negotiable", v)} label="Open to offers" />
+          </div>
+          <div className="mt-2 min-h-[20px]" aria-live="polite">
             <AnimatePresence mode="wait" initial={false}>
-              {formData.negotiable ? (
-                <motion.p
-                  key="nego-on"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.18 }}
-                  className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"
-                >
-                  <CheckCircle2 size={14} className="shrink-0" />
-                  Nice, negotiable listings get more chats and usually sell faster.
-                </motion.p>
-              ) : (
-                <motion.p
-                  key="nego-off"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.18 }}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-red-500"
-                >
-                  <AlertTriangle size={14} className="shrink-0" />
-                  Heads up, turning this off can slow down your sale. Most buyers love to negotiate.
-                </motion.p>
-              )}
+              <motion.p
+                key={formData.negotiable ? "on" : "off"}
+                initial={{ opacity: 0, y: 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -3 }}
+                transition={{ duration: 0.15 }}
+                className={`flex items-center gap-1.5 text-[12.5px] font-medium ${
+                  formData.negotiable ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                }`}
+              >
+                {formData.negotiable ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                )}
+                {formData.negotiable
+                  ? "Listings open to offers usually get more chats."
+                  : "Fixed price: fewer buyers reach out, but no haggling."}
+              </motion.p>
             </AnimatePresence>
           </div>
 
-          {/* Payment Method */}
-          <div className="mt-4" data-field="paymentMethod">
-            <div className="flex items-center gap-3">
-              <HiOutlineCash size={22} className="text-[#4F46E5]" />
-
-              <h3 className="font-bold text-[#111827]">
-                Preferred Payment Method
-                <RequiredAsterisk />
-              </h3>
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              {PRODUCT_PAYMENT_OPTIONS.map((option) => {
-                const isActive = formData.paymentMethod === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    onClick={() => updateField("paymentMethod", option.value)}
-                    className={`h-[45px] min-w-[120px] px-8 rounded-2xl border text-sm font-semibold transition-all duration-200
-                
-                ${
-                  isActive
-                    ? "border-[#2E3FDC] bg-[#EEF2FF] text-[#2E3FDC]"
-                    : "border-[#E5E7EB] hover:border-[#4F46E5]"
-                }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-            {errors.paymentMethod && <FormError error={errors.paymentMethod} />}
-          </div>
-
-          {/* Pickup Section */}
-          <div
-            data-field="address"
-            className="rounded-xl border bg-[#F8FAFC] p-5 md:p-6"
-          >
-            {/* Top */}
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#EEF2FF] flex items-center justify-center">
-                  <HiOutlineLocationMarker
-                    size={22}
-                    className="text-[#4F46E5]"
-                  />
-                </div>
-
-                <div>
-                  <h3 className="font-bold text-[#111827]">
-                    Pickup Information
-                  </h3>
-
-                  <p className="mt-1 text-sm text-[#6B7280]">
-                    Transparency helps build trust in the community.
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-xs font-medium text-[#2E3FDC]">
-                Your default pickup details are pre-filled
-              </p>
-            </div>
-
-            {/* Fields */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Campus Area */}
-              <div>
-                <label className="text-sm font-semibold text-[#374151]">
-                  Campus / Area
-                  <RequiredAsterisk />
-                </label>
-
-                <div className="mt-2 min-h-[110px] rounded-xl border bg-[#F7F8FA] p-4 flex flex-col justify-between">
-                  <div>
-                    <p className="font-medium text-[#111827]">
-                      {campus?.name || "Your campus"}
-                    </p>
-
-                    <p className="mt-2 text-sm text-[#6B7280] leading-6">
-                      Your listing goes live on your campus marketplace.
-                    </p>
-                  </div>
-
-                  <p className="mt-4 text-sm font-semibold text-[#4F46E5]">
-                    Locked to your campus
-                  </p>
-                </div>
-              </div>
-
-              {/* Pickup Spot */}
-              <div>
-                <label className="text-sm font-semibold text-[#374151]">
-                  Pickup Spot
-                  <RequiredAsterisk />
-                </label>
-
-                <div className="mt-2 min-h-[110px] rounded-xl border bg-[#F7F8FA] p-4 flex flex-col justify-between">
-                  <div>
-                    {loadingPickupSpot ? (
-                      <p className="text-sm text-[#6B7280]">
-                        Loading pickup spot...
-                      </p>
-                    ) : pickupSpots.length > 0 ? (
-                      <>
-                        <select
-                          value={formData.address?._id || ""}
-                          onChange={(e) => handleSelectSpot(e.target.value)}
-                          className="w-full rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2.5 text-sm font-semibold text-[#111827] outline-none transition focus:border-[#4F46E5] focus:ring-4 focus:ring-[#4F46E5]/10"
-                          aria-label="Choose pickup spot"
-                        >
-                          {pickupSpots.map((spot) => (
-                            <option key={spot._id} value={spot._id}>
-                              {spot.name}
-                              {spot.isPrimary ? " (Primary)" : ""},{" "}
-                              {spot.detail}
-                            </option>
-                          ))}
-                        </select>
-
-                        <p className="mt-2 text-sm text-[#6B7280] leading-6">
-                          {formData.address?.detail ||
-                            formData.address?.city ||
-                            "Select a spot above"}
-                        </p>
-
-                        {formData.address?.pincode && (
-                          <p className="text-sm text-[#6B7280]">
-                            {formData.address.pincode}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-sm text-red-500">
-                        No pickup spot found. Add one to continue
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="mt-4 flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowSpotModal(true)}
-                      disabled={
-                        isSavingSpot || pickupSpots.length >= MAX_SPOTS
-                      }
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#4F46E5] hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <FiPlus size={16} />
-                      {pickupSpots.length === 0
-                        ? "Add pickup spot"
-                        : "Add another spot"}
-                    </button>
-                    <a
-                      href="/settings"
-                      className="text-sm font-medium text-[#9CA3AF] hover:text-[#4B5563]"
-                    >
-                      Manage in Settings
-                    </a>
-                  </div>
-                </div>
-                {errors.address && <FormError error={errors.address} />}
-              </div>
-            </div>
-
-            {/* Bottom Warning */}
-            <div className="mt-5 inline-flex items-center gap-2 rounded-xl border bg-[#F7F8FA] px-4 py-3 text-sm text-[#4F46E5]">
-              <span>🛡️</span>
-
-              <span>For safety, choose a public place inside campus.</span>
-            </div>
-          </div>
-
-          {/* Terms */}
-          <div
-            data-field="termsAccepted"
-            className="rounded-xl border bg-[#F9FAFB] p-5"
-          >
-            <label className="flex items-start gap-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={formData.termsAccepted}
-                onChange={(e) => handleTermsChange(e.target.checked)}
-                className="mt-1 h-4 w-4 accent-[#2E3FDC] bg-wh cursor-pointer"
+          <div className="mt-5 border-t border-neutral-100 pt-5 dark:border-neutral-800">
+            <Field label="Accepted payment" required field="paymentMethod" error={errors.paymentMethod}>
+              <ChoiceChips
+                ariaLabel="Accepted payment"
+                options={PRODUCT_PAYMENT_OPTIONS}
+                value={formData.paymentMethod}
+                onChange={(v) => {
+                  updateField("paymentMethod", v);
+                  rememberPayment(v);
+                }}
+                invalid={Boolean(errors.paymentMethod)}
+                columns="grid-cols-3"
               />
+            </Field>
+          </div>
+        </FormSection>
 
-              <p className="text-sm leading-7 text-[#6B7280]">
-                I acknowledge and agree to the{" "}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLegalTab("terms");
-                  }}
-                  className="font-semibold text-[#2E3FDC] hover:underline"
-                >
-                  Terms & Conditions
-                </button>{" "}
-                and{" "}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLegalTab("privacy");
-                  }}
-                  className="font-semibold text-[#2E3FDC] hover:underline"
-                >
-                  Privacy Policy
-                </button>
-                .
-                <RequiredAsterisk />
+        <FormSection icon={MapPin} title="Pickup" description="Where you'll meet the buyer on campus.">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-white/[0.02]">
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-slate-400 dark:text-zinc-500">
+                <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
+                Campus
               </p>
-            </label>
-            <p className="mt-2 text-[11px] leading-5 text-[#9CA3AF]">
-              Terms v1 · accepted at publish time is recorded with your listing.
-            </p>
-            {errors.termsAccepted && <FormError error={errors.termsAccepted} />}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-10 flex items-center justify-between">
-          {/* Pagination */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[#9CA3AF]">Step 3 of 4</span>
-
-            <div className="flex gap-1">
-              <div className="w-3 h-[4px] rounded-full bg-[#16A34A]" />
-
-              <div className="w-3 h-[4px] rounded-full bg-[#16A34A]" />
-
-              <div className="w-7 h-[4px] rounded-full bg-[#4F46E5]" />
-
-              <div className="w-3 h-[4px] rounded-full bg-[#D1D5DB]" />
+              <p className="mt-1.5 text-[14.5px] font-semibold text-slate-900 dark:text-white">{campus?.name || "Your campus"}</p>
+              <p className="mt-0.5 text-[12.5px] text-slate-500 dark:text-zinc-400">Listings go live on your campus marketplace.</p>
             </div>
-          </div>
 
-          {/* Buttons */}
-          <div className="flex items-center gap-2 lg:gap-3">
-            {/* Continue */}
-            <button
-              onClick={() => validateAndProceed(validatePricing, nextStep)}
-              className="group h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-xl flex justify-center items-center gap-2 font-semibold transition-all duration-300 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200 hover:-translate-y-[1px] hover:shadow-xl hover:shadow-indigo-200/40 active:translate-y-[1px] active:scale-[0.98] active:shadow-md"
-            >
-              <span>Preview</span>
-              {/* <IoArrowForward className="size-5" /> */}
-              <IoArrowForward className="size-5 transition-transform duration-300 group-hover:translate-x-[3px] group-active:translate-x-[1px]" />
-            </button>
+            <Field label="Pickup spot" required field="address" error={errors.address}>
+              {loadingPickupSpot ? (
+                <div className="h-11 animate-pulse rounded-lg bg-neutral-100 dark:bg-white/5" />
+              ) : pickupSpots.length > 0 ? (
+                <Select
+                  value={formData.address?._id || ""}
+                  onChange={handleSelectSpot}
+                  placeholder="Choose a pickup spot"
+                  ariaLabel="Choose pickup spot"
+                  invalid={Boolean(errors.address)}
+                  options={pickupSpots.map((spot) => ({
+                    value: spot._id,
+                    label: `${spot.name}${spot.isPrimary ? " (Primary)" : ""}`,
+                  }))}
+                />
+              ) : (
+                <p className="rounded-lg border border-dashed border-neutral-300 px-3.5 py-3 text-[13px] text-slate-500 dark:border-neutral-700 dark:text-zinc-400">
+                  No pickup spots yet. Add one to continue.
+                </p>
+              )}
+              {formData.address?.detail && (
+                <p className="mt-1.5 text-[12.5px] text-slate-500 dark:text-zinc-400">{formData.address.detail}</p>
+              )}
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <button
+                  type="button"
+                  onClick={() => setShowSpotModal(true)}
+                  disabled={isSavingSpot || pickupSpots.length >= MAX_SPOTS}
+                  className="inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--accent-text)] hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  {pickupSpots.length === 0 ? "Add pickup spot" : "Add another"}
+                </button>
+                <Link to="/settings" className="text-[13px] font-medium text-slate-400 hover:text-slate-600 dark:text-zinc-500 dark:hover:text-zinc-300">
+                  Manage spots
+                </Link>
+              </div>
+            </Field>
           </div>
+          <p className="mt-4 flex items-center gap-2 text-[12.5px] text-slate-500 dark:text-zinc-400">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
+            For safety, pick a busy, public spot inside campus.
+          </p>
+        </FormSection>
+
+        <div
+          data-field="termsAccepted"
+          className={`${CARD} ${FLUSH_ON_PHONE} p-4 sm:p-5 ${errors.termsAccepted ? "border-red-300 dark:border-red-500/60" : ""}`}
+        >
+          <label className="flex cursor-pointer select-none items-start gap-3">
+            <input
+              type="checkbox"
+              checked={formData.termsAccepted}
+              onChange={(e) => handleTermsChange(e.target.checked)}
+              className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer rounded accent-[var(--accent)]"
+            />
+            <span className="text-[13.5px] leading-relaxed text-slate-600 dark:text-zinc-300">
+              I agree to the{" "}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setLegalTab("terms");
+                }}
+                className="font-semibold text-[var(--accent-text)] hover:underline"
+              >
+                Terms &amp; Conditions
+              </button>{" "}
+              and{" "}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setLegalTab("privacy");
+                }}
+                className="font-semibold text-[var(--accent-text)] hover:underline"
+              >
+                Privacy Policy
+              </button>
+              , and confirm this item is mine to sell.
+            </span>
+          </label>
+          {errors.termsAccepted && (
+            <p role="alert" className="mt-2 pl-[30px] text-[12.5px] font-medium text-red-600 dark:text-red-400">
+              {errors.termsAccepted}
+            </p>
+          )}
         </div>
+
+        <StepFooter
+          onBack={prevStep}
+          onNext={() => validateAndProceed(validatePricing, nextStep)}
+          nextLabel="Review listing"
+        />
       </div>
 
       {/* Inline add-spot modal: same popup as Settings, no page switch */}

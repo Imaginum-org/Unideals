@@ -127,7 +127,7 @@ const CampusGate = memo(function CampusGate() {
                 <button
                   type="button"
                   onClick={() => refreshDirectory?.()}
-                  className="mt-3 rounded-xl bg-[#3938EC] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
+                  className="mt-3 rounded-lg bg-[#3938EC] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2829D8]"
                 >
                   Retry
                 </button>
@@ -205,7 +205,7 @@ const CampusGate = memo(function CampusGate() {
           type="button"
           onClick={handleContinue}
           disabled={!selectedSlug || saving || done}
-          className="mt-6 w-full rounded-xl bg-[#3938EC] py-3.5 text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#3938EC]/25 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-6 w-full rounded-lg bg-[#3938EC] py-3.5 text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#3938EC]/25 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Setting your campus..." : "Continue"}
         </button>

@@ -6,7 +6,7 @@ import { ikFull, ikThumb } from "../../../utils/imageTransform.js";
 const SWIPE_THRESHOLD = 60;
 
 const arrowButtonClass =
-  "absolute top-1/2 -translate-y-1/2 z-20 flex h-12 w-12 items-center justify-center rounded-full border shadow-xl backdrop-blur-md transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-95";
+  "absolute top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full border shadow-xl backdrop-blur-md transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-95";
 
 const arrowButtonTheme =
   "border-white/25 bg-black/45 text-white hover:scale-105 hover:border-white hover:bg-[#F7F8FA] hover:text-black";
@@ -69,7 +69,9 @@ const ProductGallery = memo(function ProductGallery({
   return (
     <>
       {/* Main image */}
-      <div className="group relative overflow-hidden rounded-2xl bg-[#F8FAFC] dark:bg-zinc-900">
+      {/* Phones: edge-to-edge stage, swipe + dots (no arrows/thumbnails),
+          like native shopping apps. sm+: rounded stage, arrows, thumbnails. */}
+      <div className="group relative overflow-hidden bg-[#F1F3F7] sm:rounded-2xl sm:bg-[#F8FAFC] dark:bg-zinc-900">
         <motion.div
           drag={hasMultiple ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
@@ -98,7 +100,10 @@ const ProductGallery = memo(function ProductGallery({
             initial={{ opacity: 0, scale: 1.02 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.25 }}
-            className="aspect-[1/0.93] w-full select-none object-cover"
+            // Fixed stage height per breakpoint (the old near-square ratio
+            // grew to ~800px on wide screens). object-contain shows the
+            // whole item, letterboxed on the soft stage bg, never cropped.
+            className="h-[min(92vw,380px)] w-full select-none object-contain sm:h-[380px] lg:h-[420px] xl:h-[460px]"
           />
         </motion.div>
 
@@ -130,6 +135,25 @@ const ProductGallery = memo(function ProductGallery({
           </>
         )}
 
+        {/* Phones: position dots + counter (thumbnails are sm+ only) */}
+        {hasMultiple && (
+          <>
+            <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center gap-1.5 sm:hidden" aria-hidden="true">
+              {images.slice(0, 8).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all duration-200 ${
+                    i === Math.min(activeIndex, 7) ? "w-4 bg-white shadow" : "w-1.5 bg-white/60"
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white backdrop-blur-sm sm:hidden">
+              {activeIndex + 1} / {images.length}
+            </span>
+          </>
+        )}
+
         {/* Share */}
         {onShare && (
           <div className="absolute right-3 top-3 z-20 flex items-center gap-2">
@@ -140,7 +164,7 @@ const ProductGallery = memo(function ProductGallery({
                 onShare();
               }}
               aria-label="Share product"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F7F8FA] text-[#181C1F] shadow-md transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4F46E5] md:h-11 md:w-11"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#181C1F] shadow-md backdrop-blur-sm sm:h-10 sm:w-10 sm:bg-[#F7F8FA] transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4F46E5] md:h-11 md:w-11"
             >
               <Share2 size={18} />
             </button>
@@ -151,7 +175,7 @@ const ProductGallery = memo(function ProductGallery({
       {/* Thumbnails */}
       {hasMultiple && (
         <div
-          className="scrollbar-hide mt-3 flex gap-3 overflow-x-auto"
+          className="scrollbar-hide mt-3 hidden gap-3 overflow-x-auto sm:flex"
           role="tablist"
           aria-label="Product images"
         >

@@ -1,5 +1,5 @@
-import { Suspense, lazy } from "react";
-import { IoArrowForward } from "react-icons/io5";
+import { useEffect, useMemo, useState } from "react";
+import { FileText, Lock, SlidersHorizontal, Sparkles } from "lucide-react";
 import useProductListing from "../hooks/useProductListing";
 import {
   PRODUCT_CATEGORY_OPTIONS,
@@ -9,465 +9,355 @@ import {
   orderCategoriesForGirls,
 } from "../constants/productOptions";
 import { useUser } from "../../../context/useUserContext.jsx";
-import RequiredAsterisk from "../components/shared/RequiredLabel.jsx";
+import { normalizeMultiline } from "../../../utils/text.js";
 import { validateBasicInfo } from "../validations";
-import FormError from "../components/shared/FormError";
+import Select from "../../../components/ui/Select.jsx";
 import VisibilitySelector from "../components/VisibilitySelector.jsx";
-import { motion } from "framer-motion";
+import {
+  AutoTag,
+  ChoiceChips,
+  Counter,
+  Field,
+  FormSection,
+  StepFooter,
+  inputClass,
+} from "../components/listing/ListingKit.jsx";
+import {
+  allowedUsage,
+  draftDescription,
+  fixedValue,
+  guessFromTitle,
+  isFieldOff,
+  purchaseDateShortcuts,
+  rulesFor,
+} from "../utils/listingSmarts.js";
+import { cn } from "../../../utils/cn.js";
 
-// react-select loads only with the listing flow (never in Home/search).
-const LazySelect = lazy(() => import("react-select"));
+const TITLE_MAX = 120;
+const DESC_MAX = 1000;
+const today = () => new Date().toISOString().split("T")[0];
 
-const SelectFallback = (
-  <div className="h-[38px] animate-pulse rounded-lg border border-zinc-200 bg-[#F7F8FA]" />
-);
+const BasicInfoStep = () => {
+  const { formData, updateField, nextStep, errors, validateAndProceed } = useProductListing();
+  const { userDetails, isLoggedIn } = useUser();
+  // Which values the form filled in (shows an "Auto-filled" tag; any manual
+  // edit clears it). Session-only UI state.
+  const [auto, setAuto] = useState({});
 
-const CategoryOption = (props) => {
-  const { data, innerRef, innerProps, isFocused, isSelected } = props;
+  // Girls-only categories are offered only to eligible sellers; picking one
+  // auto-enables Girl-only (backend enforces the same).
+  const girlsEligible = isLoggedIn && (userDetails?.gender === "female" || userDetails?.role === "admin");
+  const categoryOptions = girlsEligible
+    ? orderCategoriesForGirls(PRODUCT_CATEGORY_OPTIONS)
+    : PRODUCT_CATEGORY_OPTIONS.filter((o) => !o.girlsOnly);
+  const allowedCategories = useMemo(() => categoryOptions.map((o) => o.value), [categoryOptions]);
+  const selectedCategory = PRODUCT_CATEGORY_OPTIONS.find((o) => o.value === formData.category);
+  const isGirlsCategory = GIRLS_ONLY_CATEGORIES.includes(formData.category);
+  const rules = rulesFor(formData.category);
+  const colourOff = isFieldOff(formData.category, "color");
+  const fixedCondition = fixedValue(formData.category, "condition");
+  const fixedUsage = fixedValue(formData.category, "usage");
 
-  return (
-    <motion.div
-      ref={innerRef}
-      {...innerProps}
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
-      className={`
-        px-4 py-4 cursor-pointer transition-all duration-200
-        border-b border-[#F1F5F9]
-        ${isSelected ? "bg-[#EEF2FF]" : isFocused ? "bg-[#F8FAFF]" : "bg-[#F7F8FA]"}
-      `}
-    >
-      <div className="flex flex-col">
-        <span className="font-semibold text-[15px] text-[#111827]">
-          {data.label}
-        </span>
+  // Manual edit: set the value and drop the auto tag.
+  const setManual = (field, value) => {
+    updateField(field, value);
+    setAuto((a) => (a[field] ? { ...a, [field]: false } : a));
+  };
+  const setAutoValue = (field, value) => {
+    updateField(field, value);
+    setAuto((a) => ({ ...a, [field]: true }));
+  };
 
-        <span className="text-[12px] text-[#94A3B8] mt-1">
-          {data.description}
-        </span>
-      </div>
-    </motion.div>
+  const handleCategoryChange = (value) => {
+    setManual("category", value || "");
+    if (GIRLS_ONLY_CATEGORIES.includes(value)) updateField("isGirlsOnly", true);
+  };
+
+  // Title → category / brand / colour, only into EMPTY fields (never
+  // overwrites what the seller typed). Runs when they leave the title.
+  const applyTitleSmarts = () => {
+    const g = guessFromTitle(formData.title, { allowedCategories });
+    if (g.category && !formData.category) {
+      setAutoValue("category", g.category);
+      if (GIRLS_ONLY_CATEGORIES.includes(g.category)) updateField("isGirlsOnly", true);
+    }
+    if (g.brand && !String(formData.brand || "").trim()) setAutoValue("brand", g.brand.slice(0, 100));
+    const category = formData.category || g.category;
+    if (g.color && !String(formData.color || "").trim() && !isFieldOff(category, "color")) {
+      setAutoValue("color", g.color.slice(0, 50));
+    }
+  };
+
+  // Category rules: fields that don't apply are cleared; single-value
+  // fields are locked to that value (required checks still pass).
+  useEffect(() => {
+    if (colourOff && formData.color) updateField("color", "");
+    if (fixedCondition && formData.condition !== fixedCondition) setAutoValue("condition", fixedCondition);
+    if (fixedUsage && formData.usageDuration !== fixedUsage) setAutoValue("usageDuration", fixedUsage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.category]);
+
+  // Specifications are linked: usage can't exceed the time since purchase,
+  // and a Brand New item hasn't been used. Fill usage from the purchase
+  // date when it's empty, and pull it back when it becomes impossible.
+  const usageAllowed = useMemo(
+    () => allowedUsage({ purchaseDate: formData.purchaseDate, condition: formData.condition, category: formData.category }),
+    [formData.purchaseDate, formData.condition, formData.category],
   );
-};
+  useEffect(() => {
+    const longest = usageAllowed[usageAllowed.length - 1];
+    const known = Boolean(formData.purchaseDate) || formData.condition === "brand_new" || Boolean(fixedUsage);
+    if (!formData.usageDuration && known) setAutoValue("usageDuration", longest);
+    else if (formData.usageDuration && !usageAllowed.includes(formData.usageDuration)) setAutoValue("usageDuration", longest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usageAllowed]);
 
-const CategorySingleValue = ({ data }) => {
+  const usageOptions = PRODUCT_USAGE_OPTIONS.map((o) => ({ ...o, disabled: !usageAllowed.includes(o.value) }));
+  const usageLabel = PRODUCT_USAGE_OPTIONS.find((o) => o.value === formData.usageDuration)?.label || "";
+  const descLength = normalizeMultiline(formData.description || "").length;
+  const canDraftDescription = Boolean(String(formData.title || "").trim().length >= 3 && formData.condition);
+  const shortcuts = useMemo(() => purchaseDateShortcuts(), []);
+
+  const writeDescription = () => {
+    const text = draftDescription(formData, usageLabel);
+    if (text) setAutoValue("description", text.slice(0, DESC_MAX));
+  };
+
   return (
-    <div
-      className="
-        flex
-        flex-col
-        justify-center
-        leading-tight
-      "
-    >
-      <span className="text-[15px] font-semibold text-[#111827]">
-        {data.label}
-      </span>
+    <div className="flex flex-col gap-4 sm:gap-5">
+      <FormSection icon={FileText} title="About the item" description="Start with the title. We'll fill in what we can from it.">
+        <div className="flex flex-col gap-5">
+          <Field
+            label="Title"
+            htmlFor="listing-title"
+            required
+            field="title"
+            error={errors.title}
+            hint="Brand + model + key detail works best. Category, brand and colour fill in from it."
+            counter={<Counter value={formData.title.length} max={TITLE_MAX} />}
+          >
+            <input
+              id="listing-title"
+              type="text"
+              maxLength={TITLE_MAX}
+              value={formData.title}
+              onChange={(e) => updateField("title", e.target.value)}
+              onBlur={applyTitleSmarts}
+              onKeyDown={(e) => e.key === "Enter" && applyTitleSmarts()}
+              placeholder={rules.titlePlaceholder || "e.g. Casio fx-991ES Plus scientific calculator"}
+              className={`${inputClass(errors.title)} h-11`}
+              autoComplete="off"
+              enterKeyHint="next"
+            />
+          </Field>
 
-      <span className="text-[12px] text-[#94A3B8] mt-0.5">
-        {data.description}
-      </span>
+          <Field
+            label="Category"
+            required
+            field="category"
+            error={errors.category}
+            hint={selectedCategory?.description || "Pick the closest match so buyers can find it."}
+            counter={<AutoTag show={auto.category} label="From title" />}
+          >
+            <Select
+              value={formData.category}
+              onChange={handleCategoryChange}
+              options={categoryOptions.map((o) => ({ value: o.value, label: o.label }))}
+              placeholder="Select a category"
+              ariaLabel="Category"
+              invalid={Boolean(errors.category)}
+            />
+          </Field>
+          {isGirlsCategory && (
+            <p className="-mt-2 rounded-lg bg-pink-50 px-3.5 py-2.5 text-[12.5px] font-medium leading-relaxed text-pink-800 ring-1 ring-pink-200 dark:bg-pink-950/30 dark:text-pink-200 dark:ring-pink-900/50">
+              🌸 Girls-only category: only girls on your campus can see this listing.
+            </p>
+          )}
+
+          <Field
+            label="Description"
+            htmlFor="listing-description"
+            required
+            field="description"
+            error={errors.description}
+            hint="What's included, how it's been used, any flaws."
+            counter={<Counter value={descLength} max={DESC_MAX} />}
+          >
+            <div className="relative">
+              <textarea
+                id="listing-description"
+                rows={6}
+                maxLength={DESC_MAX}
+                value={formData.description}
+                onChange={(e) => setManual("description", e.target.value)}
+                // Tidy on blur (not per keystroke, so typing a space or a new
+                // paragraph never fights the cursor). Server normalises too.
+                onBlur={(e) => {
+                  const clean = normalizeMultiline(e.target.value);
+                  if (clean !== e.target.value) updateField("description", clean);
+                }}
+                placeholder="e.g. Bought in Aug 2024, used for one semester. Comes with the original cover and manual. Small scratch on the back."
+                className={`${inputClass(errors.description)} min-h-[150px] resize-y py-3 pb-12 leading-relaxed`}
+              />
+              {!String(formData.description || "").trim() && (
+                <button
+                  type="button"
+                  onClick={writeDescription}
+                  disabled={!canDraftDescription}
+                  title={canDraftDescription ? undefined : "Add a title and condition first"}
+                  className="absolute bottom-3 left-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-3 text-[12.5px] font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-soft-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                  Write it for me
+                </button>
+              )}
+            </div>
+            {auto.description && (
+              <p className="mt-1.5 text-[12.5px] text-[var(--accent-text)]">Drafted from your details. Edit anything that isn&apos;t right.</p>
+            )}
+          </Field>
+        </div>
+      </FormSection>
+
+      <FormSection icon={SlidersHorizontal} title="Specifications" description="These are linked, so impossible combinations are ruled out for you.">
+        <div className="flex flex-col gap-5">
+          <Field
+            label="Condition"
+            required
+            field="condition"
+            error={errors.condition}
+            hint={fixedCondition ? rules.condition?.why : undefined}
+            counter={fixedCondition ? <LockedTag /> : null}
+          >
+            <ChoiceChips
+              ariaLabel="Condition"
+              options={PRODUCT_CONDITION_OPTIONS}
+              value={formData.condition}
+              onChange={(v) => setManual("condition", v)}
+              invalid={Boolean(errors.condition)}
+              disabled={Boolean(fixedCondition)}
+            />
+          </Field>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field
+              label="Purchase date"
+              htmlFor="listing-purchase"
+              required
+              field="purchaseDate"
+              error={errors.purchaseDate}
+            >
+              <input
+                id="listing-purchase"
+                type="date"
+                min="2000-01-01"
+                max={today()}
+                value={formData.purchaseDate}
+                onChange={(e) => setManual("purchaseDate", e.target.value)}
+                className={`${inputClass(errors.purchaseDate)} h-11 [color-scheme:light] dark:[color-scheme:dark]`}
+              />
+              <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Quick purchase dates">
+                {shortcuts.map((s) => (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => setManual("purchaseDate", s.value)}
+                    className={cn(
+                      "h-7 rounded-full border px-2.5 text-[12px] font-medium transition-colors",
+                      formData.purchaseDate === s.value
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                        : "border-neutral-200 text-slate-600 hover:border-[var(--accent-ring)] dark:border-neutral-700 dark:text-zinc-300",
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <Field
+              label="Used for"
+              required
+              field="usageDuration"
+              error={errors.usageDuration}
+              hint={
+                fixedUsage
+                  ? rules.usage?.why
+                  : formData.condition === "brand_new"
+                    ? "Brand New means unused."
+                    : formData.purchaseDate
+                      ? "Matched to your purchase date. Lower it if you used it for less."
+                      : "Pick a purchase date and this fills in."
+              }
+              counter={fixedUsage ? <LockedTag /> : <AutoTag show={auto.usageDuration} />}
+            >
+              <Select
+                value={formData.usageDuration}
+                onChange={(v) => setManual("usageDuration", v || "")}
+                options={usageOptions}
+                placeholder="How long have you used it?"
+                ariaLabel="Usage duration"
+                invalid={Boolean(errors.usageDuration)}
+                disabled={Boolean(fixedUsage) || formData.condition === "brand_new"}
+              />
+            </Field>
+
+            <Field
+              label="Brand / model"
+              htmlFor="listing-brand"
+              optional
+              error={errors.brand}
+              counter={<AutoTag show={auto.brand} label="From title" />}
+            >
+              <input
+                id="listing-brand"
+                type="text"
+                maxLength={100}
+                value={formData.brand}
+                onChange={(e) => setManual("brand", e.target.value.slice(0, 100))}
+                placeholder={rules.brandPlaceholder || "e.g. Casio"}
+                className={`${inputClass(errors.brand)} h-11`}
+              />
+            </Field>
+
+            <Field
+              label="Colour"
+              htmlFor="listing-color"
+              optional={!colourOff}
+              error={errors.color}
+              hint={colourOff ? `Not needed for ${selectedCategory?.label || "this category"}.` : undefined}
+              counter={<AutoTag show={auto.color && !colourOff} label="From title" />}
+            >
+              <input
+                id="listing-color"
+                type="text"
+                maxLength={50}
+                value={colourOff ? "" : formData.color}
+                onChange={(e) => setManual("color", e.target.value.slice(0, 50))}
+                placeholder={colourOff ? "Not applicable" : "e.g. Space grey"}
+                disabled={colourOff}
+                className={`${inputClass(errors.color)} h-11 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-slate-400 dark:disabled:bg-white/5`}
+              />
+            </Field>
+          </div>
+        </div>
+      </FormSection>
+
+      {/* Girls Corner visibility (renders only for eligible sellers) */}
+      <VisibilitySelector />
+
+      <StepFooter onNext={() => validateAndProceed(validateBasicInfo, nextStep)} nextLabel="Continue to photos" />
     </div>
   );
 };
 
-const BasicInfoStep = () => {
-  const { formData, updateField, nextStep, errors, validateAndProceed } =
-    useProductListing();
-  const { userDetails, isLoggedIn } = useUser();
-
-  // Girls-only categories are offered only to eligible sellers — picking one
-  // auto-enables Girl-only (backend enforces the same). Eligible sellers get
-  // the most → least suitable girls order; everyone else keeps classic order.
-  const sellerRole = userDetails?.role ?? null;
-  const girlsEligible =
-    isLoggedIn &&
-    (userDetails?.gender === "female" || sellerRole === "admin");
-  const categoryOptions = girlsEligible
-    ? orderCategoriesForGirls(PRODUCT_CATEGORY_OPTIONS)
-    : PRODUCT_CATEGORY_OPTIONS.filter((o) => !o.girlsOnly);
-  const isGirlsCategory = GIRLS_ONLY_CATEGORIES.includes(formData.category);
-  const handleCategoryChange = (selected) => {
-    const value = selected?.value || "";
-    updateField("category", value);
-    if (GIRLS_ONLY_CATEGORIES.includes(value)) {
-      updateField("isGirlsOnly", true);
-    }
-  };
-
-  // Select Styles
-  const selectStyles = {
-    control: (provided, state) => {
-      const fieldName = state.selectProps.name;
-
-      return {
-        ...provided,
-
-        minHeight: 82,
-
-        borderRadius: 16,
-
-        borderWidth: "1.5px",
-
-        borderColor: errors[fieldName]
-          ? "#EF4444"
-          : state.isFocused
-            ? "#4F46E5"
-            : "#E5E7EB",
-
-        backgroundColor: "#F8FAFC",
-
-        boxShadow: state.isFocused ? "0 0 0 4px rgba(79,70,229,0.08)" : "none",
-
-        transition: "all 180ms ease",
-
-        "&:hover": {
-          borderColor: "#4F46E5",
-          transform: "translateY(-1px)",
-        },
-      };
-    },
-
-    indicatorsContainer: (provided) => ({
-      ...provided,
-
-      paddingRight: "10px",
-
-      alignSelf: "stretch",
-    }),
-
-    dropdownIndicator: (provided, state) => ({
-      ...provided,
-
-      color: state.isFocused ? "#4F46E5" : "#94A3B8",
-
-      transition: "all 200ms ease",
-
-      transform: state.selectProps.menuIsOpen
-        ? "rotate(180deg)"
-        : "rotate(0deg)",
-    }),
-
-    valueContainer: (provided) => ({
-      ...provided,
-
-      height: "100%",
-
-      display: "flex",
-
-      alignItems: "center",
-
-      paddingTop: "0",
-
-      paddingBottom: "0",
-
-      paddingLeft: "16px",
-    }),
-
-    placeholder: (provided) => ({
-      ...provided,
-      color: "#94A3B8",
-      fontSize: 15,
-      fontWeight: 500,
-    }),
-
-    menu: (provided) => ({
-      ...provided,
-
-      marginTop: 8,
-
-      borderRadius: 20,
-
-      overflow: "hidden",
-
-      border: "1px solid #E5E7EB",
-
-      boxShadow: "0 24px 60px rgba(15,23,42,0.12)",
-
-      animation: "fadeIn 180ms ease",
-
-      zIndex: 30,
-    }),
-
-    option: (provided, state) => ({
-      ...provided,
-      // backgroundColor: state.isFocused ? "#EEF2FF" : "#FFFFFF",
-
-      // color: "#111827",
-
-      // cursor: "pointer",
-    }),
-  };
-
+function LockedTag() {
   return (
-    <motion.div
-      initial={{
-        opacity: 0,
-        y: 16,
-      }}
-      animate={{
-        opacity: 1,
-        y: 0,
-      }}
-      transition={{
-        duration: 0.35,
-        ease: "easeOut",
-      }}
-      className="w-full font-figtree rounded-xl border border-[#E1E1E1] bg-[#F7F8FA] shadow-sm p-5 sm:p-7 md:p-8 xl:p-7 dark:bg-[#1A1D20] dark:text-white dark:border-0"
-    >
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-        {/* LEFT */}
-        <div className="flex flex-col gap-6">
-          {/* Product Name */}
-          <div data-field="title">
-            <label className="text-base font-semibold text-[#0F172A] dark:text-white">
-              Product Title
-              <RequiredAsterisk />
-            </label>
-
-            <input
-              type="text"
-              maxLength={120}
-              value={formData.title}
-              onChange={(e) => updateField("title", e.target.value)}
-              placeholder="e.g. Macbook Air M1"
-              className={`mt-2 w-full h-[56px] rounded-xl border border-[#E5E7EB] ${
-                errors.title
-                  ? "border-red-500"
-                  : "border-[#E5E7EB] focus:border-[#4F46E5]"
-              } px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800`}
-            />
-            <FormError error={errors.title} />
-            <div className="mt-1 flex justify-end">
-              <span className="text-sm text-[#94A3B8]">
-                {formData.title.length}/120
-              </span>
-            </div>
-          </div>
-
-          {/* Category */}
-          <div data-field="category">
-            <label className="text-base font-semibold text-[#111827] dark:text-white">
-              Category
-              <RequiredAsterisk />
-            </label>
-
-            <div className="mt-2">
-              <Suspense fallback={SelectFallback}>
-              <LazySelect
-                name="category"
-                menuPlacement="auto"
-                menuShouldScrollIntoView={false}
-                options={categoryOptions}
-                styles={selectStyles}
-                isSearchable={false}
-                placeholder="Select category"
-                components={{
-                  Option: CategoryOption,
-                  SingleValue: CategorySingleValue,
-                }}
-                value={
-                  PRODUCT_CATEGORY_OPTIONS.find(
-                    (item) => item.value === formData.category,
-                  ) || null
-                }
-                onChange={handleCategoryChange}
-              />
-              </Suspense>
-
-              <p className="mt-2 text-sm text-[#94A3B8]">
-                Choose the category that best matches your product.
-              </p>
-              {isGirlsCategory && (
-                <p className="mt-2 rounded-xl bg-pink-50 px-4 py-3 text-xs font-medium leading-5 text-[#9D174D] ring-1 ring-pink-200 dark:bg-pink-950/30 dark:text-pink-200 dark:ring-pink-900/50">
-                  🌸 This is a Girls-only category — Girl-only is auto ON. Only
-                  girls in your campus can see this listing.
-                </p>
-              )}
-              <FormError error={errors.category} />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div data-field="description">
-            <label className="text-base font-semibold text-[#111827] dark:text-white">
-              Short Description
-              <RequiredAsterisk />
-            </label>
-
-            <textarea
-              maxLength={1000}
-              value={formData.description}
-              onChange={(e) => updateField("description", e.target.value)}
-              placeholder="Describe your product..."
-              className={`mt-2 w-full h-[220px] rounded-xl border border-[#E5E7EB] ${
-                errors.description
-                  ? "border-red-500"
-                  : "border-[#E5E7EB] focus:border-[#4F46E5]"
-              } p-5 resize-none outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800`}
-            />
-            <FormError error={errors.description} />
-
-            <div className="flex justify-between text-sm text-[#94A3B8]">
-              <span>Describe the core functionality and value.</span>
-
-              <span>{formData.description.length}/1000</span>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Brand */}
-          <div>
-            <label className="text-base font-semibold text-[#111827] dark:text-white">
-              Brand / Model
-            </label>
-
-            <input
-              type="text"
-              maxLength={100}
-              value={formData.brand}
-              onChange={(e) => updateField("brand", e.target.value.slice(0, 100))}
-              placeholder="e.g. Apple"
-              className="mt-2 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800"
-            />
-            {errors.brand && <FormError error={errors.brand} />}
-          </div>
-
-          {/* Color */}
-          <div>
-            <label className="text-base font-semibold text-[#111827] dark:text-white">
-              Product Color
-            </label>
-
-            <input
-              type="text"
-              maxLength={50}
-              value={formData.color}
-              onChange={(e) => updateField("color", e.target.value.slice(0, 50))}
-              placeholder="e.g. Space Grey"
-              className="mt-2 w-full h-[56px] rounded-xl border border-[#E5E7EB] px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800"
-            />
-            {errors.color && <FormError error={errors.color} />}
-          </div>
-
-          {/* Condition */}
-          <div data-field="condition">
-            <label className="text-base font-semibold text-[#111827] dark:text-white">
-              Product Condition
-              <RequiredAsterisk />
-            </label>
-
-            <div className="mt-2">
-              <Suspense fallback={SelectFallback}>
-              <LazySelect
-                name="condition"
-                options={PRODUCT_CONDITION_OPTIONS}
-                styles={selectStyles}
-                isSearchable={false}
-                placeholder="Choose condition"
-                value={
-                  PRODUCT_CONDITION_OPTIONS.find(
-                    (item) => item.value === formData.condition,
-                  ) || null
-                }
-                onChange={(selected) =>
-                  updateField("condition", selected?.value || "")
-                }
-              />
-              </Suspense>
-              <FormError error={errors.condition} />
-            </div>
-          </div>
-
-          {/* Usage */}
-          <div data-field="usageDuration">
-            <label className="text-base font-semibold text-[#111827] dark:text-white">
-              Usage Duration
-              <RequiredAsterisk />
-            </label>
-
-            <div className="mt-2">
-              <Suspense fallback={SelectFallback}>
-              <LazySelect
-                name="usageDuration"
-                options={PRODUCT_USAGE_OPTIONS}
-                styles={selectStyles}
-                isSearchable={false}
-                placeholder="Select duration"
-                value={
-                  PRODUCT_USAGE_OPTIONS.find(
-                    (item) => item.value === formData.usageDuration,
-                  ) || null
-                }
-                onChange={(selected) =>
-                  updateField("usageDuration", selected?.value || "")
-                }
-                className="bg-[#F7F8FA]"
-              />
-              </Suspense>
-              <FormError error={errors.usageDuration} />
-            </div>
-          </div>
-
-          {/* Purchase Date */}
-          <div data-field="purchaseDate">
-            <label className="text-base font-semibold text-[#111827] dark:text-white">
-              Date of Purchase
-              <RequiredAsterisk />
-            </label>
-
-            <input
-              type="date"
-              min="2000-01-01"
-              max={new Date().toISOString().split("T")[0]}
-              value={formData.purchaseDate}
-              onChange={(e) => updateField("purchaseDate", e.target.value)}
-              className={`mt-2 w-full h-[56px] rounded-xl border border-[#E5E7EB] ${
-                errors.purchaseDate
-                  ? "border-red-500"
-                  : "border-[#E5E7EB] focus:border-[#4F46E5]"
-              } px-5 outline-none focus:border-[#4F46E5] bg-[#F7F8FA] dark:bg-slate-800`}
-            />
-            <FormError error={errors.purchaseDate} />
-          </div>
-        </div>
-      </div>
-
-      {/* Step-1 Girls Corner toggle — visible only to girls/admins */}
-      <VisibilitySelector />
-
-      {/* Footer */}
-      <div className="mt-10 flex items-center justify-between">
-        {/* Pagination */}
-        <div className="flex items-center gap-2">
-          <span className="text-base text-[#94A3B8]">Step 1 of 4</span>
-
-          <div className="flex gap-1">
-            <div className="w-7 h-[4px] rounded-full bg-[#4F46E5]" />
-
-            <div className="w-3 h-[4px] rounded-full bg-[#D1D5DB]" />
-
-            <div className="w-3 h-[4px] rounded-full bg-[#D1D5DB]" />
-
-            <div className="w-3 h-[4px] rounded-full bg-[#D1D5DB]" />
-          </div>
-        </div>
-
-        {/* Continue */}
-        <button
-          onClick={() => validateAndProceed(validateBasicInfo, nextStep)}
-          className="h-[50px] lg:h-[54px] px-6 lg:px-8 rounded-xl flex justify-center items-center gap-2 font-semibold transition-all duration-200 text-base lg:text-lg bg-[#3838EC] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-200"
-        >
-          <span>Continue</span>
-          <IoArrowForward className="size-5" />
-        </button>
-      </div>
-    </motion.div>
+    <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-slate-400 dark:text-zinc-500">
+      <Lock className="h-3 w-3" aria-hidden="true" />
+      Set for this category
+    </span>
   );
-};
+}
 
 export default BasicInfoStep;

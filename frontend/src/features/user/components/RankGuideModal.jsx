@@ -91,7 +91,7 @@ export default function RankGuideModal({
           <div className="flex gap-2 mt-4">
             <button
               onClick={() => setActiveTab("roadmap")}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "roadmap"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                   : "bg-[#F7F8FA]/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-[#F7F8FA] dark:hover:bg-gray-800"
@@ -102,7 +102,7 @@ export default function RankGuideModal({
             </button>
             <button
               onClick={() => setActiveTab("rewards")}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "rewards"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                   : "bg-[#F7F8FA]/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-[#F7F8FA] dark:hover:bg-gray-800"
@@ -113,7 +113,7 @@ export default function RankGuideModal({
             </button>
             <button
               onClick={() => setActiveTab("earn")}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "earn"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                   : "bg-[#F7F8FA]/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-[#F7F8FA] dark:hover:bg-gray-800"
@@ -473,7 +473,7 @@ export default function RankGuideModal({
 
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 text-xs font-bold transition-colors"
+            className="px-5 py-2 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 text-xs font-bold transition-colors"
           >
             Got it!
           </button>

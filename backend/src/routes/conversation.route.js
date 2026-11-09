@@ -15,6 +15,7 @@ import {
   createConversation,
   listConversations,
   getConversation,
+  getUnreadCount,
 } from "../controllers/conversation.controller.js";
 import {
   listMessages,
@@ -30,6 +31,7 @@ import {
   confirmPayment,
   confirmItemReceived,
   cancelDeal,
+  revertDealStage,
 } from "../controllers/deal.controller.js";
 
 const router = express.Router();
@@ -67,6 +69,8 @@ const dealActionLimiter = rateLimit({
 });
 
 router.get("/", auth, listLimiter, listConversations);
+// Must be registered before "/:id" so "unread-count" isn't read as an id.
+router.get("/unread-count", auth, listLimiter, getUnreadCount);
 router.post("/", auth, messageLimiter, validate(createConversationSchema), createConversation);
 
 router.get("/:id", auth, listLimiter, getConversation);
@@ -89,5 +93,6 @@ router.post("/:id/pickup", auth, dealActionLimiter, validate(schedulePickupSchem
 router.post("/:id/payment-confirm", auth, dealActionLimiter, confirmPayment);
 router.post("/:id/item-received", auth, dealActionLimiter, confirmItemReceived);
 router.post("/:id/cancel", auth, dealActionLimiter, validate(cancelDealSchema), cancelDeal);
+router.post("/:id/revert", auth, dealActionLimiter, revertDealStage);
 
 export default router;

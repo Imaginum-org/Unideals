@@ -7,6 +7,7 @@ import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -158,16 +159,16 @@ function ForgotPassword() {
                   disabled={isSubmitting}
                   className="
                     h-[6.3vh] sm:h-11 md:h-10 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh]
-                    w-full rounded-xl
+                    w-full rounded-lg
                     bg-[#393AF2] font-semibold text-white
                     text-sm md:text-xs lg:text-sm xl:text-[0.8rem] 2xl:text-[0.85rem]
                     transition hover:bg-[#2829D8]
                     focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25
                     disabled:cursor-not-allowed disabled:opacity-60
-                    md:rounded-xl
+                   
                   "
                 >
-                  {isSubmitting ? "Sending link…" : "Send Reset Link"}
+                  <ButtonLoader loading={isSubmitting} loadingText="Sending link…">Send Reset Link</ButtonLoader>
                 </button>
 
                 {/* Back to login */}

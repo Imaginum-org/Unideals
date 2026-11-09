@@ -10,7 +10,10 @@
     "prod": "NODE_ENV=production node server.js",
     "seed:campuses": "node src/seeds/campuses.seed.js",
     "lint": "echo \"Add ESLint here\"",
-    "format": "echo \"Add Prettier here\""
+    "format": "echo \"Add Prettier here\"",
+    "test:plans": "node tests/plans.integration.test.mjs",
+    "test:views": "node tests/views.integration.test.mjs",
+    "test:deals": "node tests/deals.integration.test.mjs"
   },
   "keywords": [
     "nodejs",
@@ -31,7 +34,6 @@
     "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "crypto": "^1.0.1",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
@@ -48,11 +50,11 @@
     "resend": "^6.9.4",
     "slugify": "^1.6.9",
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3",
     "xss": "^1.0.15",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "mongodb-memory-server": "^10.4.3",
     "nodemon": "^3.1.11"
   }
 }

@@ -34,12 +34,16 @@ export const useRazorpayCheckout = () => {
   const inFlightRef = useRef(false);
 
   const openCheckout = useCallback(
-    async ({ orderId, amount, currency, planName, prefill }) => {
+    async ({ orderId, amount, currency, planName, description, prefill, keyId }) => {
       if (inFlightRef.current) {
         throw new Error("A payment window is already open");
       }
       // Fail fast with a clear message instead of opening a broken gateway.
-      if (!import.meta.env.VITE_RAZORPAY_KEY_ID) {
+      // Prefer the key the server returned with the order: the order was
+      // created under that account, so a stale/mismatched VITE key can
+      // never open checkout against a different Razorpay account.
+      const checkoutKey = keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!checkoutKey) {
         throw new Error("Payments are unavailable right now. Please try later.");
       }
       await loadCheckoutScript();
@@ -59,12 +63,14 @@ export const useRazorpayCheckout = () => {
 
         try {
           const rzp = new window.Razorpay({
-            key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+            key: checkoutKey,
+            // Informational only: with order_id set, Razorpay always charges
+            // the amount fixed on the server-created order.
             amount,
             currency,
             order_id: orderId,
             name: "Unideals",
-            description: `${planName} Plan`,
+            description: description || `${planName} Plan`,
             // Public logo + brand color customize the gateway header.
             // Absolute prod URL so it resolves inside the checkout iframe
             // on any domain (including localhost during development).
@@ -75,23 +81,23 @@ export const useRazorpayCheckout = () => {
               contact: prefill?.contact || "",
             },
             theme: { color: "#3300ff", backdrop_color: "rgba(19,19,19,0.6)" },
-            // Single "Payment Options" block listing ONLY UPI, Cards and
-            // Netbanking (in that order). One block => no separate
-            // "Recommended" tab; default blocks off; everything else
-            // (wallets, EMI, pay-later, bank transfer) hidden via `hide`
-            // at the display level (per Razorpay block-config docs).
-            // NOTE: whether the UPI screen offers QR, UPI-ID/collect or
-            // both is controlled by the Razorpay account's UPI settings —
-            // enable the Collect flow in Dashboard payment methods if the
-            // ID field is missing. No `flows` key exists in the API, so
-            // none is sent here.
+            // Single "Payment Options" block: UPI (QR code + UPI ID + UPI
+            // apps), Credit/Debit Cards, Netbanking. Wallets, EMI, pay-later
+            // and bank transfer stay hidden.
+            //
+            // UPI `flows` must be listed explicitly inside a custom block —
+            // without it the QR-code flow was never requested, which is why
+            // the QR did not show. Razorpay renders each flow where the
+            // device supports it: "qr" on desktop/wide screens (scan with
+            // any UPI app), "intent" (GPay/PhonePe/Paytm buttons) on
+            // mobile, and "collect" (enter UPI ID) everywhere.
             config: {
               display: {
                 blocks: {
                   methods: {
                     name: "Payment Options",
                     instruments: [
-                      { method: "upi" },
+                      { method: "upi", flows: ["qr", "collect", "intent"] },
                       { method: "card" },
                       { method: "netbanking" },
                     ],

@@ -138,6 +138,12 @@ conversationSchema.index({
   last_activity_at: -1,
 });
 
+// Chat list + unread badge filter by ONE participant, then sort by activity.
+// The unique index above leads with buyer_id only, so seller-side lookups
+// were collection scans.
+conversationSchema.index({ buyer_id: 1, last_activity_at: -1 });
+conversationSchema.index({ seller_id: 1, last_activity_at: -1 });
+
 const Conversation = mongoose.model("Conversation", conversationSchema);
 
 export default Conversation;

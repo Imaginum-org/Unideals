@@ -102,3 +102,9 @@ export const cancelDeal = async (id, reason = "") => {
   });
   return data?.data;
 };
+
+// Seller: step the deal back one stage (payment → pickup → confirmed → negotiating).
+export const revertDeal = async (id) => {
+  const { data } = await axios.post(`/api/conversations/${id}/revert`);
+  return data?.data;
+};

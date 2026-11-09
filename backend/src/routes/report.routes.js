@@ -21,15 +21,10 @@ const reportLimiter = rateLimit({
   message: { success: false, message: "Too many reports, try later" },
 });
 
-const optionalAuth = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return next();
-  }
-  return auth(req, res, () => {
-    next();
-  });
-};
+// Shared cookie-aware optionalAuth. The old local version only looked at a
+// Bearer header, but the web app authenticates with HttpOnly cookies, so
+// logged-in users were always recorded as anonymous visitors.
+import { optionalAuth } from "../middlewares/auth.middleware.js";
 
 router.post(
   "/product/:productId",

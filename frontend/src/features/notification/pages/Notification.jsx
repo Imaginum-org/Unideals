@@ -1,273 +1,176 @@
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  CheckCheck,
-  ArrowUpRight,
-  Check,
-  MessageSquare,
-  Package,
-  Tag,
-  Bell,
-  Megaphone,
-  ShieldAlert,
-  X,
-} from "lucide-react";
-
-import Profile_left_part from "../../../features/user/components/Profile_left_part.jsx";
+import { ArrowUpRight, Bell, BellOff, Check, CheckCheck, Megaphone, MessageSquare, Package, ShieldAlert, Tag, X } from "lucide-react";
 import { useNotification } from "../../../context/NotificationContext.jsx";
+import {
+  AccountLayout,
+  CARD,
+  ErrorState,
+  FLUSH_ON_PHONE,
+  ListSkeleton,
+  TabBar,
+  btnSecondary,
+} from "../../user/components/account/AccountKit.jsx";
+import { cn } from "../../../utils/cn.js";
 
-// Resolve icon and style by notification type
+// Icon + tone by notification type.
 const getNotificationTypeMeta = (type = "") => {
   const norm = String(type).toUpperCase();
-  if (norm.includes("OFFER") || norm.includes("PROMOTION") || norm.includes("PROMO")) {
-    return {
-      Icon: Tag,
-      iconColor: "text-amber-500",
-      dotColor: "bg-amber-500",
-      badgeBg: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-      displayType: "OFFER / PROMO",
-    };
-  }
-  if (norm.includes("WISHLIST") || norm.includes("PRICE")) {
-    return {
-      Icon: Tag,
-      iconColor: "text-orange-500",
-      dotColor: "bg-orange-500",
-      badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300",
-      displayType: "WISHLIST ALERT",
-    };
-  }
-  if (norm.includes("MESSAGE")) {
-    return {
-      Icon: MessageSquare,
-      iconColor: "text-sky-500",
-      dotColor: "bg-sky-500",
-      badgeBg: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
-      displayType: "DIRECT MESSAGE",
-    };
-  }
-  if (norm.includes("ORDER")) {
-    return {
-      Icon: Package,
-      iconColor: "text-emerald-500",
-      dotColor: "bg-emerald-500",
-      badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-      displayType: "ORDER UPDATE",
-    };
-  }
-  if (norm.includes("ANNOUNCE")) {
-    return {
-      Icon: Megaphone,
-      iconColor: "text-indigo-500",
-      dotColor: "bg-indigo-500",
-      badgeBg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300",
-      displayType: "ANNOUNCEMENT",
-    };
-  }
-  if (norm.includes("MODERAT") || norm.includes("REVIEW") || norm.includes("FLAG")) {
-    return {
-      Icon: ShieldAlert,
-      iconColor: "text-rose-500",
-      dotColor: "bg-rose-500",
-      badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300",
-      displayType: "MODERATION",
-    };
-  }
-  return {
-    Icon: Bell,
-    iconColor: "text-slate-500",
-    dotColor: "bg-slate-500",
-    badgeBg: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300",
-    displayType: "GENERAL",
-  };
+  if (norm.includes("OFFER") || norm.includes("PROMOTION") || norm.includes("PROMO"))
+    return { Icon: Tag, tone: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300", label: "Offer" };
+  if (norm.includes("WISHLIST") || norm.includes("PRICE"))
+    return { Icon: Tag, tone: "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-300", label: "Price alert" };
+  if (norm.includes("MESSAGE"))
+    return { Icon: MessageSquare, tone: "bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300", label: "Message" };
+  if (norm.includes("ORDER"))
+    return { Icon: Package, tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300", label: "Order" };
+  if (norm.includes("ANNOUNCE"))
+    return { Icon: Megaphone, tone: "bg-[var(--accent-soft)] text-[var(--accent-text)]", label: "Announcement" };
+  if (norm.includes("MODERAT") || norm.includes("REVIEW") || norm.includes("FLAG"))
+    return { Icon: ShieldAlert, tone: "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300", label: "Moderation" };
+  return { Icon: Bell, tone: "bg-neutral-100 text-slate-600 dark:bg-white/5 dark:text-zinc-300", label: "Update" };
 };
 
 export default function Notification() {
   const navigate = useNavigate();
-  const {
-    notifications,
-    unreadCount,
-    loading,
-    error,
-    markRead,
-    markAllRead,
-    trackClick,
-    dismiss,
-    fetchNotifications,
-  } = useNotification();
+  const { notifications, unreadCount, loading, error, markRead, markAllRead, trackClick, dismiss, fetchNotifications } =
+    useNotification();
+  const [filter, setFilter] = useState("all");
+
+  const visible = useMemo(
+    () => (filter === "unread" ? notifications.filter((n) => n.unread) : notifications),
+    [filter, notifications],
+  );
 
   const openNotification = async (notification) => {
     await trackClick(notification.id);
     await markRead(notification.id);
-    const targetPath =
-      notification.actionPath || notification.action_url || "/deals";
-    navigate(targetPath);
+    navigate(notification.actionPath || notification.action_url || "/deals");
   };
 
   return (
-    <div className="h-full w-full overflow-hidden bg-[#F7F8FA] font-figtree dark:bg-[#131313]">
-      <div className="flex h-[calc(100vh-70px)]">
-        <div className="hidden md:block md:w-auto md:shrink-0 bg-[#F7F8FA] dark:bg-[#131313] xl:pt-2 xl:pb-0">
-          <Profile_left_part />
+    <AccountLayout
+      seoTitle="Notifications | Unideals"
+      title="Notifications"
+      description={unreadCount > 0 ? `${unreadCount} unread` : undefined}
+      actions={
+        <button type="button" onClick={markAllRead} disabled={unreadCount === 0} className={btnSecondary}>
+          <CheckCheck className="h-4 w-4" aria-hidden="true" />
+          Mark all read
+        </button>
+      }
+    >
+      <TabBar
+        className="mb-4"
+        ariaLabel="Filter notifications"
+        stretch
+        tabs={[
+          { value: "all", label: "All", count: notifications.length },
+          { value: "unread", label: "Unread", count: unreadCount },
+        ]}
+        value={filter}
+        onChange={setFilter}
+      />
+
+      {loading && notifications.length === 0 ? (
+        <ListSkeleton rows={4} />
+      ) : error && notifications.length === 0 ? (
+        <ErrorState message={error} onRetry={fetchNotifications} />
+      ) : visible.length === 0 ? (
+        <div className={cn(CARD, "flex flex-col items-center px-6 py-12 text-center")}>
+          <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-text)]">
+            {filter === "unread" ? <CheckCheck className="h-6 w-6" aria-hidden="true" /> : <BellOff className="h-6 w-6" aria-hidden="true" />}
+          </span>
+          <h2 className="mt-3 text-[16px] font-semibold text-slate-900 dark:text-white">
+            {filter === "unread" ? "No unread notifications" : "You're all caught up"}
+          </h2>
+
         </div>
-
-        <main className="h-full overflow-y-auto bg-[#F7F8FA] px-5 py-6 dark:bg-[#131313] md:flex-1 xl:px-[5.7rem]">
-          <div className="mx-auto w-full max-w-4xl pb-10">
-            <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h1 className="mb-1 text-[1.4rem] font-bold text-gray-900 dark:text-white lg:text-2xl xl:text-xl">
-                  Notifications
-                </h1>
-                <p className="text-[13px] font-semibold text-[#9AA3B2] dark:text-gray-400">
-                  Stay updated with campus offers, deals, transactions, and direct messages
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={markAllRead}
-                  disabled={unreadCount === 0}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-[13px] font-extrabold text-[#4A3CFF] transition hover:bg-[#EEEFFF] disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-indigo-950/40"
+      ) : (
+        <>
+          {error && (
+            <p role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3.5 py-2.5 text-[13px] text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
+              {error}
+              <button type="button" onClick={fetchNotifications} className="font-semibold underline underline-offset-2">
+                Retry
+              </button>
+            </p>
+          )}
+          <ul className={cn(CARD, FLUSH_ON_PHONE, "divide-y divide-neutral-100 overflow-hidden dark:divide-neutral-800")}>
+            {visible.map((n) => {
+              const meta = getNotificationTypeMeta(n.type);
+              const Icon = meta.Icon;
+              const banner = n.imageUrl || n.image_url;
+              return (
+                <li
+                  key={n.id || n._id}
+                  className={cn("group relative flex gap-3 px-4 py-4 transition-colors sm:px-5", n.unread ? "bg-[var(--accent-soft)]/40" : "hover:bg-neutral-50/70 dark:hover:bg-white/[0.02]")}
                 >
-                  <CheckCheck size={18} />
-                  Mark all read
-                </button>
-              </div>
-            </header>
+                  <span className="relative mt-0.5 shrink-0">
+                    <span className={cn("grid h-10 w-10 place-items-center rounded-xl", meta.tone)}>
+                      <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                    </span>
+                    {n.unread && (
+                      <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[var(--accent)] ring-2 ring-white dark:ring-[#1A1D20]" />
+                    )}
+                  </span>
 
-            {error && (
-              <div
-                role="alert"
-                className="mb-4 flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <span>{error}</span>
-                <button
-                  type="button"
-                  onClick={fetchNotifications}
-                  className="font-bold underline underline-offset-2"
-                >
-                  Try again
-                </button>
-              </div>
-            )}
+                  <div className="min-w-0 flex-1">
+                    <button type="button" onClick={() => openNotification(n)} className="block w-full pr-8 text-left">
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className={cn("min-w-0 truncate text-[14.5px] text-slate-900 dark:text-white", n.unread ? "font-semibold" : "font-medium")}>
+                          {n.title}
+                        </span>
+                        <span className="shrink-0 text-[12px] text-slate-400 dark:text-zinc-500">{n.time}</span>
+                      </span>
+                      <span className="mt-0.5 line-clamp-2 block text-[13px] leading-relaxed text-slate-600 dark:text-zinc-300">
+                        {n.message || n.description}
+                      </span>
+                    </button>
 
-            {loading ? (
-              <div className="flex justify-center py-16">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
-              </div>
-            ) : error && notifications.length === 0 ? null : notifications.length === 0 ? (
-              <div className="rounded-2xl border border-[#E2E6EF] bg-[#F7F8FA] p-10 text-center dark:border-gray-800 dark:bg-[#1c1c1c]">
-                <p className="text-4xl">🎉</p>
-                <h2 className="mt-3 text-base font-bold text-[#09111F] dark:text-white">
-                  You&apos;re caught up
-                </h2>
-                <p className="mx-auto mt-2 max-w-sm text-[13px] font-medium leading-6 text-[#9AA3B2]">
-                  New announcements, messages, order updates, and campus offers will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {notifications.map((notification) => {
-                  const meta = getNotificationTypeMeta(notification.type);
-                  const Icon = meta.Icon;
-                  const bannerImage =
-                    notification.imageUrl || notification.image_url;
-
-                  return (
-                    <article
-                      key={notification.id || notification._id}
-                      className={`rounded-2xl border p-4 shadow-[0_10px_26px_rgba(15,23,42,0.055)] transition dark:bg-[#1c1c1c] ${
-                        notification.unread
-                          ? "border-[#DEDFFC] bg-[#F7F7FF] dark:border-indigo-900/60 dark:bg-indigo-950/20"
-                          : "border-[#E2E6EF] bg-[#F7F8FA] dark:border-gray-800"
-                      }`}
-                    >
-                      <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-start">
-                        <div className="flex items-center gap-3">
-                          <Icon
-                            size={22}
-                            strokeWidth={1.8}
-                            className={meta.iconColor}
-                          />
-                          {notification.unread && (
-                            <span
-                              className={`h-2 w-2 rounded-full ${meta.dotColor}`}
-                            />
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`rounded-md px-2.5 py-0.5 text-[10px] font-black tracking-wider ${meta.badgeBg}`}
-                            >
-                              {meta.displayType}
-                            </span>
-                            <h2 className="text-[15px] font-extrabold text-[#09111F] dark:text-white">
-                              {notification.title}
-                            </h2>
-                          </div>
-
-                          <p className="mt-2.5 max-w-3xl text-[13px] font-medium leading-6 text-[#09111F] dark:text-slate-200">
-                            {notification.message || notification.description}
-                          </p>
-
-                          {/* Attached Banner Image Preview */}
-                          {bannerImage && (
-                            <div className="mt-3 max-w-md overflow-hidden rounded-xl border border-slate-200 dark:border-gray-800">
-                              <img
-                                src={bannerImage}
-                                alt="Offer Banner"
-                                className="h-32 w-full object-cover"
-                              />
-                            </div>
-                          )}
-
-                          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center">
-                            <button
-                              type="button"
-                              onClick={() => openNotification(notification)}
-                              className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl bg-[#4A3CFF] px-4 text-[13px] font-extrabold text-white shadow-sm shadow-indigo-500/25 transition hover:bg-[#3832E8] sm:w-auto"
-                            >
-                              {notification.actionLabel ||
-                                notification.action_label ||
-                                "View Offers"}
-                              <ArrowUpRight size={14} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => markRead(notification.id)}
-                              disabled={!notification.unread}
-                              className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[#E2E6EF] bg-[#F7F8FA] px-4 text-[13px] font-bold text-[#09111F] transition hover:border-[#4A3CFF] hover:text-[#4A3CFF] disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-[#1c1c1c] dark:text-white sm:w-auto"
-                            >
-                              <Check size={14} />
-                              {notification.unread ? "Mark as read" : "Read"}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => dismiss(notification.id)}
-                              className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[#E2E6EF] bg-[#F7F8FA] px-4 text-[13px] font-bold text-[#9AA3B2] transition hover:border-rose-400 hover:text-rose-500 dark:border-gray-800 dark:bg-[#1c1c1c] sm:w-auto"
-                            >
-                              <X size={14} />
-                              Dismiss
-                            </button>
-                          </div>
-                        </div>
-
-                        <p className="text-[12px] font-bold text-[#9AA3B2] dark:text-gray-400 sm:text-right">
-                          {notification.time}
-                        </p>
+                    {banner && (
+                      <div className="mt-2.5 max-w-md overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
+                        <img src={banner} alt="" loading="lazy" className="h-32 w-full object-cover" />
                       </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
-    </div>
+                    )}
+
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span className="text-[11.5px] font-medium text-slate-400 dark:text-zinc-500">{meta.label}</span>
+                      <button
+                        type="button"
+                        onClick={() => openNotification(n)}
+                        className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-[var(--accent-text)] hover:underline"
+                      >
+                        {n.actionLabel || n.action_label || "View"}
+                        <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                      {n.unread && (
+                        <button
+                          type="button"
+                          onClick={() => markRead(n.id)}
+                          className="inline-flex items-center gap-1 text-[12.5px] font-medium text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"
+                        >
+                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                          Mark read
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => dismiss(n.id)}
+                    aria-label="Dismiss notification"
+                    className="absolute right-2.5 top-3 grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-neutral-100 hover:text-slate-700 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 dark:hover:bg-white/5 dark:hover:text-white"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </AccountLayout>
   );
 }

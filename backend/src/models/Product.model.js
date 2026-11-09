@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import slugify from "slugify";
 import { nanoid } from "nanoid";
+import { normalizeMultiline } from "../utils/text.js";
 
 import {
   PRODUCT_STATUS,
@@ -52,6 +53,9 @@ const productSchema = new Schema(
       },
       trim: true,
       maxlength: 2000,
+      // Last line of defence for every write path (admin edits, scripts):
+      // stored descriptions never carry padding or blank-line walls.
+      set: normalizeMultiline,
     },
 
     category: {
@@ -246,9 +250,29 @@ const productSchema = new Schema(
       type: String,
     },
 
+    // Unique viewers (one per person per 24h, owner and bots excluded).
+    // Only POST /api/product/:id/view increments it, never a detail GET,
+    // so hover prefetch / owner edits / order screens never inflate it.
     views_count: {
       type: Number,
       default: 0,
+    },
+
+    // "Hot deal" tag: set once when a young listing pulls enough unique
+    // viewers (config/hotDeals.js); the tag shows while hot_until > now.
+    hot_until: {
+      type: Date,
+      default: undefined,
+    },
+
+    // Seller's plan rank (0 Free, 1 Pro, 2 Pro+), denormalised so feed and
+    // search can rank by it without a $lookup before $sort. Kept in sync by
+    // User model hooks (utils/sellerTierSync.js).
+    seller_tier: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 2,
     },
 
     is_deleted: {
@@ -335,6 +359,8 @@ productSchema.index({
 });
 
 productSchema.index({ is_boosted: 1, boost_expires_at: -1, boost_tier: 1 });
+// Per-campus hot-deal cap check.
+productSchema.index({ campus_id: 1, hot_until: 1 });
 productSchema.index(
   { seller_id: 1, title: 1, selling_price: 1 },
   { unique: false },

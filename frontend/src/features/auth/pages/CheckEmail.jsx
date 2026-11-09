@@ -8,6 +8,7 @@ import AuthMessageBanner from "../components/AuthMessageBanner";
 import AuthMobileBanner from "../components/AuthMobileBanner";
 import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
+import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 function CheckEmail() {
   const location = useLocation();
@@ -236,7 +237,7 @@ function CheckEmail() {
                 <button
                   onClick={() => handleVerifyStatus(false)}
                   disabled={isChecking}
-                  className="h-[6.3vh] w-full rounded-xl bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-0 md:h-10 md:rounded-xl md:text-xs lg:h-10 lg:text-sm xl:h-[6.4vh] xl:text-[0.8rem] 2xl:h-[6.4vh] 2xl:text-[0.85rem]"
+                  className="h-[6.3vh] w-full rounded-lg bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-0 md:h-10 md:text-xs lg:h-10 lg:text-sm xl:h-[6.4vh] xl:text-[0.8rem] 2xl:h-[6.4vh] 2xl:text-[0.85rem]"
                 >
                   {isChecking ? "Checking..." : "Reload / I’ve Verified"}
                 </button>
@@ -251,7 +252,7 @@ function CheckEmail() {
                     className="font-semibold text-blue-700 transition-colors hover:text-[#2426C7] disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                   >
                     {isResending
-                      ? "Sending..."
+                      ? <ButtonLoader loading loadingText="Sending…" />
                       : resendCooldown > 0
                         ? `Resend Email (${formatTimer(resendCooldown)})`
                         : "Resend Email"}

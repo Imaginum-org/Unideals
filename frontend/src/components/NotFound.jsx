@@ -65,7 +65,7 @@ export default function NotFound() {
             </div>
             <button
               type="submit"
-              className="h-11 shrink-0 rounded-xl bg-[#393AF2] px-5 text-sm font-semibold text-white transition hover:bg-[#2829D8] active:scale-95"
+              className="h-11 shrink-0 rounded-lg bg-[#393AF2] px-5 text-sm font-semibold text-white transition hover:bg-[#2829D8] active:scale-95"
             >
               Search
             </button>
@@ -73,7 +73,7 @@ export default function NotFound() {
 
           <Link
             to="/"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white/60 px-5 py-2.5 text-sm font-semibold text-zinc-700 transition hover:border-[#394FF1] hover:text-[#394FF1] active:scale-95 dark:border-zinc-700 dark:bg-white/5 dark:text-zinc-200"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white/60 px-5 py-2.5 text-sm font-semibold text-zinc-700 transition hover:border-[#394FF1] hover:text-[#394FF1] active:scale-95 dark:border-zinc-700 dark:bg-white/5 dark:text-zinc-200"
           >
             <Home className="size-4" />
             Back to Home
