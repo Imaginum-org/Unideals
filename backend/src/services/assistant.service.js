@@ -6,6 +6,7 @@ import {
   getFullKnowledgeText,
 } from "./assistant.knowledge.js";
 import { PRODUCT_CATEGORY_LABELS, PRODUCT_CONDITION_LABELS, USER_TIER } from "../config/constants.js";
+import { getPricingForViewer } from "./payment.service.js";
 
 // ── In-memory LRU reply cache for instant repeated-question responses ──
 const CACHE_MAX = 120;
@@ -388,6 +389,7 @@ CRITICAL RULES:
 - If a Knowledge Base Context is provided below, treat it as the ABSOLUTE source of truth and answer from it first before calling tools.
 - For terms, privacy, website navigation, account, upload, wishlist, chat, report, address, and boosting questions, use the Knowledge Base Context BEFORE calling any tools.
 - NEVER invent, guess, or hallucinate policies, rules, prices, timelines, penalties, features, or procedures. ONLY state what is explicitly in the knowledge base or tool results.
+- Current subscription prices and viewer-specific offers must come from live plan pricing; direct users to /price rather than guessing.
 - CRITICAL NO-HALLUCINATION RULE: If a user asks a policy or procedure question that is NOT covered in the Knowledge Base Context or tool results, DO NOT make up an answer. Instead respond with: "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but our team is continuously expanding my knowledge and I'll soon be able to answer it! Please reach out to support@campusmart.in or visit /contact for direct assistance." Then provide suggestions from the platform.
 
 MANDATORY TOOL USAGE:
@@ -411,7 +413,7 @@ PLATFORM CORE GROUNDING:
 - Role: Intermediary under Section 79 IT Act. UniDeals does NOT hold funds, manage escrow, or arrange delivery. Liability capped at ₹1,000.
 - Safety: Meet in public campus spots during daylight (Library Gate, Canteen). Inspect before paying. UPI or cash only at meetup. NEVER pay advance or token money. Beware reverse QR scams.
 - Listing Rules: Selling price cannot exceed original MRP. Max 3 real photos (no stock images). Condition disclosed honestly.
-- Plans: Free (10 listings, 25 wishlist), Pro (₹99 lifetime, 25 listings, 2 boosts/month), Pro+ (₹199 lifetime, unlimited listings, 5 boosts/month). Boost add-ons: ₹29 (3-day), ₹49 (7-day). No boost stacking, no credit rollover.
+- Plan entitlements and current prices must be checked against the live plan data or the official pricing page.
 
 RESPONSE FORMAT:
 Always suggest 3-4 relevant follow-up prompts.
@@ -426,6 +428,45 @@ Return ONLY a valid JSON object with this structure:
 const CANDIDATE_MODELS = [
   GEMINI_MODEL || "gemini-flash-latest",
 ].filter(Boolean);
+
+const isPlanPricingQuestion = (message) =>
+  /\b(?:price|pricing|cost|how much|offer|charge)\b/i.test(message) &&
+  /\b(?:pro|pro plus|pro\+|subscription|plan|boost|founder|membership)\b/i.test(message);
+
+const isSupportedAssistantMessage = (message) => {
+  const text = message?.trim();
+  if (!text) return false;
+  if (/\b(?:ignore|disregard|forget|override|bypass)\b.{0,80}\b(?:rules?|instructions?|prompts?|guardrails?)\b/i.test(text)) {
+    return false;
+  }
+
+  if (/^(?:hi|hello|hey|good morning|good afternoon|good evening|thanks|thank you|bye)[!.? ]*$/i.test(text)) {
+    return true;
+  }
+  if (/\b(?:who are you|what can you do|what do you help with)\b/i.test(text)) {
+    return true;
+  }
+  const knowledgeMatch = findKnowledgeBaseAnswer(text);
+  const hasPlatformContext =
+    /\b(?:unideals|campus[- ]?mart|campus marketplace|marketplace|listing|seller|buyer|transaction|payment|upi|wishlist|boost|subscription|student email|verified student|meetup|pickup location)\b/i.test(text);
+  if (
+    (knowledgeMatch && (knowledgeMatch.id !== "terms_overview" || hasPlatformContext)) ||
+    isPlanPricingQuestion(text)
+  ) {
+    return true;
+  }
+  if (/\b(?:unideals|campus[- ]?mart|campus marketplace|marketplace|listing|seller|buyer|wishlist|boost|subscription|plan|terms|privacy|support|refund|return|deal|transaction|payment|pickup|meetup|verification|student email|safety|scam|qr code|report|account|profile|moderation|chat)\b/i.test(text)) {
+    return true;
+  }
+
+  if (/\b(?:sell|list for sale|list my|list this|create a listing|draft a listing)\b/i.test(text)) {
+    return true;
+  }
+
+  const hasProduct = /\b(?:items?|products?|listings?|laptops?|phones?|tablets?|electronics?|headphones?|chargers?|books?|textbooks?|cycles?|bicycles?|bikes?|furniture|clothing|shoes|bags?|backpacks?|cameras?|keyboards?|mice|helmets?|calculators?|monitors?|chairs?|tables?|bottles?|lamps?|hostel essentials|lab equipment|event passes|trip|travel|packing|bundle|essentials)\b/i.test(text);
+  const hasMarketplaceAction = /\b(?:find|search|show|recommend|compare|buy|purchase|sell|list|estimate|price|pricing|cost|worth|budget|under|below|cheaper|similar|available|looking for|need|want|how much|plan)\b/i.test(text);
+  return hasProduct && hasMarketplaceAction;
+};
 
 let geminiRateLimitedUntil = 0;
 
@@ -534,7 +575,7 @@ const buildMediaReply = async ({ message, attachments = [] }) => {
         {
           inlineData: {
             mimeType: attachment.mimeType,
-            data: attachment.data.replace(/^data:[^;]+;base64,/, ""),
+            data: attachment.data.replace(/^data:[^,]*;base64,/i, ""),
           },
         },
       ],
@@ -799,9 +840,77 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
     throw new Error("Message is required");
   }
 
+  const safeHistory = (Array.isArray(history) ? history : [])
+    .filter((entry) => (entry?.sender === "user" || entry?.sender === "assistant") && typeof entry.text === "string")
+    .slice(-8);
+  // Resolve short follow-ups against the latest concrete user request. Without
+  // this, deterministic search paths treat “show cheaper ones” as a literal query.
+  const latestRequest = [...safeHistory].reverse().find((entry) => entry.sender === "user" && entry.text.trim())?.text.trim();
+  const isFollowUp = /^(and\s+)?(show|find|give|any|what about|how about)?\s*(cheaper|more affordable|similar|more like that|another|other ones?|those|these|the blue one|the black one|under\s+\d+|below\s+\d+|for\s+\d+)\b|^(tell me more|show more|more options|anything else|which one|compare them)\b/i.test(message.trim());
+  const hasMarketplaceFollowUpContext = isFollowUp && latestRequest && isSupportedAssistantMessage(latestRequest);
+
+  if (
+    !attachments.length &&
+    !isSupportedAssistantMessage(message) &&
+    !hasMarketplaceFollowUpContext
+  ) {
+    return {
+      reply: "I'm the UniDeals assistant. I can help with campus marketplace listings, prices, buying and selling, platform policies, and transaction safety. What would you like help with?",
+      intent: "out_of_scope",
+      products: [],
+      suggestions: ["Find a campus listing", "Check a fair price", "Get safe buying tips"],
+      aiPowered: false,
+    };
+  }
+
+  if (!attachments.length && isPlanPricingQuestion(message)) {
+    const pricing = getPricingForViewer(user);
+    const formatPrice = (plan) =>
+      plan ? `₹${Number(plan.amount).toLocaleString("en-IN")}` : "not currently available";
+    const pricingType = pricing.subscriptionType === "founder" ? "one-time founder" : "current";
+    return {
+      reply: `Current ${pricingType} plan prices: Free is ₹0, Pro is ${formatPrice(pricing.plans.pro)}, and Pro+ is ${formatPrice(pricing.plans.pro_plus)}. Check the pricing page for plan details and any offer available to your account.`,
+      intent: "knowledge_base",
+      suggestions: ["Compare plan features", "How do boosts work?", "How do I upgrade?"],
+      route: "/price",
+      sources: ["Live plan pricing"],
+      aiPowered: false,
+    };
+  }
+
+  const resolvedMessage = isFollowUp && latestRequest
+    ? `${message.trim()} (continuing the request about: ${latestRequest})`
+    : message;
+
+  if (isFollowUp && latestRequest && /\b(cheaper|more affordable|under\s+\d+|below\s+\d+|for\s+\d+)\b/i.test(message)) {
+    const productQuery = latestRequest
+      .replace(/\b(show|find|search|looking for|available|do you have|can you find|recommend|suggest|some|any|products?|items?|please|under|below|less than|up to|budget|for)\b/gi, " ")
+      .replace(/[₹,\d]/g, " ").replace(/\s+/g, " ").trim();
+    const priorBudget = latestRequest.match(/(?:under|below|less than|up to|₹)\s*([\d,]+)/i)?.[1]?.replace(/,/g, "");
+    const followBudget = message.match(/(?:under|below|for|₹)\s*([\d,]+)/i)?.[1]?.replace(/,/g, "");
+    try {
+      const result = await toolHandlers.searchProducts({
+        query: productQuery,
+        maxPrice: followBudget ? Number(followBudget) : priorBudget ? Number(priorBudget) : undefined,
+        sortBy: /cheaper|affordable/i.test(message) ? "price_low" : "newest",
+        limit: 6,
+      });
+      if (result.products.length) {
+        return {
+          reply: `Here are ${/cheaper|affordable/i.test(message) ? "the most affordable" : "matching"} ${productQuery || "campus"} listings, using your previous search for context:`,
+          intent: "product_search", products: result.products, productCards: result.products,
+          suggestions: ["Show similar items", "What should I check before buying?", "Find another category"], aiPowered: false,
+        };
+      }
+    } catch (error) {
+      console.warn("[Assistant] Follow-up search failed:", error.message || error);
+    }
+  }
+
+  // Contextual responses must not reuse a cache entry created for a different turn.
   // ── FAST PATH: return cached reply instantly ──
   if (!attachments.length) {
-    const cached = getCachedReply(message);
+    const cached = isFollowUp ? null : getCachedReply(message);
     if (cached) return cached;
   }
 
@@ -822,6 +931,7 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
     }
   }
 
+  message = resolvedMessage;
   const categoryRecommendationIntent = /\b(recommend|suggest|show me|find me|find|suggest products|need products|what should i buy|best items|best products|good items|essentials)\b/i.test(message) &&
     /\b(book|books|study material|electronics|laptop|hostel|hostel essentials|bike|bikes|bicycle|bicycles|cycle|cycles|safety gear|travel|trip|packing|essentials)\b/i.test(message);
 
@@ -946,9 +1056,9 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
     return localFallback;
   }
 
-  const formattedHistory = history.map((msg) => ({
+  const formattedHistory = safeHistory.map((msg) => ({
     role: msg.sender === "user" ? "user" : "model",
-    parts: [{ text: msg.text }],
+    parts: [{ text: msg.text.slice(0, 2000) }],
   }));
 
   const userTier = user?.subscription || USER_TIER?.BASE_USER || "base_user";
@@ -965,7 +1075,7 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
     .map((attachment) => ({
       inlineData: {
         mimeType: attachment.mimeType,
-        data: attachment.data.replace(/^data:[^;]+;base64,/, ""),
+        data: attachment.data.replace(/^data:[^,]*;base64,/i, ""),
       },
     }));
 

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Camera,
   ExternalLink,
   Mic,
-  MessageCircle,
   Minus,
   RotateCcw,
   Sparkles,
@@ -20,19 +20,49 @@ import SafetyTipCard from "./SafetyTipCard.jsx";
 
 const quickPrompts = [
   "Cycles under ₹3,000",
-  "Electronics",
-  "Sell textbook",
-  "Price check",
-  "Safety tips",
+  "Find affordable electronics",
+  "Help me sell a textbook",
+  "Check a fair price",
+  "Campus safety tips",
 ];
 
 const initialMessage = {
-  text: "Hey there! 👋 I can instantly find campus deals, benchmark fair prices for your pre-owned items, draft counter-offers, and verify peer safety.",
+  text: "Hey there! 👋 I can find campus listings, check fair prices, help you sell, and share safe buying tips.",
   sender: "assistant",
   suggestions: quickPrompts,
 };
 
 const hiddenRoutes = ["/chat", "/login", "/signup", "/forgot-password"];
+const MAX_VOICE_RECORDING_MS = 60_000;
+
+const AssistantMark = () => (
+  <svg
+    viewBox="0 0 64 64"
+    aria-hidden="true"
+    className="h-full w-full"
+    fill="none"
+  >
+    <circle cx="30" cy="34" r="28" fill="url(#assistant-mark-gradient)" />
+    <path
+      d="M18.5 18h8v17.8c0 3.5 1.8 5.7 5 5.7 3.4 0 5.5-2.4 5.5-6.1V20h7.8v15.5c0 8.2-5.3 13.1-13.3 13.1-8 0-13-4.9-13-12.8V18Z"
+      fill="white"
+    />
+    <path
+      d="m49 7 1.6 4.5L55 13l-4.4 1.5L49 19l-1.6-4.5L43 13l4.4-1.5L49 7Z"
+      fill="white"
+    />
+    <path
+      d="m41.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"
+      fill="#C7D2FE"
+    />
+    <defs>
+      <linearGradient id="assistant-mark-gradient" x1="8" y1="7" x2="53" y2="59" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#3838EC" />
+        <stop offset="1" stopColor="#2636C8" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
 
 const formatPrice = (price) =>
   new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
@@ -96,12 +126,14 @@ const ProductResult = ({ product }) => {
 
 const FloatingAssistant = () => {
   const location = useLocation();
+  const prefersReducedMotion = useReducedMotion();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [cameraMenuOpen, setCameraMenuOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [messages, setMessages] = useState([initialMessage]);
@@ -113,6 +145,9 @@ const FloatingAssistant = () => {
   const recorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingStreamRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const assistantVisibleRef = useRef(false);
+  assistantVisibleRef.current = isOpen && !isMinimized;
 
   const shouldHide = hiddenRoutes.some((route) =>
     location.pathname.startsWith(route),
@@ -129,22 +164,7 @@ const FloatingAssistant = () => {
     setIsMinimized(false);
   }, [location.pathname]);
 
-  useEffect(() => {
-    const handleOpenAssistant = (event) => {
-      setIsOpen(true);
-      setIsMinimized(false);
-      if (event.detail?.message) {
-        sendMessage(event.detail.message);
-      }
-    };
-
-    window.addEventListener("open-unideals-assistant", handleOpenAssistant);
-    return () => {
-      window.removeEventListener("open-unideals-assistant", handleOpenAssistant);
-    };
-  }, [messages, isTyping]);
-
-  const sendMessage = async (text, attachments = []) => {
+  const sendMessage = useCallback(async (text, attachments = []) => {
     const messageText = text.trim() || (attachments.length
       ? "Please identify this image and recommend relevant UniDeals products."
       : "");
@@ -170,7 +190,11 @@ const FloatingAssistant = () => {
       const { data } = await axiosInstance.post("/api/chat/assistant", {
         message: messageText,
         history,
-        attachments: attachments.map(({ preview, ...attachment }) => attachment),
+        attachments: attachments.map((attachment) => {
+          const payload = { ...attachment };
+          delete payload.preview;
+          return payload;
+        }),
       });
 
       const assistantData = data?.data;
@@ -205,7 +229,22 @@ const FloatingAssistant = () => {
     } finally {
       setIsTyping(false);
     }
-  };
+  }, [isTyping, messages]);
+
+  useEffect(() => {
+    const handleOpenAssistant = (event) => {
+      setIsOpen(true);
+      setIsMinimized(false);
+      if (event.detail?.message) {
+        sendMessage(event.detail.message);
+      }
+    };
+
+    window.addEventListener("open-unideals-assistant", handleOpenAssistant);
+    return () => {
+      window.removeEventListener("open-unideals-assistant", handleOpenAssistant);
+    };
+  }, [sendMessage]);
 
   const imageToDataUrl = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -216,7 +255,12 @@ const FloatingAssistant = () => {
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
-        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        const context = canvas.getContext("2d");
+        if (!context) {
+          reject(new Error("Image processing is unavailable in this browser."));
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL("image/jpeg", 0.76));
       };
       image.onerror = reject;
@@ -235,7 +279,8 @@ const FloatingAssistant = () => {
     try {
       const data = await imageToDataUrl(file);
       setMediaPreview({ data, mimeType: "image/jpeg", preview: data });
-    } catch {
+    } catch (error) {
+      console.warn("[Assistant] Image could not be prepared:", error);
       setMessages((prev) => [...prev, { text: "I could not read that image. Please try another photo.", sender: "assistant", isError: true }]);
     }
   };
@@ -244,7 +289,26 @@ const FloatingAssistant = () => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
     cameraStreamRef.current = null;
     setCameraOpen(false);
+    setCameraReady(false);
   };
+
+  useEffect(() => {
+    if (isOpen && !isMinimized) return;
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    setCameraOpen(false);
+    setCameraReady(false);
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.onstop = null;
+      recorderRef.current.stop();
+    }
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingStreamRef.current = null;
+    window.clearTimeout(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    recorderRef.current = null;
+    setIsRecording(false);
+  }, [isOpen, isMinimized]);
 
   const openCamera = async () => {
     setCameraMenuOpen(false);
@@ -258,15 +322,26 @@ const FloatingAssistant = () => {
         video: { facingMode: { ideal: "environment" } },
         audio: false,
       });
+      if (!assistantVisibleRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       cameraStreamRef.current = stream;
       setCameraOpen(true);
       requestAnimationFrame(() => {
-        if (cameraVideoRef.current) {
-          cameraVideoRef.current.srcObject = stream;
-          cameraVideoRef.current.play();
+        const video = cameraVideoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          video.play().catch((error) => {
+            console.warn("[Assistant] Camera preview could not start:", error);
+            closeCamera();
+            setMessages((prev) => [...prev, { text: "The camera opened but its preview could not start. Upload a picture from your device instead.", sender: "assistant", isError: true }]);
+            cameraInputRef.current?.click();
+          });
         }
       });
-    } catch {
+    } catch (error) {
+      console.warn("[Assistant] Camera access failed:", error?.name || error);
       setMessages((prev) => [...prev, { text: "Camera access was blocked. Allow camera permission or upload a picture from your device.", sender: "assistant", isError: true }]);
       cameraInputRef.current?.click();
     }
@@ -280,7 +355,12 @@ const FloatingAssistant = () => {
     const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
-    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setMessages((prev) => [...prev, { text: "I could not capture that photo. Please try uploading an image instead.", sender: "assistant", isError: true }]);
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const data = canvas.toDataURL("image/jpeg", 0.8);
     closeCamera();
     setMediaPreview({ data, mimeType: "image/jpeg", preview: data });
@@ -288,11 +368,18 @@ const FloatingAssistant = () => {
 
   useEffect(() => () => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    window.clearTimeout(recordingTimerRef.current);
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.onstop = null;
+      recorderRef.current.stop();
+    }
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
   }, []);
 
   const handleMicClick = async () => {
     if (isRecording) {
+      window.clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
       recorderRef.current?.stop();
       return;
     }
@@ -304,30 +391,54 @@ const FloatingAssistant = () => {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!assistantVisibleRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       const recorder = new MediaRecorder(stream);
       recordingStreamRef.current = stream;
       recordingChunksRef.current = [];
       recorderRef.current = recorder;
-      recorder.ondataavailable = (event) => recordingChunksRef.current.push(event.data);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) recordingChunksRef.current.push(event.data);
+      };
       recorder.onstop = () => {
+        window.clearTimeout(recordingTimerRef.current);
+        recordingTimerRef.current = null;
         const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        const reader = new FileReader();
-        reader.onloadend = () => sendMessage("Please transcribe this audio and search UniDeals for what I said.", [{ mimeType: blob.type, data: reader.result }]);
-        reader.readAsDataURL(blob);
-        stream.getTracks().forEach((track) => track.stop());
+        if (!blob.size) {
+          setMessages((prev) => [...prev, { text: "No audio was captured. Please try recording again.", sender: "assistant", isError: true }]);
+        } else {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === "string") {
+              sendMessage("Please transcribe this audio and search UniDeals for what I said.", [{ mimeType: blob.type, data: reader.result }]);
+            } else {
+              setMessages((prev) => [...prev, { text: "I could not read that recording. Please try again.", sender: "assistant", isError: true }]);
+            }
+          };
+          reader.onerror = () => setMessages((prev) => [...prev, { text: "I could not read that recording. Please try again.", sender: "assistant", isError: true }]);
+          reader.readAsDataURL(blob);
+        }
+          stream.getTracks().forEach((track) => track.stop());
         recordingStreamRef.current = null;
         recorderRef.current = null;
         setIsRecording(false);
       };
       recorder.start();
       setIsRecording(true);
-    } catch {
+      recordingTimerRef.current = window.setTimeout(() => {
+        if (recorder.state === "recording") recorder.stop();
+      }, MAX_VOICE_RECORDING_MS);
+    } catch (error) {
+      console.warn("[Assistant] Microphone access failed:", error?.name || error);
       setMessages((prev) => [...prev, { text: "Microphone access was blocked. Allow microphone permission and try again.", sender: "assistant", isError: true }]);
     }
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    if (isTyping) return;
     const attachment = mediaPreview;
     setMediaPreview(null);
     sendMessage(input, attachment ? [attachment] : []);
@@ -343,23 +454,22 @@ const FloatingAssistant = () => {
   if (shouldHide) return null;
 
   return (
-    <div className="fixed bottom-3 right-3 z-[70] font-sans sm:bottom-6 sm:right-6">
+    <div className="fixed bottom-3 right-3 z-[70] font-figtree sm:bottom-6 sm:right-6">
       {isOpen && !isMinimized && (
-        <section className="relative mb-3 flex h-[min(700px,86vh)] w-[calc(100vw-24px)] max-w-[420px] flex-col overflow-hidden rounded-[32px] border border-black/[0.07] bg-white/85 shadow-[0_24px_60px_-12px_rgba(15,23,42,0.18),0_0_0_1px_rgba(0,0,0,0.05)] ring-1 ring-white/70 backdrop-blur-2xl dark:border-zinc-800 dark:bg-[#15171B]">
+        <section className="relative mb-3 flex h-[min(760px,88vh)] w-[calc(100vw-24px)] max-w-[520px] flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-[0_28px_90px_-24px_rgba(25,35,90,0.34),0_0_0_1px_rgba(25,35,90,0.05)] ring-1 ring-white/70 backdrop-blur-2xl dark:border-zinc-800 dark:bg-[#15171B]">
           <header className="relative z-10 flex items-center justify-between border-b border-black/[0.05] bg-white/70 px-5 py-4 backdrop-blur-xl dark:bg-[#15171B]/80">
             <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800 text-white shadow-sm ring-2 ring-white/80">
-                <div className="absolute -inset-0.5 rounded-2xl bg-blue-500/25 blur-sm" />
-                <MessageCircle className="relative h-5 w-5" />
+              <div               className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+              <AssistantMark />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <h2 className="text-[15px] font-bold leading-tight tracking-[-0.3px] text-[#1C1C1E] dark:text-white">UniDeals Copilot</h2>
+                  <h2 className="text-[15px] font-bold leading-tight tracking-[-0.3px] text-[#1C1C1E] dark:text-white">UniDeals Assistant</h2>
                   <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide text-blue-700">AI</span>
                 </div>
                 <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] font-medium tracking-tight text-slate-500">
-                  <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
-                  Live campus inventory active
+                  <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:animate-none" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
+                  Here for your campus marketplace
                 </p>
               </div>
             </div>
@@ -384,22 +494,22 @@ const FloatingAssistant = () => {
             </div>
           </header>
 
-          <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto bg-slate-50/60 px-4 py-4 dark:bg-[#101114]">
+          <div aria-live="polite" aria-relevant="additions text" className="no-scrollbar flex-1 space-y-4 overflow-y-auto bg-[radial-gradient(ellipse_at_50%_0%,rgba(99,102,241,.08),transparent_55%),linear-gradient(180deg,#f7f8ff_0%,#f6f7fb_100%)] px-4 py-4 dark:bg-[#101114] sm:px-5">
             <div className="my-1 flex justify-center"><span className="rounded-full border border-black/[0.03] bg-white/70 px-2.5 py-0.5 text-[11px] font-medium tracking-tight text-slate-400">Today · Campus Marketplace</span></div>
             {messages.map((message, index) => (
               <div
                 key={`${message.sender}-${index}`}
-                className={`flex flex-col ${
+                className={`animate-chat-in flex flex-col ${
                   message.sender === "user" ? "items-end" : "items-start"
                 }`}
               >
                 <div
                   className={`max-w-[90%] whitespace-pre-line rounded-[22px] px-4 py-3 text-[14.5px] leading-relaxed tracking-[-0.2px] shadow-sm ${
                     message.sender === "user"
-                      ? "rounded-tr-[6px] bg-gradient-to-br from-blue-700 to-blue-800 text-white"
+                      ? "rounded-tr-[7px] bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 text-white shadow-[0_8px_20px_-12px_rgba(67,56,202,.8)]"
                       : message.isError
                         ? "rounded-tl-[6px] border border-red-100 bg-red-50 text-red-700"
-                        : "rounded-tl-[6px] border border-black/[0.03] bg-[#E9E9EB] text-[#1C1C1E] dark:border-zinc-800 dark:bg-[#1E2025] dark:text-white"
+                        : "rounded-tl-[7px] border border-slate-200/80 bg-white text-slate-800 shadow-[0_8px_24px_-18px_rgba(15,23,42,.3)] dark:border-zinc-800 dark:bg-[#1E2025] dark:text-white"
                   }`}
                 >
                   {message.mediaPreview && (
@@ -444,14 +554,14 @@ const FloatingAssistant = () => {
 
             {isTyping && (
               <div className="flex w-fit items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-[11px] text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-[#1E2025]">
-                <Sparkles className="h-3.5 w-3.5 animate-spin text-[#394ff1]" />
+                <Sparkles className="h-3.5 w-3.5 animate-spin text-[#394ff1] motion-reduce:animate-none" />
                 Assistant is thinking...
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="space-y-2 border-t border-black/[0.05] bg-white/80 p-3 backdrop-blur-xl dark:border-zinc-800 dark:bg-[#15171B]">
+          <div className="space-y-2 border-t border-slate-200/70 bg-white/95 p-3 backdrop-blur-xl dark:border-zinc-800 dark:bg-[#15171B] sm:p-4">
             <div className="mb-2 flex items-center justify-between">
               <button
                 onClick={resetChat}
@@ -480,7 +590,7 @@ const FloatingAssistant = () => {
                 <button type="button" onClick={() => setMediaPreview(null)} className="font-bold text-blue-600" aria-label="Remove selected image">×</button>
               </div>
             )}
-            {isRecording && <div className="mb-2 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">Recording audio... click the microphone to search</div>}
+            {isRecording && <div className="mb-2 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">Recording audio (max 60 seconds)... click the microphone to search</div>}
             <input ref={uploadInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelected} />
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelected} />
             <form
@@ -492,22 +602,23 @@ const FloatingAssistant = () => {
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 placeholder="Ask anything on campus..."
-                className="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[14.5px] tracking-[-0.2px] text-[#1C1C1E] outline-none placeholder:text-[#8E8E93] dark:text-white"
+                  maxLength={2000}
+                  className="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[14.5px] tracking-[-0.2px] text-[#1C1C1E] outline-none placeholder:text-[#8E8E93] dark:text-white"
               />
-              <button type="button" aria-label={isRecording ? "Stop recording" : "Record voice search"} onClick={handleMicClick} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition ${isRecording ? "text-red-600" : "text-[#8E8E93] hover:text-blue-700"}`}><Mic className="h-4 w-4" /></button>
+              <button type="button" aria-label={isRecording ? "Stop recording" : "Record voice search"} onClick={handleMicClick} disabled={isTyping} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-40 ${isRecording ? "text-red-600" : "text-[#8E8E93] hover:text-blue-700"}`}><Mic className="h-4 w-4" /></button>
               <button type="submit" disabled={(!input.trim() && !mediaPreview) || isTyping} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-700 text-white shadow-[0_4px_14px_rgba(29,78,216,0.39)] transition hover:bg-blue-800 disabled:opacity-50" aria-label="Send message"><span className="text-lg leading-none">↑</span></button>
             </form>
           </div>
 
           {cameraOpen && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+            <div role="dialog" aria-modal="true" aria-label="Take a picture" className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
               <div className="w-full max-w-sm overflow-hidden rounded-3xl bg-white p-3 shadow-2xl">
                 <div className="mb-2 flex items-center justify-between px-1">
                   <h3 className="text-sm font-bold text-slate-800">Take a picture</h3>
-                  <button type="button" onClick={closeCamera} className="text-sm font-semibold text-red-600">Cancel</button>
+                  <button type="button" onClick={closeCamera} aria-label="Close camera" className="text-sm font-semibold text-red-600">Cancel</button>
                 </div>
-                <video ref={cameraVideoRef} muted playsInline className="aspect-[4/3] w-full rounded-2xl bg-black object-cover" />
-                <button type="button" onClick={captureCameraImage} className="mt-3 w-full rounded-2xl bg-blue-700 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-blue-800">Capture and use photo</button>
+                <video ref={cameraVideoRef} muted playsInline onCanPlay={() => setCameraReady(true)} aria-label="Camera preview" className="aspect-[4/3] w-full rounded-2xl bg-black object-cover" />
+                <button type="button" onClick={captureCameraImage} disabled={!cameraReady} className="mt-3 w-full rounded-2xl bg-blue-700 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">Capture and use photo</button>
               </div>
             </div>
           )}
@@ -516,21 +627,27 @@ const FloatingAssistant = () => {
 
       {(!isOpen || isMinimized) && (
         <div className="relative flex h-16 w-16 items-center justify-center">
-          {/* Glowing aura layers */}
-          <span className="absolute -inset-3 rounded-full bg-blue-500/35 blur-xl animate-pulse pointer-events-none" />
-          <span className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-blue-600/50 via-indigo-500/40 to-cyan-400/30 blur-lg pointer-events-none" />
+          <span className="pointer-events-none absolute -inset-2 rounded-full bg-indigo-500/20 blur-xl" />
 
-          <button
+          <motion.button
             onClick={() => {
               setIsOpen(true);
               setIsMinimized(false);
             }}
-            className="group relative flex h-14 w-14 items-center justify-center rounded-full border border-white/50 bg-gradient-to-tr from-blue-700 via-blue-600 to-blue-500 text-white shadow-[0_12px_32px_-4px_rgba(37,99,235,0.65),0_0_24px_rgba(59,130,246,0.45)] transition-all duration-300 hover:scale-110 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300/60 sm:h-16 sm:w-16"
+            whileHover={prefersReducedMotion ? undefined : { scale: 1.07, rotate: 5 }}
+            whileTap={prefersReducedMotion ? undefined : { scale: 0.94 }}
+            className="group relative flex h-16 w-16 items-center justify-center rounded-full border border-white/70 bg-white shadow-[0_12px_30px_-8px_rgba(49,54,205,.55)] focus:outline-none focus:ring-4 focus:ring-indigo-300/60"
             aria-label={isMinimized ? "Restore UniDeals Copilot" : "Open UniDeals Copilot"}
             title="UniDeals"
           >
-            <MessageCircle className="h-6 w-6 text-white transition-transform duration-300 group-hover:scale-110" />
-          </button>
+            <motion.span
+              animate={prefersReducedMotion ? undefined : { y: [0, -2, 0] }}
+              transition={prefersReducedMotion ? undefined : { duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="h-14 w-14 transition-transform duration-300 group-hover:scale-105"
+            >
+              <AssistantMark />
+            </motion.span>
+          </motion.button>
         </div>
       )}
     </div>

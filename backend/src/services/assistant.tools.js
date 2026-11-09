@@ -445,10 +445,22 @@ export const toolHandlers = {
       subscription_rules: {
         title: "Subscription Plans — Full Details",
         summary: SUBSCRIPTION_PLANS.philosophy,
-        plans: SUBSCRIPTION_PLANS.plans,
+        plans: {
+          ...SUBSCRIPTION_PLANS.plans,
+          pro: {
+            ...SUBSCRIPTION_PLANS.plans.pro,
+            price: "See current pricing at /price.",
+            support: "Priority chat and support.",
+          },
+          pro_plus: {
+            ...SUBSCRIPTION_PLANS.plans.pro_plus,
+            price: "See current pricing at /price.",
+            support: "Top chat and support priority.",
+          },
+        },
         boostAddons: SUBSCRIPTION_PLANS.boostAddons,
         upgradePolicy: SUBSCRIPTION_PLANS.upgradePolicy,
-        founderOffer: SUBSCRIPTION_PLANS.founderOffer,
+        founderOffer: "Current prices, account-specific offers, and purchase terms are displayed at /price.",
       },
       boost_rules: {
         title: "Boost Rules — Credits, Limits, Stacking, Rollover",
@@ -549,14 +561,10 @@ export const toolHandlers = {
       },
       founder_offer: {
         title: "Founder Offer — Lifetime Access Details",
-        summary: SUBSCRIPTION_PLANS.founderOffer,
+        summary: "Current prices, account-specific offers, and purchase terms are displayed at /price.",
         details: [
-          "Founder pricing: one-time payment, no recurring fees, ever.",
-          "Pro Founder: ₹99 for permanent lifetime access to all Pro features.",
-          "Pro+ Founder: ₹199 for permanent lifetime access to all Pro+ features.",
-          "Available only during the launch/founder phase.",
-          "After founder phase: new users pay ₹149/semester (Plus) or ₹249/semester (Premium).",
-          "Existing founders KEEP their lifetime benefits regardless of future pricing changes.",
+          "Current founder prices and eligibility are shown at /price.",
+          "Review the offer terms displayed before checkout.",
           SUBSCRIPTION_PLANS.regularPricing?.foundersKeepLifetime ? "Founders keep lifetime access forever — guaranteed." : "",
         ].filter(Boolean),
       },

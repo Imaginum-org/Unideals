@@ -38,6 +38,47 @@ const makeEntry = ({
 
 export const ASSISTANT_KNOWLEDGE_BASE = [
 
+  makeEntry({
+    id: "assistant_search_and_budgets",
+    title: "Finding Listings with Keywords, Categories, and Budgets",
+    keywords: [
+      "search products", "find listings", "find items", "search by budget", "budget search",
+      "under rupees", "under ₹", "below rupees", "cheaper listings", "sort by price",
+      "no search results", "no listings found", "similar alternatives", "similar items",
+      "filter by price", "affordable campus items", "search tips", "how to find a product",
+      "find something cheaper", "more affordable options", "budget filter",
+    ],
+    answer:
+      "Search listings with the item name or a few distinctive keywords, then narrow your request with a category or a maximum budget (for example, 'cycle under ₹3,000'). The assistant can search current active listings, order matches by price, and suggest similar alternatives when an exact match is unavailable. A search result is only a listing match; inspect the actual item and confirm its condition and availability with the seller before paying.",
+    steps: [
+      "Start with the item name or a short descriptive phrase.",
+      "Add a maximum budget when price matters, such as 'headphones below ₹1,500'.",
+      "Ask for cheaper options to sort matching listings by price.",
+      "If there is no exact match, ask for similar alternatives or try a broader keyword.",
+      "Confirm current availability with the seller and inspect the item in person before paying.",
+    ],
+    route: "/explore",
+    suggestions: ["Find a cycle under ₹3,000", "Show cheaper electronics", "What should I inspect before buying?"],
+  }),
+
+  makeEntry({
+    id: "assistant_follow_up_context",
+    title: "Following Up on an Assistant Search",
+    keywords: [
+      "show cheaper ones", "find cheaper ones", "more options", "show me more", "similar to that",
+      "the blue one", "the black one", "which one", "compare them", "follow up search",
+      "continue previous search", "more like that", "another one", "those listings",
+    ],
+    answer:
+      "You can refine a recent assistant search with short follow-ups such as 'show cheaper options', 'find similar items', or 'under ₹2,000'. The assistant uses your latest item search when it can identify one; if your follow-up could refer to several items, name the product or category to get a precise result. Always verify listing details and availability with the seller.",
+    steps: [
+      "Ask a follow-up such as 'show cheaper options' or 'under ₹2,000'.",
+      "If the previous request mentioned several items, name the item you mean.",
+      "Open a listing to review its details and contact the seller in-app to confirm availability.",
+    ],
+    suggestions: ["Show cheaper options", "Find similar items", "Find a cycle under ₹3,000"],
+  }),
+
   // ═══════════════════════════════════════════════════
   //  PLATFORM BASICS
   // ═══════════════════════════════════════════════════
@@ -103,12 +144,12 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "transaction fee", "no commission", "0 commission",
     ],
     answer:
-      "Yes, UniDeals is completely free to use! You can sign up, browse, search, wishlist, chat, and buy — all at zero cost. The Free plan includes up to 10 active listings and 25 wishlist saves. UniDeals NEVER charges commission on any transaction. Optional paid plans (Pro: ₹99 lifetime, Pro+: ₹199 lifetime) unlock extra listings, monthly boosts, and search priority — but the core marketplace is 100% free.",
+      "Yes, UniDeals is free to use for browsing, searching, wishlisting, chatting, and buying. The Free plan includes up to 10 active listings and 25 wishlist saves, and UniDeals does not charge commission on transactions. Optional paid plans add listing capacity, monthly boosts, and search priority. Check the pricing page (/price) for current prices and offers.",
     steps: [
       "Sign up for free with your college email.",
       "Free plan: 10 active listings, 25 wishlist saves, standard search visibility.",
-      "Pro plan (₹99 lifetime): 25 listings, 2 monthly 3-day boosts, 100 wishlist, high search priority.",
-      "Pro+ plan (₹199 lifetime): Unlimited listings, 5 monthly 7-day boosts, unlimited wishlist, highest priority.",
+      "Pro: 25 listings, 2 monthly 3-day boosts, 100 wishlist saves, higher search priority.",
+      "Pro+: Unlimited listings and wishlist saves, 5 monthly 7-day boosts, highest priority.",
       "No commission or hidden fees on any transaction — ever.",
       "Add-on boosts: ₹29 (3-day) or ₹49 (7-day), available to ALL users including Free plan.",
     ],
@@ -590,8 +631,8 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "Active listing limits by plan: Free = 10 active listings. Pro = 25 active listings. Pro+ = Unlimited listings. If you've reached your limit, either upgrade your plan or remove old/sold listings to make room. Listing limits are per active listing — sold or deleted listings don't count against your limit.",
     steps: [
       "Free plan: Up to 10 active listings.",
-      "Pro plan (₹99 lifetime): Up to 25 active listings.",
-      "Pro+ plan (₹199 lifetime): Unlimited active listings.",
+      "Pro: Up to 25 active listings.",
+      "Pro+: Unlimited active listings.",
       "To list more: remove sold or outdated listings, or upgrade your plan.",
       "Sold and deleted listings do not count against your active listing limit.",
       "Check your current plan in the Subscription section of your profile.",
@@ -904,13 +945,13 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "lifetime plan", "founder plan", "one time payment",
     ],
     answer:
-      "Three plans: Free (₹0): 10 listings, 25 wishlist, standard search, no monthly boosts (can buy add-ons). Pro (₹99 lifetime): 25 listings, 100 wishlist, 2 monthly 3-day boosts, high search priority, premium chat, priority support. Pro+ (₹199 lifetime): Unlimited listings, unlimited wishlist, 5 monthly 7-day boosts, HIGHEST search priority, highest priority chat, 24/7 dedicated support, full early feature access. All plans: buy and sell, unlimited chats, no commission. Add-on boosts available for all plans.",
+      "Free includes 10 active listings and 25 wishlist saves. Pro includes 25 active listings, 100 wishlist saves, 2 monthly 3-day boosts, higher search ranking, and priority chat and support. Pro+ includes unlimited listings and wishlist saves, 5 monthly 7-day boosts, the highest search ranking, and top chat and support priority. All plans support buying and selling with no transaction commission. Check the pricing page (/price) for current prices and offers.",
     steps: [
       "Open the Pricing page (/price) to compare all plans.",
       "Open Subscription from your profile to see your current plan.",
       "Free: 10 listings, 25 wishlist, standard search, community support.",
-      "Pro (₹99 lifetime): 25 listings, 100 wishlist, 2 boosts/month (3-day), high priority, priority support.",
-      "Pro+ (₹199 lifetime): Unlimited listings, unlimited wishlist, 5 boosts/month (7-day), highest priority, 24/7 support.",
+      "Pro: 25 listings, 100 wishlist saves, 2 boosts/month (3-day), higher search ranking, priority chat and support.",
+      "Pro+: Unlimited listings and wishlist saves, 5 boosts/month (7-day), highest ranking, top chat and support priority.",
       "All plans: unlimited buying, chatting, and zero commission.",
       "Boost add-ons: ₹29 (3-day) or ₹49 (7-day) available to ALL plans.",
     ],
@@ -978,13 +1019,11 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "founder offer valid", "after founder offer", "regular pricing",
     ],
     answer:
-      "Yes, the Founder Offer is genuinely a one-time payment for PERMANENT lifetime access. Early members who join during the launch period get Pro (₹99) or Pro+ (₹199) with full features forever — no monthly fees, no annual renewals, no hidden charges. After the founder phase ends, new users will be offered semester-based plans (₹149/semester or ₹249/semester). Existing founders ALWAYS keep their lifetime access regardless of plan price changes.",
+      "The active founder plan is a one-time payment with lifetime access. Offer availability and the amount shown can vary by account; check the pricing page (/price) for current terms. Existing founder benefits are governed by the offer terms accepted at checkout.",
     steps: [
       "Founder pricing is a one-time payment — no recurring fees, ever.",
-      "Pro Founder: ₹99 for lifetime access to all Pro features.",
-      "Pro+ Founder: ₹199 for lifetime access to all Pro+ features.",
-      "This pricing is only available during the launch/founder phase.",
-      "After founder phase ends, new users pay ₹149/semester (Plus) or ₹249/semester (Premium).",
+      "Current founder prices and eligibility are shown on the pricing page (/price).",
+      "Offer terms are displayed before checkout.",
       "Existing founders KEEP their lifetime benefits regardless of pricing changes for new users.",
       "Navigate to Subscription or Pricing page to upgrade now.",
     ],
