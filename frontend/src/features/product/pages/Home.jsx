@@ -19,6 +19,8 @@ import { CATEGORY_ITEMS } from "../constants/categories";
 import { GIRLS_MODE_CATEGORY_ORDER } from "../constants/productOptions.js";
 import { FiArrowRight } from "react-icons/fi";
 import { useUser } from "../../../context/useUserContext.jsx";
+import { ikCard } from "../../../utils/imageTransform.js";
+import { productPath } from "../../../utils/productPath.js";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { useGirlsMode } from "../../../context/GirlsModeContext.jsx";
 import GirlsEntryPill from "../../../components/ui/GirlsEntryPill.jsx";
@@ -111,6 +113,17 @@ const Home = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
+
+  // Hero: search box + four real listings with photos (boosted first).
+  const [heroQuery, setHeroQuery] = useState("");
+  const heroPicks = useMemo(() => {
+    const seen = new Set();
+    const imgOf = (p) => (typeof p?.images?.[0] === "string" ? p.images[0] : p?.images?.[0]?.url);
+    return [...boostedProducts, ...products]
+      .filter((p) => p?._id && imgOf(p) && !seen.has(p._id) && seen.add(p._id))
+      .slice(0, 4)
+      .map((p) => ({ _id: p._id, title: p.title, price: p.selling_price, image: ikCard(imgOf(p)), raw: p }));
+  }, [boostedProducts, products]);
   const [error, setError] = useState(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -456,76 +469,95 @@ const Home = () => {
       <div className="flex flex-col w-full max-w-[1380px] mx-auto">
         {/* Girls Corner edge menu — fixed to the right edge, girls + admins only */}
         <GirlsEntryPill tab={audienceTab} onChange={handleAudienceTab} />
-        {/* Hero banner — one component, two compositions:
-            phones: left-aligned copy + bag art on the right (readable at 320px);
-            md+: centred copy flanked by the fan + bag, all vertically centred
-            (images used to sit at a fixed top-72 offset and got clipped). */}
-        <motion.div
-          className="relative mx-auto mb-3 mt-3 flex w-full items-center overflow-hidden rounded-xl bg-cover bg-center bg-no-repeat shadow-[0_8px_20px_rgba(0,0,0,0.15)] sm:mt-4
-            min-h-[168px] sm:min-h-[220px] md:min-h-[240px] lg:min-h-[300px] xl:min-h-[360px] 2xl:min-h-[400px]
-            md:rounded-2xl"
-          style={{ backgroundImage: "url('/banner_bg.webp')" }}
-        >
-          {/* Left art (md+) */}
-          <div className="pointer-events-none absolute left-[3%] top-1/2 z-10 hidden w-[clamp(7rem,15vw,19rem)] -translate-y-1/2 -scale-x-100 -rotate-12 md:block">
-            <motion.img
-              src="/fan.webp"
-              alt=""
-              className="block h-auto w-full"
-              animate={reduceMotion ? undefined : { y: [0, -14, 0] }}
-              transition={{ duration: 4, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
-            />
-          </div>
-
-          {/* Right art: phones get a smaller bag beside the copy */}
-          <div className="pointer-events-none absolute right-[3%] top-1/2 z-10 w-[clamp(6.5rem,30vw,9rem)] -translate-y-1/2 -rotate-12 md:w-[clamp(7rem,16vw,22rem)]">
-            <motion.img
-              src="/bag_banner.webp"
-              alt=""
-              className="block h-auto w-full"
-              animate={reduceMotion ? undefined : { y: [0, -16, 0] }}
-              transition={{ duration: 4.6, ease: "easeInOut", repeat: Infinity, repeatType: "loop", delay: 0.6 }}
-            />
-          </div>
-
-          <div className="relative z-20 flex w-full items-center px-5 py-6 sm:px-8 md:justify-center md:px-[18%] md:py-8">
-            <div className="flex max-w-[62%] flex-col items-start text-left font-figtree text-white sm:max-w-[58%] md:max-w-3xl md:items-center md:text-center">
-              <h1 className="font-figtree text-[clamp(1.05rem,min(4.6vw,6.5vh),1.5rem)] font-extrabold leading-[1.2] tracking-wide md:text-[clamp(1.6rem,3vw,2.6rem)]">
-                <RevealWords text="Unlock Deals, Share Essentials," reduceMotion={reduceMotion} />{" "}
-                <br className="hidden md:block" />
-                <RevealWords text="Simplify Campus Living!" delay={0.28} reduceMotion={reduceMotion} />
+        {/* Hero (marketplace pattern): flat brand colour, big confident type,
+            search as the primary action, and real listings from this campus
+            in a staggered photo grid. No gradients, glows or mock UI. */}
+        <section className="brand-surface mx-auto mb-3 mt-3 w-full overflow-hidden rounded-xl text-white sm:mt-4 md:rounded-2xl">
+          <div className="grid items-center gap-10 px-6 py-10 sm:px-10 sm:py-12 lg:min-h-[480px] lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:px-14 lg:py-14">
+            <div className="font-figtree">
+              <h1 className="text-[34px] font-bold leading-[1.02] tracking-[-0.035em] sm:text-[46px] lg:text-[56px]">
+                <RevealWords text="Buy and sell" reduceMotion={reduceMotion} />
+                <br />
+                <RevealWords text="on campus." delay={0.15} reduceMotion={reduceMotion} />
               </h1>
-
               <motion.p
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18 }}
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={reduceMotion ? { duration: 0.2, delay: 0.3 } : { duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.55 }}
-                className="mt-1.5 font-figtree text-[clamp(0.75rem,3.2vw,0.95rem)] font-medium leading-snug text-gray-200 md:mt-4 md:text-[clamp(0.95rem,1.5vw,1.15rem)] md:leading-7 md:tracking-wide"
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+                className="mt-4 max-w-md text-[15px] leading-relaxed text-white/85 sm:text-[17px]"
               >
-                <span className="md:hidden">Buy, sell & connect with students on your campus.</span>
-                <span className="hidden md:inline">
-                  Your trusted platform to simplify student life
-                  <br /> Buy, sell and connect easily!
-                </span>
+                Textbooks, gadgets, cycles and more from verified students near you.
               </motion.p>
 
-              <motion.span
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.94 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={reduceMotion ? { duration: 0.2, delay: 0.4 } : { type: "spring", stiffness: 260, damping: 22, delay: 0.75 }}
-                className="mt-3.5 inline-flex md:mt-6"
+              <motion.form
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const q = heroQuery.trim();
+                  navigate(q ? `/search?q=${encodeURIComponent(q)}` : "/explore");
+                }}
+                className="mt-7 flex max-w-lg items-center gap-2 rounded-2xl bg-white p-1.5 shadow-[0_12px_32px_-12px_rgba(2,6,23,0.45)]"
+                role="search"
               >
-                <Link
-                  to="/upload"
-                  className="flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-4 font-figtree text-[13px] font-bold text-[#2D3339] shadow-md transition-transform duration-200 active:scale-95 md:h-11 md:px-7 md:text-base"
+                <svg viewBox="0 0 20 20" className="ml-3 h-5 w-5 shrink-0 text-slate-400" aria-hidden="true">
+                  <circle cx="9" cy="9" r="6" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="search"
+                  value={heroQuery}
+                  onChange={(e) => setHeroQuery(e.target.value)}
+                  placeholder="What are you looking for?"
+                  aria-label="Search listings"
+                  enterKeyHint="search"
+                  className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
+                />
+                <button
+                  type="submit"
+                  className="h-11 shrink-0 rounded-xl bg-slate-900 px-5 text-[14px] font-semibold text-white transition-colors hover:bg-slate-800"
                 >
-                  <span>Sell Now</span>
-                  <FiArrowRight />
-                </Link>
-              </motion.span>
+                  Search
+                </button>
+              </motion.form>
+
+              <p className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[14px] text-white/80">
+                <span>
+                  Have something to sell?{" "}
+                  <Link to="/upload" className="font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">
+                    List it free
+                  </Link>
+                </span>
+              </p>
             </div>
+
+            {/* Real listings, staggered photo grid (lg+) */}
+            {heroPicks.length >= 4 && (
+              <div className="hidden w-full max-w-[400px] grid-cols-2 gap-3 justify-self-end lg:grid" aria-label="Listed on your campus">
+                {heroPicks.map((p, i) => (
+                  <div key={p._id} className={i % 2 === 1 ? "translate-y-6" : "-translate-y-3"}>
+                  <motion.div
+                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.2 + i * 0.08 }}
+                  >
+                    <Link
+                      to={productPath(p.raw)}
+                      className="group relative block aspect-square overflow-hidden rounded-2xl bg-white/10"
+                    >
+                      <img src={p.image} alt={p.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
+                      <span className="absolute bottom-2.5 left-2.5 rounded-lg bg-white px-2 py-1 text-[13px] font-bold text-slate-900 shadow-sm">
+                        ₹{Number(p.price || 0).toLocaleString("en-IN")}
+                      </span>
+                    </Link>
+                  </motion.div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </motion.div>
+        </section>
         </div>
       </div>
 
@@ -654,40 +686,48 @@ const Home = () => {
         </div>
 
         {boostedProducts.length > 0 && (
-          <div
-            className="mx-auto mt-6 w-full max-w-[1380px] lg:mt-12"
+          <section
+            className="mx-auto mt-6 w-full max-w-[1380px] rounded-2xl border border-[var(--accent-soft-strong)] bg-gradient-to-b from-[var(--accent-soft)] via-[var(--accent-soft)] to-transparent p-4 sm:p-5 lg:mt-12 lg:p-6"
+            aria-labelledby="deals-heading"
           >
-          {/* With fewer than 4 boosted items the panel hugs its cards (each
-              capped at a feed-card width) instead of stretching across the
-              page with empty space. */}
-          <div
-            className="overflow-hidden rounded-2xl bg-[#2E4BFF] px-1 pb-1"
-            style={
-              boostedProducts.length < 4
-                ? { maxWidth: `calc(${Math.max(boostedProducts.length, 2)} * 300px + 2.5rem)` }
-                : undefined
-            }
-          >
-            <h2 className="px-4 md:px-6 pt-2.5 md:pt-3 text-white font-bold text-lg md:text-xl font-figtree">
-              Limited Time Deals
-            </h2>
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <h2
+                  id="deals-heading"
+                  className="flex items-center gap-2 font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white"
+                >
+                  Limited time deals
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[11.5px] font-semibold tracking-normal text-[var(--accent-text)] ring-1 ring-[var(--accent-soft-strong)] dark:bg-white/5">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" aria-hidden="true" />
+                    {boostedProducts.length} live
+                  </span>
+                </h2>
+                <p className="mt-0.5 truncate font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
+                  <span className="sm:hidden">Boosted listings, ending soon</span>
+                  <span className="hidden sm:inline">Boosted by sellers on your campus. Gone when the timer runs out.</span>
+                </p>
+              </div>
+              <Link
+                to={audienceTab === "girls" ? "/deals?tab=girls" : "/deals"}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 font-figtree text-[13px] font-semibold text-slate-800 transition-colors hover:border-[var(--accent-ring)] hover:text-[var(--accent-text)] dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-100"
+              >
+                View all
+                <FiArrowRight aria-hidden="true" />
+              </Link>
+            </div>
 
-            <div className="mt-2.5 md:mt-3 rounded-2xl bg-white p-3 md:p-4 dark:bg-[#18181B]">
-            {/* Phones: swipeable rail (app pattern); tablet+: 4-up grid. */}
-            <div className="no-scrollbar -mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-3 px-3 pb-0.5 md:mx-0 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:px-0 xl:gap-5">
+            {/* Phones: swipeable rail; md+: same grid as Trending */}
+            <div className="no-scrollbar -mx-4 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-1 sm:-mx-5 sm:scroll-px-5 sm:px-5 md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:grid-cols-4 xl:gap-5">
               {boostedProducts.slice(0, 4).map((product, i) => (
-                <div key={product._id} className="flex w-[min(46vw,220px)] shrink-0 snap-start md:w-auto">
-                  <ProductCard
-                    product={product}
-                    showBoostBar
-                    boostAccent={i % 2 === 0 ? "purple" : "orange"}
-                  />
+                <div
+                  key={product._id}
+                  className={`flex w-[min(46vw,220px)] shrink-0 snap-start md:w-auto ${i === 3 ? "md:hidden lg:flex" : ""}`}
+                >
+                  <ProductCard product={product} showBoostBar boostAccent={i % 2 === 0 ? "purple" : "orange"} />
                 </div>
               ))}
             </div>
-            </div>
-          </div>
-          </div>
+          </section>
         )}
 
         {/* Products section */}

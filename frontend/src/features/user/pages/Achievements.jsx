@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
-import { Info, RefreshCw, Sparkles, Target, Trophy } from "lucide-react";
+import { Info, Sparkles, Target, Trophy } from "lucide-react";
 import { AccountLayout, CARD, ErrorState, TabBar, btnSecondary } from "../components/account/AccountKit.jsx";
 import LevelCard from "../components/LevelCard.jsx";
 import BadgeCard from "../components/BadgeCard.jsx";
 import RankGuideModal from "../components/RankGuideModal.jsx";
-import { fetchMyBadges, recomputeBadges } from "../api/badgeApi.js";
+import { fetchMyBadges } from "../api/badgeApi.js";
 import { BADGE_CATALOGUE, BADGE_MAP } from "../../../utils/badgeConfig.js";
 
 const CATEGORIES = [
@@ -21,7 +21,6 @@ const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 export default function Achievements() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [recomputing, setRecomputing] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
   const [error, setError] = useState(null);
   const [showGuideModal, setShowGuideModal] = useState(false);
@@ -45,17 +44,6 @@ export default function Achievements() {
     };
   }, []);
 
-  const handleRecompute = async () => {
-    try {
-      setRecomputing(true);
-      const res = await recomputeBadges();
-      if (res.data.success) setData(res.data.data);
-    } catch {
-      // Sync is best-effort; the current badges stay on screen.
-    } finally {
-      setRecomputing(false);
-    }
-  };
 
   // Build earned map: badge_id -> earned badge object
   const earnedMap = useMemo(() => {
@@ -116,18 +104,13 @@ export default function Achievements() {
       seoTitle="Achievements | Unideals"
       width="xl"
       title="Achievements"
-      description="Earn XP. Unlock badges."
+      description="From Fresher to Campus Icon. Trade on campus to level up."
       actions={
-        <>
-          <button type="button" onClick={() => setShowGuideModal(true)} className={btnSecondary}>
-            <Info className="h-4 w-4" aria-hidden="true" />
-            How ranks work
-          </button>
-          <button type="button" onClick={handleRecompute} disabled={recomputing || loading} className={btnSecondary}>
-            <RefreshCw className={`h-4 w-4 ${recomputing ? "animate-spin" : ""}`} aria-hidden="true" />
-            {recomputing ? "Syncing…" : "Sync badges"}
-          </button>
-        </>
+        // Badges refresh server-side when this page opens (no manual sync).
+        <button type="button" onClick={() => setShowGuideModal(true)} className={btnSecondary}>
+          <Info className="h-4 w-4" aria-hidden="true" />
+          How ranks work
+        </button>
       }
     >
       <div className="space-y-5">

@@ -12,6 +12,7 @@ import {
   updateChatSettings,
   requestGenderChange,
   getGenderChangeStatus,
+  getMyInsights,
 } from "../controllers/user.controller.js";
 
 const userRouter = Router();
@@ -29,6 +30,8 @@ const deleteAccountLimiter = rateLimit({
 userRouter.get("/userProfile", auth, getUserProfile);
 // Labs (early access) features available to this account.
 userRouter.get("/labs", auth, getMyLabs);
+// Profile overview numbers (cached server-side for 2 minutes).
+userRouter.get("/insights", auth, getMyInsights);
 userRouter.put("/updateProfile", auth, updateUserProfile)
 userRouter.put("/chatSettings", auth, updateChatSettings);
 // Gender is set-once; later changes need admin approval (tight limiter).

@@ -51,7 +51,10 @@ export function AccountLayout({
           <aside className="hidden shrink-0 md:block">
             <Profile_left_part />
           </aside>
-          <main className="min-w-0 flex-1 md:h-full md:overflow-y-auto">
+          {/* `relative` keeps absolutely positioned descendants (e.g. sr-only labels)
+              inside the scroll pane; otherwise they stretch the document and the
+              whole page scrolls instead of just this column. */}
+          <main className="relative min-w-0 flex-1 md:h-full md:overflow-y-auto">
             {!root && barTitle && <MobileAppBar title={barTitle} backTo={backTo} action={mobileAction} />}
             <div className={cn("mx-auto w-full px-4 pb-12 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8", WIDTHS[width] || WIDTHS.lg)}>
               {!bare && (title || actions) && (
@@ -88,9 +91,7 @@ export function Panel({ title, description, icon: Icon, actions, padded = true, 
         <div className="flex items-start justify-between gap-3 border-b border-neutral-100 px-4 py-3.5 sm:px-5 dark:border-neutral-800">
           <div className="flex min-w-0 items-start gap-2.5">
             {Icon && (
-              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
-                <Icon className="h-4 w-4" aria-hidden="true" />
-              </span>
+              <Icon className="h-4 w-4 shrink-0 mt-0.5 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
             )}
             <div className="min-w-0">
               <h2 className="text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h2>
@@ -105,20 +106,13 @@ export function Panel({ title, description, icon: Icon, actions, padded = true, 
   );
 }
 
-export function StatTile({ label, value, icon: Icon, hint, tone = "accent", className }) {
-  const tones = {
-    accent: "bg-[var(--accent-soft)] text-[var(--accent-text)]",
-    emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300",
-    amber: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300",
-    pink: "bg-pink-50 text-pink-600 dark:bg-pink-950/40 dark:text-pink-300",
-    slate: "bg-neutral-100 text-slate-600 dark:bg-white/5 dark:text-zinc-300",
-  };
+// `tone` is accepted for compatibility; tiles are neutral now.
+// eslint-disable-next-line no-unused-vars
+export function StatTile({ label, value, icon: Icon, hint, tone, className }) {
   return (
     <div className={cn(CARD, "flex items-start gap-3 p-4", className)}>
       {Icon && (
-        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", tones[tone] || tones.accent)}>
-          <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
-        </span>
+        <Icon className="h-[18px] w-[18px] shrink-0 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
       )}
       <div className="min-w-0">
         <p className="truncate text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">{label}</p>
@@ -180,9 +174,7 @@ export function TabBar({ tabs, value, onChange, ariaLabel = "Filter", className,
 export function ErrorState({ message = "Something went wrong.", onRetry, className }) {
   return (
     <div role="alert" className={cn(CARD, "flex flex-col items-center gap-3 px-6 py-10 text-center", className)}>
-      <span className="grid h-10 w-10 place-items-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300">
-        <TriangleAlert className="h-5 w-5" aria-hidden="true" />
-      </span>
+      <TriangleAlert className="h-5 w-5 shrink-0 text-red-500" aria-hidden="true" />
       <div>
         <p className="text-[15px] font-semibold text-slate-900 dark:text-white">Couldn&apos;t load this</p>
         <p className="mt-1 text-[13px] text-slate-500 dark:text-zinc-400">{message}</p>

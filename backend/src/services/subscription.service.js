@@ -94,11 +94,15 @@ export const getMySubscription = async (user) => {
   const listingLimit = getListingLimit(tier, ACTIVE_SUBSCRIPTION_TYPE);
   const wishlistLimit = getWishlistLimit(tier, ACTIVE_SUBSCRIPTION_TYPE);
 
+  // Admins hold Pro Plus as a staff perk: always active, never expires.
+  const isStaff = user.role === "admin";
+
   return {
     tier,
     displayName: planDef?.displayName || "Free",
-    status: subscription?.status || (tier === USER_TIER.BASE_USER ? "active" : null),
-    isLifetime: subscription?.is_lifetime ?? tier === USER_TIER.BASE_USER,
+    isStaff,
+    status: isStaff ? "active" : subscription?.status || (tier === USER_TIER.BASE_USER ? "active" : null),
+    isLifetime: isStaff || (subscription?.is_lifetime ?? tier === USER_TIER.BASE_USER),
     subscriptionType: subscription?.subscription_type || null,
     startedAt: subscription?.started_at || null,
     expiresAt: subscription?.expires_at || null,
@@ -144,7 +148,7 @@ export const expireDueSubscriptions = async () => {
         { $set: { status: SUBSCRIPTION_STATUS.EXPIRED } },
       );
       await User.updateOne(
-        { _id: sub.user_id, subscription: { $ne: USER_TIER.BASE_USER } },
+        { _id: sub.user_id, role: { $ne: "admin" }, subscription: { $ne: USER_TIER.BASE_USER } },
         { $set: { subscription: USER_TIER.BASE_USER } },
       );
       expired += 1;
@@ -179,7 +183,7 @@ export const downgradeToFree = async (userId, reason = "downgrade") => {
   }
   try {
     await User.updateOne(
-      { _id: userId },
+      { _id: userId, role: { $ne: "admin" } },
       { $set: { subscription: USER_TIER.BASE_USER } },
     );
   } catch {

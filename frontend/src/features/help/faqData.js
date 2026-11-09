@@ -144,7 +144,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: "Can I turn off read receipts or typing indicators?",
-        a: "Yes. Go to Settings → Chat. You can also pick a chat wallpaper there.",
+        a: "Typing indicators can be turned off by anyone in Settings → Chat. Turning off read receipts is a Pro and Pro Plus feature. You can also pick a chat wallpaper there.",
       },
       {
         q: "Why was my message blocked?",
@@ -209,15 +209,15 @@ export const FAQ_CATEGORIES = [
     questions: [
       {
         q: "How do I earn XP?",
-        a: "By being active: listing items, completing deals, getting good ratings and replying to buyers. XP raises your level and rank. Tap “How levels work” on the Achievements tab for the full list.",
+        a: "By being active: listing items, completing deals, getting good ratings and replying to buyers. XP raises your level and rank. Tap “How ranks work” on the Achievements tab for the full list.",
       },
       {
         q: "What do levels and ranks give me?",
-        a: "Higher ranks unlock perks, and milestone levels give rewards like free boost credits and profile frames. You can see the next reward on your level card.",
+        a: "You climb from Fresher to Junior, Class Rep, Senior, Topper and finally Campus Icon (shown as Campus King or Queen). Each new rank adds boost credits, and from Class Rep up you also get free Pro or Pro Plus time. Milestone levels add profile frames and tags.",
       },
       {
         q: "A badge didn't update. What do I do?",
-        a: "Open Achievements and tap “Sync badges”. It recalculates your progress straight away.",
+        a: "Just open Achievements. Your XP and badges refresh automatically when you open it (at most every few minutes).",
       },
     ],
   },

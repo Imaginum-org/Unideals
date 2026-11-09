@@ -643,3 +643,17 @@ html[data-chat-thread] .tabbar-spacer {
     display: none;
   }
 }
+
+/* ── Brand surface ─────────────────────────────────────────────────────
+   Flat primary-colour panel shared by the home hero, the footer, the
+   profile cover and the help header, so top and bottom of the site match.
+   Deliberately flat: no glows, gradients or grid overlays. Follows --accent
+   (brand blue; pink in Girl Mode). */
+.brand-surface {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--accent);
+}
+@media print {
+  .brand-surface { background: none !important; }
+}

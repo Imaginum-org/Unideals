@@ -441,8 +441,10 @@ export const createProduct = async (data, user) => {
   return created;
 };
 
-export const getBoostedProducts = async (campusId, viewerGender = null, viewerRole = null, audience = null) => {
+export const getBoostedProducts = async (campusId, viewerGender = null, viewerRole = null, audience = null, limit = 10) => {
   const now = new Date();
+  // Home rail asks for 10; the /deals page asks for more (capped).
+  const max = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 48);
 
   // Girls Corner: default pools never include girls-only (admins see both).
   // ?audience=girls_only shows ONLY girls-only boosted (female + admin/support).
@@ -466,15 +468,15 @@ export const getBoostedProducts = async (campusId, viewerGender = null, viewerRo
   // Boosted rail renders on every Home view: share one query per campus +
   // audience for 30s. The key omits `now` on purpose (it changes every ms);
   // the same filter is re-evaluated on each refresh.
-  const cacheKey = `boosted:${keyOf({ ...filter, boost_expires_at: null })}`;
+  const cacheKey = `boosted:${max}:${keyOf({ ...filter, boost_expires_at: null })}`;
   return feedMetaCache.memo(cacheKey, 30 * 1000, () =>
     Product.find(filter)
       .sort({ boost_expires_at: -1 })
-      .limit(10)
+      .limit(max)
       .select(
         "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier isGirlsOnly hot_until status slug",
       )
-      .populate("seller_id", "name avatar subscription role")
+      .populate("seller_id", "name avatar subscription role rating")
       .lean(),
   );
 };
@@ -879,7 +881,7 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
     // member since, verified email, level/rank. Nothing private.
     .populate(
       "seller_id",
-      "name avatar subscription role createdAt is_email_verified gamification.level gamification.rank_title",
+      "name avatar subscription role createdAt is_email_verified gamification.level gamification.rank_title rating",
     )
     .populate("campus_id", "slug name short_name")
     .lean();

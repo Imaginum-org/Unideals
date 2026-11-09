@@ -8,6 +8,7 @@ import { toast } from "../../../components/ui/toast.js";
 import { productPath } from "../../../utils/productPath.js";
 import { CARD, FLUSH_ON_PHONE, btnDanger, btnSecondary } from "./account/AccountKit.jsx";
 import { cn } from "../../../utils/cn.js";
+import RateSellerDialog, { Star, StarRow } from "./RateSellerDialog.jsx";
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
@@ -19,6 +20,8 @@ const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const OrderDealCard = ({ order, onChanged }) => {
   const navigate = useNavigate();
   const [cancelling, setCancelling] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
+  const [myRating, setMyRating] = useState(order?.myRating || null);
 
   const status = order?.dealStatus || "negotiating";
   const step = dealStatusToStep(status);
@@ -168,6 +171,16 @@ const OrderDealCard = ({ order, onChanged }) => {
             Completed
           </span>
         )}
+        {isCompleted && buying && (myRating ? (
+          <span className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-500 dark:text-zinc-400">
+            You rated <StarRow value={myRating} size="h-3.5 w-3.5" />
+          </span>
+        ) : (
+          <button type="button" onClick={() => setRateOpen(true)} className={btnSecondary}>
+            <Star filled className="h-4 w-4 text-amber-400" />
+            Rate seller
+          </button>
+        ))}
         {product?._id && (
           <button
             type="button"
@@ -179,6 +192,17 @@ const OrderDealCard = ({ order, onChanged }) => {
           </button>
         )}
       </div>
+      <RateSellerDialog
+        open={rateOpen}
+        onClose={() => setRateOpen(false)}
+        conversationId={order?.conversationId}
+        sellerName={otherName}
+        productTitle={product?.title}
+        onRated={(n) => {
+          setMyRating(n);
+          onChanged?.();
+        }}
+      />
     </article>
   );
 };

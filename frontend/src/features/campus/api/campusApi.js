@@ -7,3 +7,6 @@ export const getCampuses = () => axios.get("/api/campuses");
 // Returns the updated user; live listings migrate server-side.
 export const setMyCampus = (campus_slug) =>
   axios.put("/api/user/updateProfile", { campus_slug });
+
+// Live numbers for the Home hero: listings, sellers, recent deals.
+export const getCampusStats = (campus_slug) => axios.get("/api/campuses/stats", { params: { campus_slug } });

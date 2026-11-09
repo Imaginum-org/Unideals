@@ -133,6 +133,7 @@ export const revertDealStage = async (req, res, next) => {
     const deal = await dealService.revertDealStage({
       conversationId: req.params.id,
       userId: req.userId,
+      from: typeof req.body?.from === "string" ? req.body.from.slice(0, 40) : undefined,
     });
     return res.status(200).json({ success: true, message: "Step undone", data: deal });
   } catch (error) {

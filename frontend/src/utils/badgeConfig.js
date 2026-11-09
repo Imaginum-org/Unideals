@@ -7,7 +7,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "first_listing",
     category: "seller",
-    name: "First Drop",
+    name: "Freshers' Drop",
     description: "Listed your very first item on Unideals.",
     icon: "📦",
     color: { bg: "#F0FDF4", accent: "#22C55E", text: "#15803D" },
@@ -16,7 +16,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "power_seller",
     category: "seller",
-    name: "Power Seller",
+    name: "Hostel Tycoon",
     description: "Sold a high volume of products, a true campus trader.",
     icon: "🏪",
     color: { bg: "#FFFBEB", accent: "#F59E0B", text: "#92400E" },
@@ -29,7 +29,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "top_rater",
     category: "seller",
-    name: "Top Rated",
+    name: "Dean's List",
     description: "Consistently earned high ratings from buyers.",
     icon: "⭐",
     color: { bg: "#FFFBEB", accent: "#EAB308", text: "#713F12" },
@@ -42,7 +42,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "category_ace",
     category: "seller",
-    name: "Category Ace",
+    name: "Major Declared",
     description: "Specialised in selling items from the same category.",
     icon: "🎯",
     color: { bg: "#EFF6FF", accent: "#3B82F6", text: "#1E40AF" },
@@ -55,7 +55,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "quick_flip",
     category: "seller",
-    name: "Quick Flip",
+    name: "Lunch-Break Flip",
     description: "Sold items super fast after listing, efficiency king.",
     icon: "⚡",
     color: { bg: "#F5F3FF", accent: "#8B5CF6", text: "#4C1D95" },
@@ -69,7 +69,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "first_buy",
     category: "buyer",
-    name: "First Purchase",
+    name: "First Haul",
     description: "Completed your very first deal as a buyer.",
     icon: "🛒",
     color: { bg: "#F0FDF4", accent: "#22C55E", text: "#15803D" },
@@ -78,7 +78,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "deal_hunter",
     category: "buyer",
-    name: "Deal Hunter",
+    name: "Semester Saver",
     description: "A seasoned buyer who knows where the best deals are.",
     icon: "🔍",
     color: { bg: "#EFF6FF", accent: "#3B82F6", text: "#1E40AF" },
@@ -91,7 +91,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "wishlist_curator",
     category: "buyer",
-    name: "Curator",
+    name: "Window Shopper",
     description: "Curated a massive wishlist of items to snag.",
     icon: "💝",
     color: { bg: "#FFF1F2", accent: "#F43F5E", text: "#881337" },
@@ -105,7 +105,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "chatter",
     category: "communication",
-    name: "Social Butterfly",
+    name: "Canteen Regular",
     description: "Always in the chat, the most conversational trader.",
     icon: "💬",
     color: { bg: "#F0F9FF", accent: "#0EA5E9", text: "#0C4A6E" },
@@ -118,7 +118,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "deal_closer",
     category: "communication",
-    name: "Deal Closer",
+    name: "Viva Cleared",
     description: "Seals the deal every time, never leaves a chat hanging.",
     icon: "🤝",
     color: { bg: "#F0FDF4", accent: "#16A34A", text: "#14532D" },
@@ -132,7 +132,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "verified_student",
     category: "trust",
-    name: "Verified Student",
+    name: "ID Card Verified",
     description: "Verified their email, a trusted member of the community.",
     icon: "✅",
     color: { bg: "#EFF6FF", accent: "#6366F1", text: "#312E81" },
@@ -141,7 +141,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "profile_complete",
     category: "trust",
-    name: "Profile Pro",
+    name: "Admit Card Ready",
     description: "Filled in everything: avatar, mobile, and campus.",
     icon: "🪪",
     color: { bg: "#F5F3FF", accent: "#8B5CF6", text: "#4C1D95" },
@@ -150,7 +150,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "trusted_trader",
     category: "trust",
-    name: "Trusted Trader",
+    name: "Batch Favourite",
     description: "Zero disputes, 10+ deals. This seller is the real deal.",
     icon: "🛡",
     color: { bg: "#EFF6FF", accent: "#3B82F6", text: "#1E40AF" },
@@ -159,7 +159,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "early_adopter",
     category: "trust",
-    name: "Early Adopter",
+    name: "First Bench",
     description: "Joined during early access, an OG from the start.",
     icon: "🎖",
     color: { bg: "#FFFBEB", accent: "#D97706", text: "#78350F" },
@@ -168,7 +168,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "campus_veteran",
     category: "trust",
-    name: "Campus Veteran",
+    name: "Alumni Material",
     description: "Been here for 6+ months, a loyal part of the community.",
     icon: "🏛",
     color: { bg: "#F0FDF4", accent: "#15803D", text: "#14532D" },
@@ -178,7 +178,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "century_club",
     category: "milestone",
-    name: "Century Club",
+    name: "100% Attendance",
     description: "100 total transactions, bought and sold at campus scale.",
     icon: "💯",
     color: { bg: "#FFFBEB", accent: "#F59E0B", text: "#92400E" },
@@ -187,7 +187,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "big_deal",
     category: "milestone",
-    name: "Big Deal",
+    name: "Fest Budget",
     description: "Closed a single sale worth ₹5,000 or more.",
     icon: "💰",
     color: { bg: "#FFFBEB", accent: "#EAB308", text: "#713F12" },
@@ -196,7 +196,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "streak_seller",
     category: "milestone",
-    name: "On A Roll",
+    name: "Semester Streak",
     description: "5 sales in 7 days, unstoppable hustle.",
     icon: "🔥",
     color: { bg: "#FFF7ED", accent: "#F97316", text: "#7C2D12" },
@@ -205,7 +205,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "night_owl",
     category: "milestone",
-    name: "Night Owl",
+    name: "All-Nighter",
     description: "Posted 10 listings between 10 PM and 2 AM.",
     icon: "🦉",
     color: { bg: "#0F172A", accent: "#6366F1", text: "#E0E7FF" },
@@ -214,7 +214,7 @@ export const BADGE_CATALOGUE = [
   {
     id: "og_badge",
     category: "milestone",
-    name: "OG Member",
+    name: "OG Batch",
     description: "Among the first 100 people to join Unideals.",
     icon: "👾",
     color: { bg: "#F5F3FF", accent: "#7C3AED", text: "#3B0764" },
@@ -264,162 +264,127 @@ export const TIER_STYLES = {
   },
 };
 
-// Rank tier config
+// ─── Ranks ────────────────────────────────────────────────────────────────
+// Keys are the rank_title values the backend stores (badgeService
+// rankFromLevel) and rewards are keyed on, so they must not change. `name`
+// is what students see: a campus-life ladder from Fresher to Campus Icon.
 export const RANK_CONFIG = {
-  Seedling:      { icon: "🌱", color: "#22C55E", bg: "#F0FDF4" },
-  Explorer:      { icon: "🔵", color: "#06B6D4", bg: "#ECFEFF" },
-  Dealer:        { icon: "⚡", color: "#6366F1", bg: "#EEF2FF" },
-  Hustler:       { icon: "🔥", color: "#F97316", bg: "#FFF7ED" },
-  Legend:        { icon: "💎", color: "#F59E0B", bg: "#FFFBEB" },
-  "Campus King": { icon: "👑", color: "#7C3AED", bg: "#F5F3FF" },
-  "Campus Queen":{ icon: "👑", color: "#EC4899", bg: "#FDF2F8" },
-  "Campus Royale":{ icon: "👑", color: "#8B5CF6", bg: "#F5F3FF" },
+  Seedling:        { name: "Fresher",     icon: "🎒", color: "#16A34A", bg: "#F0FDF4" },
+  Explorer:        { name: "Junior",      icon: "📚", color: "#0891B2", bg: "#ECFEFF" },
+  Dealer:          { name: "Class Rep",   icon: "🙋", color: "#4F46E5", bg: "#EEF2FF" },
+  Hustler:         { name: "Senior",      icon: "🎓", color: "#EA580C", bg: "#FFF7ED" },
+  Legend:          { name: "Topper",      icon: "🏆", color: "#D97706", bg: "#FFFBEB" },
+  "Campus King":   { name: "Campus King", icon: "👑", color: "#7C3AED", bg: "#F5F3FF" },
+  "Campus Queen":  { name: "Campus Queen", icon: "👑", color: "#DB2777", bg: "#FDF2F8" },
+  "Campus Royale": { name: "Campus Icon", icon: "👑", color: "#7C3AED", bg: "#F5F3FF" },
 };
 
-// ─── Rank Roadmap & Levels Guide ───────────────────────────────────────────
+/** Display name for a stored rank title ("Seedling" → "Fresher"). */
+export const rankName = (title) => RANK_CONFIG[title]?.name || title || "Fresher";
+
+// Rank ladder + what each rank actually grants on arrival (mirrors
+// RANK_REWARDS in backend/src/services/rewardService.js).
 export const RANK_TIERS_GUIDE = [
   {
     title: "Seedling",
-    icon: "🌱",
-    color: "#22C55E",
+    name: "Fresher",
+    icon: "🎒",
+    color: "#16A34A",
     bg: "#F0FDF4",
-    border: "#BBF7D0",
     minLevel: 1,
     maxLevel: 4,
     minXp: 0,
-    tagline: "The Campus Sprout",
-    description: "Every campus legend starts somewhere. Welcome to trading on Unideals!",
-    perks: [
-      "Access to post and browse items on campus",
-      "Basic buyer & seller in-app messaging",
-      "Eligible for Verified Student status",
-    ],
-    rewards: ["+1 Boost Credit 🚀"],
-    subReward: null,
+    about: "Just joined campus. Post your first listing to get going.",
+    rewards: ["1 boost credit"],
   },
   {
     title: "Explorer",
-    icon: "🔵",
-    color: "#06B6D4",
+    name: "Junior",
+    icon: "📚",
+    color: "#0891B2",
     bg: "#ECFEFF",
-    border: "#A5F3FC",
     minLevel: 5,
     maxLevel: 9,
     minXp: 1250,
-    tagline: "Active Campus Trader",
-    description: "Exploring listings, making deals, and building an early reputation.",
-    perks: [
-      "Bronze flair on your profile card",
-      "Higher discovery in campus browse feeds",
-      "Unlocks multi-category badge milestones",
-    ],
-    rewards: ["+2 Boost Credits 🚀"],
-    subReward: null,
+    about: "You know your way around and have a few deals done.",
+    rewards: ["2 boost credits"],
   },
   {
     title: "Dealer",
-    icon: "⚡",
-    color: "#6366F1",
+    name: "Class Rep",
+    icon: "🙋",
+    color: "#4F46E5",
     bg: "#EEF2FF",
-    border: "#C7D2FE",
     minLevel: 10,
     maxLevel: 19,
     minXp: 5000,
-    tagline: "Trusted Dealmaker",
-    description: "A seasoned regular in campus trades with strong community trust.",
-    perks: [
-      "Trusted Trader badge priority verification",
-      "Highlighted listings with 'Active Trader' chip",
-      "Faster response badge eligibility",
-    ],
-    rewards: ["+3 Boost Credits 🚀", "🆓 Pro Subscription: 1 Month FREE"],
-    subReward: { label: "Pro", duration: "1 Month" },
+    about: "People in your batch know you're the one to ask.",
+    rewards: ["3 boost credits", "1 month of Pro, free"],
   },
   {
     title: "Hustler",
-    icon: "🔥",
-    color: "#F97316",
+    name: "Senior",
+    icon: "🎓",
+    color: "#EA580C",
     bg: "#FFF7ED",
-    border: "#FED7AA",
     minLevel: 20,
     maxLevel: 29,
     minXp: 20000,
-    tagline: "Power Seller & Buyer",
-    description: "High volume, swift deal turnaround, and a trusted campus commerce powerhouse.",
-    perks: [
-      "Silver profile aura & featured seller ranking",
-      "Boosted visibility in search results",
-      "Special streak & volume badge recognition",
-    ],
-    rewards: ["+5 Boost Credits 🚀", "🆓 Pro Subscription: 1 Semester FREE", "Hustler Profile Frame 🖼️"],
-    subReward: { label: "Pro", duration: "1 Semester" },
+    about: "A go-to seller with a solid track record.",
+    rewards: ["5 boost credits", "1 semester of Pro, free", "Senior profile frame"],
   },
   {
     title: "Legend",
-    icon: "💎",
-    color: "#F59E0B",
+    name: "Topper",
+    icon: "🏆",
+    color: "#D97706",
     bg: "#FFFBEB",
-    border: "#FDE68A",
     minLevel: 30,
     maxLevel: 39,
     minXp: 45000,
-    tagline: "Campus Marketplace Elite",
-    description: "Top-tier rating, dozens of completed trades, and unmatched campus trust.",
-    perks: [
-      "Gold glowing badge across all product listings",
-      "Top-tier recommendation placement",
-      "Special recognition in campus leaderboard",
-    ],
-    rewards: ["+7 Boost Credits 🚀", "🆓 Pro+ Subscription: 1 Semester FREE", "Gold Profile Frame 🖼️"],
-    subReward: { label: "Pro+", duration: "1 Semester" },
+    about: "Top of the batch. Dozens of trades and great ratings.",
+    rewards: ["7 boost credits", "1 semester of Pro Plus, free"],
   },
   {
     title: "Campus Royale",
     altTitles: ["Campus King", "Campus Queen"],
+    name: "Campus Icon",
     icon: "👑",
     color: "#7C3AED",
     bg: "#F5F3FF",
-    border: "#DDD6FE",
     minLevel: 40,
     maxLevel: 100,
     minXp: 80000,
-    tagline: "The Pinnacle of Campus Commerce",
-    description: "The highest honor on Unideals, undisputed campus trading royalty.",
-    perks: [
-      "Exclusive Crown icon & Royale badge flair",
-      "Permanent top spotlight across university pages",
-      "Lifetime VIP perks & community leader badge",
-    ],
-    rewards: ["+10 Boost Credits 🚀", "🆓 Pro+ Subscription: LIFETIME FREE 👑", "Crown Avatar Frame 👑", "'Campus Royale' Profile Tag"],
-    subReward: { label: "Pro+", duration: "Lifetime" },
+    about: "Everyone on campus knows your name. Shown as Campus King or Queen on your profile.",
+    rewards: ["10 boost credits", "Pro Plus for life, free", "Campus Icon profile tag"],
   },
 ];
 
 export const XP_ACTIVITIES_GUIDE = [
-  { action: "Post a new listing", xp: "+30 XP", icon: "📦", note: "Earn XP for each active product you drop" },
-  { action: "Complete a purchase", xp: "+30 XP", icon: "🛒", note: "Earn XP when you buy from fellow students" },
-  { action: "Sell items (Power Seller)", xp: "+50 to +200 XP", icon: "🏪", note: "Tiered rewards for 5, 20, and 50+ sales" },
-  { action: "High buyer ratings (4.0 – 4.8+)", xp: "+60 to +200 XP", icon: "⭐", note: "Keep your trust score high" },
-  { action: "Verify student email", xp: "+50 XP", icon: "✅", note: "One-time boost for university verification" },
-  { action: "Complete profile details", xp: "+40 XP", icon: "🪪", note: "Avatar + contact details completed" },
-  { action: "Fast deal closing", xp: "+40 to +150 XP", icon: "⚡", note: "Sell items within 24–72 hours" },
-  { action: "Chat conversations & deals", xp: "+20 to +200 XP", icon: "💬", note: "Active chats leading to closed trades" },
-  { action: "Milestones & streaks", xp: "+80 to +200 XP", icon: "🔥", note: "5 sales in 7 days, ₹5,000+ sales, 100 deals" },
+  { action: "List an item", xp: "+30 XP", note: "For each active listing" },
+  { action: "Buy something", xp: "+30 XP", note: "For each completed purchase" },
+  { action: "Verify your college email", xp: "+50 XP", note: "One time" },
+  { action: "Complete your profile", xp: "+40 XP", note: "Photo and details" },
+  { action: "Sell 5, 20 or 50 items", xp: "+50 to +200 XP", note: "Hostel Tycoon badge" },
+  { action: "Sell within a day or two", xp: "+40 to +150 XP", note: "Lunch-Break Flip badge" },
+  { action: "Get great ratings", xp: "+60 to +200 XP", note: "Dean's List badge" },
+  { action: "Chat and close deals", xp: "+20 to +200 XP", note: "Canteen Regular, Viva Cleared" },
+  { action: "Hit streaks and milestones", xp: "+80 to +200 XP", note: "Semester Streak, Fest Budget, 100% Attendance" },
 ];
 
 // Level milestone rewards guide
 // Mirrors exactly what rewardService.js grants on the backend.
 export const LEVEL_REWARDS_GUIDE = [
-  { level: 5,  label: "Explorer reached",   grants: ["+1 Boost Credit"] },
-  { level: 10, label: "Dealer reached",      grants: ["+2 Boost Credits"] },
+  { level: 5,  label: "Junior unlocked",   grants: ["+1 Boost Credit"] },
+  { level: 10, label: "Class Rep unlocked",      grants: ["+2 Boost Credits"] },
   { level: 15, label: "Level 15 milestone",  grants: ["+2 Boost Credits", "Bronze Profile Frame"] },
-  { level: 20, label: "Hustler reached",     grants: ["+3 Boost Credits"] },
+  { level: 20, label: "Senior unlocked",     grants: ["+3 Boost Credits"] },
   { level: 25, label: "Level 25 milestone",  grants: ["+3 Boost Credits", "Rising Star Tag"] },
-  { level: 30, label: "Legend reached",      grants: ["+4 Boost Credits", "Gold Profile Frame"] },
+  { level: 30, label: "Topper unlocked",      grants: ["+4 Boost Credits", "Gold Profile Frame"] },
   { level: 35, label: "Level 35 milestone",  grants: ["+4 Boost Credits"] },
-  { level: 40, label: "Campus Royale!",      grants: ["+5 Boost Credits", "Crown Avatar Frame"] },
+  { level: 40, label: "Campus Icon unlocked",      grants: ["+5 Boost Credits", "Crown Avatar Frame"] },
   { level: 45, label: "Level 45 milestone",  grants: ["+5 Boost Credits", "Campus Legend Tag"] },
-  { level: 50, label: "MAX LEVEL!",          grants: ["+10 Boost Credits", "Hall of Fame Profile Tag"] },
+  { level: 50, label: "Max level",          grants: ["+10 Boost Credits", "Hall of Fame Profile Tag"] },
 ];
 
 // Level & XP helpers

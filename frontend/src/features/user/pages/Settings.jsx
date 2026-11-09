@@ -6,7 +6,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BadgeCheck,
   Camera,
+  Lock,
   LogOut,
+  MessageCircle,
   Mail,
   MapPin,
   Phone,
@@ -44,6 +46,16 @@ import {
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "Verification"];
+
+// Section nav: what each section is for (shown in the sidebar + as the
+// section subtitle).
+const SECTION_META = {
+  Profile: { icon: User, hint: "Photo, contact details and campus" },
+  Security: { icon: Lock, hint: "Password and sign-in" },
+  "Pickup Spots": { icon: MapPin, hint: "Where buyers meet you" },
+  Chat: { icon: MessageCircle, hint: "Read receipts, typing and wallpaper" },
+  Verification: { icon: BadgeCheck, hint: "Your email verification" },
+};
 
 const formatMemberSince = (date) => {
   if (!date) return "Member since date unavailable";
@@ -513,6 +525,8 @@ function Settings() {
   const header = {
     seoTitle: "Settings | Unideals",
     title: "Settings",
+    description: "Manage your profile, privacy and how buyers reach you.",
+    width: "xl",
   };
 
   if (loading) {
@@ -549,13 +563,50 @@ function Settings() {
 
   return (
     <AccountLayout {...header}>
+      <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8">
+        <nav aria-label="Settings sections" className="hidden lg:block">
+          <ul className="sticky top-4 space-y-0.5">
+            {tabs.map((t) => {
+              const Icon = SECTION_META[t].icon;
+              const on = t === activeTab;
+              return (
+                <li key={t}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(t)}
+                    aria-current={on ? "page" : undefined}
+                    className={cn(
+                      "relative flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+                      on
+                        ? "bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06)] ring-1 ring-neutral-200/80 dark:bg-[#1A1D20] dark:ring-neutral-800"
+                        : "hover:bg-white/70 dark:hover:bg-white/[0.03]",
+                    )}
+                  >
+                    {on && <span className="absolute inset-y-2.5 left-0 w-[3px] rounded-full bg-[var(--accent)]" aria-hidden="true" />}
+                    <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", on ? "text-[var(--accent-text)]" : "text-slate-400 dark:text-zinc-500")} aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className={cn("block text-[13.5px] font-semibold", on ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-zinc-300")}>{t}</span>
+                      <span className="block truncate text-[11.5px] text-slate-400 dark:text-zinc-500">{SECTION_META[t].hint}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="min-w-0">
       <TabBar
-        className="mb-5"
+        className="mb-5 lg:hidden"
         ariaLabel="Settings sections"
         tabs={tabs.map((t) => ({ value: t, label: t }))}
         value={activeTab}
         onChange={setActiveTab}
       />
+      <div className="mb-4 hidden lg:block">
+        <h2 className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-white">{activeTab}</h2>
+        <p className="text-[13px] text-slate-500 dark:text-zinc-400">{SECTION_META[activeTab].hint}</p>
+      </div>
 
       {activeTab === "Profile" && (
         <div className="flex flex-col gap-4 sm:gap-5">
@@ -609,16 +660,12 @@ function Settings() {
           <Panel title="Personal information" padded={false}>
             <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {profileRows.map((row) => {
-                const Icon = row.icon;
                 const editing = editingField === row.field;
                 return (
                   <li key={row.label} className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
-                    <div className="flex min-w-0 flex-1 items-start gap-3.5">
-                      <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
-                        <Icon className="h-4 w-4" aria-hidden="true" />
-                      </span>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:gap-6">
+                      <p className="shrink-0 text-[13px] font-medium text-slate-500 sm:w-36 sm:pt-px dark:text-zinc-400">{row.label}</p>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">{row.label}</p>
                         {editing && row.field === "phone" ? (
                           <input
                             value={phone}
@@ -626,12 +673,12 @@ function Settings() {
                             inputMode="tel"
                             autoComplete="tel-national"
                             placeholder="10 digit mobile number"
-                            className="mt-1.5 h-10 w-full max-w-xs rounded-lg border border-neutral-200 bg-white px-3 text-[14px] text-slate-900 outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] dark:border-neutral-700 dark:bg-[#131313] dark:text-white"
+                            className="h-10 w-full max-w-xs rounded-lg border border-neutral-200 bg-white px-3 text-[14px] text-slate-900 outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] dark:border-neutral-700 dark:bg-[#131313] dark:text-white"
                           />
                         ) : editing && row.field === "campus" ? (
                           <>
                             <Select
-                              className="mt-1.5 max-w-xs"
+                              className="max-w-xs"
                               value={campusSlug}
                               onChange={setCampusSlug}
                               placeholder="Select campus"
@@ -645,13 +692,13 @@ function Settings() {
                             )}
                           </>
                         ) : (
-                          <p className="mt-0.5 break-words text-[14.5px] font-medium text-slate-900 dark:text-white">{row.value}</p>
+                          <p className="break-words text-[14px] font-medium text-slate-900 dark:text-white">{row.value}</p>
                         )}
                       </div>
                     </div>
                     {row.editable &&
                       (editing ? (
-                        <span className="flex shrink-0 items-center gap-3 pt-6">
+                        <span className="flex shrink-0 items-center gap-3 pt-5 sm:pt-0">
                           <button type="button" onClick={cancelEditing} disabled={isSavingProfile} className={mutedBtn}>
                             Cancel
                           </button>
@@ -662,7 +709,7 @@ function Settings() {
                           </button>
                         </span>
                       ) : (
-                        <button type="button" onClick={() => startEditing(row.field)} disabled={editingField !== null} className={cn(linkBtn, "shrink-0 pt-6")}>
+                        <button type="button" onClick={() => startEditing(row.field)} disabled={editingField !== null} className={cn(linkBtn, "shrink-0 pt-5 sm:pt-0")}>
                           Edit
                         </button>
                       ))}
@@ -672,15 +719,12 @@ function Settings() {
 
               {/* Gender: set once, then changes need admin approval */}
               <li className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
-                <div className="flex min-w-0 flex-1 items-start gap-3.5">
-                  <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
-                    <User className="h-4 w-4" aria-hidden="true" />
-                  </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:gap-6">
+                  <p className="shrink-0 text-[13px] font-medium text-slate-500 sm:w-36 sm:pt-px dark:text-zinc-400">Gender</p>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">Gender</p>
                     {editingField === "gender" && !userDetails?.gender ? (
                       <Select
-                        className="mt-1.5 max-w-xs"
+                        className="max-w-xs"
                         value={gender}
                         onChange={setGender}
                         placeholder="Select gender"
@@ -692,7 +736,7 @@ function Settings() {
                         ]}
                       />
                     ) : (
-                      <p className="mt-0.5 text-[14.5px] font-medium capitalize text-slate-900 dark:text-white">{userDetails?.gender || "Not added"}</p>
+                      <p className="text-[14px] font-medium capitalize text-slate-900 dark:text-white">{userDetails?.gender || "Not added"}</p>
                     )}
                     {userDetails?.gender && editingField === "gender" && (
                       <div className="mt-2.5 rounded-lg bg-neutral-50 px-3.5 py-3 text-[12.5px] text-slate-600 dark:bg-white/[0.03] dark:text-zinc-300">
@@ -732,7 +776,7 @@ function Settings() {
                   </div>
                 </div>
                 {editingField === "gender" ? (
-                  <span className="flex shrink-0 items-center gap-3 pt-6">
+                  <span className="flex shrink-0 items-center gap-3 pt-5 sm:pt-0">
                     <button type="button" onClick={cancelEditing} disabled={isSavingProfile || requestSaving} className={mutedBtn}>
                       Cancel
                     </button>
@@ -745,7 +789,7 @@ function Settings() {
                     )}
                   </span>
                 ) : (
-                  <button type="button" onClick={() => startEditing("gender")} disabled={editingField !== null} className={cn(linkBtn, "shrink-0 pt-6")}>
+                  <button type="button" onClick={() => startEditing("gender")} disabled={editingField !== null} className={cn(linkBtn, "shrink-0 pt-5 sm:pt-0")}>
                     {userDetails?.gender ? "Change" : "Add"}
                   </button>
                 )}
@@ -793,14 +837,7 @@ function Settings() {
                 {pickupSpots.map((spot, index) => (
                   <li key={spot._id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span
-                        className={cn(
-                          "grid h-9 w-9 shrink-0 place-items-center rounded-lg",
-                          spot.isPrimary ? "bg-[var(--accent)] text-white" : "bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400",
-                        )}
-                      >
-                        <MapPin className="h-4 w-4" aria-hidden="true" />
-                      </span>
+                      <MapPin className={cn("h-4 w-4 shrink-0", spot.isPrimary ? "text-[var(--accent-text)]" : "text-slate-400 dark:text-zinc-500")} aria-hidden="true" />
                       <div className="min-w-0">
                         <p className="flex items-center gap-2 text-[14px] font-semibold text-slate-900 dark:text-white">
                           <span className="truncate">{spot.name}</span>
@@ -855,16 +892,7 @@ function Settings() {
         <Panel title="Email verification">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3.5">
-              <span
-                className={cn(
-                  "grid h-10 w-10 place-items-center rounded-xl",
-                  userDetails?.is_email_verified
-                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300"
-                    : "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300",
-                )}
-              >
-                <Shield className="h-5 w-5" aria-hidden="true" />
-              </span>
+              <Shield className={cn("h-5 w-5 shrink-0", userDetails?.is_email_verified ? "text-emerald-500" : "text-amber-500")} aria-hidden="true" />
               <div>
                 <p className="text-[15px] font-semibold text-slate-900 dark:text-white">
                   {userDetails?.is_email_verified ? "Your email is verified" : "Verification pending"}
@@ -880,6 +908,9 @@ function Settings() {
           </div>
         </Panel>
       )}
+
+        </div>
+      </div>
 
       <PickupSpotModal
         isOpen={isModalOpen}
@@ -966,8 +997,8 @@ function AccountCard({ onLogout }) {
     <Panel title="Account" padded={false}>
       <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-5">
         <div>
-          <p className="text-[14.5px] font-medium text-slate-900 dark:text-white">Sign out</p>
-          <p className="text-[12.5px] text-slate-500 dark:text-zinc-400">All devices</p>
+          <p className="text-[14px] font-semibold text-slate-900 dark:text-white">Sign out</p>
+          <p className="text-[12.5px] text-slate-500 dark:text-zinc-400">Signs you out of Unideals on every device.</p>
         </div>
         <button type="button" onClick={onLogout} className={btnSecondary}>
           <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -976,8 +1007,8 @@ function AccountCard({ onLogout }) {
       </div>
       <div className="flex items-center justify-between gap-4 border-t border-red-100 bg-red-50/40 px-4 py-4 sm:px-5 dark:border-red-900/30 dark:bg-red-950/10">
         <div>
-          <p className="text-[14.5px] font-medium text-red-700 dark:text-red-400">Delete account</p>
-          <p className="text-[12.5px] text-slate-500 dark:text-zinc-400">Permanent</p>
+          <p className="text-[14px] font-semibold text-red-700 dark:text-red-400">Delete account</p>
+          <p className="text-[12.5px] text-slate-500 dark:text-zinc-400">Removes your profile and listings. This can&apos;t be undone.</p>
         </div>
         <AlertDialogDemo />
       </div>

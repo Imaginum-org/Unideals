@@ -185,7 +185,7 @@ export const getSingleProduct = async (req, res, next) => {
 export const getBoostedProducts = async (req, res, next) => {
   try {
     const campus = await resolveRequestCampus(req);
-    const products = await productService.getBoostedProducts(campus._id, req.user?.gender ?? null, req.user?.role ?? null, req.query?.audience ?? null);
+    const products = await productService.getBoostedProducts(campus._id, req.user?.gender ?? null, req.user?.role ?? null, req.query?.audience ?? null, req.query?.limit);
 
     // Same content per campus URL for every viewer — edge-cacheable.
     res.set("Cache-Control", "public, max-age=60, s-maxage=300");

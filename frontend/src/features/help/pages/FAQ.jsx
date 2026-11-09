@@ -172,9 +172,7 @@ function FaqContent() {
         return (
           <section key={c.id} id={`faq-${c.id}`} className={cn(CARD, FLUSH_ON_PHONE, "scroll-mt-20 overflow-hidden")}>
             <h2 className="flex items-center gap-2.5 border-b border-neutral-100 px-4 py-3.5 text-[15px] font-semibold text-slate-900 sm:px-5 dark:border-neutral-800 dark:text-white">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
-                <Icon className="h-4 w-4" aria-hidden="true" />
-              </span>
+              <Icon className="h-4 w-4 shrink-0 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
               {c.title}
               <span className="ml-auto text-[12px] font-normal text-slate-400">{c.questions.length}</span>
             </h2>
@@ -188,9 +186,7 @@ function FaqContent() {
       {/* Still stuck */}
       <div className={cn(CARD, FLUSH_ON_PHONE, "flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:justify-between")}>
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
-            <LifeBuoy className="h-5 w-5" aria-hidden="true" />
-          </span>
+          <LifeBuoy className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
           <div>
             <p className="text-[14.5px] font-semibold text-slate-900 dark:text-white">Still need help?</p>
             <p className="text-[13px] text-slate-500 dark:text-zinc-400">Our team usually replies within 2 hours.</p>

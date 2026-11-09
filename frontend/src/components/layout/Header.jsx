@@ -37,7 +37,7 @@ import axios from "../../services/axiosInstance.js";
 import { publishChatUnread, useChatUnread } from "../../services/chatUnread.js";
 import { timeAgo } from "../../features/chat/components/ConversationCard.jsx";
 import { avatarUrl, formatName } from "../../features/chat/utils/display.js";
-import { levelProgress, xpToNextLevel } from "../../utils/badgeConfig.js";
+import { levelProgress, rankName, RANK_CONFIG, xpToNextLevel } from "../../utils/badgeConfig.js";
 import { useNotification } from "../../context/NotificationContext.jsx";
 import {
   Tag,
@@ -176,16 +176,16 @@ const ProfileDropdown = ({
       {(() => {
         const g = userDetails?.gamification;
         if (!g) return null;
-        const rankIcons = { Seedling: "🌱", Explorer: "🔵", Dealer: "⚡", Hustler: "🔥", Legend: "💎", "Campus King": "👑", "Campus Queen": "👑", "Campus Royale": "👑" };
-        const rankColors = { Seedling: "#22C55E", Explorer: "#06B6D4", Dealer: "#6366F1", Hustler: "#F97316", Legend: "#F59E0B", "Campus King": "#7C3AED", "Campus Queen": "#EC4899", "Campus Royale": "#8B5CF6" };
-        const rank = g.rank_title || "Seedling";
+        const rankKey = g.rank_title || "Seedling";
+        const rankMeta = RANK_CONFIG[rankKey] || RANK_CONFIG.Seedling;
+        const rank = rankName(rankKey);
         const level = g.level || 1;
         const totalXp = g.total_xp || 0;
         const progress = Math.min(g.progress_percent ?? levelProgress(totalXp), 100);
         const xpToNext = g.xp_to_next_level ?? xpToNextLevel(totalXp);
         const badgeCount = (g.badges || []).length;
-        const rankColor = rankColors[rank] || "#6366F1";
-        const rankIcon = rankIcons[rank] || "⚡";
+        const rankColor = rankMeta.color;
+        const rankIcon = rankMeta.icon;
         return (
           <Link
             to="/achievements"

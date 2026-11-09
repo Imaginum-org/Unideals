@@ -58,6 +58,28 @@ const CATEGORY_MAP = {
   night_owl: "milestone", og_badge: "milestone",
 };
 
+// ─── Progress towards locked badges ──────────────────────────────────────
+// [current, required] for the FIRST tier of each badge with a countable
+// target. Badges with no measurable path (verified, OG...) are omitted.
+
+const firstStep = (value, target) => [Math.max(0, Number(value) || 0), target];
+const BADGE_PROGRESS = {
+  first_listing:    (c) => firstStep(c.totalListings, 1),
+  power_seller:     (c) => firstStep(c.productsSold, 5),
+  category_ace:     (c) => firstStep(c.maxCategoryCount, 3),
+  first_buy:        (c) => firstStep(c.totalBuys, 1),
+  deal_hunter:      (c) => firstStep(c.totalBuys, 5),
+  wishlist_curator: (c) => firstStep(c.wishlistCount, 10),
+  chatter:          (c) => firstStep(c.conversationCount, 10),
+  deal_closer:      (c) => firstStep(c.dealsClosedViaChat, 3),
+  trusted_trader:   (c) => firstStep(c.productsSold + c.totalBuys, 10),
+  century_club:     (c) => firstStep(c.productsSold + c.totalBuys, 100),
+  campus_veteran:   (c) => firstStep(
+    c.accountCreatedAt ? Math.floor((Date.now() - new Date(c.accountCreatedAt).getTime()) / (30 * 86400000)) : 0,
+    6,
+  ),
+};
+
 // ─── Tier rank (for upgrade detection) ───────────────────────────────────
 
 const TIER_RANK = { bronze: 1, silver: 2, gold: 3, special: 0 };
@@ -144,7 +166,7 @@ async function getLiveWishlistCount(wishlist) {
 
 async function buildContext(userId) {
   const user = await User.findById(userId).select(
-    "is_email_verified avatar mobile createdAt wishlist gamification gender"
+    "is_email_verified avatar mobile createdAt wishlist gamification gender rating"
   );
   if (!user) throw new Error("User not found");
 
@@ -206,6 +228,17 @@ async function buildContext(userId) {
     isOGMember = rank < 100;
   } catch (_) {}
 
+  // Completed purchases: deals in conversations where this user is the buyer.
+  let totalBuys = 0;
+  try {
+    const { default: Conversation } = await import("../models/conversation.model.js");
+    const { default: Deal } = await import("../models/deal.model.js");
+    const buyingIds = await Conversation.find({ buyer_id: userId }).distinct("_id");
+    if (buyingIds.length) {
+      totalBuys = await Deal.countDocuments({ conversation_id: { $in: buyingIds }, status: "completed" });
+    }
+  } catch (_) {}
+
   // Conversation count
   let conversationCount = 0;
   try {
@@ -224,7 +257,8 @@ async function buildContext(userId) {
     wishlistCount: await getLiveWishlistCount(user.wishlist),
     totalListings: allListings.length,
     productsSold: sold.length,
-    avgRating: null, // TODO: compute from Review model when available
+    // Needs 3+ ratings so a single 5-star review cannot award it.
+    avgRating: user.rating?.count >= 3 ? user.rating.avg : null,
     maxCategoryCount,
     quickFlipCount,
     dayFlipCount,
@@ -235,7 +269,7 @@ async function buildContext(userId) {
     isOGMember,
     conversationCount,
     dealsClosedViaChat: sold.length, // approximation
-    totalBuys: 0, // TODO: query Deal model for buyer_id = userId, status = completed
+    totalBuys,
   };
 }
 
@@ -302,7 +336,16 @@ export async function computeAndAwardBadges(userId) {
   const level = computeLevel(totalXp);
   const rank_title = rankFromLevel(level, user.gender);
 
+  const earnedIds = new Set(newBadges.map((b) => b.badge_id));
+  const lockedBadges = Object.entries(BADGE_PROGRESS)
+    .filter(([id]) => !earnedIds.has(id))
+    .map(([id, fn]) => {
+      const [current, required] = fn(ctx);
+      return { badge_id: id, current: Math.min(current, required), required };
+    });
+
   await User.findByIdAndUpdate(userId, {
+    "gamification.locked_badges": lockedBadges,
     "gamification.total_xp": totalXp,
     "gamification.level": level,
     "gamification.rank_title": rank_title,
@@ -325,10 +368,15 @@ export async function computeAndAwardBadges(userId) {
     xp_to_next_level: xpToNextLevel(totalXp),
     next_level: level + 1,
     progress_percent: levelProgress(totalXp),
+    locked_badges: toLockedView(lockedBadges),
     newly_earned: newEvents,
     newly_earned_rewards,
   };
 }
+
+// API shape the client already expects: { badge_id, progress: { current, required } }.
+const toLockedView = (rows) =>
+  rows.map((r) => ({ badge_id: r.badge_id, progress: { current: r.current, required: r.required } }));
 
 /** Get current gamification data without recomputing. */
 export async function getGamificationData(userId) {
@@ -347,6 +395,7 @@ export async function getGamificationData(userId) {
     xp_to_next_level: xpToNextLevel(xp),
     next_level: level + 1,
     progress_percent: levelProgress(xp),
+    locked_badges: toLockedView(g.locked_badges || []),
     last_computed_at: g.last_computed_at || null,
   };
 }

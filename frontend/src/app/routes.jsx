@@ -77,6 +77,7 @@ const ProductListing = page(() => import("../features/product/pages/ProductListi
 const ProductListed = page(() => import("../features/product/pages/ProductListed.jsx"));
 const ProductCategory = page(() => import("../features/product/pages/ProductCategory.jsx"));
 const Explore = page(() => import("../features/product/pages/Explore.jsx"));
+const Deals = page(() => import("../features/product/pages/Deals.jsx"));
 const PricingModel = page(() => import("../features/product/pages/PricingModel.jsx"));
 // User
 const ProfileOverview = page(() => import("../features/user/pages/ProfileOverview.jsx"));
@@ -99,6 +100,7 @@ const NotFound = page(() => import("../components/NotFound.jsx"));
 // prefixes ("/profileoverview") come before shorter ones ("/profile").
 const PREFETCH_TABLE = [
   ["/explore", Explore],
+  ["/deals", Deals],
   ["/category/", ProductCategory],
   ["/product/", ProductDescription],
   ["/search", SearchResults],
@@ -164,6 +166,7 @@ export default function AppRoutes() {
           <Route path="/product/:id" element={<ProductDescription />} />
           <Route path="/category/:categoryName" element={<ProductCategory />} />
           <Route path="/explore" element={<Explore />} />
+          <Route path="/deals" element={<Deals />} />
           <Route path="/price" element={<PricingModel />} />
           <Route path="/termscondition" element={<Termscondition />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />

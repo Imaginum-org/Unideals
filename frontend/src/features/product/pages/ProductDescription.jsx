@@ -58,6 +58,7 @@ import { normalizeMultiline } from "../../../utils/text.js";
 import { isHotDeal } from "../../../utils/hotDeal.js";
 import { productPath } from "../../../utils/productPath.js";
 import { isSpecHidden } from "../utils/listingSmarts.js";
+import { rankName } from "../../../utils/badgeConfig.js";
 import HotDealChip from "../../../components/ui/HotDealChip.jsx";
 
 /*
@@ -1003,11 +1004,13 @@ function OwnerActions({ productId }) {
 function SellerCard({ seller, stats, isOwner, onReport, className }) {
   const plan = PLAN_LABEL[seller?.subscription];
   const level = seller?.gamification?.level;
-  const rank = seller?.gamification?.rank_title;
+  const rank = seller?.gamification?.rank_title ? rankName(seller.gamification.rank_title) : null;
   const memberSince = formatDate(seller?.createdAt, { month: "short", year: "numeric" });
   const activeListings = stats?.active_listings;
 
+  const ratingCount = Number(seller?.rating?.count) || 0;
   const facts = [
+    { label: "Buyer rating", value: ratingCount ? `★ ${Number(seller.rating.avg).toFixed(1)} (${ratingCount})` : "New seller" },
     memberSince && { label: "Member since", value: memberSince },
     Number.isFinite(activeListings) && { label: "Active listings", value: activeListings },
     level && { label: rank || "Level", value: `Lvl ${level}` },
@@ -1044,7 +1047,7 @@ function SellerCard({ seller, stats, isOwner, onReport, className }) {
       </div>
 
       {facts.length > 0 && (
-        <dl className={cn("mt-4 grid gap-2", facts.length === 3 ? "grid-cols-3" : facts.length === 2 ? "grid-cols-2" : "grid-cols-1")}>
+        <dl className={cn("mt-4 grid gap-2", facts.length === 3 ? "grid-cols-3" : facts.length === 2 || facts.length === 4 ? "grid-cols-2" : "grid-cols-1")}>
           {facts.map((f) => (
             <div key={f.label} className="min-w-0 rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-white/[0.03]">
               <dt className="truncate text-[11px] font-medium text-slate-500 dark:text-zinc-400">{f.label}</dt>

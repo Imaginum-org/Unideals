@@ -120,8 +120,8 @@ await test("two simultaneous undos never skip two stages", async () => {
   await deals.confirmDeal({ conversationId: id, userId: S, amount: 800 });
   await deals.schedulePickup({ conversationId: id, userId: S, date: tomorrow, location: "Library" });
   const results = await Promise.allSettled([
-    deals.revertDealStage({ conversationId: id, userId: S }),
-    deals.revertDealStage({ conversationId: id, userId: S }),
+    deals.revertDealStage({ conversationId: id, userId: S, from: "pickup_scheduled" }),
+    deals.revertDealStage({ conversationId: id, userId: S, from: "pickup_scheduled" }),
   ]);
   const final = await Deal.findOne({ conversation_id: id });
   // Either one wins and one is rejected (409), or they serialize; never negotiating.

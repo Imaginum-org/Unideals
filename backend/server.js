@@ -9,7 +9,7 @@ if (!process.env.SECRET_KEY_ACCESS_TOKEN || !process.env.SECRET_KEY_REFRESH_TOKE
 import http from "http";
 import app from "./src/app.js";
 import { connectDB } from "./src/config/db.js";
-import { backfillSellerTiers } from "./src/utils/sellerTierSync.js";
+import { backfillSellerTiers, ensureAdminPlans } from "./src/utils/sellerTierSync.js";
 import { scheduleCleanupDeletedProducts } from "./src/jobs/cleanupDeletedProducts.job.js";
 import { scheduleExpireBoosts } from "./src/jobs/expireBoosts.job.js";
 import { scheduleExpireSubscriptions } from "./src/jobs/expireSubscriptions.job.js";
@@ -27,7 +27,8 @@ const startServer = async () => {
     scheduleExpireSubscriptions();
     scheduleDispatchNotifications();
     // Plan-rank backfill for listings (search ranking perk); idempotent.
-    backfillSellerTiers();
+    // Admins get Pro Plus first so the backfill ranks their listings too.
+    ensureAdminPlans().then(backfillSellerTiers);
 
     const httpServer = http.createServer(app);
     initSockets(httpServer);

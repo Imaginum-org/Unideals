@@ -546,7 +546,9 @@ const REVERT_RULES = {
   },
 };
 
-export const revertDealStage = async ({ conversationId, userId }) => {
+// `from` is the stage the seller saw when tapping Undo. A double tap (or two
+// tabs) then undoes one step, not two: the second request sees a newer stage.
+export const revertDealStage = async ({ conversationId, userId, from }) => {
   const conversation = await loadConversation(conversationId);
   const role = roleOf(conversation, userId);
   if (role !== "seller") throw new AppError("Only the seller can undo a deal step", 403);
@@ -555,6 +557,7 @@ export const revertDealStage = async ({ conversationId, userId }) => {
   if (deal.status === DEAL_STATUS.COMPLETED) {
     throw new AppError("Completed deals can't be undone", 400);
   }
+  if (from && from !== deal.status) throw new AppError("This deal just changed. Refresh and try again.", 409);
   const rule = REVERT_RULES[deal.status];
   if (!rule) throw new AppError("There's no step to undo yet", 400);
 

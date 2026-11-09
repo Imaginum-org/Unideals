@@ -1470,7 +1470,7 @@ const ChatPanel = ({ embedded = false }) => {
                       onSchedulePickup={(d, loc) => runDealAction(() => chatApi.schedulePickup(selectedId, d, loc), "Pickup set")}
                       onPayment={() => runDealAction(() => chatApi.confirmPayment(selectedId), "Payment confirmed")}
                       onReceived={() => runDealAction(() => chatApi.confirmItemReceived(selectedId), "Done. Enjoy your buy.")}
-                      onRevert={() => runDealAction(() => chatApi.revertDeal(selectedId), "Step undone")}
+                      onRevert={() => runDealAction(() => chatApi.revertDeal(selectedId, deal?.status), "Step undone")}
                     />
                   </div>
                 </div>

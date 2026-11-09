@@ -59,9 +59,7 @@ function Row({ to, label, icon: Icon, badge }) {
       to={to}
       className="flex min-h-[52px] items-center gap-3 px-4 transition-colors active:bg-neutral-100 dark:active:bg-white/5"
     >
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
-        <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
-      </span>
+      <Icon className="h-[17px] w-[17px] shrink-0 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-slate-800 dark:text-zinc-100">{label}</span>
       {badge > 0 && (
         <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#FF3B30] px-1.5 text-[11px] font-bold text-white">

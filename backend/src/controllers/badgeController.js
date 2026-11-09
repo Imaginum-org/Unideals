@@ -98,28 +98,28 @@ export const getBadgeConfig = async (req, res) => {
 // Static badge catalogue served by the API
 const BADGE_CATALOGUE = [
   // ── Seller ──────────────────────────────────────────────────────────────
-  { id: "first_listing",  category: "seller", name: "First Drop",   icon: "📦", tiers: [{ tier: "special", xp: 30,  label: "Post your first listing" }] },
-  { id: "power_seller",   category: "seller", name: "Power Seller", icon: "🏪", tiers: [{ tier: "bronze", xp: 50,  label: "Sell 5 products" }, { tier: "silver", xp: 100, label: "Sell 20 products" }, { tier: "gold", xp: 200, label: "Sell 50 products" }] },
-  { id: "top_rater",      category: "seller", name: "Top Rated",    icon: "⭐", tiers: [{ tier: "bronze", xp: 60,  label: "Avg rating ≥ 4.0" }, { tier: "silver", xp: 100, label: "Avg rating ≥ 4.5" }, { tier: "gold", xp: 200, label: "Avg rating ≥ 4.8" }] },
-  { id: "category_ace",   category: "seller", name: "Category Ace", icon: "🎯", tiers: [{ tier: "bronze", xp: 40,  label: "3 items in same category" }, { tier: "silver", xp: 80, label: "10 items in same category" }, { tier: "gold", xp: 150, label: "25 items in same category" }] },
-  { id: "quick_flip",     category: "seller", name: "Quick Flip",   icon: "⚡", tiers: [{ tier: "bronze", xp: 40,  label: "Sell an item within 3 days" }, { tier: "silver", xp: 80, label: "Sell an item within 1 day" }, { tier: "gold", xp: 150, label: "5 sales each within 1 day" }] },
+  { id: "first_listing",  category: "seller", name: "Freshers' Drop",   icon: "📦", tiers: [{ tier: "special", xp: 30,  label: "Post your first listing" }] },
+  { id: "power_seller",   category: "seller", name: "Hostel Tycoon", icon: "🏪", tiers: [{ tier: "bronze", xp: 50,  label: "Sell 5 products" }, { tier: "silver", xp: 100, label: "Sell 20 products" }, { tier: "gold", xp: 200, label: "Sell 50 products" }] },
+  { id: "top_rater",      category: "seller", name: "Dean's List",    icon: "⭐", tiers: [{ tier: "bronze", xp: 60,  label: "Avg rating ≥ 4.0" }, { tier: "silver", xp: 100, label: "Avg rating ≥ 4.5" }, { tier: "gold", xp: 200, label: "Avg rating ≥ 4.8" }] },
+  { id: "category_ace",   category: "seller", name: "Major Declared", icon: "🎯", tiers: [{ tier: "bronze", xp: 40,  label: "3 items in same category" }, { tier: "silver", xp: 80, label: "10 items in same category" }, { tier: "gold", xp: 150, label: "25 items in same category" }] },
+  { id: "quick_flip",     category: "seller", name: "Lunch-Break Flip",   icon: "⚡", tiers: [{ tier: "bronze", xp: 40,  label: "Sell an item within 3 days" }, { tier: "silver", xp: 80, label: "Sell an item within 1 day" }, { tier: "gold", xp: 150, label: "5 sales each within 1 day" }] },
   // ── Buyer ────────────────────────────────────────────────────────────────
-  { id: "first_buy",         category: "buyer", name: "First Purchase",  icon: "🛒", tiers: [{ tier: "special", xp: 30,  label: "Complete your first purchase" }] },
-  { id: "deal_hunter",       category: "buyer", name: "Deal Hunter",     icon: "🔍", tiers: [{ tier: "bronze", xp: 50,  label: "5 completed buys" }, { tier: "silver", xp: 100, label: "15 completed buys" }, { tier: "gold", xp: 200, label: "30 completed buys" }] },
-  { id: "wishlist_curator",  category: "buyer", name: "Curator",         icon: "💝", tiers: [{ tier: "bronze", xp: 20,  label: "10 wishlist items" }, { tier: "silver", xp: 40, label: "25 wishlist items" }, { tier: "gold", xp: 80, label: "50 wishlist items" }] },
+  { id: "first_buy",         category: "buyer", name: "First Haul",  icon: "🛒", tiers: [{ tier: "special", xp: 30,  label: "Complete your first purchase" }] },
+  { id: "deal_hunter",       category: "buyer", name: "Semester Saver",     icon: "🔍", tiers: [{ tier: "bronze", xp: 50,  label: "5 completed buys" }, { tier: "silver", xp: 100, label: "15 completed buys" }, { tier: "gold", xp: 200, label: "30 completed buys" }] },
+  { id: "wishlist_curator",  category: "buyer", name: "Window Shopper",         icon: "💝", tiers: [{ tier: "bronze", xp: 20,  label: "10 wishlist items" }, { tier: "silver", xp: 40, label: "25 wishlist items" }, { tier: "gold", xp: 80, label: "50 wishlist items" }] },
   // ── Communication ────────────────────────────────────────────────────────
-  { id: "chatter",       category: "communication", name: "Social Butterfly", icon: "💬", tiers: [{ tier: "bronze", xp: 20,  label: "10 conversations" }, { tier: "silver", xp: 50, label: "50 conversations" }, { tier: "gold", xp: 100, label: "100 conversations" }] },
-  { id: "deal_closer",   category: "communication", name: "Deal Closer",      icon: "🤝", tiers: [{ tier: "bronze", xp: 50,  label: "3 deals closed" }, { tier: "silver", xp: 100, label: "10 deals closed" }, { tier: "gold", xp: 200, label: "25 deals closed" }] },
+  { id: "chatter",       category: "communication", name: "Canteen Regular", icon: "💬", tiers: [{ tier: "bronze", xp: 20,  label: "10 conversations" }, { tier: "silver", xp: 50, label: "50 conversations" }, { tier: "gold", xp: 100, label: "100 conversations" }] },
+  { id: "deal_closer",   category: "communication", name: "Viva Cleared",      icon: "🤝", tiers: [{ tier: "bronze", xp: 50,  label: "3 deals closed" }, { tier: "silver", xp: 100, label: "10 deals closed" }, { tier: "gold", xp: 200, label: "25 deals closed" }] },
   // ── Trust ────────────────────────────────────────────────────────────────
-  { id: "verified_student", category: "trust", name: "Verified Student", icon: "✅", tiers: [{ tier: "special", xp: 50,  label: "Verify your email" }] },
-  { id: "profile_complete", category: "trust", name: "Profile Pro",      icon: "🪪", tiers: [{ tier: "special", xp: 40,  label: "Complete your profile" }] },
-  { id: "trusted_trader",   category: "trust", name: "Trusted Trader",   icon: "🛡️", tiers: [{ tier: "special", xp: 100, label: "0 disputes, 10+ deals" }] },
-  { id: "early_adopter",    category: "trust", name: "Early Adopter",    icon: "🎖️", tiers: [{ tier: "special", xp: 75,  label: "Joined during early access" }] },
-  { id: "campus_veteran",   category: "trust", name: "Campus Veteran",   icon: "🏛️", tiers: [{ tier: "special", xp: 60,  label: "Account older than 6 months" }] },
+  { id: "verified_student", category: "trust", name: "ID Card Verified", icon: "✅", tiers: [{ tier: "special", xp: 50,  label: "Verify your email" }] },
+  { id: "profile_complete", category: "trust", name: "Admit Card Ready",      icon: "🪪", tiers: [{ tier: "special", xp: 40,  label: "Complete your profile" }] },
+  { id: "trusted_trader",   category: "trust", name: "Batch Favourite",   icon: "🛡️", tiers: [{ tier: "special", xp: 100, label: "0 disputes, 10+ deals" }] },
+  { id: "early_adopter",    category: "trust", name: "First Bench",    icon: "🎖️", tiers: [{ tier: "special", xp: 75,  label: "Joined during early access" }] },
+  { id: "campus_veteran",   category: "trust", name: "Alumni Material",   icon: "🏛️", tiers: [{ tier: "special", xp: 60,  label: "Account older than 6 months" }] },
   // ── Milestone ────────────────────────────────────────────────────────────
-  { id: "century_club",   category: "milestone", name: "Century Club",  icon: "💯", tiers: [{ tier: "special", xp: 200, label: "100 total transactions" }] },
-  { id: "big_deal",       category: "milestone", name: "Big Deal",      icon: "💰", tiers: [{ tier: "special", xp: 100, label: "Sell an item for ₹5,000+" }] },
-  { id: "streak_seller",  category: "milestone", name: "On A Roll",     icon: "🔥", tiers: [{ tier: "special", xp: 80,  label: "5 sales in 7 days" }] },
-  { id: "night_owl",      category: "milestone", name: "Night Owl",     icon: "🦉", tiers: [{ tier: "special", xp: 30,  label: "10 late-night listings" }] },
-  { id: "og_badge",       category: "milestone", name: "OG Member",     icon: "👾", tiers: [{ tier: "special", xp: 100, label: "Among the first 100 users" }] },
+  { id: "century_club",   category: "milestone", name: "100% Attendance",  icon: "💯", tiers: [{ tier: "special", xp: 200, label: "100 total transactions" }] },
+  { id: "big_deal",       category: "milestone", name: "Fest Budget",      icon: "💰", tiers: [{ tier: "special", xp: 100, label: "Sell an item for ₹5,000+" }] },
+  { id: "streak_seller",  category: "milestone", name: "Semester Streak",     icon: "🔥", tiers: [{ tier: "special", xp: 80,  label: "5 sales in 7 days" }] },
+  { id: "night_owl",      category: "milestone", name: "All-Nighter",     icon: "🦉", tiers: [{ tier: "special", xp: 30,  label: "10 late-night listings" }] },
+  { id: "og_badge",       category: "milestone", name: "OG Batch",     icon: "👾", tiers: [{ tier: "special", xp: 100, label: "Among the first 100 users" }] },
 ];

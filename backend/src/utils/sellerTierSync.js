@@ -44,6 +44,24 @@ export const backfillSellerTiers = async () => {
   }
 };
 
+/**
+ * Startup, idempotent: every admin gets Pro Plus (staff perk). Downgrade
+ * paths skip admins, so this only catches accounts made admin directly in
+ * the database.
+ */
+export const ensureAdminPlans = async () => {
+  try {
+    const User = mongoose.model("User");
+    const admins = await User.find({ role: "admin", subscription: { $ne: USER_TIER.PRO_PLUS } }).select("_id").lean();
+    if (!admins.length) return;
+    await User.updateMany({ _id: { $in: admins.map((a) => a._id) } }, { $set: { subscription: USER_TIER.PRO_PLUS } });
+    for (const a of admins) await syncSellerTier(a._id, USER_TIER.PRO_PLUS);
+    console.log(`[plans] gave Pro Plus to ${admins.length} admin account(s)`);
+  } catch (err) {
+    console.error("[plans] admin plan sync failed:", err?.message);
+  }
+};
+
 // Pull the new subscription value out of an update document, if any.
 export const subscriptionFromUpdate = (update) => {
   if (!update) return undefined;

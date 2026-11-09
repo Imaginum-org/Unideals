@@ -5,6 +5,7 @@ import { deleteImageSafely, getFileOwnership } from "../utils/imagekit.js";
 import { safeErrorMessage } from "../utils/response.js";
 import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges } from "../services/badgeService.js";
 import { clearAuthCookies } from "../services/auth.service.js";
+import { getInsights } from "../services/insights.service.js";
 
 // The signed-in user's own profile: never ship credentials or internal
 // session/token bookkeeping, and never the precise GPS fix (the client caches
@@ -707,5 +708,15 @@ export const getGenderChangeStatus = async (req, res) => {
       success: false,
       error: true,
     });
+  }
+};
+
+// GET /api/user/insights: earnings, spend, deals waiting and rating for Overview.
+export const getMyInsights = async (req, res) => {
+  try {
+    const data = await getInsights(req.userId);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: safeErrorMessage(error, "Could not load insights") });
   }
 };

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Info, HelpCircle, ChevronRight, Sparkles } from "lucide-react";
-import { getBadgeMeta, RANK_CONFIG, TIER_STYLES } from "../../../utils/badgeConfig.js";
+import { getBadgeMeta, rankName, RANK_CONFIG, TIER_STYLES } from "../../../utils/badgeConfig.js";
 import RankGuideModal from "./RankGuideModal.jsx";
 
 /**
@@ -71,7 +71,7 @@ export default function BadgeMiniStrip({ gamification, loading = false }) {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <p className="text-sm font-extrabold leading-tight" style={{ color: rank.color }}>
-                    {rank_title}
+                    {rankName(rank_title)}
                   </p>
                   <button
                     type="button"

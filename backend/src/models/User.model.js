@@ -244,6 +244,13 @@ const userSchema = new Schema(
       },
     ],
 
+    // Buyer ratings (denormalised from Review; see review.service).
+    rating: {
+      _id: false,
+      avg: { type: Number, default: 0 },
+      count: { type: Number, default: 0 },
+    },
+
     gamification: {
       _id: false,
       total_xp: {
@@ -277,6 +284,16 @@ const userSchema = new Schema(
           },
           earned_at: { type: Date, default: Date.now },
           xp_granted: { type: Number, default: 0 },
+        },
+      ],
+
+      // Progress towards badges not earned yet (written on every recompute).
+      locked_badges: [
+        {
+          _id: false,
+          badge_id: { type: String, required: true },
+          current: { type: Number, default: 0 },
+          required: { type: Number, default: 1 },
         },
       ],
 
@@ -348,6 +365,10 @@ userSchema.post("bulkWrite", () => clearUserCache());
 // ── Plan changes → listing rank (search ranking perk) ──
 // Any write that sets `subscription` re-stamps the seller's listings.
 userSchema.pre(["findOneAndUpdate", "updateOne"], { document: false, query: true }, function () {
+  // Promoting someone to admin also gives them Pro Plus.
+  const upd = this.getUpdate();
+  const newRole = upd?.$set?.role ?? upd?.role;
+  if (newRole === "admin") this.setUpdate({ ...upd, $set: { ...(upd.$set || {}), subscription: "pro_plus" } });
   const tier = subscriptionFromUpdate(this.getUpdate());
   if (tier !== undefined) this._planSync = { id: this.getFilter()?._id, tier };
 });
@@ -355,6 +376,8 @@ userSchema.post(["findOneAndUpdate", "updateOne"], { document: false, query: tru
   if (this._planSync?.id) await syncSellerTier(this._planSync.id, this._planSync.tier);
 });
 userSchema.pre("save", function () {
+  // Admins always have Pro Plus (staff perk, no payment row).
+  if (this.role === "admin" && this.subscription !== "pro_plus") this.subscription = "pro_plus";
   this._planChanged = !this.isNew && this.isModified("subscription");
 });
 userSchema.post("save", async function (doc) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, Gift, Info, Lock, Medal, Rocket, Sparkles } from "lucide-react";
-import { BADGE_CATALOGUE, LEVEL_REWARDS_GUIDE, RANK_CONFIG, RANK_TIERS_GUIDE } from "../../../utils/badgeConfig.js";
+import { BADGE_CATALOGUE, LEVEL_REWARDS_GUIDE, rankName, RANK_CONFIG, RANK_TIERS_GUIDE } from "../../../utils/badgeConfig.js";
 import RankGuideModal from "./RankGuideModal.jsx";
 import { fetchMyRewards } from "../api/badgeApi.js";
 import { cn } from "../../../utils/cn.js";
@@ -70,7 +70,7 @@ export default function LevelCard({
               <div className="min-w-0">
                 <p className="text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">Level {level}</p>
                 <h2 className="text-[24px] font-semibold leading-tight tracking-tight" style={{ color: rank.color }}>
-                  {rank_title}
+                  {rankName(rank_title)}
                 </h2>
                 <button
                   type="button"
@@ -89,9 +89,7 @@ export default function LevelCard({
                 onClick={() => setShowGuide(true)}
                 className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-left transition-colors hover:border-amber-300 sm:max-w-[260px] dark:border-amber-900/50 dark:bg-amber-950/20"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-amber-600 shadow-sm dark:bg-white/10 dark:text-amber-300">
-                  <Gift className="h-[18px] w-[18px]" aria-hidden="true" />
-                </span>
+                <Gift className="h-[18px] w-[18px] shrink-0 text-amber-600 dark:text-amber-300" aria-hidden="true" />
                 <span className="min-w-0">
                   <span className="block text-[11.5px] font-medium text-amber-800/80 dark:text-amber-200/80">Next reward · Level {nextReward.level}</span>
                   <span className="block truncate text-[13px] font-semibold text-amber-900 dark:text-amber-100">{nextReward.grants.join(" · ")}</span>
@@ -150,13 +148,13 @@ export default function LevelCard({
                         !done && !current && "opacity-50 grayscale",
                       )}
                       style={{ background: t.bg, ...(current ? { "--tw-ring-color": t.color } : {}) }}
-                      title={`${t.title} · Level ${t.minLevel}+`}
+                      title={`${t.name} · Level ${t.minLevel}+`}
                     >
                       {done ? <Check className="h-4 w-4" style={{ color: t.color }} strokeWidth={3} /> : t.icon}
                     </span>
                     <span className={cn("h-0.5 flex-1", i === RANK_TIERS_GUIDE.length - 1 ? "bg-transparent" : done ? "bg-[var(--accent)]" : "bg-neutral-200 dark:bg-neutral-700")} />
                   </div>
-                  <span className={cn("mt-1.5 text-[11.5px] font-semibold", current ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-zinc-400")}>{t.title}</span>
+                  <span className={cn("mt-1.5 text-[11.5px] font-semibold", current ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-zinc-400")}>{t.name}</span>
                   <span className="flex items-center gap-0.5 text-[10.5px] text-slate-400 dark:text-zinc-500">
                     {!done && !current && <Lock className="h-2.5 w-2.5" aria-hidden="true" />}
                     Lv {t.minLevel}

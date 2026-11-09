@@ -1,3 +1,4 @@
+import { ratedDealsFor } from "./review.service.js";
 import Conversation from "../models/conversation.model.js";
 import Deal from "../models/deal.model.js";
 import { DEAL_STATUS } from "../config/constants.js";
@@ -55,6 +56,10 @@ export const getUserOrders = async ({
     ? await Deal.find({ conversation_id: { $in: ids } }).lean()
     : [];
   const dealByConv = new Map(deals.map((d) => [String(d.conversation_id), d]));
+  const rated = await ratedDealsFor(
+    userId,
+    deals.filter((d) => d.status === DEAL_STATUS.COMPLETED).map((d) => d._id),
+  );
 
   let orders = rows.map((r) => {
     const isBuyer = String(r.buyer_id?._id || r.buyer_id) === me;
@@ -107,6 +112,7 @@ export const getUserOrders = async ({
         : null,
       paymentConfirmed: Boolean(deal?.payment_confirmed?.is_confirmed),
       itemReceived: Boolean(deal?.item_received?.is_confirmed),
+      myRating: deal ? rated.get(String(deal._id)) || null : null,
       last_message: r.last_message,
       last_activity_at: r.last_activity_at,
       unread: isBuyer

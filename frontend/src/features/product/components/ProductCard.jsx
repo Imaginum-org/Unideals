@@ -13,6 +13,7 @@ import HotDealChip from "../../../components/ui/HotDealChip.jsx";
 import { isHotDeal } from "../../../utils/hotDeal.js";
 import { useNavigate } from "react-router-dom";
 import { productPath } from "../../../utils/productPath.js";
+import { useUser } from "../../../context/useUserContext.jsx";
 
 const FALLBACK_IMAGE = "/logo.svg";
 
@@ -20,14 +21,14 @@ const FALLBACK_IMAGE = "/logo.svg";
 // purple/orange down a rail; trending cards derive it stably from _id.
 const BOOST_ACCENTS = {
   purple: {
-    label: "text-[#7C3AED]",
-    tintBg: "bg-[#EDE9FE]",
-    tintText: "text-[#6D28D9]",
+    label: "text-[var(--accent-text)]",
+    tintBg: "bg-[var(--accent-soft)]",
+    tintText: "text-[var(--accent-text)]",
   },
   orange: {
-    label: "text-[#EA580C]",
-    tintBg: "bg-[#FEF3C7]",
-    tintText: "text-[#B45309]",
+    label: "text-[var(--accent-text)]",
+    tintBg: "bg-[var(--accent-soft)]",
+    tintText: "text-[var(--accent-text)]",
   },
 };
 
@@ -59,11 +60,11 @@ const getTierStyles = (tier) => {
     case "pro_plus":
       return {
         cardBg: "bg-[#F7F8FA] dark:bg-[#18181B]",
-        cardBorder: "border-2 border-[#FFD700]/80",
+        cardBorder: "border border-[#E2E6FB] dark:border-indigo-900/50",
         cardHoverBorder:
-          "hover:border-[#E5CF8A] dark:hover:border-[#8a6d1f]",
+          "hover:border-[#C7D2FE] dark:hover:border-indigo-800",
         cardShadow:
-          "shadow-[0_4px_20px_rgba(255,215,0,0.15)] hover:shadow-[0_8px_30px_rgba(255,215,0,0.3)] z-10",
+          "shadow-[0_4px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)]",
         badgeBg:
           "bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black shadow-lg shadow-[#FFD700]/40",
         icon: <FaCrown className="animate-pulse" size={12} />,
@@ -71,11 +72,11 @@ const getTierStyles = (tier) => {
     case "pro":
       return {
         cardBg: "bg-[#F7F8FA] dark:bg-[#18181B]",
-        cardBorder: "border-2 border-[#3838EC]/80",
+        cardBorder: "border border-[#E2E6FB] dark:border-indigo-900/50",
         cardHoverBorder:
-          "hover:border-[#A5B4FC] dark:hover:border-[#4338CA]",
+          "hover:border-[#C7D2FE] dark:hover:border-indigo-800",
         cardShadow:
-          "shadow-[0_4px_20px_rgba(56,56,236,0.15)] hover:shadow-[0_8px_30px_rgba(56,56,236,0.3)] z-10",
+          "shadow-[0_4px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)]",
         badgeBg:
           "bg-gradient-to-r from-[#3838EC] to-[#5C6DFF] text-white shadow-lg shadow-[#3838EC]/40",
         icon: <FaStar className="animate-pulse" size={10} />,
@@ -116,6 +117,7 @@ const ProductCard = memo(
       const { toggleWishlist, removeFromWishlist, isInWishlist } =
         useWishlist();
       const { campus } = useCampus();
+      const { userDetails } = useUser();
       const [loading, setLoading] = useState(false);
       const [limitInfo, setLimitInfo] = useState(null);
       const navigate = useNavigate();
@@ -173,8 +175,34 @@ const ProductCard = memo(
 
       // Only show a rating badge when the backend provides a real one —
       // never a hardcoded number.
+      // rating is { avg, count } (buyer ratings); older payloads sent a number.
       const sellerRating =
-        typeof sellerInfo?.rating === "number" ? sellerInfo.rating : null;
+        typeof sellerInfo?.rating === "number"
+          ? sellerInfo.rating
+          : sellerInfo?.rating?.count > 0
+            ? Number(sellerInfo.rating.avg).toFixed(1)
+            : null;
+
+      // Chat Now opens this listing's thread with its seller (same deep link
+      // as the product page). Guests sign in first and come straight back.
+      const sellerIdStr = String(
+        (typeof seller_id === "object" && seller_id !== null ? seller_id._id : seller_id) || sellerInfo?._id || "",
+      );
+      const isOwnListing = Boolean(userDetails?._id && sellerIdStr && String(userDetails._id) === sellerIdStr);
+      const openChat = () => {
+        if (isOwnListing) {
+          navigate(productPath(product));
+          return;
+        }
+        const href = sellerIdStr
+          ? `/chat?seller=${encodeURIComponent(sellerIdStr)}&product=${encodeURIComponent(_id || "")}`
+          : `/chat?product=${encodeURIComponent(_id || "")}`;
+        if (!userDetails?._id) {
+          navigate("/login", { state: { from: href } });
+          return;
+        }
+        navigate(href);
+      };
 
       const imageUrl = useMemo(() => {
         if (!images?.length) return FALLBACK_IMAGE;
@@ -406,7 +434,7 @@ group-hover:pointer-events-auto
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    navigate("/chat");
+                    openChat();
                   }}
                   className="
       rounded-lg
@@ -427,7 +455,7 @@ group-hover:pointer-events-auto
     "
                 >
                   <MdOutlineChatBubbleOutline size={16} />
-                  <span>Chat Now</span>
+                  <span>{isOwnListing ? "View listing" : "Chat Now"}</span>
                 </button>
               </div>
 

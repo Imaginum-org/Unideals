@@ -11,19 +11,19 @@ const LEVEL_REWARDS = [
   {
     id: "level_5_gift",
     level: 5,
-    label: "Level 5 – Explorer Reached! 🔵",
+    label: "Level 5: Junior unlocked",
     grants: [{ type: "boost_credit", value: 1 }],
   },
   {
     id: "level_10_gift",
     level: 10,
-    label: "Level 10 – Dealer Reached! ⚡",
+    label: "Level 10: Class Rep unlocked",
     grants: [{ type: "boost_credit", value: 2 }],
   },
   {
     id: "level_15_gift",
     level: 15,
-    label: "Level 15 Milestone 🌟",
+    label: "Level 15 milestone",
     grants: [
       { type: "boost_credit", value: 2 },
       { type: "frame", value: "bronze" },
@@ -32,13 +32,13 @@ const LEVEL_REWARDS = [
   {
     id: "level_20_gift",
     level: 20,
-    label: "Level 20 – Hustler Reached! 🔥",
+    label: "Level 20: Senior unlocked",
     grants: [{ type: "boost_credit", value: 3 }],
   },
   {
     id: "level_25_gift",
     level: 25,
-    label: "Level 25 Milestone ✨",
+    label: "Level 25 milestone",
     grants: [
       { type: "boost_credit", value: 3 },
       { type: "tag", value: "rising_star" },
@@ -47,7 +47,7 @@ const LEVEL_REWARDS = [
   {
     id: "level_30_gift",
     level: 30,
-    label: "Level 30 – Legend Reached! 💎",
+    label: "Level 30: Topper unlocked",
     grants: [
       { type: "boost_credit", value: 4 },
       { type: "frame", value: "gold" },
@@ -56,13 +56,13 @@ const LEVEL_REWARDS = [
   {
     id: "level_35_gift",
     level: 35,
-    label: "Level 35 Milestone 💫",
+    label: "Level 35 milestone",
     grants: [{ type: "boost_credit", value: 4 }],
   },
   {
     id: "level_40_gift",
     level: 40,
-    label: "Level 40 – Campus Royale! 👑",
+    label: "Level 40: Campus Icon unlocked",
     grants: [
       { type: "boost_credit", value: 5 },
       { type: "frame", value: "crown" },
@@ -71,7 +71,7 @@ const LEVEL_REWARDS = [
   {
     id: "level_45_gift",
     level: 45,
-    label: "Level 45 Milestone 🌈",
+    label: "Level 45 milestone",
     grants: [
       { type: "boost_credit", value: 5 },
       { type: "tag", value: "campus_legend" },
@@ -80,7 +80,7 @@ const LEVEL_REWARDS = [
   {
     id: "level_50_gift",
     level: 50,
-    label: "Level 50 – MAX LEVEL! 🌟",
+    label: "Level 50: max level",
     grants: [
       { type: "boost_credit", value: 10 },
       { type: "tag", value: "hall_of_fame" },
@@ -96,21 +96,21 @@ const RANK_REWARDS = [
     id: "rank_seedling_gift",
     rank: "Seedling",
     minLevel: 1,
-    label: "Welcome to Unideals! 🌱",
+    label: "Welcome, Fresher",
     grants: [{ type: "boost_credit", value: 1 }],
   },
   {
     id: "rank_explorer_gift",
     rank: "Explorer",
     minLevel: 5,
-    label: "Explorer Rank Unlocked! 🔵",
+    label: "You're a Junior now",
     grants: [{ type: "boost_credit", value: 2 }],
   },
   {
     id: "rank_dealer_gift",
     rank: "Dealer",
     minLevel: 10,
-    label: "Dealer Rank – 1 Month Pro FREE! ⚡",
+    label: "Class Rep: 1 month of Pro, free",
     grants: [
       { type: "boost_credit", value: 3 },
       { type: "subscription", value: { tier: USER_TIER.PRO, days: 30, is_lifetime: false } },
@@ -120,7 +120,7 @@ const RANK_REWARDS = [
     id: "rank_hustler_gift",
     rank: "Hustler",
     minLevel: 20,
-    label: "Hustler Rank – 1 Semester Pro FREE! 🔥",
+    label: "Senior: 1 semester of Pro, free",
     grants: [
       { type: "boost_credit", value: 5 },
       { type: "subscription", value: { tier: USER_TIER.PRO, days: 180, is_lifetime: false } },
@@ -131,7 +131,7 @@ const RANK_REWARDS = [
     id: "rank_legend_gift",
     rank: "Legend",
     minLevel: 30,
-    label: "Legend Rank – 1 Semester Pro+ FREE! 💎",
+    label: "Topper: 1 semester of Pro Plus, free",
     grants: [
       { type: "boost_credit", value: 7 },
       { type: "subscription", value: { tier: USER_TIER.PRO_PLUS, days: 180, is_lifetime: false } },
@@ -141,7 +141,7 @@ const RANK_REWARDS = [
     id: "rank_royale_gift",
     rank: "Campus Royale",  // matches Campus King, Campus Queen, Campus Royale
     minLevel: 40,
-    label: "Campus Royale – LIFETIME Pro+ FREE! 👑",
+    label: "Campus Icon: Pro Plus for life, free",
     grants: [
       { type: "boost_credit", value: 10 },
       { type: "subscription", value: { tier: USER_TIER.PRO_PLUS, days: null, is_lifetime: true } },

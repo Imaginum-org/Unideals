@@ -15,7 +15,6 @@ import {
   Lightbulb,
   Clock,
   Mail,
-  Headphones,
   ChevronDown,
   X,
   AlertTriangle,
@@ -249,30 +248,56 @@ function ContactUs() {
         <PageHeader title="Help & support" description="Find answers, report a problem or reach our team." />
       )}
 
-      {/* Search: answers live in the FAQ tab */}
-      <form
-        className="relative"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const q = helpQuery.trim();
-          navigate(q ? `/faq?q=${encodeURIComponent(q)}` : "/faq");
-        }}
-      >
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-        <input
-          type="search"
-          value={helpQuery}
-          onChange={(e) => setHelpQuery(e.target.value)}
-          placeholder="Search answers, e.g. “boost” or “cancel deal”"
-          aria-label="Search the FAQ"
-          enterKeyHint="search"
-          className={`${input} h-11 pl-10`}
-        />
-      </form>
+      {/* Help-centre header: search goes to the FAQ tab */}
+      <section className="brand-surface overflow-hidden rounded-2xl px-5 py-6 text-white shadow-[0_10px_30px_-12px_rgba(15,23,42,0.35)] max-sm:-mx-4 max-sm:rounded-none sm:px-8 sm:py-8">
+        <h2 className="text-[20px] font-semibold tracking-tight sm:text-[24px]">How can we help?</h2>
+        <p className="mt-1 text-[13.5px] text-white/75">Search {FAQ_COUNT} answers, or send us a message below.</p>
+        <form
+          className="relative mt-4 max-w-xl"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = helpQuery.trim();
+            navigate(q ? `/faq?q=${encodeURIComponent(q)}` : "/faq");
+          }}
+        >
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+          <input
+            type="search"
+            value={helpQuery}
+            onChange={(e) => setHelpQuery(e.target.value)}
+            placeholder="Search, e.g. “boost” or “cancel deal”"
+            aria-label="Search the FAQ"
+            enterKeyHint="search"
+            className="h-11 w-full rounded-lg border-0 bg-white pl-10 pr-24 text-[14px] text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-white/30"
+          />
+          <button type="submit" className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 rounded-md bg-[var(--accent)] px-3 text-[13px] font-semibold text-white hover:bg-[var(--accent-hover)]">
+            Search
+          </button>
+        </form>
+        <p className="mt-3 text-[12.5px] text-white/70">
+          Popular:{" "}
+          {[
+            ["Boosts", "boost"],
+            ["Cancel a deal", "cancel"],
+            ["Payments", "pay"],
+            ["Safety", "safe"],
+          ].map(([label, q], i) => (
+            <span key={q}>
+              {i > 0 && <span className="mx-1.5 text-white/40">·</span>}
+              <Link to={`/faq?q=${q}`} className="font-medium text-white underline-offset-4 hover:underline">
+                {label}
+              </Link>
+            </span>
+          ))}
+        </p>
+      </section>
 
+      <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+      <h2 className="text-[15px] font-semibold text-slate-900 dark:text-white">Contact the team</h2>
       {/* Actions */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {ACTIONS.map(({ id, icon: Icon, title, hint, tone }) => (
+        {ACTIONS.map(({ id, icon: Icon, title, hint }) => (
           <button
             key={id}
             type="button"
@@ -280,15 +305,13 @@ function ContactUs() {
             aria-pressed={activeForm === id}
             className={cn(
               CARD,
-              "flex items-center gap-3 p-4 text-left transition-colors sm:flex-col sm:items-start",
+              "flex items-center gap-3 p-4 text-left transition-all hover:-translate-y-px sm:flex-col sm:items-start",
               activeForm === id ? "border-[var(--accent)] ring-2 ring-[var(--accent-soft-strong)]" : "hover:border-[var(--accent-ring)]",
             )}
           >
-            <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl", tone)}>
-              <Icon className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span>
-              <span className="block text-[14.5px] font-semibold text-slate-900 dark:text-white">{title}</span>
+            <Icon className={cn("h-5 w-5 shrink-0", activeForm === id ? "text-[var(--accent-text)]" : "text-slate-400 dark:text-zinc-500")} aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-semibold text-slate-900 dark:text-white">{title}</span>
               <span className="block text-[12.5px] text-slate-500 dark:text-zinc-400">{hint}</span>
             </span>
           </button>
@@ -467,37 +490,46 @@ function ContactUs() {
           </motion.section>
         ) : null}
       </AnimatePresence>
+      </div>
 
-      {/* Response time */}
-      <div className={cn(CARD, FLUSH_ON_PHONE, "flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between")}>
-        <p className="flex items-center gap-3 text-[13px] text-slate-600 dark:text-zinc-300">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
-            <Clock className="h-4 w-4" aria-hidden="true" />
+      <aside className="flex flex-col gap-4 sm:gap-5 lg:sticky lg:top-4">
+      {/* Talk to a person */}
+      <section className={cn(CARD, FLUSH_ON_PHONE, "p-4 sm:p-5")}>
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2" aria-hidden="true">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <strong className="font-semibold text-slate-900 dark:text-white" title="During campus hours, 9 AM – 9 PM">
-              Replies in ~2h
-            </strong>
-            {(userDetails?.subscription === "pro_plus" || userDetails?.subscription === "pro") && (
-              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-text)]">Priority</span>
-            )}
-          </span>
-        </p>
-        <a href="mailto:hi@unideals.in" className={cn(btnSecondary, "shrink-0")}>
+          <h2 className="text-[14.5px] font-semibold text-slate-900 dark:text-white">Talk to a person</h2>
+        </div>
+        <dl className="mt-3 space-y-2 text-[13px]">
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500 dark:text-zinc-400">Typical reply</dt>
+            <dd className="font-semibold text-slate-900 dark:text-white">
+              {userDetails?.subscription === "pro_plus" || userDetails?.subscription === "pro" ? "~1 hour · priority" : "~2 hours"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500 dark:text-zinc-400">Hours</dt>
+            <dd className="font-semibold text-slate-900 dark:text-white">9 AM – 9 PM</dd>
+          </div>
+        </dl>
+        <a href="mailto:hi@unideals.in" className={cn(btnSecondary, "mt-4 w-full")}>
           <Mail className="h-4 w-4" aria-hidden="true" />
           hi@unideals.in
         </a>
-      </div>
+        <p className="mt-2.5 flex items-start gap-1.5 text-[11.5px] text-slate-500 dark:text-zinc-400">
+          <Clock className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          Emergency on campus? Contact campus security first.
+        </p>
+      </section>
 
       {/* Popular questions → full FAQ tab */}
       <section className={cn(CARD, FLUSH_ON_PHONE, "overflow-hidden")}>
         <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3.5 sm:px-5 dark:border-neutral-800">
-          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900 dark:text-white">
-            <Headphones className="h-4 w-4 text-slate-400" aria-hidden="true" />
-            Popular questions
-          </h2>
+          <h2 className="text-[14.5px] font-semibold text-slate-900 dark:text-white">Popular questions</h2>
           <Link to="/faq" className="text-[13px] font-semibold text-[var(--accent-text)] hover:underline">
-            Browse all {FAQ_COUNT}
+            All {FAQ_COUNT}
           </Link>
         </div>
         <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -512,6 +544,8 @@ function ContactUs() {
           ))}
         </div>
       </section>
+      </aside>
+      </div>
     </div>
   );
 
@@ -521,7 +555,7 @@ function ContactUs() {
     return (
       <AccountLayout
         seoTitle="Help & support | Unideals"
-        width="md"
+        width="xl"
         title="Help & support"
       >
         {content}
@@ -530,7 +564,7 @@ function ContactUs() {
   }
   return (
     <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#F7F9FD] font-figtree dark:bg-[#131313]">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:py-8">{content}</div>
+      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-8">{content}</div>
     </div>
   );
 }
