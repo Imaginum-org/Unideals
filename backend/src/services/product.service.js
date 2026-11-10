@@ -1841,6 +1841,21 @@ export const relistProduct = async (productId, userId) => {
     return product;
   }
 
+  // Moderation holds: a listing staff blocked, or one auto-hidden for
+  // reports, can't be relisted by the seller until staff review it.
+  if (product.status === PRODUCT_STATUS.BLOCKED) {
+    const error = new Error("This listing was removed by our team and can't be relisted.");
+    error.statusCode = 403;
+    error.code = "LISTING_BLOCKED";
+    throw error;
+  }
+  if (product.auto_hidden_at) {
+    const error = new Error("This listing is paused while our team reviews reports about it.");
+    error.statusCode = 403;
+    error.code = "LISTING_UNDER_REVIEW";
+    throw error;
+  }
+
   const prevStatus = product.status;
 
   // Relisting reactivates against the plan cap, same rule as creation.

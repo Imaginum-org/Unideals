@@ -1,4 +1,4 @@
-import cron from "node-cron";
+import { defineJob } from "./jobRegistry.js";
 import Product from "../models/Product.model.js";
 import { deleteImageSafely } from "../utils/imagekit.js";
 import { autoUnlistInvalidGirlsListings } from "./autoUnlistInvalidGirlsListings.job.js";
@@ -47,10 +47,14 @@ const hardDeleteProducts = async (ids) => {
  * Runs daily at 2 AM
  */
 export const scheduleCleanupDeletedProducts = () => {
-  cron.schedule("0 2 * * *", async () => {
-    try {
-      console.log("[Job] Starting cleanup of deleted products...");
-
+  defineJob({
+    key: "cleanup-deleted-products",
+    name: "Purge deleted listings",
+    description:
+      "Permanently removes listings deleted 30+ days ago (15+ if sold), plus listings whose seller no longer exists, and their images.",
+    schedule: "0 2 * * *",
+    scheduleLabel: "Daily at 02:00",
+    run: async () => {
       const fifteenDaysAgo = new Date();
       fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
       const thirtyDaysAgo = new Date();
@@ -67,106 +71,62 @@ export const scheduleCleanupDeletedProducts = () => {
         { _id: 1, images: 1, seller_id: 1 },
       ).lean();
 
-      console.log(
-        `[Job] Found ${deletedProducts.length} deleted products to clean up`,
-      );
-
       if (deletedProducts.length > 0) {
-        const ids = deletedProducts.map((p) => p._id);
-        // Remove DB rows first so the reference check in the image purge
-        // no longer sees these products as live references.
-        await hardDeleteProducts(ids);
+        await hardDeleteProducts(deletedProducts.map((p) => p._id));
         await purgeProductImages(deletedProducts);
-        console.log(
-          `[Job] Successfully deleted ${ids.length} products from database`,
-        );
       }
 
-      // Orphan sweep (unverified TTL deletes): products whose seller no
-      // longer exists. Uses $lookup instead of loading every user id into
-      // memory for a $nin (which degrades linearly with the user base).
-      try {
-        const User = (await import("../models/User.model.js")).default;
-        const orphanProducts = await Product.aggregate([
-          {
-            $lookup: {
-              from: User.collection.name,
-              localField: "seller_id",
-              foreignField: "_id",
-              as: "seller",
-            },
+      const User = (await import("../models/User.model.js")).default;
+      const orphanProducts = await Product.aggregate([
+        {
+          $lookup: {
+            from: User.collection.name,
+            localField: "seller_id",
+            foreignField: "_id",
+            as: "seller",
           },
-          { $match: { seller: { $size: 0 } } },
-          { $project: { _id: 1, images: 1, seller_id: 1 } },
-          { $limit: 5000 },
-        ]);
-        if (orphanProducts.length > 0) {
-          const orphanIds = orphanProducts.map((p) => p._id);
-          console.log(
-            `[Job] Found ${orphanIds.length} orphan products (seller gone) to clean up`,
-          );
-          await hardDeleteProducts(orphanIds);
-          await purgeProductImages(orphanProducts);
-          console.log(
-            `[Job] Successfully deleted ${orphanIds.length} orphan products`,
-          );
-        }
-      } catch (orphanErr) {
-        console.error("[Job] Error in orphan sweep:", orphanErr.message);
+        },
+        { $match: { seller: { $size: 0 } } },
+        { $project: { _id: 1, images: 1, seller_id: 1 } },
+        { $limit: 5000 },
+      ]);
+      if (orphanProducts.length > 0) {
+        await hardDeleteProducts(orphanProducts.map((p) => p._id));
+        await purgeProductImages(orphanProducts);
       }
 
-      console.log("[Job] Cleanup job completed successfully");
-    } catch (error) {
-      console.error("[Job] Error in cleanup job:", error.message);
-    }
+      return { deletedListings: deletedProducts.length, orphanListings: orphanProducts.length };
+    },
   });
 
-  console.log(
-    "[Job] Product cleanup scheduler initialized (runs daily at 2 AM UTC)",
-  );
-
-  // Draft TTL: unpublished drafts older than 30d are deleted (abandoned
-  // composer state — never user-visible). Their images are purged too
-  // (previously left orphaned on ImageKit). Runs daily at 2:30 AM UTC.
-  cron.schedule("30 2 * * *", async () => {
-    try {
-      console.log("[Job] Purging stale drafts older than 30 days...");
+  defineJob({
+    key: "purge-stale-drafts",
+    name: "Purge stale drafts",
+    description: "Deletes drafts that haven't been touched in 30 days, with their images.",
+    schedule: "30 2 * * *",
+    scheduleLabel: "Daily at 02:30",
+    run: async () => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const staleDrafts = await Product.find(
-        {
-          status: "draft",
-          is_deleted: false,
-          updatedAt: { $lt: thirtyDaysAgo },
-        },
+        { status: "draft", is_deleted: false, updatedAt: { $lt: thirtyDaysAgo } },
         { _id: 1, images: 1, seller_id: 1 },
       ).lean();
       if (staleDrafts.length > 0) {
         await hardDeleteProducts(staleDrafts.map((d) => d._id));
         await purgeProductImages(staleDrafts);
       }
-      console.log(
-        `[Job] Draft purge done (deleted ${staleDrafts.length} stale drafts)`,
-      );
-    } catch (error) {
-      console.error("[Job] Error in draft purge:", error.message);
-    }
+      return { draftsDeleted: staleDrafts.length };
+    },
   });
 
-  // Girls Corner: nightly auto-unlist of girls-only listings whose seller is
-  // no longer female (admin gender corrections). The job existed but was
-  // never scheduled. Runs daily at 2:45 AM UTC.
-  cron.schedule("45 2 * * *", async () => {
-    try {
-      const { checked, unlisted } = await autoUnlistInvalidGirlsListings();
-      if (unlisted > 0) {
-        console.log(
-          `[Job] Girls Corner sweep: checked ${checked}, unlisted ${unlisted}`,
-        );
-      }
-    } catch (error) {
-      console.error("[Job] Error in Girls Corner sweep:", error.message);
-    }
+  defineJob({
+    key: "girls-corner-sweep",
+    name: "Girls Corner eligibility sweep",
+    description: "Unlists Girls Corner listings whose seller is no longer eligible.",
+    schedule: "45 2 * * *",
+    scheduleLabel: "Daily at 02:45",
+    run: () => autoUnlistInvalidGirlsListings(),
   });
 };
 

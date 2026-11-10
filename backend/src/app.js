@@ -29,6 +29,7 @@ import orderRouter from "./routes/order.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import reviewRouter from "./routes/review.routes.js";
 import { verifyOrigin } from "./middlewares/csrf.middleware.js";
+import { requestMetrics } from "./middlewares/requestMetrics.middleware.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
 const app = express();
@@ -58,6 +59,9 @@ app.use(
     crossOriginResourcePolicy: false,
   }),
 );
+
+// API traffic metrics for the admin "Service status" page (in-memory).
+app.use(requestMetrics);
 
 
 // Escape HTML in URL params + query strings (reflected-XSS hardening).

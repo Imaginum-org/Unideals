@@ -178,6 +178,223 @@ await test("deletes an empty campus", async () => {
   assert.equal(await Campus.findById(empty._id), null);
 });
 
+// ─── Reports: evidence, notifications, auto-hide ─────────────────────────
+const { default: Report } = await import(B + "src/models/Report.model.js");
+const { default: Notification } = await import(B + "src/models/Notification.model.js");
+const { default: Conversation } = await import(B + "src/models/conversation.model.js");
+const { default: Message } = await import(B + "src/models/message.model.js");
+const reportSvc = await import(B + "src/services/report.service.js");
+const moderation = await import(B + "src/services/moderation.service.js");
+const productPublic = await import(B + "src/services/product.service.js");
+const registry = await import(B + "src/jobs/jobRegistry.js");
+const { JobRun, JobState } = await import(B + "src/models/JobRun.model.js");
+
+const notesFor = (userId) => Notification.find({ recipient_id: userId }).sort({ createdAt: 1 }).lean();
+// Notifications are fire-and-forget; give them a moment to land.
+const settle = () => new Promise((r) => setTimeout(r, 150));
+
+const seller = await mkUser({ name: "Sam Seller" });
+const buyer = await mkUser({ name: "Bea Buyer" });
+const outsider = await mkUser({ name: "Olly Outsider" });
+const chatProduct = await mkProduct(seller, { title: "Desk lamp" });
+const convId = new mongoose.Types.ObjectId();
+await Conversation.collection.insertOne({ _id: convId, product_id: chatProduct._id, seller_id: seller._id, buyer_id: buyer._id, createdAt: new Date() });
+for (let i = 0; i < 45; i++) {
+  await Message.collection.insertOne({
+    conversation_id: convId,
+    sender_id: i % 2 ? seller._id : buyer._id,
+    receiver_id: i % 2 ? buyer._id : seller._id,
+    message_type: "text",
+    text: `message ${i}`,
+    createdAt: new Date(Date.now() - (45 - i) * 1000),
+  });
+}
+
+console.log("\nChat report evidence");
+await test("report from chat stores the conversation and last 40 messages in order", async () => {
+  const report = await reportSvc.reportUser(String(seller._id), { reason: "fraud_or_scam", description: "Asked me to pay outside the app", conversation_id: String(convId) }, buyer);
+  const saved = await Report.findById(report._id).lean();
+  assert.equal(String(saved.conversation_id), String(convId));
+  assert.equal(saved.chat_snapshot.length, reportSvc.CHAT_SNAPSHOT_LIMIT);
+  assert.equal(saved.chat_snapshot.at(-1).text, "message 44");
+  assert.equal(saved.chat_snapshot[0].text, "message 5");
+});
+await test("cannot attach a conversation you are not part of", async () => {
+  await assert.rejects(
+    reportSvc.reportUser(String(seller._id), { reason: "fraud_or_scam", description: "Trying to pull someone else's chat", conversation_id: String(convId) }, outsider),
+    /part of/,
+  );
+});
+await test("cannot attach a chat to a user who isn't in it", async () => {
+  await assert.rejects(
+    reportSvc.reportUser(String(outsider._id), { reason: "fraud_or_scam", description: "Wrong person for this chat", conversation_id: String(convId) }, buyer),
+    /not part of this conversation/,
+  );
+});
+await test("review panel returns chat with sender names", async () => {
+  const reports = await moderation.getTargetReports({ targetId: String(seller._id), targetModel: "User" });
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].reporter.name, "Bea Buyer");
+  assert.ok(reports[0].chat.some((m) => m.sender.name === "Sam Seller"));
+});
+
+await test("queue flags items that have chat evidence", async () => {
+  const queue = await adminSvc.getModerationQueue({ target_model: "User" });
+  const item = queue.data.find((i) => i.targetId === String(seller._id));
+  assert.ok(item, "reported seller is in the queue");
+  assert.equal(item.hasChat, true);
+});
+
+console.log("\nReporter and seller notifications");
+await test("resolving reports tells each reporter, once", async () => {
+  const result = await moderation.closeReports({ targetId: String(seller._id), targetModel: "User", outcome: "resolved", adminNote: "Warned", actor: admin });
+  await settle();
+  assert.equal(result.notifiedReporters, 1);
+  const notes = await notesFor(buyer._id);
+  assert.ok(notes.some((n) => /took action/.test(n.message)));
+  const report = await Report.findOne({ target_id: seller._id }).lean();
+  assert.ok(report.reporter_notified_at);
+});
+await test("blocking a listing tells the seller, with the reason", async () => {
+  const p = await mkProduct(seller, { title: "Fake AirPods" });
+  await moderation.moderateProductStatus({ productId: String(p._id), status: "blocked", reason: "Counterfeit item", actor: admin });
+  await settle();
+  const notes = await notesFor(seller._id);
+  const note = notes.find((n) => n.title === "Listing removed");
+  assert.ok(note, "seller notified");
+  assert.match(note.message, /Fake AirPods.*Counterfeit item/);
+});
+await test("sellers can no longer relist a blocked listing", async () => {
+  const p = await mkProduct(seller, { title: "Blocked thing", status: "blocked" });
+  await assert.rejects(productPublic.relistProduct(String(p._id), seller._id), /removed by our team/);
+});
+
+console.log("\nAuto-hidden listings");
+const hidden = await mkProduct(seller, { title: "Suspicious phone" });
+await test("5 reports auto-hide the listing, mark it and tell the seller", async () => {
+  for (let i = 0; i < 5; i++) {
+    const reporter = await mkUser();
+    await reportSvc.reportProduct(String(hidden._id), { reason: "fake_or_misleading", description: "Looks like a scam listing" }, reporter);
+  }
+  await settle();
+  const fresh = await Product.findById(hidden._id).lean();
+  assert.equal(fresh.status, "unlisted");
+  assert.ok(fresh.auto_hidden_at);
+  const notes = await notesFor(seller._id);
+  assert.equal(notes.filter((n) => n.title === "Listing paused for review").length, 1);
+  const listed = await productSvc.getProducts({ flag: "auto_hidden", limit: 50 });
+  assert.deepEqual(listed.data.map((p) => p.id), [String(hidden._id)]);
+});
+await test("seller can't relist while it is under review", async () => {
+  await assert.rejects(productPublic.relistProduct(String(hidden._id), seller._id), /reviews reports/);
+});
+await test("dismissing the reports puts it back live and tells seller + all 5 reporters", async () => {
+  const result = await moderation.closeReports({ targetId: String(hidden._id), targetModel: "Product", outcome: "dismissed", actor: admin });
+  await settle();
+  assert.equal(result.notifiedReporters, 5);
+  const fresh = await Product.findById(hidden._id).lean();
+  assert.equal(fresh.status, "listed");
+  assert.equal(fresh.auto_hidden_at, null);
+  const notes = await notesFor(seller._id);
+  assert.ok(notes.some((n) => n.title === "Listing is live again"));
+});
+await test("deleting a reported listing still tells its reporters", async () => {
+  const p = await mkProduct(seller, { title: "Doomed listing" });
+  const reporter = await mkUser();
+  await reportSvc.reportProduct(String(p._id), { reason: "prohibited_item", description: "This item is not allowed" }, reporter);
+  await moderation.deleteProductPermanently({ productId: String(p._id), actor: admin });
+  await settle();
+  assert.equal(await Product.findById(p._id), null);
+  assert.ok((await notesFor(reporter._id)).some((n) => /Doomed listing/.test(n.message)));
+  assert.ok((await notesFor(seller._id)).some((n) => n.title === "Listing deleted"));
+});
+
+console.log("\nBulk actions");
+await test("bulk applies per item and reports partial failures", async () => {
+  const a = await mkProduct(seller);
+  const b = await mkProduct(seller);
+  const missing = new mongoose.Types.ObjectId();
+  const result = await moderation.runBulk([String(a._id), String(b._id), String(missing)], (productId) =>
+    moderation.moderateProductStatus({ productId, status: "unlisted", actor: admin, bulk: true }),
+  );
+  assert.equal(result.succeeded, 2);
+  assert.equal(result.failed, 1);
+  assert.equal(result.results.find((r) => !r.ok).error, "Product not found");
+  assert.equal((await Product.findById(a._id)).status, "unlisted");
+});
+await test("bulk rejects more than the limit", async () => {
+  const ids = Array.from({ length: moderation.BULK_LIMIT + 1 }, () => String(new mongoose.Types.ObjectId()));
+  await assert.rejects(moderation.runBulk(ids, async () => {}), /at most/);
+});
+
+console.log("\nBackground job tracking");
+registry.defineJob({ key: "test-ok", name: "OK job", schedule: "0 3 * * *", run: async () => ({ cleaned: 2 }) });
+registry.defineJob({ key: "test-fail", name: "Failing job", schedule: "0 3 * * *", run: async () => { throw new Error("db down"); } });
+registry.defineJob({ key: "test-noop", name: "Frequent no-op", schedule: "* * * * *", frequent: true, run: async () => ({ sent: 0 }) });
+await test("successful run updates state and history", async () => {
+  const run = await registry.runJob("test-ok");
+  assert.equal(run.status, "success");
+  const state = await JobState.findOne({ key: "test-ok" }).lean();
+  assert.equal(state.last_status, "success");
+  assert.deepEqual(state.last_result, { cleaned: 2 });
+  assert.equal(await JobRun.countDocuments({ key: "test-ok" }), 1);
+});
+await test("failure is recorded, not thrown", async () => {
+  await registry.runJob("test-fail");
+  await registry.runJob("test-fail");
+  const state = await JobState.findOne({ key: "test-fail" }).lean();
+  assert.equal(state.last_status, "failed");
+  assert.equal(state.consecutive_failures, 2);
+  assert.match(state.last_error, /db down/);
+});
+await test("frequent no-op runs update state but skip history", async () => {
+  await registry.runJob("test-noop");
+  assert.equal(await JobRun.countDocuments({ key: "test-noop" }), 0);
+  assert.equal((await JobState.findOne({ key: "test-noop" }).lean()).run_count, 1);
+});
+await test("dashboard counts failing jobs and auto-hidden listings", async () => {
+  const { stats } = await adminSvc.getDashboardMetrics();
+  assert.equal(stats.failingJobs, 1);
+  assert.equal(stats.autoHiddenListings, 0);
+});
+
+console.log("\nService status");
+const metrics = await import(B + "src/middlewares/requestMetrics.middleware.js");
+const status = await import(B + "src/services/systemStatus.service.js");
+await test("traffic snapshot groups by API area with error rate and percentiles", async () => {
+  metrics.__resetMetrics();
+  const now = Date.now();
+  for (let i = 1; i <= 18; i++) metrics.__record("product", 200, i * 10, now);
+  metrics.__record("product", 500, 900, now);
+  metrics.__record("admin", 404, 30, now);
+  const snap = metrics.getTrafficSnapshot(15, now);
+  assert.equal(snap.totals.requests, 20);
+  assert.equal(snap.totals.serverErrors, 1);
+  assert.equal(snap.totals.clientErrors, 1);
+  assert.equal(snap.totals.errorRate, 5);
+  const product = snap.areas.find((a) => a.area === "product");
+  assert.equal(product.requests, 19);
+  assert.equal(product.p50, 100);
+  assert.equal(product.p95, 900, "nearest-rank: the slow failing request");
+  assert.equal(snap.series.length, 15);
+  assert.equal(snap.series.at(-1).requests, 20);
+});
+await test("status: DB checked live, missing credentials flagged, optional services ignored", async () => {
+  for (const k of ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RESEND_API_KEY", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID", "IMAGEKIT_PUBLIC_KEY"]) delete process.env[k];
+  status.__resetExternalCache();
+  const result = await status.getSystemStatus();
+  const byKey = Object.fromEntries(result.components.map((c) => [c.key, c]));
+  assert.equal(byKey.database.status, "operational");
+  assert.ok(byKey.database.latencyMs >= 0);
+  assert.equal(byKey.payments.status, "outage");
+  assert.match(byKey.payments.detail, /Credentials missing/);
+  assert.equal(byKey.assistant.status, "not_configured");
+  assert.equal(byKey.api.status, "degraded", "5% errors over 20 requests");
+  assert.equal(byKey.jobs.status, "degraded", "the failing test job from earlier");
+  assert.equal(result.overall, "outage");
+  assert.ok(result.process.uptimeSeconds >= 0);
+});
+
 await mongoose.disconnect();
 await mongod.stop();
 console.log(`\n${passed} passed, ${failed} failed`);

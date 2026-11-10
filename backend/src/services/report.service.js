@@ -5,7 +5,62 @@ import Product from "../models/Product.model.js";
 import User from "../models/User.model.js";
 import { PRODUCT_STATUS, REPORT_STATUS } from "../config/constants.js";
 import { supportPriorityFor } from "../utils/planPerks.js";
-import { notifyModerationWarning } from "./notification.service.js";
+import { notifyListingModerated, notifyModerationWarning } from "./notification.service.js";
+import Conversation from "../models/conversation.model.js";
+import Message from "../models/message.model.js";
+
+// How many recent messages are captured as evidence with a chat report.
+export const CHAT_SNAPSHOT_LIMIT = 40;
+
+/**
+ * Evidence for a report filed from a chat. The reporter must be a
+ * participant, and (for user reports) the reported user must be the other
+ * participant, so nobody can pull an arbitrary conversation into a report.
+ * For product reports the chat must be about that product.
+ * Returns null when no conversation id was sent.
+ */
+const buildChatEvidence = async ({ conversationId, reporterId, targetUserId = null, productId = null }) => {
+  if (!conversationId) return null;
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) throw badRequest("Invalid conversation id");
+
+  const conversation = await Conversation.findById(conversationId)
+    .select("buyer_id seller_id product_id")
+    .lean();
+  if (!conversation) throw badRequest("Conversation not found");
+
+  const participants = [String(conversation.buyer_id), String(conversation.seller_id)];
+  if (!participants.includes(String(reporterId))) {
+    throw badRequest("You can only attach a conversation you are part of");
+  }
+  if (targetUserId && !participants.includes(String(targetUserId))) {
+    throw badRequest("That user is not part of this conversation");
+  }
+  if (productId && String(conversation.product_id) !== String(productId)) {
+    throw badRequest("This conversation is not about that listing");
+  }
+
+  const recent = await Message.find({ conversation_id: conversation._id })
+    .sort({ createdAt: -1 })
+    .limit(CHAT_SNAPSHOT_LIMIT)
+    .select("sender_id message_type text is_edited is_flagged createdAt")
+    .lean();
+
+  return {
+    conversation_id: conversation._id,
+    chat_snapshot: recent.reverse().map((m) => ({
+      message_id: m._id,
+      sender_id: m.sender_id,
+      message_type: m.message_type,
+      text: typeof m.text === "string" ? m.text.slice(0, 4000) : "",
+      is_edited: Boolean(m.is_edited),
+      is_flagged: Boolean(m.is_flagged),
+      sent_at: m.createdAt,
+    })),
+  };
+};
+
+const cleanEvidence = (evidence) =>
+  Array.isArray(evidence) && evidence.length ? evidence.slice(0, 3) : undefined;
 
 const MAX_REPORTS_PER_HOUR = 10;
 // Cross-user per-target throttle: at most 20 reports/hour land on the same
@@ -74,7 +129,7 @@ export const reportProduct = async (productId, data, user) => {
     _id: productId,
     is_deleted: false,
   })
-    .select("seller_id")
+    .select("seller_id title auto_hidden_at")
     .lean();
 
   if (!product) {
@@ -92,11 +147,15 @@ export const reportProduct = async (productId, data, user) => {
   checkTargetThrottle(productId);
 
   try {
-    // Evidence URLs are shape-validated by zod; the Report schema has no
-    // evidence field yet, so they are screened and intentionally not
-    // persisted (a migration adds the field later).
+    const chatEvidence = await buildChatEvidence({
+      conversationId: data.conversation_id,
+      reporterId: user._id,
+      productId,
+    });
     const report = await Report.create({
       reporter_id: user._id,
+      evidence: cleanEvidence(data.evidence),
+      ...(chatEvidence || {}),
 
       target_id: productId,
       target_model: "Product",
@@ -117,7 +176,13 @@ export const reportProduct = async (productId, data, user) => {
         await Product.updateOne(
           { _id: productId },
           {
-            $set: { status: PRODUCT_STATUS.UNLISTED, is_boosted: false },
+            $set: {
+              status: PRODUCT_STATUS.UNLISTED,
+              is_boosted: false,
+              // Marks it for staff review and blocks seller relisting.
+              auto_hidden_at: new Date(),
+              auto_hidden_report_count: pendingCount,
+            },
             $unset: { boost_expires_at: "", boost_tier: "" },
           },
         );
@@ -127,11 +192,14 @@ export const reportProduct = async (productId, data, user) => {
         } catch {
           // ignore boost cleanup failures
         }
-        // Notify hook: console for now; swap with the mailer when
-        // moderation email infra lands (no new infra per constraints).
-        console.warn(
-          `[Reports] auto-unlisted product ${productId} after ${pendingCount} pending reports`,
-        );
+        // Only notify on the first hide (later reports keep it hidden).
+        if (!product.auto_hidden_at) {
+          notifyListingModerated({
+            sellerId: product.seller_id,
+            productTitle: product.title,
+            action: "auto_hidden",
+          }).catch(() => {});
+        }
       }
     } catch {
       // auto-hide must never fail the report submission
@@ -183,8 +251,15 @@ export const reportUser = async (targetUserId, data, user) => {
   checkTargetThrottle(targetUserId);
 
   try {
+    const chatEvidence = await buildChatEvidence({
+      conversationId: data.conversation_id,
+      reporterId: user._id,
+      targetUserId,
+    });
     const report = await Report.create({
       reporter_id: user._id,
+      evidence: cleanEvidence(data.evidence),
+      ...(chatEvidence || {}),
 
       target_id: targetUserId,
       target_model: "User",

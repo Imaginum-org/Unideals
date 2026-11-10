@@ -29,6 +29,11 @@ export const getProducts = async (query = {}) => {
     match.status = query.status;
   }
 
+  // "Needs review": listings auto-hidden by the report threshold.
+  if (query.flag === "auto_hidden") {
+    match.auto_hidden_at = { $ne: null };
+  }
+
   if (typeof query.campus === "string" && ObjectId.isValid(query.campus.trim())) {
     match.campus_id = new ObjectId(query.campus.trim());
   }
@@ -131,6 +136,8 @@ export const getProducts = async (query = {}) => {
               price: "$selling_price",
               selling_price: 1,
               is_deleted: 1,
+              auto_hidden_at: 1,
+              auto_hidden_report_count: 1,
               seller: {
                 id: { $toString: "$seller._id" },
                 name: "$seller.name",

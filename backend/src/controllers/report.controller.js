@@ -6,11 +6,11 @@ export const reportProduct = async (req, res, next) => {
     const user = req.user;
     const { productId } = req.params;
 
-    const { reason, description, evidence } = req.body;
+    const { reason, description, evidence, conversation_id } = req.body;
 
     const report = await reportService.reportProduct(
       productId,
-      { reason, description, evidence },
+      { reason, description, evidence, conversation_id },
       user,
     );
 
@@ -29,11 +29,11 @@ export const reportUser = async (req, res, next) => {
     const user = req.user;
     const { userId } = req.params;
 
-    const { reason, description, evidence } = req.body;
+    const { reason, description, evidence, conversation_id } = req.body;
 
     const report = await reportService.reportUser(
       userId,
-      { reason, description, evidence },
+      { reason, description, evidence, conversation_id },
       user,
     );
 

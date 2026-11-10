@@ -1,16 +1,14 @@
-import cron from "node-cron";
+import { defineJob } from "./jobRegistry.js";
 import { dispatchDueScheduledNotifications } from "../services/notification.service.js";
 
 export const scheduleDispatchNotifications = () => {
-  // Check every minute for scheduled notifications that are due
-  cron.schedule("* * * * *", async () => {
-    try {
-      const count = await dispatchDueScheduledNotifications();
-      if (count > 0) {
-        console.log(`[NotificationJob] Dispatched ${count} scheduled notification(s)`);
-      }
-    } catch (error) {
-      console.error("[NotificationJob] Error dispatching scheduled notifications:", error.message);
-    }
+  defineJob({
+    key: "dispatch-scheduled-notifications",
+    name: "Send scheduled notifications",
+    description: "Sends push notifications whose scheduled time has arrived.",
+    schedule: "* * * * *",
+    scheduleLabel: "Every minute",
+    frequent: true,
+    run: async () => ({ dispatched: (await dispatchDueScheduledNotifications()) || 0 }),
   });
 };

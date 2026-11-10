@@ -175,6 +175,22 @@ const userSchema = new Schema(
 
     // Chat preferences (wallpaper, read receipts, typing indicators).
     // Defaults keep classic behaviour; clients merge over these.
+    // Admin console saved list filters (staff only, small capped array).
+    admin_saved_views: {
+      type: [
+        {
+          _id: false,
+          id: { type: String, required: true },
+          page: { type: String, required: true },
+          name: { type: String, required: true, maxlength: 60 },
+          query: { type: String, default: "", maxlength: 1000 },
+          created_at: { type: Date, default: Date.now },
+        },
+      ],
+      default: undefined,
+      select: false,
+    },
+
     chat_settings: {
       _id: false,
       wallpaper: {

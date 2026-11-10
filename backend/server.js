@@ -14,6 +14,7 @@ import { scheduleCleanupDeletedProducts } from "./src/jobs/cleanupDeletedProduct
 import { scheduleExpireBoosts } from "./src/jobs/expireBoosts.job.js";
 import { scheduleExpireSubscriptions } from "./src/jobs/expireSubscriptions.job.js";
 import { scheduleDispatchNotifications } from "./src/jobs/dispatchScheduledNotifications.job.js";
+import { startScheduledJobs } from "./src/jobs/jobRegistry.js";
 import { initSockets } from "./src/sockets/index.js";
 
 const PORT = process.env.PORT || 5000;
@@ -26,6 +27,8 @@ const startServer = async () => {
     scheduleExpireBoosts();
     scheduleExpireSubscriptions();
     scheduleDispatchNotifications();
+    // Start every job defined above (records runs for the admin console).
+    startScheduledJobs();
     // Plan-rank backfill for listings (search ranking perk); idempotent.
     // Admins get Pro Plus first so the backfill ranks their listings too.
     ensureAdminPlans().then(backfillSellerTiers);

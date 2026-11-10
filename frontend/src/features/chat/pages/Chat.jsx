@@ -912,7 +912,9 @@ const ChatPanel = ({ embedded = false }) => {
     try {
       await axios.post(`/api/report/user/${otherId}`, {
         reason,
-        description: `${description} (From chat conversation ${selectedId})`,
+        description,
+        // Lets the server attach this chat as evidence for moderators.
+        conversation_id: selectedId,
       });
       setReportOpen(false);
       toast.success("Report sent. Our team will check it out.");
@@ -933,7 +935,8 @@ const ChatPanel = ({ embedded = false }) => {
     try {
       await axios.post(`/api/report/product/${prodId}`, {
         reason,
-        description: `${description} (Reported from chat for: ${productTitle})`,
+        description,
+        conversation_id: selectedId,
       });
       setReportProductOpen(false);
       toast.success("Product report submitted. Our team will review it.");

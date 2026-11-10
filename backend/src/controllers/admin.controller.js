@@ -3,12 +3,13 @@ import * as adminUserService from "../services/admin.user.service.js";
 import * as adminProductService from "../services/admin.product.service.js";
 import * as campusService from "../services/campus.service.js";
 import * as auditLogService from "../services/auditLog.service.js";
+import * as moderationService from "../services/moderation.service.js";
 import { safeErrorMessage } from "../utils/response.js";
 
 const sendSuccess = (res, message, payload, statusCode = 200) =>
   res.status(statusCode).json({ success: true, error: false, message, ...payload });
 
-const sendFailure = (res, error, statusCode = 400) =>
+const sendFailure = (res, error, statusCode = error?.statusCode || 400) =>
   res.status(statusCode).json({
     success: false,
     error: true,
@@ -41,30 +42,12 @@ export const getUserDetails = async (req, res) => {
 
 export const updateUserStatusWithAudit = async (req, res) => {
   try {
-    const user = await adminUserService.updateUserStatus(
-      req.params.id,
-      req.body.status,
-    );
-
-    // Audit log — fire and forget
-    const actionVerb =
-      req.body.status === "suspended"
-        ? "user.suspend"
-        : req.body.status === "active"
-        ? "user.activate"
-        : "user.status_change";
-
-    auditLogService
-      .logAdminAction({
-        actor: req.user,
-        action: actionVerb,
-        targetType: "user",
-        targetId: req.params.id,
-        targetSnapshot: { name: user.name, email: user.email },
-        metadata: { newStatus: req.body.status },
-      })
-      .catch(() => {});
-
+    const user = await moderationService.moderateUserStatus({
+      userId: req.params.id,
+      status: req.body.status,
+      reason: req.body.reason,
+      actor: req.user,
+    });
     return sendSuccess(res, "User status updated successfully", { data: user });
   } catch (error) {
     return sendFailure(res, error);
@@ -86,34 +69,12 @@ export const getProductDetails = async (req, res) => {
 
 export const updateProductStatusWithAudit = async (req, res) => {
   try {
-    const product = await adminProductService.updateProductStatus(
-      req.params.id,
-      req.body.status,
-    );
-
-    const actionMap = {
-      blocked: "product.block",
-      unlisted: "product.unlist",
-      listed: "product.activate",
-    };
-
-    const action = actionMap[req.body.status] || "product.status_change";
-
-    auditLogService
-      .logAdminAction({
-        actor: req.user,
-        action,
-        targetType: "product",
-        targetId: req.params.id,
-        targetSnapshot: { title: product.title },
-        metadata: { newStatus: req.body.status },
-        note:
-          typeof req.body.reason === "string" && req.body.reason.trim()
-            ? req.body.reason.trim().slice(0, 500)
-            : null,
-      })
-      .catch(() => {});
-
+    const product = await moderationService.moderateProductStatus({
+      productId: req.params.id,
+      status: req.body.status,
+      reason: req.body.reason,
+      actor: req.user,
+    });
     return sendSuccess(res, "Product status updated successfully", { data: product });
   } catch (error) {
     return sendFailure(res, error);
@@ -146,26 +107,11 @@ export const softDeleteProductWithAudit = async (req, res) => {
 
 export const hardDeleteProductWithAudit = async (req, res) => {
   try {
-    // Fetch snapshot before deletion
-    const { default: Product } = await import("../models/Product.model.js");
-    const snapshot = await Product.findById(req.params.id)
-      .select("title category selling_price")
-      .lean();
-
-    const result = await adminProductService.hardDeleteProduct(req.params.id);
-
-    auditLogService
-      .logAdminAction({
-        actor: req.user,
-        action: "product.hard_delete",
-        targetType: "product",
-        targetId: req.params.id,
-        targetSnapshot: snapshot
-          ? { title: snapshot.title, category: snapshot.category }
-          : null,
-      })
-      .catch(() => {});
-
+    const result = await moderationService.deleteProductPermanently({
+      productId: req.params.id,
+      reason: req.body?.reason,
+      actor: req.user,
+    });
     return sendSuccess(res, "Product permanently deleted", { data: result });
   } catch (error) {
     return sendFailure(res, error);
@@ -191,8 +137,7 @@ export const dismissReports = async (req, res) => {
     if (!targetId || !targetModel) {
       return sendFailure(res, new Error("targetId and targetModel are required"));
     }
-
-    const result = await adminService.dismissReports(targetId, targetModel, req.user);
+    const result = await moderationService.closeReports({ targetId, targetModel, outcome: "dismissed", actor: req.user });
     return sendSuccess(res, "Reports dismissed", { data: result });
   } catch (error) {
     return sendFailure(res, error);
@@ -207,8 +152,13 @@ export const resolveReports = async (req, res) => {
     if (!targetId || !targetModel) {
       return sendFailure(res, new Error("targetId and targetModel are required"));
     }
-
-    const result = await adminService.resolveReports(targetId, targetModel, adminNote, req.user);
+    const result = await moderationService.closeReports({
+      targetId,
+      targetModel,
+      outcome: "resolved",
+      adminNote,
+      actor: req.user,
+    });
     return sendSuccess(res, "Reports resolved", { data: result });
   } catch (error) {
     return sendFailure(res, error);

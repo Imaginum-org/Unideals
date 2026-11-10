@@ -13,7 +13,7 @@ const descriptionValidation = z
 
 // Optional evidence links: max 3 HTTPS URLs (host-pinned at upload time,
 // validated here for shape only; the Report model persists reason/
-// description — evidence is screened and dropped until a migration adds it).
+// description, evidence links and the chat it came from).
 const evidenceValidation = z
   .array(
     z
@@ -27,12 +27,19 @@ const evidenceValidation = z
   .max(3, "Maximum 3 evidence links allowed")
   .optional();
 
+const conversationIdValidation = z
+  .string()
+  .regex(/^[a-f0-9]{24}$/i, "Invalid conversation id")
+  .optional();
+
 export const reportProductSchema = z.object({
   reason: reasonEnum,
 
   description: descriptionValidation,
 
   evidence: evidenceValidation,
+
+  conversation_id: conversationIdValidation,
 });
 
 export const reportUserSchema = z.object({
@@ -41,4 +48,6 @@ export const reportUserSchema = z.object({
   description: descriptionValidation,
 
   evidence: evidenceValidation,
+
+  conversation_id: conversationIdValidation,
 });

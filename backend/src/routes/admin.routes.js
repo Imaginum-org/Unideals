@@ -12,6 +12,18 @@ import {
   adminRefreshToken,
 } from "../controllers/adminAuth.controller.js";
 import {
+  getTargetReports,
+  bulkProducts,
+  bulkUsers,
+  listSavedViews,
+  createSavedView,
+  deleteSavedView,
+  listJobs,
+  getJobRuns,
+  triggerJob,
+  systemStatus,
+} from "../controllers/admin.ops.controller.js";
+import {
   getMyProfile,
   updateMyProfile,
   changeMyPassword,
@@ -94,6 +106,32 @@ const passwordChangeLimiter = rateLimit({
 });
 const staffOnly = [auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT)];
 router.get("/profile", ...staffOnly, getMyProfile);
+const adminOnly = [auth, requireRoles(USER_ROLES.ADMIN)];
+
+// Saved list views (per staff member)
+router.get("/saved-views", ...staffOnly, listSavedViews);
+router.post("/saved-views", ...staffOnly, createSavedView);
+router.delete("/saved-views/:id", ...staffOnly, deleteSavedView);
+
+// Individual reports + chat evidence for one reported item
+router.get("/moderation/reports", ...staffOnly, getTargetReports);
+
+// Bulk moderation (admin only, max 100 items per request)
+const bulkLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many bulk actions, slow down" },
+});
+router.post("/products/bulk", bulkLimiter, ...adminOnly, bulkProducts);
+router.post("/users/bulk", bulkLimiter, ...adminOnly, bulkUsers);
+
+// Background jobs: status for staff, manual runs for admins
+router.get("/system/status", ...staffOnly, systemStatus);
+router.get("/system/jobs", ...staffOnly, listJobs);
+router.get("/system/jobs/:key/runs", ...staffOnly, getJobRuns);
+router.post("/system/jobs/:key/run", ...adminOnly, triggerJob);
 router.patch("/profile", ...staffOnly, updateMyProfile);
 router.post("/profile/change-password", passwordChangeLimiter, ...staffOnly, changeMyPassword);
 

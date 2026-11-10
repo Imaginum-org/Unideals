@@ -281,6 +281,19 @@ const productSchema = new Schema(
       index: true,
     },
 
+    // Set when the listing was auto-unlisted for hitting the report
+    // threshold. While set, the seller cannot relist; staff clear it by
+    // reviewing (any admin status change or resolving/dismissing reports).
+    auto_hidden_at: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    auto_hidden_report_count: {
+      type: Number,
+      default: 0,
+    },
+
     // Girls Corner 🌸 — seller opt-in. true = invisible + uncontactable
     // to non-females (enforced in product/conversation services).
     isGirlsOnly: {

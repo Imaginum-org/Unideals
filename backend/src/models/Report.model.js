@@ -90,6 +90,40 @@ const reportSchema = new Schema(
     reviewed_at: {
       type: Date,
     },
+
+    // Chat the report was filed from (reporter verified as a participant).
+    conversation_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Conversation",
+      default: null,
+    },
+    // Messages captured when the report was filed, so evidence survives
+    // later edits/deletes. Capped at CHAT_SNAPSHOT_LIMIT on write.
+    chat_snapshot: {
+      type: [
+        {
+          _id: false,
+          message_id: { type: Schema.Types.ObjectId },
+          sender_id: { type: Schema.Types.ObjectId },
+          message_type: { type: String },
+          text: { type: String, maxlength: 4000 },
+          is_edited: { type: Boolean, default: false },
+          is_flagged: { type: Boolean, default: false },
+          sent_at: { type: Date },
+        },
+      ],
+      default: undefined,
+    },
+    // Screened HTTPS evidence links from the report form (max 3).
+    evidence: {
+      type: [String],
+      default: undefined,
+    },
+    // When the reporter was told the outcome (resolve/dismiss).
+    reporter_notified_at: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

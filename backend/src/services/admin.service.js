@@ -6,6 +6,7 @@ import Report from "../models/Report.model.js";
 import AuditLog from "../models/AuditLog.model.js";
 import Deal from "../models/deal.model.js";
 import Payment from "../models/Payment.model.js";
+import { JobState } from "../models/JobRun.model.js";
 import {
   USER_ROLES,
   USER_STATUS,
@@ -76,6 +77,8 @@ export const getDashboardMetrics = async () => {
     blockedProducts,
     pendingReports,
     pendingGenderRequests,
+    autoHiddenListings,
+    failingJobs,
     activeCampuses,
     completedDeals,
     dealVolumeRupees,
@@ -101,6 +104,8 @@ export const getDashboardMetrics = async () => {
     Product.countDocuments({ status: PRODUCT_STATUS.BLOCKED, is_deleted: false }),
     Report.countDocuments({ status: REPORT_STATUS.PENDING }),
     User.countDocuments({ "genderChangeRequest.status": "pending" }).catch(() => 0),
+    Product.countDocuments({ auto_hidden_at: { $ne: null }, is_deleted: false }).catch(() => 0),
+    JobState.countDocuments({ last_status: "failed" }).catch(() => 0),
     Campus.countDocuments({ is_active: true }),
     Deal.countDocuments(completed).catch(() => 0),
     // Deal prices are stored in rupees.
@@ -160,6 +165,10 @@ export const getDashboardMetrics = async () => {
       blockedProducts: blockedProducts || 0,
       pendingReports: pendingReports || 0,
       pendingGenderRequests: pendingGenderRequests || 0,
+      // Listings hidden automatically by the report threshold, awaiting review.
+      autoHiddenListings: autoHiddenListings || 0,
+      // Background jobs whose latest run failed.
+      failingJobs: failingJobs || 0,
       activeCampuses: activeCampuses || 0,
       // Completed peer-to-peer deals and their total value (GMV), rupees.
       completedDeals: completedDeals || 0,
@@ -299,6 +308,8 @@ export const getProductDetails = async (productId) => {
       fileId: img.fileId,
     })),
     is_deleted: product.is_deleted,
+    auto_hidden_at: product.auto_hidden_at || null,
+    auto_hidden_report_count: product.auto_hidden_report_count || 0,
     views_count: product.views_count,
     reportCount,
     seller: product.seller_id
@@ -359,6 +370,8 @@ export const getModerationQueue = async (query = {}) => {
         reasons: { $addToSet: "$reason" },
         latestReport: { $max: "$createdAt" },
         firstReport: { $min: "$createdAt" },
+        // Any report filed from a chat (evidence available).
+        hasChat: { $max: { $cond: [{ $ifNull: ["$conversation_id", false] }, 1, 0] } },
       },
     },
     { $sort: { reportCount: -1, latestReport: -1 } },
@@ -469,6 +482,7 @@ export const getModerationQueue = async (query = {}) => {
       targetId,
       targetModel,
       reportCount: g.reportCount,
+      hasChat: Boolean(g.hasChat),
       reasons: g.reasons,
       latestReport: g.latestReport,
       firstReport: g.firstReport,
@@ -491,71 +505,4 @@ export const getModerationQueue = async (query = {}) => {
 
 // ─── Report Quick Actions ─────────────────────────────────────────────────
 
-export const dismissReports = async (targetId, targetModel, actor) => {
-  if (!ObjectId.isValid(targetId)) throw new Error("Invalid target id");
 
-  const validModels = ["Product", "User", "Support"];
-  if (!validModels.includes(targetModel)) {
-    throw new Error("Invalid target model");
-  }
-
-  const result = await Report.updateMany(
-    {
-      target_id: new ObjectId(targetId),
-      target_model: targetModel,
-      status: REPORT_STATUS.PENDING,
-    },
-    {
-      status: REPORT_STATUS.DISMISSED,
-      reviewed_at: new Date(),
-    },
-  );
-
-  try {
-    const { logAdminAction } = await import("./auditLog.service.js");
-    await logAdminAction({
-      actor,
-      action: "report.dismiss",
-      targetType: "report",
-      targetId: new ObjectId(targetId),
-      metadata: { targetModel, dismissedCount: result.modifiedCount },
-    });
-  } catch { /* audit log failure never blocks action */ }
-
-  return { dismissedCount: result.modifiedCount };
-};
-
-export const resolveReports = async (targetId, targetModel, adminNote, actor) => {
-  if (!ObjectId.isValid(targetId)) throw new Error("Invalid target id");
-
-  const validModels = ["Product", "User", "Support"];
-  if (!validModels.includes(targetModel)) {
-    throw new Error("Invalid target model");
-  }
-
-  const result = await Report.updateMany(
-    {
-      target_id: new ObjectId(targetId),
-      target_model: targetModel,
-      status: REPORT_STATUS.PENDING,
-    },
-    {
-      status: REPORT_STATUS.ACTION_TAKEN,
-      admin_note: adminNote || "Resolved by moderator",
-      reviewed_at: new Date(),
-    },
-  );
-
-  try {
-    const { logAdminAction } = await import("./auditLog.service.js");
-    await logAdminAction({
-      actor,
-      action: "report.resolve",
-      targetType: "report",
-      targetId: new ObjectId(targetId),
-      metadata: { targetModel, resolvedCount: result.modifiedCount },
-    });
-  } catch { /* audit log failure never blocks action */ }
-
-  return { resolvedCount: result.modifiedCount };
-};

@@ -67,7 +67,7 @@ export const getBoostSummary = async (user) => {
 export const expireStaleBoosts = async () => {
   const now = new Date();
 
-  await Boost.updateMany(
+  const boosts = await Boost.updateMany(
     {
       status: "active",
       expires_at: { $lte: now },
@@ -75,7 +75,7 @@ export const expireStaleBoosts = async () => {
     { $set: { status: "expired" } },
   );
 
-  await Product.updateMany(
+  const products = await Product.updateMany(
     {
       is_boosted: true,
       boost_expires_at: { $lte: now },
@@ -85,6 +85,12 @@ export const expireStaleBoosts = async () => {
       $unset: { boost_expires_at: "", boost_tier: "" },
     },
   );
+
+  // Summary for the admin "System jobs" page.
+  return {
+    boostsExpired: boosts?.modifiedCount || 0,
+    listingsUnboosted: products?.modifiedCount || 0,
+  };
 };
 
 export const createBoost = async ({ productId, user }) => {

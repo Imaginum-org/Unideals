@@ -1,12 +1,14 @@
-import cron from "node-cron";
+import { defineJob } from "./jobRegistry.js";
 import { expireStaleBoosts } from "../services/boost.service.js";
 
 export const scheduleExpireBoosts = () => {
-  cron.schedule("*/10 * * * *", async () => {
-    try {
-      await expireStaleBoosts();
-    } catch (error) {
-      console.error("Boost expiry job failed:", error.message);
-    }
+  defineJob({
+    key: "expire-boosts",
+    name: "Expire boosts",
+    description: "Ends boosts past their expiry and removes the boost from those listings.",
+    schedule: "*/10 * * * *",
+    scheduleLabel: "Every 10 minutes",
+    frequent: true,
+    run: () => expireStaleBoosts(),
   });
 };

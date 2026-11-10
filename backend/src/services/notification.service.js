@@ -1104,3 +1104,113 @@ const formatRelativeTime = (date) => {
   if (diffSec < 172800) return "Yesterday";
   return `${Math.floor(diffSec / 86400)}d ago`;
 };
+
+/**
+ * One-off in-app notification to a single user (stored + pushed live).
+ * Never throws: moderation must not fail because a notification did.
+ */
+export const notifyUser = async ({ userId, title, message, actionUrl = null, actionLabel = null }) => {
+  if (!userId) return null;
+  try {
+    const notification = await Notification.create({
+      title,
+      message,
+      type: "general",
+      target_audience: "all",
+      is_broadcast: false,
+      recipient_id: userId,
+      action_url: actionUrl,
+      action_label: actionLabel,
+      status: "sent",
+      is_read: false,
+      stats: { total_sent: 1, delivered: 1, clicked: 0 },
+    });
+    emitToUser(userId, "notification:new", {
+      id: String(notification._id),
+      _id: String(notification._id),
+      title,
+      message,
+      description: message,
+      type: "GENERAL",
+      actionPath: actionUrl,
+      actionLabel,
+      action_url: actionUrl,
+      action_label: actionLabel,
+      createdAt: notification.createdAt,
+      time: "Just now",
+      unread: true,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Failed to send user notification:", error.message);
+    return null;
+  }
+};
+
+const LISTING_ACTION_COPY = {
+  blocked: {
+    title: "Listing removed",
+    body: (t) => `Your listing "${t}" was removed from the marketplace by our team and can't be relisted.`,
+  },
+  unlisted: {
+    title: "Listing hidden",
+    body: (t) => `Your listing "${t}" was hidden by our team. Fix the issue, then you can relist it.`,
+  },
+  deleted: {
+    title: "Listing deleted",
+    body: (t) => `Your listing "${t}" was deleted by our team for breaking our guidelines.`,
+  },
+  auto_hidden: {
+    title: "Listing paused for review",
+    body: (t) => `Your listing "${t}" received several reports and is paused while our team reviews it.`,
+  },
+  reinstated: {
+    title: "Listing is live again",
+    body: (t) => `Good news: your listing "${t}" was reviewed and is visible on the marketplace again.`,
+  },
+};
+
+/**
+ * Tell a seller what moderation did to their listing, with the reason.
+ */
+export const notifyListingModerated = ({ sellerId, productTitle, action, reason = null }) => {
+  const copy = LISTING_ACTION_COPY[action];
+  if (!copy) return Promise.resolve(null);
+  const title = (productTitle || "your item").slice(0, 80);
+  const reasonText = reason ? ` Reason: ${String(reason).slice(0, 200)}` : "";
+  return notifyUser({
+    userId: sellerId,
+    title: copy.title,
+    message: copy.body(title) + reasonText,
+    actionUrl: "/productlisted",
+    actionLabel: "My listings",
+  });
+};
+
+/**
+ * Close the loop with whoever filed a report.
+ * outcome: "resolved" (action taken) | "dismissed" (no violation found).
+ */
+export const notifyReporterOutcome = ({ reporterId, targetModel, targetLabel, outcome }) => {
+  const what =
+    targetModel === "Product"
+      ? `the listing "${(targetLabel || "you reported").slice(0, 80)}"`
+      : targetModel === "User"
+        ? "the user you reported"
+        : "your support request";
+  const isSupport = targetModel === "Support";
+  const message =
+    outcome === "resolved"
+      ? isSupport
+        ? "Your support request has been resolved. Thanks for reaching out."
+        : `Thanks for your report about ${what}. Our team reviewed it and took action.`
+      : isSupport
+        ? "Your support request was closed. Reply via Help if you still need assistance."
+        : `Thanks for your report about ${what}. We reviewed it and didn't find a violation of our guidelines this time.`;
+  return notifyUser({
+    userId: reporterId,
+    title: outcome === "resolved" ? "Update on your report" : "Your report was reviewed",
+    message,
+    actionUrl: "/notification",
+  });
+};
