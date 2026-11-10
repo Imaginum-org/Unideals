@@ -33,7 +33,8 @@ export const adminCreateCampus = async (req, res, next) => {
 export const adminListCampuses = async (req, res, next) => {
   try {
     const Campus = (await import("../models/Campus.model.js")).default;
-    const campuses = await Campus.find({})
+    // Campus-limited staff only see (and can filter by) their own campuses.
+    const campuses = await Campus.find(req.campusScope ? { _id: { $in: req.campusScope } } : {})
       .sort({ name: 1 })
       .lean();
     return res.status(200).json({

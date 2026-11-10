@@ -7,6 +7,7 @@ import Campus from "../models/Campus.model.js";
 import { DEAL_STATUS } from "../config/constants.js";
 import { buildPagination, escapeRegex, toPositiveInt } from "../utils/adminQuery.js";
 import { logAdminAction } from "./auditLog.service.js";
+import { countScoped, dealScopeStages } from "./campusScope.service.js";
 
 const { ObjectId } = mongoose.Types;
 
@@ -36,7 +37,9 @@ const mapDealStatusToOrderStage = (status) => {
   }
 };
 
-export const getAdminOrderStats = async () => {
+export const getAdminOrderStats = async (scope = null) => {
+  const stages = dealScopeStages(scope);
+  const count = (match) => countScoped(Deal, match, stages);
   const now = new Date();
   const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -51,25 +54,25 @@ export const getAdminOrderStats = async () => {
     ordersThisMonth,
     ordersPrevMonth,
   ] = await Promise.all([
-    Deal.countDocuments({}),
-    Deal.countDocuments({
+    count({}),
+    count({
       status: { $in: [DEAL_STATUS.NEGOTIATING, DEAL_STATUS.OFFER_ACCEPTED] },
     }),
-    Deal.countDocuments({
+    count({
       status: { $in: [DEAL_STATUS.DEAL_CONFIRMED, DEAL_STATUS.PAYMENT_CONFIRMED] },
     }),
-    Deal.countDocuments({
+    count({
       status: DEAL_STATUS.PICKUP_SCHEDULED,
     }),
-    Deal.countDocuments({
+    count({
       status: DEAL_STATUS.COMPLETED,
     }),
-    Deal.countDocuments({
+    count({
       status: DEAL_STATUS.CANCELLED,
     }),
-    Deal.countDocuments({ createdAt: { $gte: startOfCurrentMonth } }),
+    count({ createdAt: { $gte: startOfCurrentMonth } }),
     // Same number of days into last month, so early-month numbers compare fairly.
-    Deal.countDocuments({
+    count({
       createdAt: {
         $gte: startOfPreviousMonth,
         $lt: new Date(Math.min(startOfPreviousMonth.getTime() + (now.getTime() - startOfCurrentMonth.getTime()), startOfCurrentMonth.getTime())),
@@ -95,7 +98,8 @@ export const getAdminOrderStats = async () => {
   };
 };
 
-export const getAdminOrders = async (query = {}) => {
+export const getAdminOrders = async (query = {}, scope = null) => {
+  const allowedCampuses = scope ? new Set(scope.map(String)) : null;
   const page = toPositiveInt(query.page, 1);
   const limit = toPositiveInt(query.limit, 10, 50);
 
@@ -145,6 +149,14 @@ export const getAdminOrders = async (query = {}) => {
   // Search filter & campus filter
   const searchText = (query.search || "").trim().toLowerCase();
   const campusFilter = (query.campus || "all").trim();
+
+  // Campus limit: the buyer or the seller must belong to one of the caller's campuses.
+  if (allowedCampuses) {
+    deals = deals.filter((d) => {
+      const conv = d.conversation_id || {};
+      return [conv.buyer_id?.campus_id, conv.seller_id?.campus_id].some((id) => id && allowedCampuses.has(String(id)));
+    });
+  }
 
   if (searchText || (campusFilter && campusFilter !== "all" && campusFilter !== "Campus (All)")) {
     deals = deals.filter((d) => {

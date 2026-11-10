@@ -33,5 +33,22 @@ export const DEFAULT_SUPPORT_PERMISSIONS = Object.fromEntries(
 // Shown on the access page so nobody looks for a toggle that can't exist.
 export const ADMIN_ONLY_ACTIONS = [
   "Change a user's role (make or remove support staff)",
+  "Permanently delete a user account and everything linked to it",
   "Edit support access (this page)",
+];
+
+/**
+ * Sections whose data follows a campus limit. The rest (audit log, service
+ * status, background jobs) are platform-wide and ignore it. With a limit,
+ * creating or deleting campuses also needs all-campus access.
+ */
+export const CAMPUS_SCOPED_SECTIONS = [
+  "dashboard",
+  "users",
+  "listings",
+  "orders",
+  "campuses",
+  "reports",
+  "genderRequests",
+  "notifications",
 ];

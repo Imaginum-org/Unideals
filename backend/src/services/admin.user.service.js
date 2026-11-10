@@ -9,10 +9,11 @@ import {
   toPositiveInt,
 } from "../utils/adminQuery.js";
 import { notifyRoleAssigned } from "./notification.service.js";
+import { campusMatch, withCampusScope } from "./campusScope.service.js";
 
 const { ObjectId } = mongoose.Types;
 
-export const getUsers = async (query = {}) => {
+export const getUsers = async (query = {}, scope = null) => {
   const page = toPositiveInt(query.page, 1);
   const limit = toPositiveInt(query.limit, 5, 50);
   const skip = (page - 1) * limit;
@@ -54,7 +55,7 @@ export const getUsers = async (query = {}) => {
   }
 
   const pipeline = [
-    { $match: match },
+    { $match: withCampusScope(match, scope) },
     {
       $lookup: {
         from: "products",
@@ -260,7 +261,9 @@ export const updateUserRole = async (userId, role) => {
   };
 };
 
-export const getUserStats = async () => {  const now = new Date();
+export const getUserStats = async (scope = null) => {
+  const now = new Date();
+  const people = { role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, ...campusMatch(scope) };
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
   const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -275,13 +278,13 @@ export const getUserStats = async () => {  const now = new Date();
     newUsers30d,
     newUsersPrev30d,
   ] = await Promise.all([
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] } }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.ACTIVE }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.SUSPENDED }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, createdAt: { $gte: startOfCurrentMonth } }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, createdAt: { $gte: thirtyDaysAgo } }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }),
+    User.countDocuments(people),
+    User.countDocuments({ ...people, status: USER_STATUS.ACTIVE }),
+    User.countDocuments({ ...people, status: USER_STATUS.SUSPENDED }),
+    User.countDocuments({ ...people, createdAt: { $gte: startOfCurrentMonth } }),
+    User.countDocuments({ ...people, createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } }),
+    User.countDocuments({ ...people, createdAt: { $gte: thirtyDaysAgo } }),
+    User.countDocuments({ ...people, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }),
   ]);
 
   const activePct = totalUsers > 0 ? Number(((activeUsers / totalUsers) * 100).toFixed(1)) : 0;
@@ -309,11 +312,11 @@ export const getUserStats = async () => {  const now = new Date();
 
 // Gender change approval queue — scalable paginated query on the embedded
 // pending subdoc (single index-friendly match, lean + limit clamped).
-export const getGenderChangeRequests = async (query = {}) => {
+export const getGenderChangeRequests = async (query = {}, scope = null) => {
   const page = toPositiveInt(query.page, 1);
   const limit = toPositiveInt(query.limit, 20, 50);
   const skip = (page - 1) * limit;
-  const match = { "genderChangeRequest.status": "pending" };
+  const match = { "genderChangeRequest.status": "pending", ...campusMatch(scope) };
   const [total, data] = await Promise.all([
     User.countDocuments(match),
     User.find(match)

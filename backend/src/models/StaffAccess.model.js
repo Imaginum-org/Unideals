@@ -11,6 +11,8 @@ const staffAccessSchema = new Schema(
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
     // { [featureKey]: { view: Boolean, manage: Boolean } }
     permissions: { type: Schema.Types.Mixed, default: {} },
+    // Campuses whose data this access covers. Empty = every campus.
+    campuses: { type: [{ type: Schema.Types.ObjectId, ref: "Campus" }], default: [] },
     updated_by: { type: Schema.Types.ObjectId, ref: "User", default: null },
     updated_by_name: { type: String, default: null },
   },

@@ -6,6 +6,7 @@ import * as moderationService from "../services/moderation.service.js";
 import { expectedIntervalMs, listJobDefinitions, runJob } from "../jobs/jobRegistry.js";
 import { safeErrorMessage } from "../utils/response.js";
 import { getSystemStatus } from "../services/systemStatus.service.js";
+import { isProductInScope, isUserInScope, outOfScope } from "../services/campusScope.service.js";
 
 const ok = (res, message, payload = {}) => res.status(200).json({ success: true, error: false, message, ...payload });
 const fail = (res, error) =>
@@ -35,11 +36,13 @@ export const bulkProducts = async (req, res) => {
   try {
     const { ids, action, reason } = req.body || {};
     if (!PRODUCT_BULK_ACTIONS.includes(action)) throw badRequest("Invalid bulk action");
-    const data = await moderationService.runBulk(ids, (productId) =>
-      action === "delete"
+    const data = await moderationService.runBulk(ids, async (productId) => {
+      // Campus-limited staff: items outside their campuses fail individually.
+      if (!(await isProductInScope(req.campusScope, productId))) throw outOfScope("Listing");
+      return action === "delete"
         ? moderationService.deleteProductPermanently({ productId, reason, actor: req.user, bulk: true })
-        : moderationService.moderateProductStatus({ productId, status: action, reason, actor: req.user, bulk: true }),
-    );
+        : moderationService.moderateProductStatus({ productId, status: action, reason, actor: req.user, bulk: true });
+    });
     return ok(res, `${data.succeeded} updated${data.failed ? `, ${data.failed} failed` : ""}`, { data });
   } catch (error) {
     return fail(res, error);
@@ -53,9 +56,10 @@ export const bulkUsers = async (req, res) => {
     // Never let an admin suspend themselves through a bulk selection.
     const selfId = String(req.user._id);
     const targetIds = Array.isArray(ids) ? ids.filter((id) => String(id) !== selfId) : ids;
-    const data = await moderationService.runBulk(targetIds, (userId) =>
-      moderationService.moderateUserStatus({ userId, status, reason, actor: req.user, bulk: true }),
-    );
+    const data = await moderationService.runBulk(targetIds, async (userId) => {
+      if (!(await isUserInScope(req.campusScope, userId))) throw outOfScope("User");
+      return moderationService.moderateUserStatus({ userId, status, reason, actor: req.user, bulk: true });
+    });
     return ok(res, `${data.succeeded} updated${data.failed ? `, ${data.failed} failed` : ""}`, { data });
   } catch (error) {
     return fail(res, error);

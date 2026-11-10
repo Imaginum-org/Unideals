@@ -1,9 +1,15 @@
 import * as analyticsService from "../services/analytics.service.js";
 import { safeErrorMessage } from "../utils/response.js";
 
+// Section access + campus limit from attachAccess (see admin.routes.js).
+const contextOf = (req) => {
+  const permissions = req.access?.permissions || {};
+  return { scope: req.campusScope || null, can: (section) => Boolean(permissions[section]?.view) };
+};
+
 const respond = (fn, message) => async (req, res) => {
   try {
-    const data = await fn(req.query);
+    const data = await fn(req.query, contextOf(req));
     return res.status(200).json({ success: true, error: false, message, data });
   } catch (error) {
     return res.status(error?.statusCode || 400).json({

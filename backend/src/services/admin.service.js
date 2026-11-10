@@ -16,6 +16,14 @@ import {
   DEAL_STATUS,
   PAYMENT_STATUS,
 } from "../config/constants.js";
+import {
+  campusIn,
+  campusMatch,
+  countScoped,
+  dealScopeStages,
+  paymentScopeStages,
+  reportScopeStages,
+} from "./campusScope.service.js";
 
 const { ObjectId } = mongoose.Types;
 
@@ -46,8 +54,8 @@ export const percentChange = (current, previous) => {
   return diff >= 0 ? `+${diff}%` : `${diff}%`;
 };
 
-const sumField = (Model, match, field) =>
-  Model.aggregate([{ $match: match }, { $group: { _id: null, total: { $sum: field } } }])
+const sumField = (Model, match, field, stages = []) =>
+  Model.aggregate([{ $match: match }, ...stages, { $group: { _id: null, total: { $sum: field } } }])
     .then((rows) => rows?.[0]?.total || 0)
     .catch(() => 0);
 
@@ -64,10 +72,21 @@ const verifiedIn = (range) => ({
   $or: [{ verified_at: range }, { verified_at: null, createdAt: range }],
 });
 
-export const getDashboardMetrics = async () => {
+/**
+ * scope: null (every campus) or campus ids — limits every number to those
+ * campuses. can(section): counts for sections the caller can't view are 0,
+ * and recent activity needs audit log access.
+ */
+export const getDashboardMetrics = async ({ scope = null, can = () => true } = {}) => {
   const { current, previous } = comparisonWindows();
   const completed = { status: DEAL_STATUS.COMPLETED };
   const verified = { status: PAYMENT_STATUS.VERIFIED };
+  const people = { role: STAFF_AND_USERS, ...campusMatch(scope) };
+  const inCampus = campusMatch(scope);
+  const dealStages = dealScopeStages(scope);
+  const paymentStages = paymentScopeStages(scope);
+  const countDeals = (match) => countScoped(Deal, match, dealStages).catch(() => 0);
+  const zero = () => Promise.resolve(0);
 
   const [
     totalUsers,
@@ -97,34 +116,34 @@ export const getDashboardMetrics = async () => {
     campusDistributionRaw,
     recentAuditLogs,
   ] = await Promise.all([
-    User.countDocuments({ role: STAFF_AND_USERS }),
-    User.countDocuments({ role: STAFF_AND_USERS, status: USER_STATUS.ACTIVE }),
-    User.countDocuments({ role: STAFF_AND_USERS, status: USER_STATUS.SUSPENDED }),
-    User.countDocuments({ role: STAFF_AND_USERS, status: USER_STATUS.INACTIVE }),
-    Product.countDocuments({ status: PRODUCT_STATUS.LISTED, is_deleted: false }),
-    Product.countDocuments({ status: PRODUCT_STATUS.BLOCKED, is_deleted: false }),
-    Report.countDocuments({ status: REPORT_STATUS.PENDING }),
-    User.countDocuments({ "genderChangeRequest.status": "pending" }).catch(() => 0),
-    Product.countDocuments({ auto_hidden_at: { $ne: null }, is_deleted: false }).catch(() => 0),
-    JobState.countDocuments({ last_status: "failed" }).catch(() => 0),
-    Campus.countDocuments({ is_active: true }),
-    Deal.countDocuments(completed).catch(() => 0),
+    User.countDocuments(people),
+    User.countDocuments({ ...people, status: USER_STATUS.ACTIVE }),
+    User.countDocuments({ ...people, status: USER_STATUS.SUSPENDED }),
+    User.countDocuments({ ...people, status: USER_STATUS.INACTIVE }),
+    Product.countDocuments({ status: PRODUCT_STATUS.LISTED, is_deleted: false, ...inCampus }),
+    Product.countDocuments({ status: PRODUCT_STATUS.BLOCKED, is_deleted: false, ...inCampus }),
+    can("reports") ? countScoped(Report, { status: REPORT_STATUS.PENDING }, reportScopeStages(scope)) : zero(),
+    can("genderRequests") ? User.countDocuments({ "genderChangeRequest.status": "pending", ...inCampus }).catch(() => 0) : zero(),
+    can("listings") ? Product.countDocuments({ auto_hidden_at: { $ne: null }, is_deleted: false, ...inCampus }).catch(() => 0) : zero(),
+    can("jobs") ? JobState.countDocuments({ last_status: "failed" }).catch(() => 0) : zero(),
+    Campus.countDocuments({ is_active: true, ...(scope ? { _id: { $in: scope } } : {}) }),
+    countDeals(completed),
     // Deal prices are stored in rupees.
-    sumField(Deal, completed, "$current_price"),
+    sumField(Deal, completed, "$current_price", dealStages),
     // Payment.amount is stored in paise.
-    sumField(Payment, verified, "$amount"),
-    User.countDocuments({ role: STAFF_AND_USERS, createdAt: current }).catch(() => 0),
-    User.countDocuments({ role: STAFF_AND_USERS, createdAt: previous }).catch(() => 0),
-    Product.countDocuments({ is_deleted: false, createdAt: current }).catch(() => 0),
-    Product.countDocuments({ is_deleted: false, createdAt: previous }).catch(() => 0),
-    Deal.countDocuments(completedIn(current)).catch(() => 0),
-    Deal.countDocuments(completedIn(previous)).catch(() => 0),
-    sumField(Deal, completedIn(current), "$current_price"),
-    sumField(Deal, completedIn(previous), "$current_price"),
-    sumField(Payment, verifiedIn(current), "$amount"),
-    sumField(Payment, verifiedIn(previous), "$amount"),
+    sumField(Payment, verified, "$amount", paymentStages),
+    User.countDocuments({ ...people, createdAt: current }).catch(() => 0),
+    User.countDocuments({ ...people, createdAt: previous }).catch(() => 0),
+    Product.countDocuments({ is_deleted: false, createdAt: current, ...inCampus }).catch(() => 0),
+    Product.countDocuments({ is_deleted: false, createdAt: previous, ...inCampus }).catch(() => 0),
+    countDeals(completedIn(current)),
+    countDeals(completedIn(previous)),
+    sumField(Deal, completedIn(current), "$current_price", dealStages),
+    sumField(Deal, completedIn(previous), "$current_price", dealStages),
+    sumField(Payment, verifiedIn(current), "$amount", paymentStages),
+    sumField(Payment, verifiedIn(previous), "$amount", paymentStages),
     User.aggregate([
-      { $match: { role: STAFF_AND_USERS, campus_id: { $ne: null } } },
+      { $match: { role: STAFF_AND_USERS, campus_id: scope ? campusIn(scope) : { $ne: null } } },
       // Legacy accounts may hold campus_id as a string; normalise first.
       { $addFields: { campusObjId: { $convert: { input: "$campus_id", to: "objectId", onError: null, onNull: null } } } },
       { $match: { campusObjId: { $ne: null } } },
@@ -132,7 +151,7 @@ export const getDashboardMetrics = async () => {
       { $lookup: { from: Campus.collection.name, localField: "_id", foreignField: "_id", as: "campus" } },
       { $project: { campusName: { $arrayElemAt: ["$campus.name", 0] }, count: 1 } },
     ]).catch(() => []),
-    AuditLog.find({}).sort({ createdAt: -1 }).limit(8).lean(),
+    can("auditLog") ? AuditLog.find({}).sort({ createdAt: -1 }).limit(8).lean() : Promise.resolve([]),
   ]);
 
   // Users by campus: every active campus appears, even with zero users.
@@ -140,7 +159,7 @@ export const getDashboardMetrics = async () => {
   for (const row of campusDistributionRaw) {
     if (row.campusName) countMap.set(row.campusName, row.count);
   }
-  const activeCampusesList = await Campus.find({ is_active: true }).select("name").lean();
+  const activeCampusesList = await Campus.find({ is_active: true, ...(scope ? { _id: { $in: scope } } : {}) }).select("name").lean();
   for (const campus of activeCampusesList) {
     if (!countMap.has(campus.name)) countMap.set(campus.name, 0);
   }
@@ -355,7 +374,7 @@ export const getProductDetails = async (productId) => {
 // Report-count ranges behind the queue's priority badge.
 const PRIORITY_COUNTS = { high: { $gte: 5 }, medium: { $gte: 2, $lt: 5 }, low: { $lt: 2 } };
 
-export const getModerationQueue = async (query = {}) => {
+export const getModerationQueue = async (query = {}, scope = null) => {
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 20));
   const skip = (page - 1) * limit;
@@ -367,6 +386,8 @@ export const getModerationQueue = async (query = {}) => {
   // Aggregate pending reports grouped by target
   const pipeline = [
     { $match: { status: REPORT_STATUS.PENDING, ...targetModelFilter } },
+    // Campus limit: only reports about the caller's campuses.
+    ...reportScopeStages(scope),
     {
       $group: {
         _id: { target_id: "$target_id", target_model: "$target_model" },

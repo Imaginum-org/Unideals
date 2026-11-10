@@ -18,7 +18,7 @@ const sendFailure = (res, error, statusCode = 400) =>
 
 export const getOrders = async (req, res) => {
   try {
-    const result = await adminOrderService.getAdminOrders(req.query);
+    const result = await adminOrderService.getAdminOrders(req.query, req.campusScope);
     return sendSuccess(res, "Orders fetched successfully", result);
   } catch (error) {
     return sendFailure(res, error);
@@ -27,7 +27,7 @@ export const getOrders = async (req, res) => {
 
 export const getOrderStats = async (req, res) => {
   try {
-    const stats = await adminOrderService.getAdminOrderStats();
+    const stats = await adminOrderService.getAdminOrderStats(req.campusScope);
     return sendSuccess(res, "Order stats fetched successfully", { data: stats });
   } catch (error) {
     return sendFailure(res, error);

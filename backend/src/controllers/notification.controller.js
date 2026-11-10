@@ -1,5 +1,13 @@
 import * as notificationService from "../services/notification.service.js";
 import { forwardServiceError } from "../utils/response.js";
+import { isCampusInScope } from "../services/campusScope.service.js";
+
+// Campus-limited staff can only reach (and see) their own campuses.
+const limitedAudienceError = (req, audience, campus) => {
+  if (!req.campusScope) return null;
+  if (audience === "campus" && campus && isCampusInScope(req.campusScope, campus)) return null;
+  return Object.assign(new Error("You can only send to a campus you have access to"), { statusCode: 403 });
+};
 
 // ==================== USER CONTROLLERS ====================
 
@@ -97,6 +105,9 @@ export const adminCreateNotification = async (req, res, next) => {
       scheduled_at,
     } = req.body;
 
+    const denied = limitedAudienceError(req, target_audience, target_campus);
+    if (denied) return res.status(403).json({ success: false, error: true, message: denied.message });
+
     const notification = await notificationService.createAdminNotification({
       title,
       message,
@@ -127,7 +138,7 @@ export const adminCreateNotification = async (req, res, next) => {
 // GET /api/admin/notifications/stats
 export const adminGetStats = async (req, res, next) => {
   try {
-    const stats = await notificationService.getAdminNotificationStats();
+    const stats = await notificationService.getAdminNotificationStats({ campuses: req.campusScope });
     return res.status(200).json({
       success: true,
       message: "Notification stats fetched successfully",
@@ -145,6 +156,7 @@ export const adminGetHistory = async (req, res, next) => {
     const history = await notificationService.getAdminNotificationHistory({
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
+      campuses: req.campusScope,
     });
     return res.status(200).json({
       success: true,
@@ -159,7 +171,7 @@ export const adminGetHistory = async (req, res, next) => {
 // GET /api/admin/notifications/scheduled
 export const adminGetScheduled = async (req, res, next) => {
   try {
-    const scheduled = await notificationService.getAdminScheduledNotifications();
+    const scheduled = await notificationService.getAdminScheduledNotifications({ campuses: req.campusScope });
     return res.status(200).json({
       success: true,
       message: "Scheduled notifications fetched successfully",
@@ -174,7 +186,8 @@ export const adminGetScheduled = async (req, res, next) => {
 export const adminCancelScheduled = async (req, res, next) => {
   try {
     const cancelled = await notificationService.cancelScheduledNotification(
-      req.params.id
+      req.params.id,
+      { campuses: req.campusScope },
     );
     return res.status(200).json({
       success: true,
@@ -190,6 +203,8 @@ export const adminCancelScheduled = async (req, res, next) => {
 export const adminEstimateRecipients = async (req, res, next) => {
   try {
     const { target_audience = "all", target_campus = null } = req.query;
+    const denied = limitedAudienceError(req, target_audience, target_campus);
+    if (denied) return res.status(403).json({ success: false, error: true, message: denied.message });
     const count = await notificationService.estimateRecipients({
       targetAudience: target_audience,
       targetCampus: target_campus,

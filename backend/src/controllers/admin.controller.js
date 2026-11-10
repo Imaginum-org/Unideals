@@ -20,7 +20,11 @@ const sendFailure = (res, error, statusCode = error?.statusCode || 400) =>
 
 export const getDashboard = async (req, res) => {
   try {
-    const data = await adminService.getDashboardMetrics();
+    const permissions = req.access?.permissions || {};
+    const data = await adminService.getDashboardMetrics({
+      scope: req.campusScope,
+      can: (section) => Boolean(permissions[section]?.view),
+    });
     return sendSuccess(res, "Dashboard data fetched", { data });
   } catch (error) {
     return sendFailure(res, error);
@@ -122,7 +126,7 @@ export const hardDeleteProductWithAudit = async (req, res) => {
 
 export const getModerationQueue = async (req, res) => {
   try {
-    const result = await adminService.getModerationQueue(req.query);
+    const result = await adminService.getModerationQueue(req.query, req.campusScope);
     return sendSuccess(res, "Moderation queue fetched", result);
   } catch (error) {
     return sendFailure(res, error);

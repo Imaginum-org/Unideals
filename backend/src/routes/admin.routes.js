@@ -30,7 +30,7 @@ import {
 } from "../controllers/adminProfile.controller.js";
 
 // Legacy controllers (still used directly for simple cases)
-import { getUsers, getUserStats, updateUserRole, getGenderChangeRequests, reviewGenderChangeRequest } from "../controllers/admin.user.controller.js";
+import { getUsers, getUserStats, updateUserRole, deleteUser, getGenderChangeRequests, reviewGenderChangeRequest } from "../controllers/admin.user.controller.js";
 import { getProducts } from "../controllers/admin.product.controller.js";
 import {
   getOrders,
@@ -61,7 +61,13 @@ import {
 import { adminListCampuses } from "../controllers/campus.controller.js";
 import { getTrends, getBreakdowns, getJobAnalytics } from "../controllers/admin.analytics.controller.js";
 import { getAccess, updateSupportAccess, getAttention, updatePersonAccess, resetPersonAccess } from "../controllers/admin.access.controller.js";
-import { requireAccess } from "../middlewares/access.middleware.js";
+import {
+  attachAccess,
+  requireAccess,
+  requireAllCampuses,
+  requireInScope,
+  requireReportTargetInScope,
+} from "../middlewares/access.middleware.js";
 
 // Validations
 import {
@@ -117,7 +123,7 @@ router.post("/saved-views", ...staffOnly, createSavedView);
 router.delete("/saved-views/:id", ...staffOnly, deleteSavedView);
 
 // Individual reports + chat evidence for one reported item
-router.get("/moderation/reports", auth, requireAccess("reports", "view"), getTargetReports);
+router.get("/moderation/reports", auth, requireAccess("reports", "view"), requireReportTargetInScope("query"), getTargetReports);
 
 // Bulk moderation (admin only, max 100 items per request)
 const bulkLimiter = rateLimit({
@@ -143,8 +149,9 @@ const analyticsLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: "Too many analytics requests, slow down" },
 });
-router.get("/analytics/trends", analyticsLimiter, ...staffOnly, getTrends);
-router.get("/analytics/breakdown", analyticsLimiter, ...staffOnly, getBreakdowns);
+// Each metric/dimension is checked against the caller's sections and campuses.
+router.get("/analytics/trends", analyticsLimiter, ...staffOnly, attachAccess, getTrends);
+router.get("/analytics/breakdown", analyticsLimiter, ...staffOnly, attachAccess, getBreakdowns);
 router.get("/analytics/jobs", analyticsLimiter, auth, requireAccess("jobs", "view"), getJobAnalytics);
 
 // Role access: everyone reads their own; only Super Admins edit support access.
@@ -153,7 +160,7 @@ router.put("/access/support", ...adminOnly, updateSupportAccess);
 router.put("/access/staff/:userId", ...adminOnly, updatePersonAccess);
 router.delete("/access/staff/:userId", ...adminOnly, resetPersonAccess);
 // Sidebar/inbox counts, limited to sections the caller can see.
-router.get("/attention", ...staffOnly, getAttention);
+router.get("/attention", ...staffOnly, attachAccess, getAttention);
 router.patch("/profile", ...staffOnly, updateMyProfile);
 router.post("/profile/change-password", passwordChangeLimiter, ...staffOnly, changeMyPassword);
 
@@ -178,12 +185,14 @@ router.post(
   "/moderation/dismiss",
   auth,
   requireAccess("reports", "manage"),
+  requireReportTargetInScope("body"),
   dismissReports,
 );
 router.post(
   "/moderation/resolve",
   auth,
   requireAccess("reports", "manage"),
+  requireReportTargetInScope("body"),
   resolveReports,
 );
 
@@ -209,6 +218,7 @@ router.get(
   "/users/:id",
   auth,
   requireAccess("users", "view"),
+  requireInScope("user"),
   getUserDetails,
 );
 
@@ -217,6 +227,7 @@ router.patch(
   "/users/:id/status",
   auth,
   requireAccess("users", "manage"),
+  requireInScope("user"),
   updateUserStatusWithAudit,
 );
 
@@ -226,6 +237,16 @@ router.patch(
   requireRoles(USER_ROLES.ADMIN),
   updateUserRole,
 );
+
+// Permanent account deletion with everything linked to it — Super Admin only.
+const deleteUserLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many deletions, slow down" },
+});
+router.delete("/users/:id", deleteUserLimiter, ...adminOnly, deleteUser);
 
 // Gender change approvals (set-once gender; admin-only writes).
 router.get(
@@ -238,6 +259,7 @@ router.patch(
   "/gender-requests/:id",
   auth,
   requireAccess("genderRequests", "manage"),
+  requireInScope("user"),
   reviewGenderChangeRequest,
 );
 
@@ -255,6 +277,7 @@ router.get(
   "/products/:id",
   auth,
   requireAccess("listings", "view"),
+  requireInScope("product"),
   getProductDetails,
 );
 
@@ -263,6 +286,7 @@ router.patch(
   "/products/:id/status",
   auth,
   requireAccess("listings", "manage"),
+  requireInScope("product"),
   updateProductStatusWithAudit,
 );
 
@@ -271,6 +295,7 @@ router.patch(
   "/products/:id/soft-delete",
   auth,
   requireAccess("listings", "manage"),
+  requireInScope("product"),
   softDeleteProductWithAudit,
 );
 
@@ -279,6 +304,7 @@ router.delete(
   "/products/:id",
   auth,
   requireAccess("listings", "manage"),
+  requireInScope("product"),
   hardDeleteProductWithAudit,
 );
 
@@ -299,12 +325,14 @@ router.get(
   "/orders/:id",
   auth,
   requireAccess("orders", "view"),
+  requireInScope("order"),
   getOrderDetails,
 );
 router.patch(
   "/orders/:id/status",
   auth,
   requireAccess("orders", "manage"),
+  requireInScope("order"),
   updateOrderStatus,
 );
 
@@ -316,12 +344,15 @@ router.get(
   "/reports",
   auth,
   requireAccess("reports", "view"),
+  // Legacy flat list (the portal uses /moderation/*); not campus-aware.
+  requireAllCampuses("This report list needs access to every campus"),
   getAdminReports,
 );
 router.patch(
   "/reports/:id",
   auth,
   requireAccess("reports", "manage"),
+  requireAllCampuses("This report list needs access to every campus"),
   reviewAdminReport,
 );
 
@@ -331,6 +362,7 @@ router.get(
   "/campuses",
   auth,
   requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  attachAccess,
   adminListCampuses,
 );
 
@@ -338,6 +370,7 @@ router.post(
   "/campuses",
   auth,
   requireAccess("campuses", "manage"),
+  requireAllCampuses("Creating campuses needs access to every campus"),
   validate(createCampusSchema),
   createCampusWithAudit,
 );
@@ -346,6 +379,7 @@ router.patch(
   "/campuses/:id",
   auth,
   requireAccess("campuses", "manage"),
+  requireInScope("campus"),
   validate(updateCampusSchema),
   updateCampusWithAudit,
 );
@@ -354,6 +388,7 @@ router.delete(
   "/campuses/:id",
   auth,
   requireAccess("campuses", "manage"),
+  requireAllCampuses("Deleting campuses needs access to every campus"),
   deleteCampusWithAudit,
 );
 

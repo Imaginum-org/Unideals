@@ -9,9 +9,11 @@ import {
   toPositiveInt,
 } from "../utils/adminQuery.js";
 
+import { withCampusScope } from "./campusScope.service.js";
+
 const { ObjectId } = mongoose.Types;
 
-export const getProducts = async (query = {}) => {
+export const getProducts = async (query = {}, scope = null) => {
   const page = toPositiveInt(query.page, 1);
   const limit = toPositiveInt(query.limit, 5, 50);
   const skip = (page - 1) * limit;
@@ -43,7 +45,7 @@ export const getProducts = async (query = {}) => {
   }
 
   const pipeline = [
-    { $match: match },
+    { $match: withCampusScope(match, scope) },
     {
       $lookup: {
         from: "users",
@@ -62,7 +64,7 @@ export const getProducts = async (query = {}) => {
 
   // Per-status totals for the admin tabs: same filters, minus status.
   const { status: _ignoredStatus, ...matchWithoutStatus } = match;
-  const countPipeline = [{ $match: matchWithoutStatus }];
+  const countPipeline = [{ $match: withCampusScope(matchWithoutStatus, scope) }];
   let searchStage = null;
 
   if (query.search?.trim()) {

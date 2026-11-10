@@ -27,6 +27,7 @@ import {
   DEAL_STATUS,
   PAYMENT_STATUS,
 } from "../config/constants.js";
+import { campusIn, campusMatch, dealScopeStages, paymentScopeStages, reportScopeStages } from "./campusScope.service.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 const MAX_SPAN_DAYS = 3 * 366;
@@ -37,6 +38,16 @@ const STAFF_AND_USERS = { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] };
 const MODERATED = { $in: ["Product", "User"] };
 
 const badRequest = (message) => Object.assign(new Error(message), { statusCode: 400 });
+const forbidden = (message) => Object.assign(new Error(message), { statusCode: 403 });
+
+/**
+ * Who may read what. ctx.can(section) says whether the caller can view a
+ * section; a metric/dimension is readable through any of its sections (the
+ * dashboard shows a summary of several). ctx.scope limits every number to the
+ * caller's campuses (null = every campus).
+ */
+const FULL_CTX = { scope: null, can: () => true };
+const allowed = (sections, ctx) => sections.some((section) => ctx.can(section));
 
 // ─── Calendar helpers ──────────────────────────────────────────────────────
 // A "calendar day" is represented as the UTC-midnight timestamp of that date,
@@ -190,21 +201,52 @@ const withFallback = (field, fallback) => (range) => ({
   $or: [{ [field]: range }, { [field]: null, [fallback]: range }],
 });
 
+// Campus filter per record type: { match } for direct fields, { stages } for lookups.
+const SCOPES = {
+  user: (scope) => ({ match: campusMatch(scope) }),
+  listing: (scope) => ({ match: campusMatch(scope) }),
+  deal: (scope) => ({ stages: dealScopeStages(scope) }),
+  payment: (scope) => ({ stages: paymentScopeStages(scope) }),
+  report: (scope) => ({ stages: reportScopeStages(scope) }),
+  // Staff actions aren't tied to a campus (the audit log is platform-wide).
+  none: () => ({}),
+};
+
+const DASH = "dashboard";
+
 export const METRICS = {
-  users: { model: User, base: { role: STAFF_AND_USERS }, date: "$createdAt", inRange: byCreated },
-  listings: { model: Product, base: { is_deleted: false }, date: "$createdAt", inRange: byCreated },
-  orders: { model: Deal, base: {}, date: "$createdAt", inRange: byCreated },
-  deals: { model: Deal, base: { status: DEAL_STATUS.COMPLETED }, date: completedAt, inRange: withFallback("completed_at", "updatedAt") },
+  users: { model: User, base: { role: STAFF_AND_USERS }, date: "$createdAt", inRange: byCreated, sections: ["users", DASH], scope: "user" },
+  listings: { model: Product, base: { is_deleted: false }, date: "$createdAt", inRange: byCreated, sections: ["listings", DASH], scope: "listing" },
+  orders: { model: Deal, base: {}, date: "$createdAt", inRange: byCreated, sections: ["orders", DASH], scope: "deal" },
+  deals: {
+    model: Deal,
+    base: { status: DEAL_STATUS.COMPLETED },
+    date: completedAt,
+    inRange: withFallback("completed_at", "updatedAt"),
+    sections: ["orders", DASH],
+    scope: "deal",
+  },
   gmv: {
+    sections: ["orders", DASH],
+    scope: "deal",
     model: Deal,
     base: { status: DEAL_STATUS.COMPLETED },
     date: completedAt,
     inRange: withFallback("completed_at", "updatedAt"),
     value: "$current_price",
   },
-  cancelled: { model: Deal, base: { status: DEAL_STATUS.CANCELLED }, date: cancelledAt, inRange: withFallback("cancelled_at", "updatedAt") },
+  cancelled: {
+    model: Deal,
+    base: { status: DEAL_STATUS.CANCELLED },
+    date: cancelledAt,
+    inRange: withFallback("cancelled_at", "updatedAt"),
+    sections: ["orders", DASH],
+    scope: "deal",
+  },
   // Payment.amount is paise; reported in rupees.
   revenue: {
+    sections: [DASH],
+    scope: "payment",
     model: Payment,
     base: { status: PAYMENT_STATUS.VERIFIED },
     date: verifiedAt,
@@ -212,21 +254,25 @@ export const METRICS = {
     value: "$amount",
     divisor: 100,
   },
-  reports: { model: Report, base: { target_model: MODERATED }, date: "$createdAt", inRange: byCreated },
+  reports: { model: Report, base: { target_model: MODERATED }, date: "$createdAt", inRange: byCreated, sections: ["reports", DASH], scope: "report" },
   reportsClosed: {
+    sections: ["reports", DASH],
+    scope: "report",
     model: Report,
     base: { target_model: MODERATED, status: { $in: [REPORT_STATUS.ACTION_TAKEN, REPORT_STATUS.DISMISSED] } },
     date: reviewedAt,
     inRange: withFallback("reviewed_at", "updatedAt"),
   },
-  staffActions: { model: AuditLog, base: {}, date: "$createdAt", inRange: byCreated },
+  staffActions: { model: AuditLog, base: {}, date: "$createdAt", inRange: byCreated, sections: ["auditLog"], scope: "none" },
 };
 
-const seriesFor = async (metric, window, period, extraMatch = {}) => {
+const seriesFor = async (metric, window, period, extraMatch = {}, campusScope = null) => {
   const def = METRICS[metric];
+  const scoped = SCOPES[def.scope](campusScope);
   const rows = await def.model
     .aggregate([
-      { $match: { $and: [def.base, extraMatch, def.inRange(period.range)] } },
+      { $match: { $and: [def.base, extraMatch, scoped.match || {}, def.inRange(period.range)] } },
+      ...(scoped.stages || []),
       {
         $group: {
           _id: {
@@ -253,7 +299,7 @@ const seriesFor = async (metric, window, period, extraMatch = {}) => {
  * Time series for the requested metrics over the current window and the
  * comparison window. `previous` buckets are aligned to `buckets` by index.
  */
-export const getTrends = async (query = {}) => {
+export const getTrends = async (query = {}, ctx = FULL_CTX) => {
   const window = resolveWindow(query);
   const requested = String(query.metrics || "users,listings,deals,gmv,revenue")
     .split(",")
@@ -261,6 +307,8 @@ export const getTrends = async (query = {}) => {
     .filter((m) => METRICS[m]);
   const metrics = [...new Set(requested)];
   if (!metrics.length) throw badRequest(`metrics must include one of: ${Object.keys(METRICS).join(", ")}`);
+  const blocked = metrics.filter((metric) => !allowed(METRICS[metric].sections, ctx));
+  if (blocked.length) throw forbidden(`Your role doesn't have access to: ${blocked.join(", ")}`);
   if (buildBuckets(window.current.fromCal, window.current.toCal, window.interval).length > MAX_BUCKETS) {
     throw badRequest("Too many points; pick a longer interval");
   }
@@ -272,7 +320,10 @@ export const getTrends = async (query = {}) => {
   const results = await Promise.all(
     metrics.flatMap((metric) => {
       const extra = metric === "staffActions" ? auditMatch : {};
-      return [seriesFor(metric, window, window.current, extra), seriesFor(metric, window, window.previous, extra)];
+      return [
+        seriesFor(metric, window, window.current, extra, ctx.scope),
+        seriesFor(metric, window, window.previous, extra, ctx.scope),
+      ];
     }),
   );
 
@@ -317,9 +368,10 @@ const toRows = (rows) =>
 
 // Open (pending) moderation items, one row per reported target — the same
 // unit the Reports queue lists.
-const pendingTargets = (extra = []) =>
+const pendingTargets = (extra = [], scope = null) =>
   Report.aggregate([
     { $match: { status: REPORT_STATUS.PENDING } },
+    ...reportScopeStages(scope),
     {
       $group: {
         _id: { target_id: "$target_id", target_model: "$target_model" },
@@ -330,31 +382,35 @@ const pendingTargets = (extra = []) =>
     ...extra,
   ]);
 
+// Each dimension: run(query, window, scope) plus the sections that can read it.
 const DIMENSIONS = {
   // Current listing status mix (matches the Listings tab counts).
-  listingStatus: async () =>
-    toRows(await Product.aggregate([{ $match: { is_deleted: false } }, { $group: { _id: "$status", count: { $sum: 1 } } }])),
+  listingStatus: async (query, window, scope) =>
+    toRows(
+      await Product.aggregate([{ $match: { is_deleted: false, ...campusMatch(scope) } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
+    ),
 
   // Category mix, narrowed by the Listings page's status/campus filters.
-  listingCategory: async (query) => {
-    const match = { is_deleted: false };
+  listingCategory: async (query, window, scope) => {
+    const match = { is_deleted: false, ...campusMatch(scope) };
     if (query.listingStatus === "review") match.auto_hidden_at = { $ne: null };
     else if (Object.values(PRODUCT_STATUS).includes(query.listingStatus)) match.status = query.listingStatus;
     const campus = objectIdOrNull(query.campus);
-    if (campus) match.campus_id = campus;
+    if (campus) match.$and = [{ campus_id: campus }];
     return toRows(await Product.aggregate([{ $match: match }, { $group: { _id: "$category", count: { $sum: 1 } } }]));
   },
 
   // Per active campus: users, live listings, and new users/listings in range.
-  campusComparison: async (query, window) => {
+  campusComparison: async (query, window, scope) => {
     const range = window.current.range;
-    const campuses = await Campus.find({ is_active: true }).select("name short_name").lean();
+    const campuses = await Campus.find({ is_active: true, ...(scope ? { _id: { $in: scope } } : {}) }).select("name short_name").lean();
     const ids = campuses.map((c) => c._id);
     // Legacy users may store campus_id as a string; normalise like the dashboard.
     const userCampus = { $convert: { input: "$campus_id", to: "objectId", onError: null, onNull: null } };
+    const people = { role: STAFF_AND_USERS, ...(scope ? { campus_id: campusIn(scope) } : {}) };
     const [users, newUsers, live, newListings] = await Promise.all([
-      User.aggregate([{ $match: { role: STAFF_AND_USERS } }, { $group: { _id: userCampus, count: { $sum: 1 } } }]),
-      User.aggregate([{ $match: { role: STAFF_AND_USERS, createdAt: range } }, { $group: { _id: userCampus, count: { $sum: 1 } } }]),
+      User.aggregate([{ $match: people }, { $group: { _id: userCampus, count: { $sum: 1 } } }]),
+      User.aggregate([{ $match: { ...people, createdAt: range } }, { $group: { _id: userCampus, count: { $sum: 1 } } }]),
       Product.aggregate([
         { $match: { is_deleted: false, status: PRODUCT_STATUS.LISTED, campus_id: { $in: ids } } },
         { $group: { _id: "$campus_id", count: { $sum: 1 } } },
@@ -383,20 +439,21 @@ const DIMENSIONS = {
   },
 
   // Reports filed in range, by their current status.
-  reportStatus: async (query, window) =>
+  reportStatus: async (query, window, scope) =>
     toRows(
       await Report.aggregate([
         { $match: { target_model: MODERATED, createdAt: window.current.range } },
+        ...reportScopeStages(scope),
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
     ),
 
   // Open queue items by type (Listing / User / Help & support).
-  queueType: async () =>
-    toRows(await pendingTargets([{ $group: { _id: "$_id.target_model", count: { $sum: 1 } } }])),
+  queueType: async (query, window, scope) =>
+    toRows(await pendingTargets([{ $group: { _id: "$_id.target_model", count: { $sum: 1 } } }], scope)),
 
   // Open listing/user items by priority (same thresholds as the queue badge).
-  queuePriority: async () =>
+  queuePriority: async (query, window, scope) =>
     toRows(
       await pendingTargets([
         { $match: { "_id.target_model": MODERATED } },
@@ -414,17 +471,17 @@ const DIMENSIONS = {
             count: { $sum: 1 },
           },
         },
-      ]),
+      ], scope),
     ),
 
   // Open listing/user items by reason (an item counts once per reason).
-  queueReason: async () =>
+  queueReason: async (query, window, scope) =>
     toRows(
       await pendingTargets([
         { $match: { "_id.target_model": MODERATED } },
         { $unwind: "$reasons" },
         { $group: { _id: "$reasons", count: { $sum: 1 } } },
-      ]),
+      ], scope),
     ),
 
   // Audit entries in range by action, honouring the audit page filters.
@@ -450,11 +507,25 @@ const DIMENSIONS = {
 
 export const DIMENSION_KEYS = Object.keys(DIMENSIONS);
 
-export const getBreakdowns = async (query = {}) => {
+const DIMENSION_SECTIONS = {
+  listingStatus: ["listings", DASH],
+  listingCategory: ["listings", DASH],
+  campusComparison: ["campuses", DASH],
+  reportStatus: ["reports", DASH],
+  queueType: ["reports", DASH],
+  queuePriority: ["reports", DASH],
+  queueReason: ["reports", DASH],
+  auditAction: ["auditLog"],
+  auditActor: ["auditLog"],
+};
+
+export const getBreakdowns = async (query = {}, ctx = FULL_CTX) => {
   const dims = [...new Set(String(query.dims || "").split(",").map((d) => d.trim()))].filter((d) => DIMENSIONS[d]);
   if (!dims.length) throw badRequest(`dims must include one of: ${DIMENSION_KEYS.join(", ")}`);
+  const blocked = dims.filter((dim) => !allowed(DIMENSION_SECTIONS[dim], ctx));
+  if (blocked.length) throw forbidden(`Your role doesn't have access to: ${blocked.join(", ")}`);
   const window = resolveWindow(query);
-  const values = await Promise.all(dims.map((dim) => DIMENSIONS[dim](query, window).catch(() => [])));
+  const values = await Promise.all(dims.map((dim) => DIMENSIONS[dim](query, window, ctx.scope).catch(() => [])));
   return {
     range: { from: window.current.from, to: window.current.to },
     data: Object.fromEntries(dims.map((dim, i) => [dim, values[i]])),

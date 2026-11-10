@@ -18,7 +18,7 @@ const sendFailure = (res, error, statusCode = 400) =>
 
 export const getProducts = async (req, res) => {
   try {
-    const result = await adminProductService.getProducts(req.query);
+    const result = await adminProductService.getProducts(req.query, req.campusScope);
     return sendSuccess(res, "Products fetched successfully", result);
   } catch (error) {
     return sendFailure(res, error);

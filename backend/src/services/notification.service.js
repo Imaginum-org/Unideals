@@ -603,10 +603,13 @@ export const trackNotificationClick = async (notificationId, userId) => {
 /**
  * Fetch analytics and stats for the admin push notifications view
  */
-export const getAdminNotificationStats = async () => {
+// campuses: null (everything) or the campus ids a limited staff member covers.
+const campusAudience = (campuses) => (campuses ? { target_audience: "campus", target_campus: { $in: campuses } } : {});
+
+export const getAdminNotificationStats = async ({ campuses = null } = {}) => {
   const [totals, activeCount] = await Promise.all([
     Notification.aggregate([
-      { $match: { is_broadcast: true, status: "sent" } },
+      { $match: { is_broadcast: true, status: "sent", ...campusAudience(campuses) } },
       {
         $group: {
           _id: null,
@@ -640,21 +643,21 @@ export const getAdminNotificationStats = async () => {
 /**
  * Fetch history of sent notifications
  */
-export const getAdminNotificationHistory = async ({ page = 1, limit = 20 }) => {
+export const getAdminNotificationHistory = async ({ page = 1, limit = 20, campuses = null }) => {
   // NaN / negative / huge values from the query string used to reach
   // .skip()/.limit() directly.
   page = Math.min(Math.max(Number.parseInt(page, 10) || 1, 1), 1000);
   limit = Math.min(Math.max(Number.parseInt(limit, 10) || 20, 1), 100);
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
-    Notification.find({ is_broadcast: true, status: "sent" })
+    Notification.find({ is_broadcast: true, status: "sent", ...campusAudience(campuses) })
       .populate("target_campus", "name code")
       .populate("sent_by", "name email")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
-    Notification.countDocuments({ is_broadcast: true, status: "sent" }),
+    Notification.countDocuments({ is_broadcast: true, status: "sent", ...campusAudience(campuses) }),
   ]);
 
   return {
@@ -668,8 +671,8 @@ export const getAdminNotificationHistory = async ({ page = 1, limit = 20 }) => {
 /**
  * Fetch scheduled notifications
  */
-export const getAdminScheduledNotifications = async () => {
-  return await Notification.find({ status: "scheduled" })
+export const getAdminScheduledNotifications = async ({ campuses = null } = {}) => {
+  return await Notification.find({ status: "scheduled", ...campusAudience(campuses) })
     .populate("target_campus", "name code")
     .populate("sent_by", "name email")
     .sort({ scheduled_at: 1 })
@@ -679,12 +682,12 @@ export const getAdminScheduledNotifications = async () => {
 /**
  * Cancel a scheduled notification
  */
-export const cancelScheduledNotification = async (notificationId) => {
+export const cancelScheduledNotification = async (notificationId, { campuses = null } = {}) => {
   if (!mongoose.Types.ObjectId.isValid(notificationId)) {
     throw new AppError("Invalid notification ID", 400);
   }
   const notif = await Notification.findOneAndUpdate(
-    { _id: notificationId, status: "scheduled" },
+    { _id: notificationId, status: "scheduled", ...campusAudience(campuses) },
     { $set: { status: "cancelled" } },
     { new: true }
   );

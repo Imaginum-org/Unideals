@@ -1,6 +1,7 @@
 import * as adminUserService from "../services/admin.user.service.js";
 import * as accessService from "../services/access.service.js";
 import * as auditLogService from "../services/auditLog.service.js";
+import * as userDeletionService from "../services/userDeletion.service.js";
 import { safeErrorMessage } from "../utils/response.js";
 
 const sendSuccess = (res, message, payload, statusCode = 200) =>
@@ -20,7 +21,7 @@ const sendFailure = (res, error, statusCode = 400) =>
 
 export const getUsers = async (req, res) => {
   try {
-    const result = await adminUserService.getUsers(req.query);
+    const result = await adminUserService.getUsers(req.query, req.campusScope);
     return sendSuccess(res, "Users fetched successfully", result);
   } catch (error) {
     return sendFailure(res, error);
@@ -73,7 +74,7 @@ export const updateUserRole = async (req, res) => {
 
 export const getUserStats = async (req, res) => {
   try {
-    const stats = await adminUserService.getUserStats();
+    const stats = await adminUserService.getUserStats(req.campusScope);
     return sendSuccess(res, "User stats fetched successfully", { data: stats });
   } catch (error) {
     return sendFailure(res, error);
@@ -83,7 +84,7 @@ export const getUserStats = async (req, res) => {
 // Gender change approvals — admin only. Paginated, indexed by pending status.
 export const getGenderChangeRequests = async (req, res) => {
   try {
-    const result = await adminUserService.getGenderChangeRequests(req.query);
+    const result = await adminUserService.getGenderChangeRequests(req.query, req.campusScope);
     return sendSuccess(res, "Gender change requests fetched", result);
   } catch (error) {
     return sendFailure(res, error);
@@ -114,3 +115,19 @@ export const reviewGenderChangeRequest = async (req, res) => {
   }
 };
 
+
+// DELETE /admin/users/:id { confirmEmail, reason? } — Super Admin only.
+// Permanently removes the account and everything linked to it (audited).
+export const deleteUser = async (req, res) => {
+  try {
+    const result = await userDeletionService.deleteUserPermanently({
+      userId: req.params.id,
+      actor: req.user,
+      confirmEmail: req.body?.confirmEmail,
+      reason: req.body?.reason,
+    });
+    return sendSuccess(res, "Account and all linked data deleted", { data: result });
+  } catch (error) {
+    return sendFailure(res, error, error?.statusCode || 400);
+  }
+};
