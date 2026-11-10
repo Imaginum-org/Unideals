@@ -12,6 +12,7 @@ import {
   USER_STATUS,
   PRODUCT_STATUS,
   REPORT_STATUS,
+  REPORT_REASONS,
   DEAL_STATUS,
   PAYMENT_STATUS,
 } from "../config/constants.js";
@@ -351,6 +352,9 @@ export const getProductDetails = async (productId) => {
  * Build the moderation queue: groups pending reports by their target,
  * sorted by report count descending (highest priority first).
  */
+// Report-count ranges behind the queue's priority badge.
+const PRIORITY_COUNTS = { high: { $gte: 5 }, medium: { $gte: 2, $lt: 5 }, low: { $lt: 2 } };
+
 export const getModerationQueue = async (query = {}) => {
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 20));
@@ -374,6 +378,12 @@ export const getModerationQueue = async (query = {}) => {
         hasChat: { $max: { $cond: [{ $ifNull: ["$conversation_id", false] }, 1, 0] } },
       },
     },
+    // Optional chart drill-downs: items with an open report for `reason`, or
+    // listing/user items at a priority (same thresholds as the badge below).
+    ...(Object.values(REPORT_REASONS).includes(query.reason) ? [{ $match: { reasons: query.reason } }] : []),
+    ...(PRIORITY_COUNTS[query.priority]
+      ? [{ $match: { "_id.target_model": { $in: ["Product", "User"] }, reportCount: PRIORITY_COUNTS[query.priority] } }]
+      : []),
     { $sort: { reportCount: -1, latestReport: -1 } },
     {
       $facet: {

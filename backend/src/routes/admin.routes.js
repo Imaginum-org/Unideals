@@ -59,6 +59,7 @@ import {
 
 // Campus read (support-accessible)
 import { adminListCampuses } from "../controllers/campus.controller.js";
+import { getTrends, getBreakdowns, getJobAnalytics } from "../controllers/admin.analytics.controller.js";
 
 // Validations
 import {
@@ -132,6 +133,17 @@ router.get("/system/status", ...staffOnly, systemStatus);
 router.get("/system/jobs", ...staffOnly, listJobs);
 router.get("/system/jobs/:key/runs", ...staffOnly, getJobRuns);
 router.post("/system/jobs/:key/run", ...adminOnly, triggerJob);
+// Analytics for charts (read-only, computed from live records)
+const analyticsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many analytics requests, slow down" },
+});
+router.get("/analytics/trends", analyticsLimiter, ...staffOnly, getTrends);
+router.get("/analytics/breakdown", analyticsLimiter, ...staffOnly, getBreakdowns);
+router.get("/analytics/jobs", analyticsLimiter, ...staffOnly, getJobAnalytics);
 router.patch("/profile", ...staffOnly, updateMyProfile);
 router.post("/profile/change-password", passwordChangeLimiter, ...staffOnly, changeMyPassword);
 

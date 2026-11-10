@@ -99,7 +99,7 @@ export const getTrafficSnapshot = (minutes = 15, now = Date.now()) => {
     const bucket = buckets.get(minute);
     const minuteStats = bucket ? [...bucket.values()] : [];
     const summary = summarize(minuteStats);
-    series.push({ minute: new Date(minute).toISOString(), requests: summary.requests, serverErrors: summary.serverErrors, p95: summary.p95 });
+    series.push({ minute: new Date(minute).toISOString(), requests: summary.requests, serverErrors: summary.serverErrors, p50: summary.p50, p95: summary.p95 });
     if (bucket) {
       for (const [area, stats] of bucket) {
         if (!byArea.has(area)) byArea.set(area, []);

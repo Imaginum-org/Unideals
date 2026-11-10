@@ -29,13 +29,10 @@ export const logAdminAction = async ({
 };
 
 /**
- * Get paginated audit log entries with optional filters.
+ * Mongo filter for the audit-log query params (action, target_type,
+ * actor_role, actor_id, from, to). Shared by the list and its charts.
  */
-export const getAuditLogs = async (query = {}) => {
-  const page = Math.max(1, parseInt(query.page, 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 20));
-  const skip = (page - 1) * limit;
-
+export const auditMatchFromQuery = (query = {}) => {
   const match = {};
 
   // Escape the filter: raw user input was used as a regex (ReDoS /
@@ -73,6 +70,19 @@ export const getAuditLogs = async (query = {}) => {
     if (from && !Number.isNaN(from.getTime())) match.createdAt.$gte = from;
     if (to && !Number.isNaN(to.getTime())) match.createdAt.$lte = to;
   }
+
+  return match;
+};
+
+/**
+ * Get paginated audit log entries with optional filters.
+ */
+export const getAuditLogs = async (query = {}) => {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 20));
+  const skip = (page - 1) * limit;
+
+  const match = auditMatchFromQuery(query);
 
   const [total, entries] = await Promise.all([
     AuditLog.countDocuments(match),
