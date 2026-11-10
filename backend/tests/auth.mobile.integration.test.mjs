@@ -174,13 +174,20 @@ await test("google redirect ignores web return_to values (no open redirect)", as
 });
 
 await test("google callback errors go back to the app, not the website", async () => {
+  // Hand-off page (not a bare 302): auto-opens the app + a tappable button.
   const res = await get("/api/auth/google/callback?state=x", { cookie: "oauth_mobile_return=" + encodeURIComponent("unideals://oauth") });
-  assert.equal(res.status, 302);
-  assert.equal(res.headers.get("location"), "unideals://oauth?oauth_error=missing_code");
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /href="unideals:\/\/oauth\?oauth_error=missing_code"/);
+  assert.match(html, /location\.replace\("unideals:\/\/oauth\?oauth_error=missing_code"\)/);
+  const csp = res.headers.get("content-security-policy");
+  const nonce = csp.match(/'nonce-([^']+)'/)[1];
+  assert.match(csp, /default-src 'none'/);
+  assert.ok(html.includes(`<script nonce="${nonce}">`));
   const mismatch = await get("/api/auth/google/callback?code=abc&state=nope", {
     cookie: "oauth_state=other; oauth_mobile_return=" + encodeURIComponent("exp://192.168.0.5:8081/--/oauth"),
   });
-  assert.equal(mismatch.headers.get("location"), "exp://192.168.0.5:8081/--/oauth?oauth_error=session_mismatch");
+  assert.match(await mismatch.text(), /href="exp:\/\/192\.168\.0\.5:8081\/--\/oauth\?oauth_error=session_mismatch"/);
 });
 
 await test("google callback without the app cookie still redirects to the website", async () => {

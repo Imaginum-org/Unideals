@@ -63,10 +63,36 @@ const OAUTH_COOKIE_OPTS = () => ({
   sameSite: "Lax",
   path: "/",
 });
+
+// Hand the result back to the app. Android Chrome (Custom Tabs) often
+// refuses a bare 302 to an app scheme (unideals:// / exp://) that isn't
+// tied to a tap, leaving users on a blank "loading" tab. So we serve a tiny
+// page that tries to open the app right away and also shows a button: a tap
+// always works. The page carries its own strict CSP (nonce'd script only).
 const redirectToApp = (res, base, params) => {
   const url = new URL(base);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  return res.redirect(url.toString());
+  const target = url.toString();
+  const ok = !params.oauth_error;
+  const nonce = crypto.randomBytes(16).toString("base64");
+  res.set(
+    "Content-Security-Policy",
+    `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+  );
+  res.set("Cache-Control", "no-store");
+  res.set("Referrer-Policy", "no-referrer");
+  const href = escapeHtml(target);
+  return res
+    .status(200)
+    .type("html")
+    .send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unideals</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#F7F8FA;color:#0F172A}
+.c{text-align:center;padding:32px 24px;max-width:340px}.l{width:56px;height:56px;border-radius:16px;background:#3838EC;color:#fff;font-weight:800;font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+h1{font-size:20px;margin:0 0 6px}p{color:#64748B;font-size:14px;line-height:1.5;margin:0 0 22px}
+a{display:block;background:#3838EC;color:#fff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 20px;border-radius:14px}</style></head>
+<body><div class="c"><div class="l">U</div><h1>${ok ? "You're signed in" : "Sign-in didn't finish"}</h1><p>${ok ? "Taking you back to the Unideals app." : "Head back to the app and try again."}</p>
+<a id="go" href="${href}">Open Unideals</a></div>
+<script nonce="${nonce}">location.replace(${JSON.stringify(target).replace(/</g, "\\u003c")});</script></body></html>`);
 };
 
 const redirectOAuthError = (res, code, mobileReturn = null) => {
