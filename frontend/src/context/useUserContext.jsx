@@ -47,6 +47,7 @@ export const clearAccountScopedStorage = () => {
       .filter((k) => k.startsWith("unideals-offer-hint:"))
       .forEach((k) => localStorage.removeItem(k));
     sessionStorage.removeItem("contactLastSent");
+    sessionStorage.removeItem("unideals-assistant-chat");
   } catch {
     // storage unavailable (private mode): nothing to clear
   }

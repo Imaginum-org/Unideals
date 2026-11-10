@@ -19,10 +19,53 @@ const { ObjectId } = mongoose.Types;
 
 // ─── Dashboard ─────────────────────────────────────────────────────────────
 
-export const getDashboardMetrics = async (range = "month") => {
-  const now = new Date();
-  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+const STAFF_AND_USERS = { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] };
+
+/**
+ * Month-to-date vs the SAME number of days last month. Comparing a partial
+ * month against a full one made every trend read negative early on.
+ */
+const comparisonWindows = (now = new Date()) => {
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const elapsed = now.getTime() - startOfMonth.getTime();
+  // Clamp so e.g. Mar 31 compares against the whole of February.
+  const prevEnd = new Date(Math.min(startOfPrevMonth.getTime() + elapsed, startOfMonth.getTime()));
+  return {
+    current: { $gte: startOfMonth, $lte: now },
+    previous: { $gte: startOfPrevMonth, $lt: prevEnd },
+  };
+};
+
+// Percent change, or null when there is no baseline to compare against.
+export const percentChange = (current, previous) => {
+  if (!previous) return null;
+  const diff = Math.round(((current - previous) / previous) * 100);
+  return diff >= 0 ? `+${diff}%` : `${diff}%`;
+};
+
+const sumField = (Model, match, field) =>
+  Model.aggregate([{ $match: match }, { $group: { _id: null, total: { $sum: field } } }])
+    .then((rows) => rows?.[0]?.total || 0)
+    .catch(() => 0);
+
+// When a deal finished: completed_at, falling back to updatedAt for legacy
+// deals completed before completed_at was recorded.
+const completedIn = (range) => ({
+  status: DEAL_STATUS.COMPLETED,
+  $or: [{ completed_at: range }, { completed_at: null, updatedAt: range }],
+});
+
+// When a payment cleared: verified_at, falling back to createdAt.
+const verifiedIn = (range) => ({
+  status: PAYMENT_STATUS.VERIFIED,
+  $or: [{ verified_at: range }, { verified_at: null, createdAt: range }],
+});
+
+export const getDashboardMetrics = async () => {
+  const { current, previous } = comparisonWindows();
+  const completed = { status: DEAL_STATUS.COMPLETED };
+  const verified = { status: PAYMENT_STATUS.VERIFIED };
 
   const [
     totalUsers,
@@ -32,218 +75,80 @@ export const getDashboardMetrics = async (range = "month") => {
     listedProducts,
     blockedProducts,
     pendingReports,
+    pendingGenderRequests,
     activeCampuses,
-    totalOrders,
-    paymentsAgg,
-    dealsAgg,
-    paymentsThisMonthAgg,
-    paymentsPrevMonthAgg,
-    dealsThisMonthAgg,
-    dealsPrevMonthAgg,
+    completedDeals,
+    dealVolumeRupees,
+    platformRevenuePaise,
+    usersNow,
+    usersPrev,
+    productsNow,
+    productsPrev,
+    dealsNow,
+    dealsPrev,
+    volumeNow,
+    volumePrev,
+    revenueNow,
+    revenuePrev,
     campusDistributionRaw,
     recentAuditLogs,
-    usersThisMonth,
-    usersPrevMonth,
-    productsThisMonth,
-    productsPrevMonth,
-    ordersThisMonth,
-    ordersPrevMonth,
   ] = await Promise.all([
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] } }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.ACTIVE }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.SUSPENDED }),
-    User.countDocuments({ role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, status: USER_STATUS.INACTIVE }),
+    User.countDocuments({ role: STAFF_AND_USERS }),
+    User.countDocuments({ role: STAFF_AND_USERS, status: USER_STATUS.ACTIVE }),
+    User.countDocuments({ role: STAFF_AND_USERS, status: USER_STATUS.SUSPENDED }),
+    User.countDocuments({ role: STAFF_AND_USERS, status: USER_STATUS.INACTIVE }),
     Product.countDocuments({ status: PRODUCT_STATUS.LISTED, is_deleted: false }),
     Product.countDocuments({ status: PRODUCT_STATUS.BLOCKED, is_deleted: false }),
     Report.countDocuments({ status: REPORT_STATUS.PENDING }),
+    User.countDocuments({ "genderChangeRequest.status": "pending" }).catch(() => 0),
     Campus.countDocuments({ is_active: true }),
-    Deal.countDocuments({
-      status: {
-        $in: [
-          DEAL_STATUS.COMPLETED,
-          DEAL_STATUS.PAYMENT_CONFIRMED,
-          DEAL_STATUS.DEAL_CONFIRMED,
-        ],
-      },
-    }).catch(() => 0),
-    Payment.aggregate([
-      { $match: { status: PAYMENT_STATUS.VERIFIED } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]).catch(() => []),
-    Deal.aggregate([
-      { $match: { status: DEAL_STATUS.COMPLETED } },
-      { $group: { _id: null, total: { $sum: "$current_price" } } },
-    ]).catch(() => []),
-    Payment.aggregate([
-      {
-        $match: {
-          status: PAYMENT_STATUS.VERIFIED,
-          createdAt: { $gte: startOfCurrentMonth },
-        },
-      },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]).catch(() => []),
-    Payment.aggregate([
-      {
-        $match: {
-          status: PAYMENT_STATUS.VERIFIED,
-          createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
-        },
-      },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]).catch(() => []),
-    Deal.aggregate([
-      {
-        $match: {
-          status: DEAL_STATUS.COMPLETED,
-          createdAt: { $gte: startOfCurrentMonth },
-        },
-      },
-      { $group: { _id: null, total: { $sum: "$current_price" } } },
-    ]).catch(() => []),
-    Deal.aggregate([
-      {
-        $match: {
-          status: DEAL_STATUS.COMPLETED,
-          createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
-        },
-      },
-      { $group: { _id: null, total: { $sum: "$current_price" } } },
-    ]).catch(() => []),
+    Deal.countDocuments(completed).catch(() => 0),
+    // Deal prices are stored in rupees.
+    sumField(Deal, completed, "$current_price"),
+    // Payment.amount is stored in paise.
+    sumField(Payment, verified, "$amount"),
+    User.countDocuments({ role: STAFF_AND_USERS, createdAt: current }).catch(() => 0),
+    User.countDocuments({ role: STAFF_AND_USERS, createdAt: previous }).catch(() => 0),
+    Product.countDocuments({ is_deleted: false, createdAt: current }).catch(() => 0),
+    Product.countDocuments({ is_deleted: false, createdAt: previous }).catch(() => 0),
+    Deal.countDocuments(completedIn(current)).catch(() => 0),
+    Deal.countDocuments(completedIn(previous)).catch(() => 0),
+    sumField(Deal, completedIn(current), "$current_price"),
+    sumField(Deal, completedIn(previous), "$current_price"),
+    sumField(Payment, verifiedIn(current), "$amount"),
+    sumField(Payment, verifiedIn(previous), "$amount"),
     User.aggregate([
-      { $match: { role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] }, campus_id: { $ne: null } } },
-      {
-        $addFields: {
-          campusObjId: {
-            $cond: {
-              if: { $eq: [{ $type: "$campus_id" }, "objectId"] },
-              then: "$campus_id",
-              else: {
-                $convert: {
-                  input: "$campus_id",
-                  to: "objectId",
-                  onError: null,
-                  onNull: null,
-                },
-              },
-            },
-          },
-        },
-      },
+      { $match: { role: STAFF_AND_USERS, campus_id: { $ne: null } } },
+      // Legacy accounts may hold campus_id as a string; normalise first.
+      { $addFields: { campusObjId: { $convert: { input: "$campus_id", to: "objectId", onError: null, onNull: null } } } },
       { $match: { campusObjId: { $ne: null } } },
       { $group: { _id: "$campusObjId", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-      {
-        $lookup: {
-          from: Campus.collection.name,
-          localField: "_id",
-          foreignField: "_id",
-          as: "campus",
-        },
-      },
-      {
-        $project: {
-          campusName: { $arrayElemAt: ["$campus.name", 0] },
-          count: 1,
-        },
-      },
+      { $lookup: { from: Campus.collection.name, localField: "_id", foreignField: "_id", as: "campus" } },
+      { $project: { campusName: { $arrayElemAt: ["$campus.name", 0] }, count: 1 } },
     ]).catch(() => []),
-    AuditLog.find({})
-      .sort({ createdAt: -1 })
-      .limit(8)
-      .lean(),
-    User.countDocuments({
-      role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] },
-      createdAt: { $gte: startOfCurrentMonth },
-    }).catch(() => 0),
-    User.countDocuments({
-      role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] },
-      createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
-    }).catch(() => 0),
-    Product.countDocuments({
-      status: PRODUCT_STATUS.LISTED,
-      is_deleted: false,
-      createdAt: { $gte: startOfCurrentMonth },
-    }).catch(() => 0),
-    Product.countDocuments({
-      status: PRODUCT_STATUS.LISTED,
-      is_deleted: false,
-      createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
-    }).catch(() => 0),
-    Deal.countDocuments({
-      status: {
-        $in: [
-          DEAL_STATUS.COMPLETED,
-          DEAL_STATUS.PAYMENT_CONFIRMED,
-          DEAL_STATUS.DEAL_CONFIRMED,
-        ],
-      },
-      createdAt: { $gte: startOfCurrentMonth },
-    }).catch(() => 0),
-    Deal.countDocuments({
-      status: {
-        $in: [
-          DEAL_STATUS.COMPLETED,
-          DEAL_STATUS.PAYMENT_CONFIRMED,
-          DEAL_STATUS.DEAL_CONFIRMED,
-        ],
-      },
-      createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
-    }).catch(() => 0),
+    AuditLog.find({}).sort({ createdAt: -1 }).limit(8).lean(),
   ]);
 
-  // Payment.amount is recorded in paise in schema; divide by 100 for INR.
-  const paymentRupees = Math.round((paymentsAgg?.[0]?.total || 0) / 100);
-  const dealRupees = Math.round(dealsAgg?.[0]?.total || 0);
-  const totalRevenue = paymentRupees + dealRupees;
-
-  const paymentThisMonthRupees = Math.round((paymentsThisMonthAgg?.[0]?.total || 0) / 100);
-  const paymentPrevMonthRupees = Math.round((paymentsPrevMonthAgg?.[0]?.total || 0) / 100);
-  const dealThisMonthRupees = Math.round(dealsThisMonthAgg?.[0]?.total || 0);
-  const dealPrevMonthRupees = Math.round(dealsPrevMonthAgg?.[0]?.total || 0);
-
-  const revenueThisMonth = paymentThisMonthRupees + dealThisMonthRupees;
-  const revenuePrevMonth = paymentPrevMonthRupees + dealPrevMonthRupees;
-
-  const calculateChange = (current, previous) => {
-    if (!previous || previous === 0) {
-      if (!current || current === 0) return null;
-      return `+${current}`;
-    }
-    const diff = Math.round(((current - previous) / previous) * 100);
-    return diff >= 0 ? `+${diff}%` : `${diff}%`;
-  };
-
-  const campusColors = ["#3B82F6", "#8B5CF6", "#10B981", "#F97316", "#EC4899", "#06B6D4", "#64748B"];
+  // Users by campus: every active campus appears, even with zero users.
   const countMap = new Map();
-  for (const c of campusDistributionRaw) {
-    if (c.campusName) {
-      countMap.set(c.campusName, c.count);
-    }
+  for (const row of campusDistributionRaw) {
+    if (row.campusName) countMap.set(row.campusName, row.count);
   }
-
   const activeCampusesList = await Campus.find({ is_active: true }).select("name").lean();
-  for (const ac of activeCampusesList) {
-    if (!countMap.has(ac.name)) {
-      countMap.set(ac.name, 0);
-    }
+  for (const campus of activeCampusesList) {
+    if (!countMap.has(campus.name)) countMap.set(campus.name, 0);
   }
-
-  const combinedCampuses = Array.from(countMap.entries()).map(([name, count]) => ({
-    name,
-    count,
-  }));
-
-  combinedCampuses.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const combinedCampuses = Array.from(countMap, ([name, count]) => ({ name, count })).sort(
+    (a, b) => b.count - a.count || a.name.localeCompare(b.name),
+  );
   const totalCampusUsers = combinedCampuses.reduce((sum, c) => sum + c.count, 0) || totalUsers;
-
-  const usersByCampus = combinedCampuses.slice(0, 6).map((c, index) => ({
+  const usersByCampus = combinedCampuses.slice(0, 6).map((c) => ({
     name: c.name,
     count: c.count,
     percentage: totalCampusUsers > 0 ? Math.round((c.count / totalCampusUsers) * 100) : 0,
-    color: campusColors[index % campusColors.length],
   }));
+
+  const toRupees = (paise) => Math.round((paise || 0) / 100);
 
   return {
     stats: {
@@ -254,15 +159,27 @@ export const getDashboardMetrics = async (range = "month") => {
       listedProducts: listedProducts || 0,
       blockedProducts: blockedProducts || 0,
       pendingReports: pendingReports || 0,
+      pendingGenderRequests: pendingGenderRequests || 0,
       activeCampuses: activeCampuses || 0,
-      totalOrders: totalOrders || 0,
-      totalRevenue: totalRevenue || 0,
+      // Completed peer-to-peer deals and their total value (GMV), rupees.
+      completedDeals: completedDeals || 0,
+      dealVolume: Math.round(dealVolumeRupees || 0),
+      // Money paid to Unideals itself (subscriptions, boosts), rupees.
+      platformRevenue: toRupees(platformRevenuePaise),
+      monthToDate: {
+        newUsers: usersNow,
+        newListings: productsNow,
+        completedDeals: dealsNow,
+        dealVolume: Math.round(volumeNow),
+        platformRevenue: toRupees(revenueNow),
+      },
       usersByCampus,
       trends: {
-        users: calculateChange(usersThisMonth, usersPrevMonth),
-        products: calculateChange(productsThisMonth, productsPrevMonth),
-        orders: calculateChange(ordersThisMonth, ordersPrevMonth),
-        revenue: calculateChange(revenueThisMonth, revenuePrevMonth),
+        users: percentChange(usersNow, usersPrev),
+        products: percentChange(productsNow, productsPrev),
+        orders: percentChange(dealsNow, dealsPrev),
+        dealVolume: percentChange(volumeNow, volumePrev),
+        revenue: percentChange(revenueNow, revenuePrev),
       },
     },
     recentActivity: recentAuditLogs.map((log) => ({

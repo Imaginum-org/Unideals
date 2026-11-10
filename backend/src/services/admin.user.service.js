@@ -28,6 +28,19 @@ export const getUsers = async (query = {}) => {
     match.status = query.status;
   }
 
+  // Campus filter: accepts a campus id or slug. Unknown values match nothing
+  // rather than silently returning every user.
+  if (typeof query.campus === "string" && query.campus.trim()) {
+    const campusKey = query.campus.trim();
+    if (ObjectId.isValid(campusKey)) {
+      match.campus_id = new ObjectId(campusKey);
+    } else {
+      const campusDoc = await Campus.findOne({ slug: campusKey.toLowerCase() }).select("_id").lean();
+      match.campus_id = campusDoc ? campusDoc._id : null;
+      if (!campusDoc) match._id = { $exists: false };
+    }
+  }
+
   if (query.search?.trim()) {
     const searchText = query.search.trim();
     const safeSearch = escapeRegex(searchText);

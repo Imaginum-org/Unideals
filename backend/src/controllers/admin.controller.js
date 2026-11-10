@@ -19,7 +19,7 @@ const sendFailure = (res, error, statusCode = 400) =>
 
 export const getDashboard = async (req, res) => {
   try {
-    const data = await adminService.getDashboardMetrics(req.query.range);
+    const data = await adminService.getDashboardMetrics();
     return sendSuccess(res, "Dashboard data fetched", { data });
   } catch (error) {
     return sendFailure(res, error);
@@ -107,6 +107,10 @@ export const updateProductStatusWithAudit = async (req, res) => {
         targetId: req.params.id,
         targetSnapshot: { title: product.title },
         metadata: { newStatus: req.body.status },
+        note:
+          typeof req.body.reason === "string" && req.body.reason.trim()
+            ? req.body.reason.trim().slice(0, 500)
+            : null,
       })
       .catch(() => {});
 

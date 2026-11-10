@@ -1,5 +1,5 @@
 /**
- * UniDeals Official Platform Knowledge Base — COMPREHENSIVE EDITION
+ * Unideals Official Platform Knowledge Base — COMPREHENSIVE EDITION
  * Covers Terms & Conditions, Privacy, Safety, Monetization, Listings, Deals,
  * Moderation, Disputes, Reviews, Boosts, Subscription Plans, Account Management,
  * Content Policies, Category Rules, Technical Support, and Step-by-Step Guides.
@@ -13,7 +13,7 @@
 
 export const TERMS_AND_CONDITIONS = {
   summary:
-    "UniDeals (Campus-Mart) is a peer-to-peer campus marketplace exclusively for verified Indian university students to buy, sell, and exchange items safely within their college community. UniDeals acts as a technology intermediary under Section 79 of the Information Technology Act, 2000 and is NOT a party to any buyer-seller transaction.",
+    "Unideals (Campus-Mart) is a peer-to-peer campus marketplace exclusively for verified Indian university students to buy, sell, and exchange items safely within their college community. Unideals acts as a technology intermediary under Section 79 of the Information Technology Act, 2000 and is NOT a party to any buyer-seller transaction.",
   sections: [
     {
       id: "eligibility",
@@ -32,10 +32,10 @@ export const TERMS_AND_CONDITIONS = {
       id: "role",
       title: "2. Platform Role & Transactions",
       rules: [
-        "UniDeals is a technology facilitator and intermediary connecting campus buyers and sellers under Section 79, IT Act 2000.",
-        "UniDeals does NOT hold funds, manage escrow, process payments, arrange delivery, or take title to any goods.",
+        "Unideals is a technology facilitator and intermediary connecting campus buyers and sellers under Section 79, IT Act 2000.",
+        "Unideals does NOT hold funds, manage escrow, process payments, arrange delivery, or take title to any goods.",
         "All transactions, price negotiations, inspections, and handovers happen directly between the student buyer and seller.",
-        "UniDeals does not endorse any specific product, seller, or listing.",
+        "Unideals does not endorse any specific product, seller, or listing.",
         "Transactions are entirely at the risk of the participating students.",
       ],
     },
@@ -69,7 +69,7 @@ export const TERMS_AND_CONDITIONS = {
         "Make payments directly via UPI (GPay/PhonePe/Paytm) or cash ONLY after verifying product condition in person.",
         "NEVER scan QR codes sent by a seller promising to 'receive' money — this is a common reversal scam.",
         "Verify payment confirmation ONLY on your own registered banking app.",
-        "UniDeals will never ask you to pay via a payment link, crypto, or third-party wallet.",
+        "Unideals will never ask you to pay via a payment link, crypto, or third-party wallet.",
         "If a deal involves amounts over ₹5,000, bring a trusted friend for extra safety.",
       ],
     },
@@ -86,7 +86,7 @@ export const TERMS_AND_CONDITIONS = {
         "Listing title must describe the actual item — no clickbait or misleading keywords.",
         "A seller's pickup address must be a verifiable campus location.",
         "Sellers must keep listings updated — mark items as 'Sold' or remove them when no longer available.",
-        "UniDeals reserves the right to moderate or remove misleading, fraudulent, or flagged listings at any time.",
+        "Unideals reserves the right to moderate or remove misleading, fraudulent, or flagged listings at any time.",
         "Listings of items in 'For Parts/Not Working' condition must explicitly state the defect in the description.",
       ],
     },
@@ -94,7 +94,7 @@ export const TERMS_AND_CONDITIONS = {
       id: "deal_workflow",
       title: "6. Deal Lifecycle & Status System",
       rules: [
-        "Deals on UniDeals follow a structured workflow: Negotiating → Offer Accepted → Deal Confirmed → Pickup Scheduled → Payment Confirmed → Completed.",
+        "Deals on Unideals follow a structured workflow: Negotiating → Offer Accepted → Deal Confirmed → Pickup Scheduled → Payment Confirmed → Completed.",
         "NEGOTIATING: Buyer and seller are actively discussing price, condition, and meetup logistics through in-app chat.",
         "OFFER ACCEPTED: Buyer's offer price has been accepted by the seller. Meetup details to be finalized.",
         "DEAL CONFIRMED: Both parties have confirmed the deal and are preparing for the campus pickup.",
@@ -111,12 +111,12 @@ export const TERMS_AND_CONDITIONS = {
       id: "liability_disputes",
       title: "7. Liability & Dispute Resolution",
       rules: [
-        "UniDeals is not liable for transaction losses, disputes, product defects, or failed meetups between students.",
+        "Unideals is not liable for transaction losses, disputes, product defects, or failed meetups between students.",
         "Platform liability is capped at ₹1,000 under applicable Indian law.",
         "Users can report suspicious users or scams via the flag/report button on any product or user profile, or by emailing support@campusmart.in.",
-        "For any safety emergency, contact campus security or local police first before reporting to UniDeals.",
-        "UniDeals does NOT mediate financial disputes — students must resolve payment disagreements personally or through appropriate authorities.",
-        "UniDeals may cooperate with law enforcement agencies or campus administration in case of reported fraud, theft, or criminal activity.",
+        "For any safety emergency, contact campus security or local police first before reporting to Unideals.",
+        "Unideals does NOT mediate financial disputes — students must resolve payment disagreements personally or through appropriate authorities.",
+        "Unideals may cooperate with law enforcement agencies or campus administration in case of reported fraud, theft, or criminal activity.",
         "Abusing the dispute/report system by filing false reports will result in account penalties.",
         "For formal complaints or legal notices, contact legal@campusmart.in.",
       ],
@@ -125,13 +125,13 @@ export const TERMS_AND_CONDITIONS = {
       id: "moderation_penalties",
       title: "8. Moderation & Account Penalties",
       rules: [
-        "Content moderation is performed by the UniDeals campus moderation team within 2 hours of a report being filed.",
+        "Content moderation is performed by the Unideals campus moderation team within 2 hours of a report being filed.",
         "First violation: Warning issued and listing removed.",
         "Second violation: Temporary account suspension (7 to 30 days depending on severity).",
         "Third violation OR any serious violation (fraud, prohibited items, harassment): Permanent account ban.",
         "Permanently banned users cannot create new accounts using the same identity, email, or device.",
         "Appeals against account suspension can be submitted via support@campusmart.in with supporting evidence.",
-        "UniDeals reserves the right to permanently ban an account without prior warning in cases of severe violation (criminal activity, fraud).",
+        "Unideals reserves the right to permanently ban an account without prior warning in cases of severe violation (criminal activity, fraud).",
         "Banned users are NOT entitled to refunds for any paid subscription plans.",
       ],
     },
@@ -139,8 +139,8 @@ export const TERMS_AND_CONDITIONS = {
       id: "intellectual_property",
       title: "9. Intellectual Property",
       rules: [
-        "All UniDeals platform content, branding, logos, UI, and codebase are the intellectual property of the UniDeals team.",
-        "Users retain ownership of their submitted listing content (photos, descriptions) but grant UniDeals a non-exclusive license to display and index this content on the platform.",
+        "All Unideals platform content, branding, logos, UI, and codebase are the intellectual property of the Unideals team.",
+        "Users retain ownership of their submitted listing content (photos, descriptions) but grant Unideals a non-exclusive license to display and index this content on the platform.",
         "Unauthorized copying, scraping, or redistribution of platform content is prohibited.",
       ],
     },
@@ -151,7 +151,7 @@ export const TERMS_AND_CONDITIONS = {
         "These Terms are governed by the laws of India.",
         "Disputes shall be subject to the exclusive jurisdiction of courts in India.",
         "The platform complies with the Information Technology Act, 2000, Digital Personal Data Protection Act (DPDP), 2023, and other applicable Indian regulations.",
-        "UniDeals operates as an intermediary under Section 79 of the IT Act and is not responsible for third-party content on the platform.",
+        "Unideals operates as an intermediary under Section 79 of the IT Act and is not responsible for third-party content on the platform.",
       ],
     },
   ],
@@ -250,7 +250,7 @@ export const SUBSCRIPTION_PLANS = {
 
 export const PRIVACY_POLICY = {
   summary:
-    "UniDeals is committed to protecting user privacy in compliance with the Digital Personal Data Protection Act (DPDP), 2023, and the Information Technology Act, 2000. We collect only what is necessary to run the campus marketplace safely and effectively.",
+    "Unideals is committed to protecting user privacy in compliance with the Digital Personal Data Protection Act (DPDP), 2023, and the Information Technology Act, 2000. We collect only what is necessary to run the campus marketplace safely and effectively.",
   sections: [
     {
       id: "data_collected",
@@ -304,9 +304,9 @@ export const PRIVACY_POLICY = {
       title: "Third-Party Services",
       points: [
         "Google OAuth: Used for sign-in only. Google may store authentication tokens as per Google's own privacy policy.",
-        "ImageKit: Used for image hosting and optimization. Photos uploaded to UniDeals are processed via ImageKit CDN.",
+        "ImageKit: Used for image hosting and optimization. Photos uploaded to Unideals are processed via ImageKit CDN.",
         "MongoDB Atlas: Database hosting on secure cloud infrastructure.",
-        "UniDeals does not run targeted advertising and does not share user data with ad networks.",
+        "Unideals does not run targeted advertising and does not share user data with ad networks.",
       ],
     },
     {
@@ -327,7 +327,7 @@ export const PRIVACY_POLICY = {
 
 export const REVIEW_RATING_POLICY = {
   summary:
-    "The UniDeals review system is designed to build campus trust. Reviews must be honest, fair, and based on actual completed transactions.",
+    "The Unideals review system is designed to build campus trust. Reviews must be honest, fair, and based on actual completed transactions.",
   rules: [
     "Reviews can only be submitted after a deal is marked as 'Completed' by both parties.",
     "Reviews must reflect the actual experience of the transaction — condition of item, communication quality, and meetup reliability.",
@@ -336,7 +336,7 @@ export const REVIEW_RATING_POLICY = {
     "A single completed deal allows one review per direction — buyer can review seller and seller can review buyer.",
     "Reviews cannot be edited once submitted (submit carefully).",
     "If you believe a review about you is false, misleading, or malicious, report it via support@campusmart.in for moderation review.",
-    "UniDeals moderators will investigate and remove reviews that clearly violate these guidelines.",
+    "Unideals moderators will investigate and remove reviews that clearly violate these guidelines.",
     "Attempting to coerce or threaten another student into changing their review is grounds for account suspension.",
   ],
 };
@@ -348,7 +348,7 @@ export const REVIEW_RATING_POLICY = {
 export const STEP_BY_STEP_GUIDES = [
   {
     topic: "how_to_sell",
-    title: "How to List & Sell an Item on UniDeals",
+    title: "How to List & Sell an Item on Unideals",
     steps: [
       "Step 1: Click the 'Sell' or '+' button in the navbar, or navigate to /upload.",
       "Step 2: Enter Product Title — be descriptive and accurate (e.g., 'Dell Inspiron 15 Laptop — 8GB RAM, Used 1 Year').",
@@ -451,13 +451,13 @@ export const STEP_BY_STEP_GUIDES = [
       "Step 4: Add a description of the issue (optional but recommended — screenshots help).",
       "Step 5: Submit the report. The campus moderation team reviews flagged items within 2 hours.",
       "Step 6: You will receive a notification once the moderation team takes action.",
-      "Step 7: For urgent safety threats, contact campus security or local police FIRST, then report to UniDeals.",
+      "Step 7: For urgent safety threats, contact campus security or local police FIRST, then report to Unideals.",
       "Step 8: For emergency or persistent issues, email support@campusmart.in.",
     ],
   },
   {
     topic: "how_to_use_ai",
-    title: "How to Use the UniDeals AI Assistant",
+    title: "How to Use the Unideals AI Assistant",
     steps: [
       "Step 1: Click the floating chat bubble (💬) in the bottom-right corner of any page, or visit /chat.",
       "Step 2: Ask anything in English or Hinglish.",
@@ -468,7 +468,7 @@ export const STEP_BY_STEP_GUIDES = [
       "Step 7 — Safety Guidance: 'Is advance UPI payment safe?', 'Where should I meet a stranger on campus?'.",
       "Step 8 — Platform Navigation: 'How do I boost my listing?', 'How to upgrade to Pro?', 'How to delete my account?'.",
       "Step 9 — Policy Questions: 'What items are prohibited?', 'What is the return policy?', 'What are the terms?'.",
-      "Step 10: Upload an image or send a voice note — the AI will identify the item and search for it on UniDeals!",
+      "Step 10: Upload an image or send a voice note — the AI will identify the item and search for it on Unideals!",
     ],
   },
   {
@@ -549,7 +549,7 @@ export const FAQ_SECTION_LIBRARY = {
     ],
     questions: [
       "What are the platform rules?",
-      "Who can use UniDeals?",
+      "Who can use Unideals?",
       "What items are strictly prohibited?",
       "Can I sell alcohol, drugs, or weapons?",
       "Is it allowed to use more than one account?",
@@ -561,14 +561,14 @@ export const FAQ_SECTION_LIBRARY = {
       "Do I need to pay a deposit or escrow?",
       "Can I sell exam papers or answer keys?",
       "Can I sell services or digital products?",
-      "Can I do bulk commercial reselling on UniDeals?",
-      "What law governs UniDeals?",
-      "What is UniDeals' legal role as an intermediary?",
+      "Can I do bulk commercial reselling on Unideals?",
+      "What law governs Unideals?",
+      "What is Unideals' legal role as an intermediary?",
       "How many times before my account gets banned?",
       "Can I appeal an account suspension?",
     ],
     answer:
-      "UniDeals is a student-only campus marketplace governed by Indian law (IT Act 2000, DPDP Act 2023). Users must be 18+, active Indian college students with verified student email. One account per person strictly — duplicates are permanently banned. Listings must be honest, legally owned, accurately described, and priced below original MRP. Strictly prohibited: alcohol, drugs, prescription medicines, tobacco, weapons, counterfeit goods, stolen items, adult content, exam leaks, academic cheating materials, bulk commercial reselling, digital-only products, and services. Platform activities banned: bait-and-switch, misrepresentation, harassment, scraping, off-platform deal solicitation. UniDeals acts as a Section 79 IT Act intermediary — it facilitates, not participates in, transactions. Platform liability is capped at ₹1,000. Violations are penalized: warning → temporary suspension → permanent ban. Appeals go to support@campusmart.in.",
+      "Unideals is a student-only campus marketplace governed by Indian law (IT Act 2000, DPDP Act 2023). Users must be 18+, active Indian college students with verified student email. One account per person strictly — duplicates are permanently banned. Listings must be honest, legally owned, accurately described, and priced below original MRP. Strictly prohibited: alcohol, drugs, prescription medicines, tobacco, weapons, counterfeit goods, stolen items, adult content, exam leaks, academic cheating materials, bulk commercial reselling, digital-only products, and services. Platform activities banned: bait-and-switch, misrepresentation, harassment, scraping, off-platform deal solicitation. Unideals acts as a Section 79 IT Act intermediary — it facilitates, not participates in, transactions. Platform liability is capped at ₹1,000. Violations are penalized: warning → temporary suspension → permanent ban. Appeals go to support@campusmart.in.",
   },
   privacy: {
     title: "Privacy, data handling, DPDP compliance, and account management",
@@ -583,7 +583,7 @@ export const FAQ_SECTION_LIBRARY = {
       "analytics data", "ad network", "advertising data", "privacy rights", "grievance@campusmart.in", "privacy@campusmart.in",
     ],
     questions: [
-      "What data does UniDeals collect?",
+      "What data does Unideals collect?",
       "Is my phone number visible to everyone?",
       "Are my chats stored?",
       "Can I delete my account?",
@@ -597,7 +597,7 @@ export const FAQ_SECTION_LIBRARY = {
       "Who handles privacy grievances?",
     ],
     answer:
-      "UniDeals complies with India's Digital Personal Data Protection Act (DPDP), 2023. We collect account info, verification data, listing data, chat history, transaction interaction data, and anonymized usage analytics. We do NOT sell personal data or share it with advertisers. Your rights: Access your data, correct inaccuracies, request deletion (done within 30 days), file a grievance (privacy@campusmart.in), and withdraw consent to optional data. Google OAuth and ImageKit are used for sign-in and photo hosting respectively. Anonymized analytics are retained indefinitely. Email privacy@campusmart.in for all privacy requests.",
+      "Unideals complies with India's Digital Personal Data Protection Act (DPDP), 2023. We collect account info, verification data, listing data, chat history, transaction interaction data, and anonymized usage analytics. We do NOT sell personal data or share it with advertisers. Your rights: Access your data, correct inaccuracies, request deletion (done within 30 days), file a grievance (privacy@campusmart.in), and withdraw consent to optional data. Google OAuth and ImageKit are used for sign-in and photo hosting respectively. Anonymized analytics are retained indefinitely. Email privacy@campusmart.in for all privacy requests.",
   },
   subscription: {
     title: "Plans, pricing, upgrades, boosts, and billing",
@@ -612,7 +612,7 @@ export const FAQ_SECTION_LIBRARY = {
       "when do credits reset", "how many boosts", "boost limit", "active boost limit", "boost eligibility",
     ],
     questions: [
-      "Is UniDeals free to use?",
+      "Is Unideals free to use?",
       "What is included in the free plan?",
       "What is the Pro plan?",
       "What does Pro+ include?",
@@ -634,7 +634,7 @@ export const FAQ_SECTION_LIBRARY = {
       "What does early feature access mean?",
     ],
     answer:
-      "UniDeals has three tiers: Free (₹0), Pro (₹99 lifetime founder), Pro+ (₹199 lifetime founder). Free: 10 active listings, 25 wishlist, standard search, no monthly boosts (can buy add-ons). Pro: 25 active listings, 100 wishlist, 2 monthly 3-day boosts, high search priority, priority support. Pro+ (unlimited listings, unlimited wishlist, 5 monthly 7-day boosts, highest search priority, 24/7 dedicated support). Boost add-ons: ₹29 for 3-day, ₹49 for 7-day (available to all users). Boost rules: no stacking same listing, no credit rollover, credits reset on 1st of month, only active listings can be boosted. Subscriptions are non-refundable. No downgrade option. After founder phase, new users get semester-based plans (₹149 Plus, ₹249 Premium). Founders keep lifetime access forever.",
+      "Unideals has three tiers: Free (₹0), Pro (₹99 lifetime founder), Pro+ (₹199 lifetime founder). Free: 10 active listings, 25 wishlist, standard search, no monthly boosts (can buy add-ons). Pro: 25 active listings, 100 wishlist, 2 monthly 3-day boosts, high search priority, priority support. Pro+ (unlimited listings, unlimited wishlist, 5 monthly 7-day boosts, highest search priority, 24/7 dedicated support). Boost add-ons: ₹29 for 3-day, ₹49 for 7-day (available to all users). Boost rules: no stacking same listing, no credit rollover, credits reset on 1st of month, only active listings can be boosted. Subscriptions are non-refundable. No downgrade option. After founder phase, new users get semester-based plans (₹149 Plus, ₹249 Premium). Founders keep lifetime access forever.",
   },
   selling: {
     title: "Selling, listing creation, price rules, photos, and product upload",
@@ -716,7 +716,7 @@ export const FAQ_SECTION_LIBRARY = {
       "Is late night meetup safe?",
     ],
     answer:
-      "Never pay before inspecting the item — not a single rupee in advance or token. NEVER scan QR codes a seller/buyer sends claiming you'll 'receive' money — this is a common reversal fraud. Always meet in public, well-lit campus areas during daylight: Library Gate, Main Canteen, Student Activity Center, Security Office. Avoid private hostel rooms, off-campus locations, and late-night meetings. For deals over ₹5,000, bring a trusted friend. Tell someone your meetup details. Red flags: pressure to pay fast, reluctance to meet on campus, suspicious QR codes, deals that seem too good to be true. Stop any deal that feels wrong and walk away. Report the user or listing using the in-app flag button. For emergencies or physical threats, contact campus security or local police FIRST, then report to UniDeals via support@campusmart.in.",
+      "Never pay before inspecting the item — not a single rupee in advance or token. NEVER scan QR codes a seller/buyer sends claiming you'll 'receive' money — this is a common reversal fraud. Always meet in public, well-lit campus areas during daylight: Library Gate, Main Canteen, Student Activity Center, Security Office. Avoid private hostel rooms, off-campus locations, and late-night meetings. For deals over ₹5,000, bring a trusted friend. Tell someone your meetup details. Red flags: pressure to pay fast, reluctance to meet on campus, suspicious QR codes, deals that seem too good to be true. Stop any deal that feels wrong and walk away. Report the user or listing using the in-app flag button. For emergencies or physical threats, contact campus security or local police FIRST, then report to Unideals via support@campusmart.in.",
   },
   boosts: {
     title: "Boosting listings, boost rules, credits, and visibility",
@@ -786,7 +786,7 @@ export const FAQ_SECTION_LIBRARY = {
       "How do I file a formal complaint?",
     ],
     answer:
-      "Contact support via /contact (Support Ticket form) or directly at support@campusmart.in. SLAs: Free users — 24-48 hours. Pro users — 12-24 hours. Pro+ users — same day dedicated support. Include: product links, user IDs, screenshots, chat history, and incident date in your report. For privacy/data requests: privacy@campusmart.in (72 hours). For legal matters and formal notices: legal@campusmart.in. For grievances: grievance@campusmart.in. If you feel threatened or unsafe, contact campus security or local police FIRST — then report to UniDeals. Moderation team reviews flagged listings/users within 2 hours.",
+      "Contact support via /contact (Support Ticket form) or directly at support@campusmart.in. SLAs: Free users — 24-48 hours. Pro users — 12-24 hours. Pro+ users — same day dedicated support. Include: product links, user IDs, screenshots, chat history, and incident date in your report. For privacy/data requests: privacy@campusmart.in (72 hours). For legal matters and formal notices: legal@campusmart.in. For grievances: grievance@campusmart.in. If you feel threatened or unsafe, contact campus security or local police FIRST — then report to Unideals. Moderation team reviews flagged listings/users within 2 hours.",
   },
   deals: {
     title: "Deal lifecycle, offer flow, cancellation, and completion",
@@ -845,7 +845,7 @@ export const FAQ_SECTION_LIBRARY = {
       "Can I exchange an item?",
     ],
     answer:
-      "UniDeals is a peer-to-peer marketplace — it does NOT process returns, refunds, or exchanges between students. This is exactly WHY we require you to inspect BEFORE paying. If item doesn't match the listing: do NOT pay — walk away. Report the seller immediately using the in-app flag/report. For serious fraud (scam, theft): contact campus security or local police first, then email support@campusmart.in with full evidence. UniDeals can take platform action (account suspension) against fraudulent sellers. Financial recovery must be pursued through appropriate legal channels. Prevention is key: always inspect before paying.",
+      "Unideals is a peer-to-peer marketplace — it does NOT process returns, refunds, or exchanges between students. This is exactly WHY we require you to inspect BEFORE paying. If item doesn't match the listing: do NOT pay — walk away. Report the seller immediately using the in-app flag/report. For serious fraud (scam, theft): contact campus security or local police first, then email support@campusmart.in with full evidence. Unideals can take platform action (account suspension) against fraudulent sellers. Financial recovery must be pursued through appropriate legal channels. Prevention is key: always inspect before paying.",
   },
   ai: {
     title: "AI assistant features, capabilities, limitations, and usage",
@@ -867,7 +867,7 @@ export const FAQ_SECTION_LIBRARY = {
       "What are the AI's limitations?",
     ],
     answer:
-      "UniDeals AI (powered by Google Gemini) is your campus marketplace assistant. Capabilities: 🔍 Find products by keyword, category, budget. 💰 Estimate fair selling prices. 📝 Generate listing drafts. ⚖️ Compare products. 🎒 Build budget bundles (e.g., 'hostel room setup under ₹5000'). ✅ Generate inspection checklists. 🛡️ Safety tips for meetups and payments. 📖 Platform navigation (how to sell, boost, upgrade, report). 📷 Image search — upload a photo of an item and AI finds matching listings. 🎤 Voice notes — send audio and AI transcribes and searches. 🗣️ English and Hinglish supported. Limitations: AI cannot process payments, contact sellers on your behalf, guarantee product quality, or answer questions unrelated to UniDeals.",
+      "Unideals AI (powered by Google Gemini) is your campus marketplace assistant. Capabilities: 🔍 Find products by keyword, category, budget. 💰 Estimate fair selling prices. 📝 Generate listing drafts. ⚖️ Compare products. 🎒 Build budget bundles (e.g., 'hostel room setup under ₹5000'). ✅ Generate inspection checklists. 🛡️ Safety tips for meetups and payments. 📖 Platform navigation (how to sell, boost, upgrade, report). 📷 Image search — upload a photo of an item and AI finds matching listings. 🎤 Voice notes — send audio and AI transcribes and searches. 🗣️ English and Hinglish supported. Limitations: AI cannot process payments, contact sellers on your behalf, guarantee product quality, or answer questions unrelated to Unideals.",
   },
   content_rules: {
     title: "Photo rules, content standards, listing image policies",

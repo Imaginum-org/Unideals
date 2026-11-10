@@ -11,6 +11,11 @@ import {
   adminMe,
   adminRefreshToken,
 } from "../controllers/adminAuth.controller.js";
+import {
+  getMyProfile,
+  updateMyProfile,
+  changeMyPassword,
+} from "../controllers/adminProfile.controller.js";
 
 // Legacy controllers (still used directly for simple cases)
 import { getUsers, getUserStats, updateUserRole, getGenderChangeRequests, reviewGenderChangeRequest } from "../controllers/admin.user.controller.js";
@@ -79,6 +84,19 @@ router.post("/auth/refresh-token", adminAuthLimiter, adminRefreshToken);
 router.get("/auth/me", auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT), adminMe);
 router.post("/auth/logout", auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT), adminLogout);
 
+// Own profile (self-service for both roles)
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many attempts, please try later" },
+});
+const staffOnly = [auth, requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT)];
+router.get("/profile", ...staffOnly, getMyProfile);
+router.patch("/profile", ...staffOnly, updateMyProfile);
+router.post("/profile/change-password", passwordChangeLimiter, ...staffOnly, changeMyPassword);
+
 // Dashboard (real metrics)
 // Both roles can view dashboard
 router.get(
@@ -134,7 +152,7 @@ router.get(
   getUserDetails,
 );
 
-// Status change (suspend/activate) — both roles can moderate users
+// Status change (suspend/activate) — admin only
 router.patch(
   "/users/:id/status",
   auth,
@@ -180,7 +198,7 @@ router.get(
   getProductDetails,
 );
 
-// Status change (block/unlist/list) — both roles can moderate
+// Status change (block/unlist/list) — admin only
 router.patch(
   "/products/:id/status",
   auth,

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Type } from "@google/genai";
 import Product from "../models/Product.model.js";
 import {
@@ -5,7 +6,9 @@ import {
   PRODUCT_STATUS,
   PRODUCT_CATEGORY_LABELS,
   PRODUCT_CONDITION_LABELS,
+  GIRLS_ONLY_CATEGORIES,
 } from "../config/constants.js";
+import { canSeeGirlsProduct } from "../utils/girlsCorner.js";
 import {
   TERMS_AND_CONDITIONS,
   SUBSCRIPTION_PLANS,
@@ -36,6 +39,154 @@ const compactProduct = (product) => {
     brand: product.attributes?.brand,
   };
 };
+
+
+// ── Per-request viewer context ──
+// Tool handlers are called from many code paths (Gemini function calls and the
+// deterministic fallbacks), so the viewer travels via AsyncLocalStorage rather
+// than being threaded through every call.
+const viewerContext = new AsyncLocalStorage();
+
+export const runWithViewer = (user, fn) => viewerContext.run({ user: user || null }, fn);
+
+export const viewerCanSeeGirlsListings = () => {
+  const user = viewerContext.getStore()?.user;
+  return Boolean(user && canSeeGirlsProduct(user.gender, user.role));
+};
+
+// Base filter for anything the assistant shows: active listings only, and
+// Girls Corner listings hidden from viewers who can't see them elsewhere.
+const visibleListingFilter = (extra = {}) => {
+  const filter = { is_deleted: false, status: PRODUCT_STATUS.LISTED, ...extra };
+  if (!viewerCanSeeGirlsListings()) {
+    filter.isGirlsOnly = { $ne: true };
+    if (!filter.category) {
+      filter.category = { $nin: [...GIRLS_ONLY_CATEGORIES] };
+    } else if (typeof filter.category === "string" && GIRLS_ONLY_CATEGORIES.includes(filter.category)) {
+      filter.category = { $in: [] };
+    }
+  }
+  return filter;
+};
+
+const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const SEARCH_STOPWORDS = new Set([
+  "a", "an", "the", "and", "or", "for", "to", "of", "in", "on", "at", "with", "by", "from", "is", "are", "am",
+  "be", "it", "this", "that", "these", "those", "me", "my", "i", "we", "you", "your", "some", "any", "all",
+  "please", "pls", "plz", "show", "find", "search", "get", "give", "need", "want", "looking", "look", "buy",
+  "purchase", "recommend", "suggest", "do", "does", "have", "has", "there", "available", "can", "could",
+  "would", "like", "good", "best", "cheap", "cheapest", "cheaper", "affordable", "budget", "under", "below",
+  "less", "than", "within", "upto", "up", "above", "over", "more", "around", "rs", "inr", "rupees", "price",
+  "priced", "item", "items", "product", "products", "listing", "listings", "stuff", "thing", "things",
+  "campus", "unideals", "website", "app", "here", "now", "new", "used", "second", "hand", "secondhand",
+  "student", "students", "college", "something", "one", "ones", "what", "which", "where", "how", "much",
+  "only", "just", "also", "very", "really", "kya", "hai", "chahiye", "mujhe", "dikhao", "ka", "ki", "ke",
+  "similar", "other", "another", "options", "option", "deal", "deals", "sale", "sell", "selling",
+]);
+
+// Words that point straight at a category. Matching on the category field
+// lets "cycle" find a listing titled "Hero Sprint 26T" filed under vehicles.
+const CATEGORY_ALIASES = {
+  electronics: "electronics", electronic: "electronics", gadget: "electronics", gadgets: "electronics",
+  laptop: "electronics", laptops: "electronics", phone: "electronics", phones: "electronics", mobile: "electronics",
+  book: "study_material", books: "study_material", textbook: "study_material", textbooks: "study_material",
+  notes: "study_material", stationery: "study_material", drafter: "study_material",
+  cycle: "vehicles", cycles: "vehicles", bicycle: "vehicles", bicycles: "vehicles", bike: "vehicles",
+  bikes: "vehicles", scooter: "vehicles", scooty: "vehicles", vehicle: "vehicles", vehicles: "vehicles",
+  hostel: "hostel_essentials", mattress: "hostel_essentials", kettle: "hostel_essentials", cooler: "hostel_essentials",
+  clothes: "clothing", clothing: "clothing", jacket: "clothing", hoodie: "clothing", tshirt: "clothing",
+  sports: "sports", sport: "sports", cricket: "sports", football: "sports", badminton: "sports",
+  fitness: "fitness", gym: "fitness", dumbbell: "fitness", dumbbells: "fitness", yoga: "fitness",
+  lab: "lab_equipment", labcoat: "lab_equipment", apron: "lab_equipment",
+  ticket: "event_passes", tickets: "event_passes", pass: "event_passes", passes: "event_passes",
+  accessories: "accessories", accessory: "accessories", watch: "accessories",
+};
+
+// Broad words that name a whole category ("electronics", "books"). Only these
+// match every listing in the category; specific items ("laptop", "cycle") use
+// the category as a ranking hint so "laptop" doesn't return every gadget.
+const GENERIC_CATEGORY_WORDS = new Set([
+  "electronics", "electronic", "gadget", "gadgets", "books", "textbooks", "stationery", "vehicle", "vehicles",
+  "hostel", "clothes", "clothing", "sports", "sport", "fitness", "gym", "lab", "tickets", "passes",
+  "accessories", "accessory",
+]);
+
+const isGenericCategoryWord = (token) => GENERIC_CATEGORY_WORDS.has(token) && Boolean(CATEGORY_ALIASES[token]);
+
+const stemToken = (word) => {
+  if (word.length > 4 && /(ches|shes|xes|sses)$/.test(word)) return word.slice(0, -2);
+  if (word.length > 4 && word.endsWith("ies")) return `${word.slice(0, -3)}y`;
+  if (word.length > 3 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+  return word;
+};
+
+export const tokenizeSearchQuery = (query = "") =>
+  [...new Set(
+    String(query || "")
+      .toLowerCase()
+      // Drop prices ("₹3,000", "25k", "under 3000") but keep model numbers ("iphone 16").
+      .replace(/(?:₹|\brs\.?|\binr)\s*\d[\d,]*(?:\.\d+)?\s*k?\b/g, " ")
+      .replace(/\b\d[\d,]*(?:\.\d+)?\s*k\b/g, " ")
+      .replace(/\b(under|below|above|over|between|and|to|within|upto|than|budget|of|is)\s+\d[\d,]*(?:\.\d+)?\b/g, "$1 ")
+      .replace(/\b\d{1,3}(?:,\d{2,3})+\b/g, " ")
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length >= 2 && !SEARCH_STOPWORDS.has(word))
+  )].slice(0, 6);
+
+export const categoryFromTokens = (tokens = []) => {
+  for (const token of tokens) {
+    if (CATEGORY_ALIASES[token]) return CATEGORY_ALIASES[token];
+  }
+  return null;
+};
+
+const normalizeCategory = (category) => {
+  if (!category || typeof category !== "string") return null;
+  const raw = category.trim().toLowerCase();
+  const value = raw.replace(/[\s&-]+/g, "_").replace(/_+/g, "_");
+  if (Object.values(PRODUCT_CATEGORIES).includes(value)) return value;
+  const byLabel = Object.entries(PRODUCT_CATEGORY_LABELS).find(([, label]) => label.toLowerCase() === raw);
+  return byLabel ? byLabel[0] : CATEGORY_ALIASES[value] || null;
+};
+
+const tokenPattern = (token) => {
+  const stem = escapeRegex(stemToken(token));
+  // Short tokens must start a word ("pen" shouldn't hit "open"); longer ones
+  // may appear inside words ("cycle" should hit "bicycle").
+  return stem.length <= 3 ? `\\b${stem}` : stem;
+};
+
+const scoreProduct = (product, tokens, categoryHint) => {
+  const title = (product.title || "").toLowerCase();
+  const description = (product.description || "").toLowerCase();
+  const brand = String(product.attributes?.brand || "").toLowerCase();
+  const category = (product.category || "").toLowerCase();
+  let score = 0;
+  let matched = 0;
+  for (const token of tokens) {
+    const re = new RegExp(tokenPattern(token), "i");
+    const inTitle = re.test(title);
+    const inBrand = re.test(brand);
+    const inDesc = re.test(description);
+    const inCategory = re.test(category) || (isGenericCategoryWord(token) && CATEGORY_ALIASES[token] === category);
+    if (inTitle || inBrand || inDesc || inCategory) matched += 1;
+    if (inTitle) score += 6;
+    if (inBrand) score += 4;
+    if (inCategory) score += 3;
+    if (inDesc) score += 1;
+  }
+  if (tokens.length && matched === tokens.length) score += 8;
+  if (categoryHint && category === categoryHint) score += 3;
+  if (product.is_boosted) score += 1;
+  return { score, matched };
+};
+
+const toNumberOrUndefined = (value) =>
+  value === null || value === undefined || value === "" || !Number.isFinite(Number(value)) ? undefined : Number(value);
+
+const LISTING_FIELDS = "title description category condition images selling_price original_price slug views_count is_boosted is_negotiable attributes createdAt";
 
 export const toolDeclarations = [
   {
@@ -155,13 +306,13 @@ export const toolDeclarations = [
   },
   {
     name: "getPlatformGuide",
-    description: "Get step-by-step instructions on how to use any feature of the UniDeals website (e.g. how to sell, how to buy, how to boost, how to upgrade, how to wishlist, how to edit profile, how to report).",
+    description: "Get step-by-step instructions on how to use any feature of the Unideals website (e.g. how to sell, how to buy, how to boost, how to upgrade, how to wishlist, how to edit profile, how to report).",
     parameters: {
       type: Type.OBJECT,
       properties: {
-        topic: { 
-          type: Type.STRING, 
-          description: "Topic of the guide (how_to_sell, how_to_buy, how_to_boost, how_to_upgrade, how_to_wishlist, how_to_profile_settings, how_to_report_safety, how_to_use_ai)" 
+        topic: {
+          type: Type.STRING,
+          description: "Topic of the guide (how_to_sell, how_to_buy, how_to_boost, how_to_upgrade, how_to_wishlist, how_to_profile_settings, how_to_report_safety, how_to_use_ai)"
         }
       },
       required: ["topic"]
@@ -169,20 +320,20 @@ export const toolDeclarations = [
   },
   {
     name: "getTermsAndPolicies",
-    description: "Get official UniDeals Terms and Conditions, platform rules, prohibited items, eligibility criteria, and dispute policies.",
+    description: "Get official Unideals Terms and Conditions, platform rules, prohibited items, eligibility criteria, and dispute policies.",
     parameters: {
       type: Type.OBJECT,
       properties: {
-        section: { 
-          type: Type.STRING, 
-          description: "Specific section id (eligibility, role, prohibited_items, safety_payments, listings_ownership, deal_workflow, liability_disputes, moderation_penalties, intellectual_property, governing_law, all)" 
+        section: {
+          type: Type.STRING,
+          description: "Specific section id (eligibility, role, prohibited_items, safety_payments, listings_ownership, deal_workflow, liability_disputes, moderation_penalties, intellectual_property, governing_law, all)"
         }
       }
     }
   },
   {
     name: "getPolicyOrProcedure",
-    description: "Get detailed policy or procedure information for any UniDeals topic. Use for questions about returns, refunds, reviews, privacy, data rights, subscription rules, boost policies, moderation, disputes, account security, content rules, and any platform policy.",
+    description: "Get detailed policy or procedure information for any Unideals topic. Use for questions about returns, refunds, reviews, privacy, data rights, subscription rules, boost policies, moderation, disputes, account security, content rules, and any platform policy.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -197,84 +348,118 @@ export const toolDeclarations = [
 ];
 
 export const toolHandlers = {
-  searchProducts: async (args) => {
-    const { query, category, maxPrice, minPrice, condition, sortBy = "newest", limit = 5 } = args;
-    const filter = { is_deleted: false, status: PRODUCT_STATUS.LISTED };
-    
-    if (category) filter.category = category;
-    if (condition) filter.condition = condition;
-    
+  searchProducts: async (args = {}) => {
+    const { query, condition, sortBy = "relevance" } = args;
+    const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 12);
+    const maxPrice = toNumberOrUndefined(args.maxPrice);
+    const minPrice = toNumberOrUndefined(args.minPrice);
+    const tokens = tokenizeSearchQuery(query);
+    const explicitCategory = normalizeCategory(args.category);
+    const categoryHint = explicitCategory || categoryFromTokens(tokens);
+
+    const extra = {};
+    if (explicitCategory) extra.category = explicitCategory;
+    if (condition && PRODUCT_CONDITION_LABELS[condition]) extra.condition = condition;
     if (maxPrice !== undefined || minPrice !== undefined) {
-      filter.selling_price = {};
-      if (maxPrice !== undefined) filter.selling_price.$lte = maxPrice;
-      if (minPrice !== undefined) filter.selling_price.$gte = minPrice;
+      extra.selling_price = {};
+      if (maxPrice !== undefined) extra.selling_price.$lte = maxPrice;
+      if (minPrice !== undefined) extra.selling_price.$gte = minPrice;
     }
-    
-    if (query && query.length >= 2) {
-      filter.$or = [
-        { title: { $regex: query, $options: "i" } },
-        { description: { $regex: query, $options: "i" } },
-        { category: { $regex: query, $options: "i" } }
-      ];
+    const filter = visibleListingFilter(extra);
+
+    if (tokens.length) {
+      // Any token may match; results are ranked below so listings matching
+      // every word come first.
+      filter.$or = tokens.flatMap((token) => {
+        const regex = { $regex: tokenPattern(token), $options: "i" };
+        const clause = [{ title: regex }, { description: regex }, { "attributes.brand": regex }, { category: regex }];
+        if (isGenericCategoryWord(token) && !explicitCategory) clause.push({ category: CATEGORY_ALIASES[token] });
+        return clause;
+      });
     }
-    
-    let sortOptions = { createdAt: -1 };
-    if (sortBy === "price_low") sortOptions = { selling_price: 1 };
-    else if (sortBy === "price_high") sortOptions = { selling_price: -1 };
-    else if (sortBy === "most_viewed") sortOptions = { views_count: -1 };
-    
-    const products = await Product.find(filter)
-      .sort(sortOptions)
-      .limit(limit)
-      .select("title description category condition images selling_price original_price slug views_count is_boosted is_negotiable attributes")
+
+    const dbSort = {
+      price_low: { selling_price: 1 },
+      price_high: { selling_price: -1 },
+      most_viewed: { views_count: -1 },
+    }[sortBy] || { is_boosted: -1, createdAt: -1 };
+
+    const candidates = await Product.find(filter)
+      .sort(tokens.length ? { is_boosted: -1, createdAt: -1 } : dbSort)
+      .limit(tokens.length ? 80 : limit)
+      .select(LISTING_FIELDS)
       .lean();
-      
-    return { products: products.map(compactProduct) };
+
+    let ranked = candidates;
+    let exact = true;
+    if (tokens.length) {
+      const scored = candidates.map((product) => ({ product, ...scoreProduct(product, tokens, categoryHint) }));
+      const fullMatches = scored.filter((entry) => entry.matched === tokens.length);
+      // With several words, prefer listings matching all of them; fall back to
+      // partial matches only when nothing matches everything.
+      const pool = fullMatches.length ? fullMatches : scored.filter((entry) => entry.matched > 0);
+      exact = fullMatches.length > 0;
+      const bySort = {
+        price_low: (a, b) => a.product.selling_price - b.product.selling_price,
+        price_high: (a, b) => b.product.selling_price - a.product.selling_price,
+        most_viewed: (a, b) => (b.product.views_count || 0) - (a.product.views_count || 0),
+      }[sortBy];
+      pool.sort((a, b) =>
+        bySort
+          ? bySort(a, b) || b.score - a.score
+          : b.score - a.score || new Date(b.product.createdAt) - new Date(a.product.createdAt)
+      );
+      ranked = pool.map((entry) => entry.product);
+    }
+
+    return {
+      products: ranked.slice(0, limit).map(compactProduct),
+      exact,
+      total: ranked.length,
+      category: categoryHint,
+    };
   },
 
   getProductDetails: async (args) => {
     const { productId } = args;
     let product;
-    
-    if (productId.match(/^[0-9a-fA-F]{24}$/)) {
-      product = await Product.findById(productId).lean();
-    } else {
-      product = await Product.findOne({ slug: productId }).lean();
-    }
-    
+
+    const lookup = String(productId || "").match(/^[0-9a-fA-F]{24}$/) ? { _id: productId } : { slug: String(productId || "") };
+    product = await Product.findOne(visibleListingFilter(lookup)).select(LISTING_FIELDS).lean();
+
     if (!product) throw new Error("Product not found");
     return { product: compactProduct(product) };
   },
 
   estimateFairPrice: async (args) => {
-    const { category, keyword } = args;
-    const filter = { is_deleted: false, status: PRODUCT_STATUS.LISTED };
-    
-    if (category) filter.category = category;
-    if (keyword) {
-      filter.$or = [
-        { title: { $regex: keyword, $options: "i" } },
-        { description: { $regex: keyword, $options: "i" } }
-      ];
+    const { keyword } = args;
+    const category = normalizeCategory(args.category);
+    const filter = visibleListingFilter(category ? { category } : {});
+    const tokens = tokenizeSearchQuery(keyword);
+    if (tokens.length) {
+      filter.$and = tokens.map((token) => {
+        const regex = { $regex: tokenPattern(token), $options: "i" };
+        return { $or: [{ title: regex }, { description: regex }, { "attributes.brand": regex }] };
+      });
     }
-    
+
     const products = await Product.find(filter).select("selling_price").lean();
-    
+
     if (!products.length) return { error: "Not enough data" };
-    
+
     const prices = products.map(p => p.selling_price).sort((a, b) => a - b);
     const min = prices[0];
     const max = prices[prices.length - 1];
     const sum = prices.reduce((a, b) => a + b, 0);
     const average = Math.round(sum / prices.length);
     const median = prices[Math.floor(prices.length / 2)];
-    
+
     return { low: min, fair: median, high: max, average, sampleSize: prices.length, category };
   },
 
   getCategoryDemandStats: async () => {
     const stats = await Product.aggregate([
-      { $match: { is_deleted: false, status: PRODUCT_STATUS.LISTED } },
+      { $match: visibleListingFilter() },
       { $group: { _id: "$category", count: { $sum: 1 }, avgViews: { $avg: "$views_count" } } },
       { $sort: { count: -1 } }
     ]);
@@ -283,69 +468,72 @@ export const toolHandlers = {
 
   generateListingDraft: async (args) => {
     const { itemDescription, condition, originalPrice, category } = args;
-    
+
     const words = itemDescription.split(" ").slice(0, 5).join(" ");
     const title = `${words.charAt(0).toUpperCase() + words.slice(1)} - student owned, campus pickup`;
-    
+
     const draft = {
       title,
-      category: category || "other",
-      categoryLabel: category || "Other",
+      category: normalizeCategory(category) || "others",
+      categoryLabel: PRODUCT_CATEGORY_LABELS[normalizeCategory(category)] || "Others",
       description: `Selling my ${itemDescription}.\nCondition: ${condition || "Used"}\n\nKey details:\n- [Add detail here]\n- [Add detail here]\n\nAvailable for immediate campus pickup!`,
       tags: itemDescription.split(" ").filter(w => w.length > 3).slice(0, 5),
       pricingAdvice: "Check similar items on campus for fair pricing."
     };
-    
+
     return { draft };
   },
 
   getTrendingProducts: async (args) => {
-    const limit = args.limit || 6;
-    const products = await Product.find({ is_deleted: false, status: PRODUCT_STATUS.LISTED })
+    const limit = Math.min(Math.max(Number(args?.limit) || 6, 1), 12);
+    const products = await Product.find(visibleListingFilter())
       .sort({ is_boosted: -1, views_count: -1, createdAt: -1 })
       .limit(limit)
+      .select(LISTING_FIELDS)
       .lean();
     return { products: products.map(compactProduct) };
   },
 
   compareTwoProducts: async (args) => {
     const { productId1, productId2 } = args;
-    const query1 = productId1.match(/^[0-9a-fA-F]{24}$/) ? { _id: productId1 } : { slug: productId1 };
-    const query2 = productId2.match(/^[0-9a-fA-F]{24}$/) ? { _id: productId2 } : { slug: productId2 };
-    
+    const toLookup = (id) => (String(id || "").match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: String(id || "") });
+
     const [p1, p2] = await Promise.all([
-      Product.findOne(query1).lean(),
-      Product.findOne(query2).lean()
+      Product.findOne(visibleListingFilter(toLookup(productId1))).select(LISTING_FIELDS).lean(),
+      Product.findOne(visibleListingFilter(toLookup(productId2))).select(LISTING_FIELDS).lean(),
     ]);
-    
+
     if (!p1 || !p2) throw new Error("One or both products not found");
-    
+
     return { product1: compactProduct(p1), product2: compactProduct(p2) };
   },
 
   getBudgetBundle: async (args) => {
-    const { totalBudget, categories = ["hostel_essentials", "electronics", "study_material"] } = args;
+    const totalBudget = Math.max(Number(args.totalBudget) || 0, 0);
+    const categories = Array.isArray(args.categories) && args.categories.length
+      ? args.categories
+      : ["hostel_essentials", "electronics", "study_material"];
     const products = [];
     let remainingBudget = totalBudget;
-    
+
     for (const cat of categories) {
       if (remainingBudget <= 0) break;
-      const cheapest = await Product.findOne({ 
-        category: cat, 
-        is_deleted: false, 
-        status: PRODUCT_STATUS.LISTED,
-        selling_price: { $lte: remainingBudget }
-      }).sort({ selling_price: 1 }).lean();
-      
+      const category = normalizeCategory(cat);
+      if (!category) continue;
+      const cheapest = await Product.findOne(visibleListingFilter({
+        category,
+        selling_price: { $lte: remainingBudget },
+      })).sort({ selling_price: 1 }).select(LISTING_FIELDS).lean();
+
       if (cheapest) {
         products.push(compactProduct(cheapest));
         remainingBudget -= cheapest.selling_price;
       }
     }
-    
+
     const totalCost = totalBudget - remainingBudget;
-    const budgetUsedPercent = Math.round((totalCost / totalBudget) * 100);
-    
+    const budgetUsedPercent = totalBudget ? Math.round((totalCost / totalBudget) * 100) : 0;
+
     return { products, totalCost, remainingBudget, budgetUsedPercent };
   },
 
@@ -357,10 +545,10 @@ export const toolHandlers = {
       study_material: ["Check for missing pages", "Look for excessive highlighting or notes", "Verify edition/publication year"],
       hostel_essentials: ["Verify working condition", "Check cleanliness/hygiene", "Inspect for any physical damage"]
     };
-    
-    return { 
-      category, 
-      checklist: checklists[category] || ["Check overall condition", "Verify it matches description", "Test functionality if applicable"] 
+
+    return {
+      category,
+      checklist: checklists[category] || ["Check overall condition", "Verify it matches description", "Test functionality if applicable"]
     };
   },
 
@@ -372,7 +560,7 @@ export const toolHandlers = {
       scam: ["Beware of deals that seem too good to be true", "Do not click on suspicious QR codes for receiving money", "Avoid buyers/sellers who refuse to meet on campus"],
       general: ["Communicate only through the platform if possible", "Trust your instincts, walk away if something feels off", "Check the user's profile and reviews"]
     };
-    
+
     return { topic, tips: tips[topic] || tips.general };
   },
 
@@ -383,10 +571,10 @@ export const toolHandlers = {
       return { guide };
     }
     // Fallback: return all guide topics so Gemini can pick the right one
-    return { 
+    return {
       availableTopics: STEP_BY_STEP_GUIDES.map(g => ({ topic: g.topic, title: g.title })),
       guide: {
-        title: "UniDeals Platform Guide",
+        title: "Unideals Platform Guide",
         steps: [
           "Explore listings from the Home page.",
           "Use the Search bar or Categories to find student deals.",
@@ -420,16 +608,16 @@ export const toolHandlers = {
     const policies = {
       returns_refunds: {
         title: "Returns and Refunds Policy",
-        summary: "UniDeals does NOT process returns, refunds, or exchanges — it is a peer-to-peer marketplace.",
+        summary: "Unideals does NOT process returns, refunds, or exchanges — it is a peer-to-peer marketplace.",
         details: [
-          "UniDeals does NOT process returns, refunds, or exchanges between students.",
+          "Unideals does NOT process returns, refunds, or exchanges between students.",
           "ALWAYS inspect the item thoroughly BEFORE making payment — this is your only protection.",
           "Test electronics (power on, check all ports, test battery) before paying.",
           "If item doesn't match the listing: do NOT pay — walk away.",
           "Report fraudulent sellers via the in-app report/flag button.",
           "For serious fraud (theft, criminal scam): contact campus security or local police first.",
           "Email support@campusmart.in with full evidence for platform action against the seller.",
-          "UniDeals can suspend/ban fraudulent sellers but cannot recover funds.",
+          "Unideals can suspend/ban fraudulent sellers but cannot recover funds.",
         ]
       },
       reviews_ratings: {
@@ -488,12 +676,12 @@ export const toolHandlers = {
       },
       dispute_resolution: {
         title: "Dispute Resolution and Liability",
-        summary: "UniDeals is a Section 79 IT Act intermediary — platform liability is capped at ₹1,000.",
+        summary: "Unideals is a Section 79 IT Act intermediary — platform liability is capped at ₹1,000.",
         details: TERMS_AND_CONDITIONS.sections.find(s => s.id === "liability_disputes")?.rules || [],
       },
       account_security: {
         title: "Account Security — Password, OAuth, Verification",
-        summary: "UniDeals uses email/password and Google OAuth2 for secure sign-in.",
+        summary: "Unideals uses email/password and Google OAuth2 for secure sign-in.",
         details: [
           "Password reset: Login page → Forgot Password → email reset link → set new password.",
           "Google OAuth users: no separate password — sign in with Google account.",
@@ -530,28 +718,28 @@ export const toolHandlers = {
       },
       listing_price_rules: {
         title: "Listing Price Rules — Selling Price Cannot Exceed Original Price",
-        summary: "Selling price on UniDeals CANNOT exceed the original MRP or purchase price.",
+        summary: "Selling price on Unideals CANNOT exceed the original MRP or purchase price.",
         details: TERMS_AND_CONDITIONS.sections.find(s => s.id === "listings_ownership")?.rules || [],
       },
       prohibited_items: {
         title: "Prohibited Items and Banned Activities",
-        summary: "UniDeals strictly prohibits certain items and activities on the platform.",
+        summary: "Unideals strictly prohibits certain items and activities on the platform.",
         details: TERMS_AND_CONDITIONS.sections.find(s => s.id === "prohibited_items")?.rules || [],
       },
       eligibility: {
-        title: "Eligibility Requirements — Who Can Use UniDeals",
-        summary: "UniDeals is exclusively for students 18+ currently enrolled at recognized Indian colleges.",
+        title: "Eligibility Requirements — Who Can Use Unideals",
+        summary: "Unideals is exclusively for students 18+ currently enrolled at recognized Indian colleges.",
         details: TERMS_AND_CONDITIONS.sections.find(s => s.id === "eligibility")?.rules || [],
       },
       platform_liability: {
         title: "Platform Liability and Legal Status",
-        summary: "UniDeals is a Section 79 IT Act intermediary. Platform liability is capped at ₹1,000.",
+        summary: "Unideals is a Section 79 IT Act intermediary. Platform liability is capped at ₹1,000.",
         details: TERMS_AND_CONDITIONS.sections.find(s => s.id === "liability_disputes")?.rules || [],
         legalSection: TERMS_AND_CONDITIONS.sections.find(s => s.id === "governing_law")?.rules || [],
       },
       governing_law: {
         title: "Governing Law and Jurisdiction",
-        summary: "UniDeals is governed by the laws of India. Disputes are subject to Indian courts.",
+        summary: "Unideals is governed by the laws of India. Disputes are subject to Indian courts.",
         details: TERMS_AND_CONDITIONS.sections.find(s => s.id === "governing_law")?.rules || [],
       },
       subscription_upgrade_policy: {

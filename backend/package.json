@@ -14,7 +14,8 @@
     "test:plans": "node tests/plans.integration.test.mjs",
     "test:views": "node tests/views.integration.test.mjs",
     "test:deals": "node tests/deals.integration.test.mjs",
-    "test:reviews": "node tests/reviews.integration.test.mjs"
+    "test:reviews": "node tests/reviews.integration.test.mjs",
+    "test:admin": "node tests/admin.integration.test.mjs"
   },
   "keywords": [
     "nodejs",

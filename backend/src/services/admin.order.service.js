@@ -68,8 +68,12 @@ export const getAdminOrderStats = async () => {
       status: DEAL_STATUS.CANCELLED,
     }),
     Deal.countDocuments({ createdAt: { $gte: startOfCurrentMonth } }),
+    // Same number of days into last month, so early-month numbers compare fairly.
     Deal.countDocuments({
-      createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth },
+      createdAt: {
+        $gte: startOfPreviousMonth,
+        $lt: new Date(Math.min(startOfPreviousMonth.getTime() + (now.getTime() - startOfCurrentMonth.getTime()), startOfCurrentMonth.getTime())),
+      },
     }),
   ]);
 
@@ -152,10 +156,13 @@ export const getAdminOrders = async (query = {}) => {
 
       const buyerCampusId = buyer.campus_id ? buyer.campus_id.toString() : "";
       const sellerCampusId = seller.campus_id ? seller.campus_id.toString() : "";
-      const campusName = campusMap.get(buyerCampusId) || campusMap.get(sellerCampusId) || "VIT Vellore";
+      const campusName = campusMap.get(buyerCampusId) || campusMap.get(sellerCampusId) || "";
 
+      // Campus filter accepts a campus id (preferred) or a name fragment.
       if (campusFilter && campusFilter !== "all" && campusFilter !== "Campus (All)") {
-        if (!campusName.toLowerCase().includes(campusFilter.toLowerCase())) {
+        const matchesId = buyerCampusId === campusFilter || sellerCampusId === campusFilter;
+        const matchesName = campusName && campusName.toLowerCase().includes(campusFilter.toLowerCase());
+        if (!matchesId && !matchesName) {
           return false;
         }
       }
@@ -185,7 +192,7 @@ export const getAdminOrders = async (query = {}) => {
 
     const buyerCampusId = buyer.campus_id ? buyer.campus_id.toString() : "";
     const sellerCampusId = seller.campus_id ? seller.campus_id.toString() : "";
-    const campusName = campusMap.get(buyerCampusId) || campusMap.get(sellerCampusId) || "Campus";
+    const campusName = campusMap.get(buyerCampusId) || campusMap.get(sellerCampusId) || null;
 
     const isPaid = Boolean(d.payment_confirmed?.is_confirmed);
     const orderStage = mapDealStatusToOrderStage(d.status);
@@ -232,7 +239,7 @@ export const getAdminOrders = async (query = {}) => {
       amount: d.current_price || d.original_price || 0,
       originalAmount: d.original_price || d.current_price || 0,
       payment: {
-        status: isPaid ? "Paid" : d.status === DEAL_STATUS.CANCELLED ? "Refunded" : "Pending",
+        status: isPaid ? "Paid" : "Unpaid",
         method: null,
         txnId: null,
       },
@@ -241,11 +248,11 @@ export const getAdminOrders = async (query = {}) => {
       deliveryAddress,
       pickup: d.pickup || null,
       timeline: [
-        { label: "Order Placed", date: d.createdAt, completed: true },
+        { label: "Deal started", date: d.createdAt, completed: true },
         { label: "Deal Confirmed", date: d.deal_confirmed_at, completed: Boolean(d.deal_confirmed_at || [DEAL_STATUS.DEAL_CONFIRMED, DEAL_STATUS.PICKUP_SCHEDULED, DEAL_STATUS.PAYMENT_CONFIRMED, DEAL_STATUS.COMPLETED].includes(d.status)) },
         { label: "Pickup Scheduled", date: d.pickup?.scheduled_at || d.pickup?.scheduled_date, completed: Boolean(d.pickup?.scheduled_date || [DEAL_STATUS.PICKUP_SCHEDULED, DEAL_STATUS.PAYMENT_CONFIRMED, DEAL_STATUS.COMPLETED].includes(d.status)) },
         { label: "Payment Confirmed", date: d.payment_confirmed?.confirmed_at, completed: isPaid || d.status === DEAL_STATUS.COMPLETED },
-        { label: "Delivered", date: d.completed_at, completed: d.status === DEAL_STATUS.COMPLETED },
+        { label: "Completed", date: d.completed_at, completed: d.status === DEAL_STATUS.COMPLETED },
       ],
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
@@ -292,7 +299,7 @@ export const getAdminOrderById = async (dealId) => {
 
   const buyerCampusId = buyer.campus_id ? buyer.campus_id.toString() : "";
   const sellerCampusId = seller.campus_id ? seller.campus_id.toString() : "";
-  const campusName = campusMap.get(buyerCampusId) || campusMap.get(sellerCampusId) || "Campus";
+  const campusName = campusMap.get(buyerCampusId) || campusMap.get(sellerCampusId) || null;
 
   const isPaid = Boolean(d.payment_confirmed?.is_confirmed);
   const orderStage = mapDealStatusToOrderStage(d.status);
@@ -339,7 +346,7 @@ export const getAdminOrderById = async (dealId) => {
     amount: d.current_price || d.original_price || 0,
     originalAmount: d.original_price || d.current_price || 0,
     payment: {
-      status: isPaid ? "Paid" : d.status === DEAL_STATUS.CANCELLED ? "Refunded" : "Pending",
+      status: isPaid ? "Paid" : "Unpaid",
       method: null,
       txnId: null,
     },
@@ -348,11 +355,11 @@ export const getAdminOrderById = async (dealId) => {
     deliveryAddress,
     pickup: d.pickup || null,
     timeline: [
-      { label: "Order Placed", date: d.createdAt, completed: true },
+      { label: "Deal started", date: d.createdAt, completed: true },
       { label: "Deal Confirmed", date: d.deal_confirmed_at, completed: Boolean(d.deal_confirmed_at || [DEAL_STATUS.DEAL_CONFIRMED, DEAL_STATUS.PICKUP_SCHEDULED, DEAL_STATUS.PAYMENT_CONFIRMED, DEAL_STATUS.COMPLETED].includes(d.status)) },
       { label: "Pickup Scheduled", date: d.pickup?.scheduled_at || d.pickup?.scheduled_date, completed: Boolean(d.pickup?.scheduled_date || [DEAL_STATUS.PICKUP_SCHEDULED, DEAL_STATUS.PAYMENT_CONFIRMED, DEAL_STATUS.COMPLETED].includes(d.status)) },
       { label: "Payment Confirmed", date: d.payment_confirmed?.confirmed_at, completed: isPaid || d.status === DEAL_STATUS.COMPLETED },
-      { label: "Delivered", date: d.completed_at, completed: d.status === DEAL_STATUS.COMPLETED },
+      { label: "Completed", date: d.completed_at, completed: d.status === DEAL_STATUS.COMPLETED },
     ],
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,

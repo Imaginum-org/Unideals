@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Campus from "../models/Campus.model.js";
 import User from "../models/User.model.js";
+import Product from "../models/Product.model.js";
 import { createTtlCache } from "../utils/ttlCache.js";
 
 // Campus docs change only via admin writes (which call invalidateCampusCache),
@@ -144,6 +145,16 @@ export const updateCampus = async (id, data) => {
 export const deleteCampus = async (id) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw err(400, "Invalid campus ID");
+  }
+
+  // Deleting a campus with live inventory would orphan those listings
+  // (they'd vanish from every feed). Pausing is the supported path.
+  const listingCount = await Product.countDocuments({ campus_id: id, is_deleted: false });
+  if (listingCount > 0) {
+    throw err(
+      409,
+      `This campus still has ${listingCount} listing${listingCount === 1 ? "" : "s"}. Pause it instead of deleting.`,
+    );
   }
 
   const campus = await Campus.findByIdAndDelete(id).lean();

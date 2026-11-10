@@ -1061,7 +1061,7 @@ export const notifyRoleAssigned = async ({ userId, newRole }) => {
       newRole === "support" ? "Support Staff" : newRole.charAt(0).toUpperCase() + newRole.slice(1);
     const notification = await Notification.create({
       title: "Staff Role Updated",
-      message: `You have been granted ${roleLabel} permissions on UniDeals Admin Portal.`,
+      message: `You have been granted ${roleLabel} permissions on Unideals Admin Portal.`,
       type: "general",
       target_audience: "all",
       is_broadcast: false,

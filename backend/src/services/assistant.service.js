@@ -1,5 +1,12 @@
-﻿import ai, { GEMINI_MODEL } from "../config/gemini.js";
-import { toolDeclarations, toolHandlers } from "./assistant.tools.js";
+import ai, { GEMINI_MODEL, GEMINI_TIMEOUT } from "../config/gemini.js";
+import {
+  toolDeclarations,
+  toolHandlers,
+  runWithViewer,
+  viewerCanSeeGirlsListings,
+  tokenizeSearchQuery,
+  categoryFromTokens,
+} from "./assistant.tools.js";
 import {
   findKnowledgeBaseAnswer,
   formatKnowledgeReply,
@@ -13,7 +20,8 @@ const CACHE_MAX = 120;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const _replyCache = new Map();
 
-const cacheKey = (msg) => msg.trim().toLowerCase().replace(/\s+/g, " ");
+const cacheKey = (msg) =>
+  `${viewerCanSeeGirlsListings() ? "g" : "p"}|${msg.trim().toLowerCase().replace(/\s+/g, " ")}`;
 
 const getCachedReply = (msg) => {
   const key = cacheKey(msg);
@@ -371,10 +379,191 @@ const buildAvailabilityResponse = async (message = "") => {
   }
 };
 
+
+// ── Direct product search ──
+// Shopping questions ("cycles under ₹3,000", "laptop", "any power bank?") are
+// answered straight from the database: it's faster than a model round trip
+// and the listings shown are always real.
+
+const parseAmount = (value = "", suffix = "") => {
+  const amount = Number(String(value).replace(/,/g, ""));
+  if (!Number.isFinite(amount)) return undefined;
+  return /^k$/i.test(suffix) ? amount * 1000 : amount;
+};
+
+export const parsePriceConstraint = (message = "") => {
+  const text = String(message).toLowerCase();
+  const num = String.raw`(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?\b`;
+  const between = text.match(new RegExp(String.raw`(?:between|from)\s+${num}\s*(?:and|to|-)\s*${num}`));
+  if (between) {
+    const a = parseAmount(between[1], between[2]);
+    const b = parseAmount(between[3], between[4]);
+    if (a !== undefined && b !== undefined) return { minPrice: Math.min(a, b), maxPrice: Math.max(a, b) };
+  }
+  const max = text.match(new RegExp(String.raw`(?:under|below|less than|within|upto|up to|max(?:imum)?|budget(?: of| is)?|<=?)\s*${num}`))
+    || text.match(new RegExp(String.raw`${num}\s*(?:se kam|ke andar|or less|max)`));
+  const min = text.match(new RegExp(String.raw`(?:above|over|more than|at least|min(?:imum)?|>=?)\s*${num}`));
+  return {
+    maxPrice: max ? parseAmount(max[1], max[2]) : undefined,
+    minPrice: min ? parseAmount(min[1], min[2]) : undefined,
+  };
+};
+
+const NOT_SHOPPING_PATTERN = /\b(sell|selling|sold|list my|post my|upload|worth|estimate|fair price|valuation|how much (?:is|should|can|will|do)|scam|scams|safe|safety|policy|policies|refund|return|terms|privacy|boost|subscription|plan|plans|report|account|password|login|sign ?up|verify|verification|inspect|inspection|checklist|compare|trip|travel|packing|bundle|how (?:do|to|can|does)|what is|what are|why|who)\b/i;
+const SHOPPING_VERB_PATTERN = /\b(find|search|show|looking for|look for|need|want|buy|get me|do you have|have any|any|available|in stock|recommend|suggest|cheap|cheaper|cheapest|affordable|under|below|budget|chahiye|dikhao)\b/i;
+
+export const isShoppingQuery = (message = "") => {
+  const text = String(message).trim();
+  if (!text || NOT_SHOPPING_PATTERN.test(text)) return false;
+  const tokens = tokenizeSearchQuery(text);
+  if (!tokens.length) return false;
+  const { maxPrice, minPrice } = parsePriceConstraint(text);
+  if (maxPrice !== undefined || minPrice !== undefined) return true;
+  if (SHOPPING_VERB_PATTERN.test(text)) return true;
+  // Bare product names: "laptop", "hero cycle", "casio fx-991"
+  return text.split(/\s+/).length <= 4 && !/\?$/.test(text);
+};
+
+const formatRupees = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
+
+const buildDirectSearchReply = async (message) => {
+  const { maxPrice, minPrice } = parsePriceConstraint(message);
+  const wantsCheap = /\b(cheap|cheaper|cheapest|affordable|budget|low price|lowest)\b/i.test(message);
+  const sortBy = wantsCheap ? "price_low" : "relevance";
+  const tokens = tokenizeSearchQuery(message);
+  const label = tokens.join(" ");
+  const priceText = maxPrice !== undefined && minPrice !== undefined
+    ? ` between ${formatRupees(minPrice)} and ${formatRupees(maxPrice)}`
+    : maxPrice !== undefined
+      ? ` under ${formatRupees(maxPrice)}`
+      : minPrice !== undefined
+        ? ` above ${formatRupees(minPrice)}`
+        : "";
+
+  const result = await toolHandlers.searchProducts({ query: message, maxPrice, minPrice, sortBy, limit: 6 });
+  const base = {
+    intent: "product_search",
+    searchQuery: label,
+    aiPowered: false,
+  };
+
+  if (result.products.length) {
+    const lead = result.exact
+      ? `Found ${result.total > result.products.length ? `${result.total}+` : result.products.length} listing${result.products.length === 1 ? "" : "s"} for **${label}**${priceText}.`
+      : `No exact match for **${label}**${priceText}, but these come close:`;
+    return {
+      ...base,
+      reply: `${lead}${result.exact ? " Tap one to see details and chat with the seller." : ""}`,
+      products: result.products,
+      productCards: result.products,
+      suggestions: [
+        wantsCheap ? `Newest ${label}` : `Cheapest ${label}`,
+        `What should I check before buying ${label}?`,
+        `Fair price for ${label}`,
+      ],
+    };
+  }
+
+  // Nothing in budget: show the closest options just above it.
+  if (maxPrice !== undefined) {
+    const above = await toolHandlers.searchProducts({ query: message, minPrice: maxPrice, sortBy: "price_low", limit: 4 });
+    if (above.products.length) {
+      return {
+        ...base,
+        reply: `Nothing for **${label}**${priceText} right now. The cheapest options just above your budget:`,
+        products: above.products,
+        productCards: above.products,
+        missingItems: [label],
+        suggestions: [`Show all ${label}`, `Fair price for ${label}`, "Show trending items"],
+      };
+    }
+  }
+
+  const trending = await toolHandlers.getTrendingProducts({ limit: 4 });
+  return {
+    ...base,
+    intent: "product_recommendation",
+    reply: `I couldn't find **${label}**${priceText} on campus right now. New listings come in daily, so check back soon. Meanwhile, here's what's popular:`,
+    products: trending.products,
+    productCards: trending.products,
+    missingItems: [label],
+    suggestions: ["Show trending items", "Find affordable electronics", "Help me sell an item"],
+  };
+};
+
+// ── Sell / fair-price quick actions ──
+const SELL_REQUEST_PATTERN = /\b(help me sell|i want to sell|i wanna sell|sell my|sell an?|selling my|list my|post my|create a listing|draft a listing|write a listing)\b/i;
+const PRICE_CHECK_PATTERN = /\b(fair price|price check|check (?:a |the )?price|what(?:'s| is) (?:a )?(?:fair|good|right) price|how much (?:should|can|is|will)|worth|resale value)\b/i;
+const ACTION_FILLER = new Set(["help", "write", "create", "draft", "post", "check", "fair", "worth", "resale", "value", "should", "charge", "ask", "my", "old"]);
+
+const itemFromMessage = (message = "") =>
+  tokenizeSearchQuery(message).filter((token) => !ACTION_FILLER.has(token)).join(" ");
+
+const buildSellReply = async (message) => {
+  const item = itemFromMessage(message);
+  if (!item) {
+    return {
+      reply: "Happy to help you sell! What are you selling? Tell me the item and its condition, e.g. *\"my Hero cycle, 1 year old\"*.",
+      intent: "listing_creation",
+      suggestions: ["Sell my cycle", "Sell my engineering books", "Sell my laptop"],
+      route: "/upload",
+      routeLabel: "Start a listing",
+      aiPowered: false,
+    };
+  }
+  const [{ draft }, estimate] = await Promise.all([
+    toolHandlers.generateListingDraft({
+      itemDescription: item,
+      category: categoryFromTokens(tokenizeSearchQuery(item)) || undefined,
+    }),
+    toolHandlers.estimateFairPrice({ keyword: item }).catch(() => null),
+  ]);
+  const hasEstimate = estimate && !estimate.error;
+  return {
+    reply: `Here's a starter listing for your **${item}**. Add 1–3 real photos and the condition, then post it.${hasEstimate ? ` Similar listings on campus go for around **${formatRupees(estimate.fair)}**.` : ""}`,
+    intent: "listing_creation",
+    draft,
+    estimate: hasEstimate ? estimate : null,
+    suggestions: ["What photos should I take?", `Fair price for ${item}`, "How do boosts work?"],
+    route: "/upload",
+    routeLabel: "Start a listing",
+    aiPowered: false,
+  };
+};
+
+const buildPriceCheckReply = async (message) => {
+  const item = itemFromMessage(message);
+  if (!item) {
+    return {
+      reply: "Sure! Which item should I price? Tell me what it is (and its condition if you can), and I'll compare it with live campus listings.",
+      intent: "price_estimation",
+      suggestions: ["Fair price for a used cycle", "Fair price for a laptop", "Fair price for engineering books"],
+      aiPowered: false,
+    };
+  }
+  const estimate = await toolHandlers.estimateFairPrice({ keyword: item });
+  if (!estimate || estimate.error) {
+    return {
+      reply: `There aren't enough **${item}** listings on campus yet to estimate a fair price. A good rule of thumb: 50–70% of the original price for items in good condition, lower for visible wear.`,
+      intent: "price_estimation",
+      suggestions: [`Help me sell my ${item}`, "Show trending items", "Fair price for a laptop"],
+      aiPowered: false,
+    };
+  }
+  return {
+    reply: `Based on **${estimate.sampleSize}** campus listing${estimate.sampleSize === 1 ? "" : "s"}, a fair price for **${item}** is around **${formatRupees(estimate.fair)}**.`,
+    intent: "price_estimation",
+    estimate,
+    suggestions: [`Show ${item} listings`, `Help me sell my ${item}`, "What should I check before buying?"],
+    aiPowered: false,
+  };
+};
+
 const SYSTEM_PROMPT = `
-You are UniDeals AI, a friendly campus marketplace shopping assistant for Indian college students.
-You help users understand UniDeals, search products, estimate prices, write listings, compare products, plan budgets, follow website steps, understand terms/privacy rules, and stay safe.
-Always respond naturally and concisely in the user's language (support Hindi/Hinglish).
+You are Unideals AI, a friendly campus marketplace shopping assistant for Indian college students.
+You help users understand Unideals, search products, estimate prices, write listings, compare products, plan budgets, follow website steps, understand terms/privacy rules, and stay safe.
+Always respond naturally and concisely in the SAME language the user wrote in. Default to English; reply in Hindi or Hinglish only when the user's message is in Hindi or Hinglish.
+Keep replies short: 2-5 sentences or a short numbered list. Use **bold** for key points; no headings or tables.
 Use ₹ for all prices, format with Indian number system.
 Available categories: ${Object.values(PRODUCT_CATEGORY_LABELS || {}).join(", ")}.
 Available conditions: ${Object.values(PRODUCT_CONDITION_LABELS || {}).join(", ")}.
@@ -383,9 +572,9 @@ Always recommend meeting in public campus locations.
 Be encouraging about the campus marketplace community.
 
 CRITICAL RULES:
-- You are ONLY a UniDeals assistant. NEVER answer questions unrelated to UniDeals, campus buying/selling, or student marketplace topics.
+- You are ONLY a Unideals assistant. NEVER answer questions unrelated to Unideals, campus buying/selling, or student marketplace topics.
 - NEVER answer from your general training knowledge. Use ONLY the platform knowledge, tools, and Knowledge Base Context provided below.
-- If a user asks something outside your scope, politely redirect: "I'm the UniDeals assistant — I can help with buying, selling, pricing, safety, platform policies, and navigating the platform!"
+- If a user asks something outside your scope, politely redirect: "I'm the Unideals assistant — I can help with buying, selling, pricing, safety, platform policies, and navigating the platform!"
 - If a Knowledge Base Context is provided below, treat it as the ABSOLUTE source of truth and answer from it first before calling tools.
 - For terms, privacy, website navigation, account, upload, wishlist, chat, report, address, and boosting questions, use the Knowledge Base Context BEFORE calling any tools.
 - NEVER invent, guess, or hallucinate policies, rules, prices, timelines, penalties, features, or procedures. ONLY state what is explicitly in the knowledge base or tool results.
@@ -410,7 +599,7 @@ If after exhausting all knowledge base context and tool results you still cannot
 
 PLATFORM CORE GROUNDING:
 - Eligibility: 18+ currently enrolled Indian university students with verified college email. Strict 1 account per person.
-- Role: Intermediary under Section 79 IT Act. UniDeals does NOT hold funds, manage escrow, or arrange delivery. Liability capped at ₹1,000.
+- Role: Intermediary under Section 79 IT Act. Unideals does NOT hold funds, manage escrow, or arrange delivery. Liability capped at ₹1,000.
 - Safety: Meet in public campus spots during daylight (Library Gate, Canteen). Inspect before paying. UPI or cash only at meetup. NEVER pay advance or token money. Beware reverse QR scams.
 - Listing Rules: Selling price cannot exceed original MRP. Max 3 real photos (no stock images). Condition disclosed honestly.
 - Plan entitlements and current prices must be checked against the live plan data or the official pricing page.
@@ -427,7 +616,18 @@ Return ONLY a valid JSON object with this structure:
 
 const CANDIDATE_MODELS = [
   GEMINI_MODEL || "gemini-flash-latest",
+  // Tried in order when the primary model times out or is overloaded (503).
+  // The lite model is a sensible default: it's fast and rarely saturated.
+  ...String(process.env.GEMINI_FALLBACK_MODELS || "gemini-flash-lite-latest")
+    .split(",")
+    .map((model) => model.trim()),
 ].filter(Boolean);
+
+// Per-model budget. Kept short so an overloaded model falls through to the
+// next one quickly instead of leaving the user staring at "thinking...".
+const PER_MODEL_TIMEOUT_MS = Math.min(GEMINI_TIMEOUT, 9000);
+const MODEL_COOLDOWN_MS = 2 * 60_000;
+const modelCooldownUntil = new Map();
 
 const isPlanPricingQuestion = (message) =>
   /\b(?:price|pricing|cost|how much|offer|charge)\b/i.test(message) &&
@@ -444,6 +644,9 @@ const isSupportedAssistantMessage = (message) => {
     return true;
   }
   if (/\b(?:who are you|what can you do|what do you help with)\b/i.test(text)) {
+    return true;
+  }
+  if (SELL_REQUEST_PATTERN.test(text) || PRICE_CHECK_PATTERN.test(text)) {
     return true;
   }
   const knowledgeMatch = findKnowledgeBaseAnswer(text);
@@ -464,7 +667,7 @@ const isSupportedAssistantMessage = (message) => {
   }
 
   const hasProduct = /\b(?:items?|products?|listings?|laptops?|phones?|tablets?|electronics?|headphones?|chargers?|books?|textbooks?|cycles?|bicycles?|bikes?|furniture|clothing|shoes|bags?|backpacks?|cameras?|keyboards?|mice|helmets?|calculators?|monitors?|chairs?|tables?|bottles?|lamps?|hostel essentials|lab equipment|event passes|trip|travel|packing|bundle|essentials)\b/i.test(text);
-  const hasMarketplaceAction = /\b(?:find|search|show|recommend|compare|buy|purchase|sell|list|estimate|price|pricing|cost|worth|budget|under|below|cheaper|similar|available|looking for|need|want|how much|plan)\b/i.test(text);
+  const hasMarketplaceAction = /\b(?:find|finding|search|searching|show|recommend|compare|comparing|buy|buying|bought|purchase|purchasing|sell|selling|list|listing|estimate|price|pricing|priced|cost|worth|budget|under|below|cheaper|cheap|similar|available|looking for|need|want|how much|plan|second[- ]hand|used|inspect|check|tips|advice|keep in mind|negotiate|negotiating|deal)\b/i.test(text);
   return hasProduct && hasMarketplaceAction;
 };
 
@@ -488,7 +691,11 @@ const callGeminiWithFallback = async (params) => {
   }
 
   let lastError = null;
-  const uniqueModels = [...new Set(CANDIDATE_MODELS)];
+  const allModels = [...new Set(CANDIDATE_MODELS)];
+  const now = Date.now();
+  // Skip models that recently timed out / were overloaded, unless every model is.
+  const healthyModels = allModels.filter((model) => (modelCooldownUntil.get(model) || 0) <= now);
+  const uniqueModels = healthyModels.length ? healthyModels : allModels;
 
   for (const model of uniqueModels) {
     try {
@@ -497,7 +704,7 @@ const callGeminiWithFallback = async (params) => {
           ...params,
           model,
         }),
-        6000,
+        PER_MODEL_TIMEOUT_MS,
         `Model ${model}`
       );
       return { response, model };
@@ -521,6 +728,14 @@ const callGeminiWithFallback = async (params) => {
       // If client-side error (bad request, auth), do not retry
       if (status === 400 || status === 401 || status === 403) {
         break;
+      }
+
+      // Overloaded (503), timed out, or retired (404): park this model so the
+      // next requests go straight to a healthy fallback.
+      const isTimeout = /timed out/i.test(String(err.message || ""));
+      if (isTimeout || status === 503 || status === 500 || status === 404) {
+        modelCooldownUntil.set(model, Date.now() + (status === 404 ? 30 * 60_000 : MODEL_COOLDOWN_MS));
+        console.warn(`[Assistant] Model ${model} unavailable (${status || "timeout"}); trying fallback.`);
       }
     }
   }
@@ -564,8 +779,8 @@ const buildMediaReply = async ({ message, attachments = [] }) => {
 
   const isAudio = attachment.mimeType.startsWith("audio/");
   const mediaPrompt = isAudio
-    ? `${message}\nTranscribe the audio exactly, then convert the spoken request into a concise UniDeals marketplace search query. Return only JSON.`
-    : `${message}\nInspect this image, identify the visible product or useful product keywords, and convert them into a concise UniDeals marketplace search query. Return only JSON.`;
+    ? `${message}\nTranscribe the audio exactly, then convert the spoken request into a concise Unideals marketplace search query. Return only JSON.`
+    : `${message}\nInspect this image, identify the visible product or useful product keywords, and convert them into a concise Unideals marketplace search query. Return only JSON.`;
 
   const { response } = await callGeminiWithFallback({
     contents: [{
@@ -631,8 +846,8 @@ const buildMediaReply = async ({ message, attachments = [] }) => {
 
   return {
     reply: isAudio
-      ? `I heard: "${extracted.transcript || rawMediaText}". Here are the closest UniDeals listings:`
-      : `I identified "${searchQuery}" in the image. Here are the closest UniDeals listings:`,
+      ? `I heard: "${extracted.transcript || rawMediaText}". Here are the closest Unideals listings:`
+      : `I identified "${searchQuery}" in the image. Here are the closest Unideals listings:`,
     intent: products.length ? "product_search" : "product_recommendation",
     products,
     productCards: products,
@@ -691,7 +906,7 @@ const fallbackLocalSearch = async (message) => {
     }
 
     // 2. Inspection / Checklist questions
-    if (/\b(inspect|check|checklist|test|condition|look for)\b/i.test(text)) {
+    if (/\b(inspect|check|checklist|test|condition|look for|keep in mind|before buying|second[- ]hand)\b/i.test(text)) {
       let category = "general";
       if (/\b(laptop|phone|monitor|keyboard|electronic|tab|gadget|charger)\b/i.test(text)) category = "electronics";
       else if (/\b(cycle|bike|bicycle|scooter)\b/i.test(text)) category = "vehicles";
@@ -753,9 +968,10 @@ const fallbackLocalSearch = async (message) => {
     }
 
     // 5. Budget Bundle questions
-    if (/\b(budget|bundle|room setup|hostel setup)\b/i.test(text) || (/\b(under|below|for)\b/i.test(text) && /\d{3,6}/.test(text))) {
-      const budgetMatch = text.match(/\d{3,6}/);
-      const budget = budgetMatch ? parseInt(budgetMatch[0], 10) : 5000;
+    if (/\b(budget|bundle|room setup|hostel setup)\b/i.test(text)) {
+      const parsedBudget = parsePriceConstraint(text).maxPrice
+        ?? parseAmount(text.match(/(\d[\d,]*)\s*(k)?\b/i)?.[1], text.match(/(\d[\d,]*)\s*(k)?\b/i)?.[2]);
+      const budget = parsedBudget && parsedBudget > 0 ? parsedBudget : 5000;
       const bundleRes = await toolHandlers.getBudgetBundle({ totalBudget: budget });
       return {
         reply: `🎒 Here is a curated budget bundle within ₹${budget.toLocaleString("en-IN")}:`,
@@ -812,7 +1028,7 @@ const fallbackLocalSearch = async (message) => {
 
     // 8. General conversational / Helpful redirect (Never return random product cards for general queries!)
     return {
-      reply: "I'm UniDeals AI — your campus marketplace assistant! 🎓\n\nI can help you with:\n• 🔍 Finding campus products, electronics, cycles, and books\n• 💰 Estimating fair selling prices\n• 📝 Writing product listings\n• 🛡️ Campus safety tips and scam avoidance\n• 📖 Platform rules, policies, and procedures\n\nHow can I help you today?",
+      reply: "I'm Unideals AI — your campus marketplace assistant! 🎓\n\nI can help you with:\n• 🔍 Finding campus products, electronics, cycles, and books\n• 💰 Estimating fair selling prices\n• 📝 Writing product listings\n• 🛡️ Campus safety tips and scam avoidance\n• 📖 Platform rules, policies, and procedures\n\nHow can I help you today?",
       intent: "conversation",
       suggestions: [
         "How do I avoid scams?",
@@ -823,7 +1039,7 @@ const fallbackLocalSearch = async (message) => {
     };
   } catch (err) {
     return {
-      reply: "I'm UniDeals AI — I can help you find products, estimate fair prices, write listings, compare deals, plan budgets, check safety tips, navigate the platform, and answer policy questions. What would you like help with?",
+      reply: "I'm Unideals AI — I can help you find products, estimate fair prices, write listings, compare deals, plan budgets, check safety tips, navigate the platform, and answer policy questions. What would you like help with?",
       intent: "conversation",
       suggestions: [
         "Find a cycle under ₹3000",
@@ -835,7 +1051,10 @@ const fallbackLocalSearch = async (message) => {
   }
 };
 
-export const buildAssistantReply = async ({ message, history = [], user = null, attachments = [] }) => {
+export const buildAssistantReply = (params = {}) =>
+  runWithViewer(params.user, () => buildAssistantReplyForViewer(params));
+
+const buildAssistantReplyForViewer = async ({ message, history = [], user = null, attachments = [] }) => {
   if (!message || typeof message !== "string" || message.trim() === "") {
     throw new Error("Message is required");
   }
@@ -854,8 +1073,21 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
     !isSupportedAssistantMessage(message) &&
     !hasMarketplaceFollowUpContext
   ) {
+    // A bare product name ("iphone", "casio calculator") isn't off-topic.
+    if (isShoppingQuery(message)) {
+      try {
+        const direct = await toolHandlers.searchProducts({ query: message, limit: 6 });
+        // Known product words get a "not found + alternatives" answer even with
+        // zero hits; unknown words only count as a search when something matches.
+        if (direct.products.length || categoryFromTokens(tokenizeSearchQuery(message))) {
+          return await buildDirectSearchReply(message);
+        }
+      } catch (error) {
+        console.warn("[Assistant] Direct search failed:", error.message || error);
+      }
+    }
     return {
-      reply: "I'm the UniDeals assistant. I can help with campus marketplace listings, prices, buying and selling, platform policies, and transaction safety. What would you like help with?",
+      reply: "I'm the Unideals assistant. I can help with campus marketplace listings, prices, buying and selling, platform policies, and transaction safety. What would you like help with?",
       intent: "out_of_scope",
       products: [],
       suggestions: ["Find a campus listing", "Check a fair price", "Get safe buying tips"],
@@ -928,6 +1160,28 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
         aiPowered: false,
         error: error.message,
       };
+    }
+  }
+
+  if (!attachments.length && !isFollowUp && isShoppingQuery(message)) {
+    try {
+      const direct = await buildDirectSearchReply(message);
+      setCachedReply(message, direct);
+      return direct;
+    } catch (error) {
+      console.warn("[Assistant] Direct search failed:", error.message || error);
+    }
+  }
+
+  if (!attachments.length && !isFollowUp && (SELL_REQUEST_PATTERN.test(message) || PRICE_CHECK_PATTERN.test(message))) {
+    try {
+      const quick = SELL_REQUEST_PATTERN.test(message)
+        ? await buildSellReply(message)
+        : await buildPriceCheckReply(message);
+      setCachedReply(message, quick);
+      return quick;
+    } catch (error) {
+      console.warn("[Assistant] Quick action failed:", error.message || error);
     }
   }
 
@@ -1182,7 +1436,7 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
         intent: knowledgeMatch ? "knowledge_base" : "conversation",
         suggestions: knowledgeMatch?.suggestions || [
           "Show trending items",
-          "How do I sell on UniDeals?",
+          "How do I sell on Unideals?",
           "Safety tips for meetups",
         ],
       };
@@ -1191,19 +1445,19 @@ export const buildAssistantReply = async ({ message, history = [], user = null, 
     const result = {
       reply: parsed.reply || text,
       intent: parsed.intent || (knowledgeMatch ? "knowledge_base" : inferIntentFromTools(toolsUsed)),
-      products: parsed.products || collectedProducts,
+      products: collectedProducts || [],
       suggestions:
         parsed.suggestions || knowledgeMatch?.suggestions || [
           "Show trending items",
           "Help me sell",
           "Safety tips",
         ],
-      estimate: parsed.estimate || collectedEstimate,
+      estimate: collectedEstimate && !collectedEstimate.error ? collectedEstimate : null,
       draft: parsed.draft || collectedDraft,
-      comparison: parsed.comparison || collectedComparison,
-      checklist: parsed.checklist || collectedChecklist,
-      bundle: parsed.bundle || collectedBundle,
-      safetyTips: parsed.safetyTips || collectedSafetyTips,
+      comparison: collectedComparison,
+      checklist: collectedChecklist,
+      bundle: collectedBundle,
+      safetyTips: collectedSafetyTips,
       sources: knowledgeMatch ? [knowledgeMatch.source] : parsed.sources,
       route: knowledgeMatch?.route || parsed.route,
       aiPowered: true,
@@ -1223,7 +1477,7 @@ export const buildEnhanceListingReply = async ({
   category,
 }) => {
   const prompt = `
-You are an expert copywriter for UniDeals, a campus marketplace.
+You are an expert copywriter for Unideals, a campus marketplace.
 Enhance the following item details into a highly compelling, structured product listing for college students.
 Item Description: ${itemDescription}
 Condition: ${condition || "Not specified"}
@@ -1275,7 +1529,7 @@ Asking Price: ₹${askingPrice}
 Offer Price: ₹${offerPrice}
 User Role: ${userRole} (buyer or seller)
 
-Provide friendly, actionable advice on how to respond to this offer. 
+Provide friendly, actionable advice on how to respond to this offer.
 Keep it under 3 sentences and suggest a fair counter-offer if applicable.
 `;
 

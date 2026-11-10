@@ -29,6 +29,10 @@ export const getProducts = async (query = {}) => {
     match.status = query.status;
   }
 
+  if (typeof query.campus === "string" && ObjectId.isValid(query.campus.trim())) {
+    match.campus_id = new ObjectId(query.campus.trim());
+  }
+
   if (query.category?.trim() && !query.category.includes("All")) {
     match.category = { $regex: new RegExp(`^${escapeRegex(query.category.trim())}$`, "i") };
   }
@@ -51,10 +55,15 @@ export const getProducts = async (query = {}) => {
     },
   ];
 
+  // Per-status totals for the admin tabs: same filters, minus status.
+  const { status: _ignoredStatus, ...matchWithoutStatus } = match;
+  const countPipeline = [{ $match: matchWithoutStatus }];
+  let searchStage = null;
+
   if (query.search?.trim()) {
     const searchText = query.search.trim();
     const safeSearch = escapeRegex(searchText);
-    pipeline.push({
+    pipeline.push(searchStage = {
       $match: {
         $or: [
           { title: { $regex: safeSearch, $options: "i" } },
@@ -137,12 +146,32 @@ export const getProducts = async (query = {}) => {
     },
   );
 
-  const [result] = await Product.aggregate(pipeline);
+  if (searchStage) {
+    countPipeline.push(
+      { $lookup: { from: "users", localField: "seller_id", foreignField: "_id", as: "seller" } },
+      { $unwind: { path: "$seller", preserveNullAndEmptyArrays: true } },
+      searchStage,
+    );
+  }
+  countPipeline.push({ $group: { _id: "$status", count: { $sum: 1 } } });
+
+  const [[result], statusRows] = await Promise.all([
+    Product.aggregate(pipeline),
+    Product.aggregate(countPipeline).catch(() => []),
+  ]);
   const total = result?.total?.[0]?.count || 0;
+
+  const statusCounts = { all: 0 };
+  for (const row of statusRows) {
+    if (!row._id) continue;
+    statusCounts[row._id] = row.count;
+    statusCounts.all += row.count;
+  }
 
   return {
     data: result?.data || [],
     pagination: buildPagination(total, page, limit),
+    statusCounts,
   };
 };
 

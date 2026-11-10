@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import AuditLog from "../models/AuditLog.model.js";
 
 /**
@@ -48,7 +49,7 @@ export const getAuditLogs = async (query = {}) => {
   }
 
   if (query.target_type) {
-    const validTypes = ["user", "product", "campus", "report"];
+    const validTypes = ["user", "product", "campus", "report", "order"];
     if (validTypes.includes(query.target_type)) {
       match.target_type = query.target_type;
     }
@@ -59,6 +60,18 @@ export const getAuditLogs = async (query = {}) => {
     if (validRoles.includes(query.actor_role)) {
       match.actor_role = query.actor_role;
     }
+  }
+
+  if (typeof query.actor_id === "string" && mongoose.Types.ObjectId.isValid(query.actor_id)) {
+    match.actor_id = new mongoose.Types.ObjectId(query.actor_id);
+  }
+
+  const from = query.from ? new Date(query.from) : null;
+  const to = query.to ? new Date(query.to) : null;
+  if ((from && !Number.isNaN(from.getTime())) || (to && !Number.isNaN(to.getTime()))) {
+    match.createdAt = {};
+    if (from && !Number.isNaN(from.getTime())) match.createdAt.$gte = from;
+    if (to && !Number.isNaN(to.getTime())) match.createdAt.$lte = to;
   }
 
   const [total, entries] = await Promise.all([

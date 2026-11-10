@@ -1,5 +1,5 @@
 ﻿/**
- * UniDeals AI Assistant Knowledge Base — COMPREHENSIVE EDITION v3.0
+ * Unideals AI Assistant Knowledge Base — COMPREHENSIVE EDITION v3.0
  * 40+ dense structured entries covering every aspect of the platform,
  * from extreme basics to extreme advanced policies and procedures.
  *
@@ -23,7 +23,7 @@ const makeEntry = ({
   answer,
   steps = [],
   route = null,
-  source = "UniDeals knowledge base",
+  source = "Unideals knowledge base",
   suggestions = [],
 }) => ({
   id,
@@ -85,7 +85,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
 
   makeEntry({
     id: "what_is_unideals",
-    title: "What is UniDeals?",
+    title: "What is Unideals?",
     keywords: [
       "what is unideals", "what is this", "about unideals", "unideals kya hai",
       "ye kya hai", "tell me about", "what is campus mart", "what is this app",
@@ -95,22 +95,22 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "campus marketplace", "student marketplace", "peer to peer",
     ],
     answer:
-      "UniDeals (Campus-Mart) is a peer-to-peer campus marketplace built exclusively for verified Indian college students. It lets you buy, sell, and exchange pre-owned items — electronics, cycles, books, hostel essentials, clothing, lab equipment, event passes, and more — safely within your own campus community. Think of it as OLX, but only for your campus, with student verification, AI-powered price estimates, smart listing tools, in-app chat, boost features, and subscription plans designed for student budgets.",
+      "Unideals (Campus-Mart) is a peer-to-peer campus marketplace built exclusively for verified Indian college students. It lets you buy, sell, and exchange pre-owned items — electronics, cycles, books, hostel essentials, clothing, lab equipment, event passes, and more — safely within your own campus community. Think of it as OLX, but only for your campus, with student verification, AI-powered price estimates, smart listing tools, in-app chat, boost features, and subscription plans designed for student budgets.",
     steps: [
       "Students sign up and verify their college email to join.",
       "Sellers upload listings with photos, price, condition, and a campus pickup location.",
       "Buyers browse, search by category, or ask the AI assistant to find deals.",
       "Buyer and seller negotiate via in-app chat.",
       "They meet at a safe public campus spot, inspect the item, and exchange payment (UPI/cash).",
-      "UniDeals never handles money — all transactions happen directly between students.",
+      "Unideals never handles money — all transactions happen directly between students.",
     ],
     route: "/",
-    suggestions: ["How do I sign up?", "Is UniDeals free?", "How do I sell something?"],
+    suggestions: ["How do I sign up?", "Is Unideals free?", "How do I sell something?"],
   }),
 
   makeEntry({
     id: "who_can_use",
-    title: "Who Can Use UniDeals? — Eligibility",
+    title: "Who Can Use Unideals? — Eligibility",
     keywords: [
       "who can use", "eligibility", "eligible", "college student", "university",
       "age limit", "age requirement", "koun use kar sakta", "student only",
@@ -120,7 +120,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "one account per person", "duplicate account policy",
     ],
     answer:
-      "UniDeals is exclusively for students aged 18+ currently enrolled at a recognized Indian college or university. You must verify your student email (e.g., @college.edu, @domain.ac.in) to access selling, chatting, wishlisting, and all protected features. Guest browsing of public listings is allowed without an account. Alumni, faculty, school students, and non-students cannot use the marketplace. Strict one account per person — duplicate or fake accounts are permanently banned without appeal.",
+      "Unideals is exclusively for students aged 18+ currently enrolled at a recognized Indian college or university. You must verify your student email (e.g., @college.edu, @domain.ac.in) to access selling, chatting, wishlisting, and all protected features. Guest browsing of public listings is allowed without an account. Alumni, faculty, school students, and non-students cannot use the marketplace. Strict one account per person — duplicate or fake accounts are permanently banned without appeal.",
     steps: [
       "Must be at least 18 years old.",
       "Must be an active student at a recognized Indian college or university.",
@@ -130,12 +130,12 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "Alumni, faculty, staff, school students, and non-students are NOT eligible.",
     ],
     route: "/signup",
-    suggestions: ["How do I verify my email?", "Can alumni use UniDeals?", "How do I sign up?"],
+    suggestions: ["How do I verify my email?", "Can alumni use Unideals?", "How do I sign up?"],
   }),
 
   makeEntry({
     id: "is_it_free",
-    title: "Is UniDeals Free? — Cost & Charges",
+    title: "Is Unideals Free? — Cost & Charges",
     keywords: [
       "is it free", "free hai kya", "cost", "charge", "paisa lagta hai",
       "fees", "kharcha", "subscription zaruri", "do i need to pay",
@@ -144,7 +144,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "transaction fee", "no commission", "0 commission",
     ],
     answer:
-      "Yes, UniDeals is free to use for browsing, searching, wishlisting, chatting, and buying. The Free plan includes up to 10 active listings and 25 wishlist saves, and UniDeals does not charge commission on transactions. Optional paid plans add listing capacity, monthly boosts, and search priority. Check the pricing page (/price) for current prices and offers.",
+      "Yes, Unideals is free to use for browsing, searching, wishlisting, chatting, and buying. The Free plan includes up to 10 active listings and 25 wishlist saves, and Unideals does not charge commission on transactions. Optional paid plans add listing capacity, monthly boosts, and search priority. Check the pricing page (/price) for current prices and offers.",
     steps: [
       "Sign up for free with your college email.",
       "Free plan: 10 active listings, 25 wishlist saves, standard search visibility.",
@@ -159,7 +159,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
 
   makeEntry({
     id: "how_it_works",
-    title: "How Does UniDeals Work? — Full Process",
+    title: "How Does Unideals Work? — Full Process",
     keywords: [
       "how does it work", "how it works", "kaise kaam karta", "kaise use kare",
       "explain the process", "buying selling process", "step by step",
@@ -168,7 +168,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "how does buying work", "how does selling work", "samjhao",
     ],
     answer:
-      "UniDeals works in 6 simple steps: Sign up → List or Browse → Chat → Meet on Campus → Inspect → Pay & Exchange. Sellers create listings with photos and pricing. Buyers find items via search, categories, or the AI assistant. All negotiations happen through in-app chat. Meetups must be at public campus locations. Payment (UPI or cash) happens only AFTER the buyer inspects the item in person. UniDeals never handles money or arranges shipping — it's a direct peer-to-peer exchange.",
+      "Unideals works in 6 simple steps: Sign up → List or Browse → Chat → Meet on Campus → Inspect → Pay & Exchange. Sellers create listings with photos and pricing. Buyers find items via search, categories, or the AI assistant. All negotiations happen through in-app chat. Meetups must be at public campus locations. Payment (UPI or cash) happens only AFTER the buyer inspects the item in person. Unideals never handles money or arranges shipping — it's a direct peer-to-peer exchange.",
     steps: [
       "Step 1: Sign up with your college email and verify your account.",
       "Step 2 (Sellers): Upload your item with photos, price, condition, and pickup address.",
@@ -184,7 +184,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
 
   makeEntry({
     id: "campus_coverage",
-    title: "Which Colleges Does UniDeals Cover?",
+    title: "Which Colleges Does Unideals Cover?",
     keywords: [
       "which college", "campus coverage", "my college", "available at",
       "supported college", "kaunsa college", "mere college mein", "city",
@@ -192,16 +192,16 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "is my college supported", "does it work at my college", "available in my city",
     ],
     answer:
-      "UniDeals is designed for ALL recognized Indian colleges and universities. As long as you have a valid student email from a recognized institution, you can join. The marketplace works best when multiple students from the same campus join, so invite your hostel-mates and classmates! The more students on your campus, the more deals you'll find and the faster items sell.",
+      "Unideals is designed for ALL recognized Indian colleges and universities. As long as you have a valid student email from a recognized institution, you can join. The marketplace works best when multiple students from the same campus join, so invite your hostel-mates and classmates! The more students on your campus, the more deals you'll find and the faster items sell.",
     steps: [
       "Any recognized Indian college or university student can join.",
       "You need a valid student email to verify your account.",
       "The platform becomes more useful as more students from your campus join.",
-      "Share UniDeals with hostel-mates and classmates to build your campus marketplace.",
+      "Share Unideals with hostel-mates and classmates to build your campus marketplace.",
       "There is no college-specific approval needed — your student email is sufficient.",
     ],
     route: "/signup",
-    suggestions: ["How do I sign up?", "How do I invite friends?", "Is UniDeals free?"],
+    suggestions: ["How do I sign up?", "How do I invite friends?", "Is Unideals free?"],
   }),
 
   // ═══════════════════════════════════════════════════
@@ -219,7 +219,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "unable to login", "password nahi pata", "password yaad nahi",
     ],
     answer:
-      "If you've forgotten your password, use the 'Forgot Password' link on the login page. You'll receive a password reset email at your registered address. Click the reset link (valid for a limited time), set a new password, and log in. If you signed up with Google OAuth, you don't have a separate UniDeals password — just click 'Sign in with Google'.",
+      "If you've forgotten your password, use the 'Forgot Password' link on the login page. You'll receive a password reset email at your registered address. Click the reset link (valid for a limited time), set a new password, and log in. If you signed up with Google OAuth, you don't have a separate Unideals password — just click 'Sign in with Google'.",
     steps: [
       "Go to the Login page (/login).",
       "Click 'Forgot Password' below the login form.",
@@ -246,7 +246,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "account deletion", "how long does account deletion take", "deletion take",
     ],
     answer:
-      "To delete your UniDeals account and associated data, email privacy@campusmart.in with your registered email and a deletion request. Your account, listings, chat history, and personal data will be permanently removed within 30 days. Some records may be retained if required by Indian law (e.g., fraud investigations). This action is irreversible — all your listings, wishlist, and chat history will be permanently lost.",
+      "To delete your Unideals account and associated data, email privacy@campusmart.in with your registered email and a deletion request. Your account, listings, chat history, and personal data will be permanently removed within 30 days. Some records may be retained if required by Indian law (e.g., fraud investigations). This action is irreversible — all your listings, wishlist, and chat history will be permanently lost.",
     steps: [
       "Send an email to privacy@campusmart.in from your registered email.",
       "Subject line: 'Account Deletion Request'.",
@@ -258,7 +258,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "Records required for fraud investigations or legal compliance may be retained longer.",
     ],
     route: "/settings",
-    suggestions: ["What data does UniDeals collect?", "How do I change my password?", "Contact support"],
+    suggestions: ["What data does Unideals collect?", "How do I change my password?", "Contact support"],
   }),
 
   makeEntry({
@@ -270,12 +270,12 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "social login", "one click login", "google button", "google authentication",
     ],
     answer:
-      "UniDeals supports Google OAuth2 for quick, secure sign-in. Click 'Sign in with Google' on the login or signup page, select your Google account, and your UniDeals account is created instantly — no separate password needed. You can update your display name and other details later in Settings. Note: Google OAuth users manage passwords via Google account settings.",
+      "Unideals supports Google OAuth2 for quick, secure sign-in. Click 'Sign in with Google' on the login or signup page, select your Google account, and your Unideals account is created instantly — no separate password needed. You can update your display name and other details later in Settings. Note: Google OAuth users manage passwords via Google account settings.",
     steps: [
       "Go to the Login or Signup page.",
       "Click the 'Sign in with Google' button.",
       "Select your Google account from the popup.",
-      "Your UniDeals account is created automatically.",
+      "Your Unideals account is created automatically.",
       "Update your profile details in Settings if needed.",
       "To change your display name, go to Settings → Edit Profile.",
     ],
@@ -294,10 +294,10 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "student email required", "college email required", "ac.in email",
     ],
     answer:
-      "Email verification confirms you're a real student at a recognized Indian college. After signing up, check your inbox for a verification email from UniDeals. Click the verification link to activate your account. Verified accounts unlock: listing products, wishlisting, chatting with sellers, and all protected features. Without verification, you can only browse public listings. If the email doesn't arrive, check spam or request a resend.",
+      "Email verification confirms you're a real student at a recognized Indian college. After signing up, check your inbox for a verification email from Unideals. Click the verification link to activate your account. Verified accounts unlock: listing products, wishlisting, chatting with sellers, and all protected features. Without verification, you can only browse public listings. If the email doesn't arrive, check spam or request a resend.",
     steps: [
       "Sign up with your student/university email.",
-      "Check your inbox for the verification email from UniDeals.",
+      "Check your inbox for the verification email from Unideals.",
       "If not in inbox, check the Spam/Junk folder.",
       "Click the verification link in the email.",
       "Your account is now verified — all features are unlocked!",
@@ -341,7 +341,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "full terms", "all rules", "complete terms",
     ],
     answer:
-      "UniDeals operates as a Section 79 IT Act intermediary — a technology facilitator, not a party to transactions. Key rules: Must be 18+, active Indian college student, one verified account per person. Post honest listings of legally owned items, meet safely on campus, and avoid prohibited items or fraudulent activities. Violations result in warnings, suspension, or permanent ban. Platform liability is capped at ₹1,000 under Indian law. Governing law: Republic of India, IT Act 2000, DPDP Act 2023.",
+      "Unideals operates as a Section 79 IT Act intermediary — a technology facilitator, not a party to transactions. Key rules: Must be 18+, active Indian college student, one verified account per person. Post honest listings of legally owned items, meet safely on campus, and avoid prohibited items or fraudulent activities. Violations result in warnings, suspension, or permanent ban. Platform liability is capped at ₹1,000 under Indian law. Governing law: Republic of India, IT Act 2000, DPDP Act 2023.",
     steps: [
       "Use only one verified student account.",
       "Post accurate product details, real photos, honest prices, and a campus pickup location.",
@@ -357,7 +357,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
 
   makeEntry({
     id: "prohibited_items",
-    title: "What Items Are Prohibited on UniDeals?",
+    title: "What Items Are Prohibited on Unideals?",
     keywords: [
       "prohibited items", "banned items", "not allowed", "what can i sell",
       "restricted items", "illegal items", "kya nahi bech sakte", "banned products",
@@ -372,7 +372,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "hazardous chemicals", "flammable", "medical equipment",
     ],
     answer:
-      "UniDeals strictly prohibits: Alcohol, drugs, tobacco, e-cigarettes, prescription medicines. Weapons (knives, firearms, explosives). Counterfeit/fake products, stolen goods. Adult/explicit content. Exam leaks, answer keys, academic dishonesty materials, contract cheating services. Bulk commercial reselling or dropshipping (not personal student sales). Digital-only products or services/freelancing. Hazardous chemicals, flammable liquids. Banned activities: Bait-and-switch pricing, misrepresenting condition, harassment, scraping, off-platform solicitation. Violations = listing removal + account penalties up to permanent ban.",
+      "Unideals strictly prohibits: Alcohol, drugs, tobacco, e-cigarettes, prescription medicines. Weapons (knives, firearms, explosives). Counterfeit/fake products, stolen goods. Adult/explicit content. Exam leaks, answer keys, academic dishonesty materials, contract cheating services. Bulk commercial reselling or dropshipping (not personal student sales). Digital-only products or services/freelancing. Hazardous chemicals, flammable liquids. Banned activities: Bait-and-switch pricing, misrepresenting condition, harassment, scraping, off-platform solicitation. Violations = listing removal + account penalties up to permanent ban.",
     steps: [
       "Banned: Alcohol, drugs, tobacco, prescription medicines, e-cigarettes.",
       "Banned: Weapons (knives, firearms, explosives, edged weapons).",
@@ -400,13 +400,13 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "no escrow", "no refund from platform", "platform not liable",
     ],
     answer:
-      "UniDeals acts as a technology intermediary under Section 79 of the Information Technology Act, 2000 — it facilitates connections but is NOT a party to any transaction. Platform liability is capped at ₹1,000 under Indian law. UniDeals does not hold funds, arrange escrow, process payments, manage delivery, or guarantee transaction outcomes. For financial disputes, students must resolve through appropriate legal channels. UniDeals cooperates with law enforcement for criminal activity reports. Legal notices: legal@campusmart.in. Governed by the laws of India; jurisdiction: Indian courts.",
+      "Unideals acts as a technology intermediary under Section 79 of the Information Technology Act, 2000 — it facilitates connections but is NOT a party to any transaction. Platform liability is capped at ₹1,000 under Indian law. Unideals does not hold funds, arrange escrow, process payments, manage delivery, or guarantee transaction outcomes. For financial disputes, students must resolve through appropriate legal channels. Unideals cooperates with law enforcement for criminal activity reports. Legal notices: legal@campusmart.in. Governed by the laws of India; jurisdiction: Indian courts.",
     steps: [
-      "UniDeals is a Section 79 IT Act intermediary — not a participant in transactions.",
+      "Unideals is a Section 79 IT Act intermediary — not a participant in transactions.",
       "Platform liability is capped at ₹1,000 under Indian law.",
-      "UniDeals does not hold funds, manage escrow, or process payments.",
+      "Unideals does not hold funds, manage escrow, or process payments.",
       "For financial disputes, students must seek resolution through appropriate legal channels.",
-      "UniDeals cooperates with law enforcement in cases of reported fraud or crime.",
+      "Unideals cooperates with law enforcement in cases of reported fraud or crime.",
       "Legal notices and formal complaints: legal@campusmart.in.",
       "All platform activities are governed by the laws of the Republic of India.",
     ],
@@ -427,7 +427,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "refund after ban", "ban refund",
     ],
     answer:
-      "UniDeals moderation team reviews flagged content within 2 hours. Penalty ladder: 1st violation = Warning issued + listing removed. 2nd violation = Temporary suspension (7-30 days depending on severity). 3rd violation OR any serious offense (fraud, prohibited items, harassment, criminal activity) = Permanent account ban. Permanently banned users cannot create new accounts. Appeals against suspension can be submitted to support@campusmart.in with supporting evidence. Banned accounts are NOT entitled to subscription refunds. False reports to manipulate the system are also penalized.",
+      "Unideals moderation team reviews flagged content within 2 hours. Penalty ladder: 1st violation = Warning issued + listing removed. 2nd violation = Temporary suspension (7-30 days depending on severity). 3rd violation OR any serious offense (fraud, prohibited items, harassment, criminal activity) = Permanent account ban. Permanently banned users cannot create new accounts. Appeals against suspension can be submitted to support@campusmart.in with supporting evidence. Banned accounts are NOT entitled to subscription refunds. False reports to manipulate the system are also penalized.",
     steps: [
       "1st violation: Warning + listing removed.",
       "2nd violation: Temporary suspension (7-30 days based on severity).",
@@ -455,7 +455,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "sell my item", "upload product", "post item", "list item",
     ],
     answer:
-      "To sell on UniDeals: Go to Upload (/upload) → Fill title, category, condition, usage duration, and description (use AI Polish for auto-generation!) → Upload 1-3 real photos → Set original price and selling price (selling price CANNOT exceed original price) → Toggle 'Negotiable' if applicable → Add a public campus pickup address → Accept T&C → Preview → Publish. Your listing goes live immediately for all campus students!",
+      "To sell on Unideals: Go to Upload (/upload) → Fill title, category, condition, usage duration, and description (use AI Polish for auto-generation!) → Upload 1-3 real photos → Set original price and selling price (selling price CANNOT exceed original price) → Toggle 'Negotiable' if applicable → Add a public campus pickup address → Accept T&C → Preview → Publish. Your listing goes live immediately for all campus students!",
     steps: [
       "Go to Upload from the menu (or click the + / Sell button in the navbar).",
       "Enter a clear, accurate Product Title (e.g., 'Dell Laptop 8GB RAM — Used 1 Year').",
@@ -582,7 +582,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "why is price capped", "price rule policy", "price limit rule",
     ],
     answer:
-      "The selling price on UniDeals CANNOT exceed the original MRP or purchase price of the item. This rule ensures fair dealing in the campus marketplace — UniDeals is for students to sell pre-owned items at fair or discounted prices, not for commercial reselling at a profit. If you try to set a price above the original, the listing will fail to publish. For items without a clear original price, use a reasonable market estimate.",
+      "The selling price on Unideals CANNOT exceed the original MRP or purchase price of the item. This rule ensures fair dealing in the campus marketplace — Unideals is for students to sell pre-owned items at fair or discounted prices, not for commercial reselling at a profit. If you try to set a price above the original, the listing will fail to publish. For items without a clear original price, use a reasonable market estimate.",
     steps: [
       "Selling price must be LESS THAN OR EQUAL TO the original purchase price/MRP.",
       "You cannot list an item at a higher price than what you originally paid for it.",
@@ -604,7 +604,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "listing kab tak", "does listing expire", "permanent listing",
     ],
     answer:
-      "Listings on UniDeals stay active indefinitely until you manually remove them, mark them as sold, or they're removed by moderation. There is NO automatic expiry. However, keep listings updated — mark items as sold or remove them when they're no longer available to avoid misleading buyers. Boosted listings have a timed visibility boost (3 or 7 days), but the listing itself stays active.",
+      "Listings on Unideals stay active indefinitely until you manually remove them, mark them as sold, or they're removed by moderation. There is NO automatic expiry. However, keep listings updated — mark items as sold or remove them when they're no longer available to avoid misleading buyers. Boosted listings have a timed visibility boost (3 or 7 days), but the listing itself stays active.",
     steps: [
       "Listings remain active indefinitely until manually removed.",
       "Mark items as 'Sold' when the deal is complete or item is no longer available.",
@@ -654,7 +654,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "kaise order kare", "buyer process", "buying steps",
     ],
     answer:
-      "To buy on UniDeals: Search/Browse → Click a product card → Review details → Chat with seller → Negotiate → Confirm meetup → Inspect in person → Pay ONLY after inspection. Payment via UPI or cash at the meetup location. Never pay advance online.",
+      "To buy on Unideals: Search/Browse → Click a product card → Review details → Chat with seller → Negotiate → Confirm meetup → Inspect in person → Pay ONLY after inspection. Payment via UPI or cash at the meetup location. Never pay advance online.",
     steps: [
       "Browse Home, Search, or a Category page.",
       "Open a product card to view photos, price, condition, seller details, and pickup area.",
@@ -679,10 +679,10 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "price discuss", "is price final", "can i negotiate", "bargain karna",
     ],
     answer:
-      "Many UniDeals listings are marked 'Negotiable'. To negotiate: Open Chat with the seller, politely suggest a counter-offer based on research. A good rule of thumb: offer 10-20% below asking price for negotiable listings. Research similar items on UniDeals first to back your offer with data. Be respectful — remember you're dealing with a fellow student. Never lowball aggressively — it discourages sellers.",
+      "Many Unideals listings are marked 'Negotiable'. To negotiate: Open Chat with the seller, politely suggest a counter-offer based on research. A good rule of thumb: offer 10-20% below asking price for negotiable listings. Research similar items on Unideals first to back your offer with data. Be respectful — remember you're dealing with a fellow student. Never lowball aggressively — it discourages sellers.",
     steps: [
       "Check if the listing is marked 'Negotiable' on the product page.",
-      "Research similar items on UniDeals to understand fair pricing.",
+      "Research similar items on Unideals to understand fair pricing.",
       "Open in-app Chat with the seller.",
       "Politely suggest your offer with a reason (e.g., 'I found a similar one for ₹X').",
       "Be willing to meet in the middle — suggest a fair counter-offer.",
@@ -695,7 +695,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
 
   makeEntry({
     id: "return_refund",
-    title: "Return Policy and Refunds — No Returns on UniDeals",
+    title: "Return Policy and Refunds — No Returns on Unideals",
     keywords: [
       "return", "refund", "return policy", "money back", "paisa wapas",
       "defective item", "broken item", "not as described", "exchange",
@@ -705,9 +705,9 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "return policy campus", "no returns policy",
     ],
     answer:
-      "UniDeals is a peer-to-peer marketplace — it does NOT process returns, refunds, or exchanges between students. This is exactly why we require you to INSPECT BEFORE PAYING. If the item doesn't match the listing, do NOT pay — walk away and report the seller. For serious fraud (scam, theft), contact campus security or local police FIRST, then email support@campusmart.in with evidence.",
+      "Unideals is a peer-to-peer marketplace — it does NOT process returns, refunds, or exchanges between students. This is exactly why we require you to INSPECT BEFORE PAYING. If the item doesn't match the listing, do NOT pay — walk away and report the seller. For serious fraud (scam, theft), contact campus security or local police FIRST, then email support@campusmart.in with evidence.",
     steps: [
-      "UniDeals does NOT process returns, refunds, or exchanges — transactions are between students directly.",
+      "Unideals does NOT process returns, refunds, or exchanges — transactions are between students directly.",
       "ALWAYS inspect the item thoroughly before making payment — this is your only protection.",
       "Test electronics (power on, check ports, test battery) before paying.",
       "If item doesn't match listing: do NOT pay — walk away.",
@@ -731,14 +731,14 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "pay before inspection", "pay online before meeting",
     ],
     answer:
-      "UniDeals supports direct peer-to-peer payments. Preferred: UPI (GPay, PhonePe, Paytm) or Cash at the time of in-person exchange AFTER inspecting the item. UniDeals does NOT handle payments, escrow, or act as a payment intermediary. NEVER send advance payments before seeing the item. NEVER scan QR codes from sellers claiming to 'receive' money — this is a common reversal fraud. No card payments, no bank transfers, no crypto.",
+      "Unideals supports direct peer-to-peer payments. Preferred: UPI (GPay, PhonePe, Paytm) or Cash at the time of in-person exchange AFTER inspecting the item. Unideals does NOT handle payments, escrow, or act as a payment intermediary. NEVER send advance payments before seeing the item. NEVER scan QR codes from sellers claiming to 'receive' money — this is a common reversal fraud. No card payments, no bank transfers, no crypto.",
     steps: [
       "Preferred: UPI payment (GPay, PhonePe, Paytm) AT THE MEETUP after inspection.",
       "Alternative: Cash payment at the meetup location after inspection.",
       "NEVER send advance payments or token amounts before inspecting the item.",
       "NEVER scan QR codes from sellers claiming you'll 'receive' money (reversal scam).",
       "Verify payment confirmation on YOUR OWN banking app.",
-      "UniDeals does not handle money, escrow, or act as a payment intermediary.",
+      "Unideals does not handle money, escrow, or act as a payment intermediary.",
       "No card payments, no bank transfers, no crypto — only UPI/cash in-person.",
     ],
     route: "/",
@@ -751,7 +751,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
 
   makeEntry({
     id: "how_to_avoid_scams",
-    title: "How to Avoid Scams & Stay Safe on UniDeals",
+    title: "How to Avoid Scams & Stay Safe on Unideals",
     keywords: [
       "avoid scams", "avoid scam", "how to avoid scams", "how to avoid scam",
       "how do i avoid scams", "how to stay safe", "stay safe", "safety tips",
@@ -761,7 +761,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "what are common scam signs", "how do i stay safe", "campus safety",
     ],
     answer:
-      "To avoid scams and trade safely on UniDeals, follow these core safety rules: 1. NEVER pay in advance — no token amounts, booking deposits, or advance UPI before inspecting the item in person. 2. Always meet in public, busy campus spots during daylight (Library Gate, Main Canteen, Student Activity Center). 3. Always inspect and test the item thoroughly before paying (power on electronics, check condition). 4. Beware of Reverse QR scams — NEVER scan a QR code sent by a buyer or seller to 'receive' money. 5. Confirm payments only on YOUR OWN registered banking app, not via screenshots from others. 6. Bring a friend for deals over ₹5,000. 7. Report any suspicious behavior using the flag/report button on the listing or user profile.",
+      "To avoid scams and trade safely on Unideals, follow these core safety rules: 1. NEVER pay in advance — no token amounts, booking deposits, or advance UPI before inspecting the item in person. 2. Always meet in public, busy campus spots during daylight (Library Gate, Main Canteen, Student Activity Center). 3. Always inspect and test the item thoroughly before paying (power on electronics, check condition). 4. Beware of Reverse QR scams — NEVER scan a QR code sent by a buyer or seller to 'receive' money. 5. Confirm payments only on YOUR OWN registered banking app, not via screenshots from others. 6. Bring a friend for deals over ₹5,000. 7. Report any suspicious behavior using the flag/report button on the listing or user profile.",
     steps: [
       "Rule 1 (Golden Rule): NEVER send advance payments or token money online before meeting.",
       "Rule 2: Always meet in public, well-lit campus hubs during daylight hours.",
@@ -799,7 +799,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "Submit the report.",
       "Campus moderation team reviews flagged content within 2 hours.",
       "You'll receive a notification once action is taken.",
-      "For urgent safety threats: contact campus security or local police FIRST, then report to UniDeals.",
+      "For urgent safety threats: contact campus security or local police FIRST, then report to Unideals.",
     ],
     route: "/contact",
     suggestions: ["Is advance UPI payment safe?", "What are common scam signs?", "How do I stay safe?"],
@@ -815,7 +815,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "is token money safe", "advance kyu nahi dena chahiye", "advance payment risk",
     ],
     answer:
-      "NEVER pay advance, token, or booking amounts online before meeting and physically inspecting the item. This is the single most important safety rule on UniDeals. Any seller asking for advance payment (online UPI/bank transfer before meetup) is a major red flag and likely a scam. Legitimate sellers will ALWAYS meet you in person first. Pay ONLY after inspecting the item at the meetup, using UPI or cash at the time of exchange.",
+      "NEVER pay advance, token, or booking amounts online before meeting and physically inspecting the item. This is the single most important safety rule on Unideals. Any seller asking for advance payment (online UPI/bank transfer before meetup) is a major red flag and likely a scam. Legitimate sellers will ALWAYS meet you in person first. Pay ONLY after inspecting the item at the meetup, using UPI or cash at the time of exchange.",
     steps: [
       "NEVER pay advance, token, or booking amount online before inspecting the item.",
       "Any seller requesting advance payment is likely a scammer — treat it as a major red flag.",
@@ -893,7 +893,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "deal process", "how deals work", "deal system", "my deals",
     ],
     answer:
-      "UniDeals deals follow a structured lifecycle: Negotiating → Offer Accepted → Deal Confirmed → Pickup Scheduled → Payment Confirmed → Completed (or Cancelled at any stage). After a deal is Completed, both buyer and seller can leave a review for each other.",
+      "Unideals deals follow a structured lifecycle: Negotiating → Offer Accepted → Deal Confirmed → Pickup Scheduled → Payment Confirmed → Completed (or Cancelled at any stage). After a deal is Completed, both buyer and seller can leave a review for each other.",
     steps: [
       "NEGOTIATING: Buyer and seller discussing price, condition, and meetup via in-app chat.",
       "OFFER ACCEPTED: Seller has accepted the buyer's offered price.",
@@ -1099,7 +1099,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "privacy@campusmart.in", "grievance@campusmart.in",
     ],
     answer:
-      "UniDeals complies with India's DPDP Act 2023 and IT Act 2000. Data collected: account info, verification data, listing data, chat history, transaction interactions, anonymized usage analytics. We do NOT sell or share your personal data with advertisers. Your rights: Access, correct, delete data; file a grievance. Deletion requests processed within 30 days. Privacy contact: privacy@campusmart.in. Grievances: grievance@campusmart.in.",
+      "Unideals complies with India's DPDP Act 2023 and IT Act 2000. Data collected: account info, verification data, listing data, chat history, transaction interactions, anonymized usage analytics. We do NOT sell or share your personal data with advertisers. Your rights: Access, correct, delete data; file a grievance. Deletion requests processed within 30 days. Privacy contact: privacy@campusmart.in. Grievances: grievance@campusmart.in.",
     steps: [
       "Data collected: account info, college email, listing data, chat history, usage analytics.",
       "Data use: student verification, marketplace operation, fraud prevention, feature improvement.",
@@ -1111,7 +1111,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "Third-party services used: Google OAuth (sign-in), ImageKit (photo hosting), MongoDB Atlas (database).",
     ],
     route: "/privacy-policy",
-    suggestions: ["How do I delete my account?", "Are chats stored?", "What data does UniDeals collect?"],
+    suggestions: ["How do I delete my account?", "Are chats stored?", "What data does Unideals collect?"],
   }),
 
   // ═══════════════════════════════════════════════════
@@ -1149,7 +1149,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
 
   makeEntry({
     id: "no_delivery",
-    title: "Does UniDeals Offer Delivery or Shipping?",
+    title: "Does Unideals Offer Delivery or Shipping?",
     keywords: [
       "delivery", "shipping", "courier", "deliver", "ship", "kya deliver hota hai",
       "home delivery", "deliver karega", "shipping available", "can you ship",
@@ -1157,9 +1157,9 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "delivery charges", "shipping cost", "ghar pe aayega",
     ],
     answer:
-      "No, UniDeals does NOT offer delivery, shipping, or courier services. It's a campus pickup-only marketplace. Buyers and sellers meet in person at a safe public campus location to exchange the item and payment. This is by design — it ensures you can inspect before paying and keeps transactions safe within your campus community.",
+      "No, Unideals does NOT offer delivery, shipping, or courier services. It's a campus pickup-only marketplace. Buyers and sellers meet in person at a safe public campus location to exchange the item and payment. This is by design — it ensures you can inspect before paying and keeps transactions safe within your campus community.",
     steps: [
-      "UniDeals is a campus pickup-only marketplace — no delivery or shipping.",
+      "Unideals is a campus pickup-only marketplace — no delivery or shipping.",
       "Sellers specify a campus pickup location when creating a listing.",
       "Buyers and sellers agree on a meetup spot via in-app chat.",
       "Always choose public, well-lit campus locations (Library Gate, Main Canteen, Student Center).",
@@ -1176,7 +1176,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
 
   makeEntry({
     id: "what_can_ai_do",
-    title: "What Can the UniDeals AI Assistant Do?",
+    title: "What Can the Unideals AI Assistant Do?",
     keywords: [
       "what can you do", "ai features", "chatbot features", "kya kar sakta hai",
       "assistant features", "help me", "tum kya karte ho", "your capabilities",
@@ -1185,7 +1185,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "commands", "options", "available commands", "menu", "ai capabilities",
     ],
     answer:
-      "I'm UniDeals AI — your campus marketplace assistant! Here's what I can help with: 🔍 Find products (keyword, category, budget). 💰 Estimate fair prices. 📝 Write listing drafts. ⚖️ Compare two products. 🎒 Build budget bundles. ✅ Generate inspection checklists. 🛡️ Safety tips for meetups and payments. 📖 Platform navigation (sell, buy, boost, upgrade, report). 📜 Policy & procedure guidance (terms, privacy, returns, subscription rules). 📷 Image search (upload photo → AI finds matching listings). 🎤 Voice notes (speak → AI transcribes and searches). 🗣️ English and Hinglish both supported!",
+      "I'm Unideals AI — your campus marketplace assistant! Here's what I can help with: 🔍 Find products (keyword, category, budget). 💰 Estimate fair prices. 📝 Write listing drafts. ⚖️ Compare two products. 🎒 Build budget bundles. ✅ Generate inspection checklists. 🛡️ Safety tips for meetups and payments. 📖 Platform navigation (sell, buy, boost, upgrade, report). 📜 Policy & procedure guidance (terms, privacy, returns, subscription rules). 📷 Image search (upload photo → AI finds matching listings). 🎤 Voice notes (speak → AI transcribes and searches). 🗣️ English and Hinglish both supported!",
     steps: [
       "🔍 Product Search: 'Find cycles under 3000', 'Show electronics', 'Trending items'",
       "💰 Price Estimation: 'How much is a used laptop worth?', 'Fair price for my calculator'",
@@ -1212,14 +1212,14 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "homework help", "exam help", "medical advice", "financial advice", "legal advice",
     ],
     answer:
-      "I'm focused exclusively on UniDeals — the campus marketplace. I CANNOT: process payments or refunds, contact sellers on your behalf, guarantee product quality or seller honesty, provide medical/legal/financial advice, help with homework or exams, or answer questions unrelated to UniDeals. For platform issues, reach out to support@campusmart.in. For payment disputes, contact campus security or local authorities.",
+      "I'm focused exclusively on Unideals — the campus marketplace. I CANNOT: process payments or refunds, contact sellers on your behalf, guarantee product quality or seller honesty, provide medical/legal/financial advice, help with homework or exams, or answer questions unrelated to Unideals. For platform issues, reach out to support@campusmart.in. For payment disputes, contact campus security or local authorities.",
     steps: [
       "❌ Cannot process, handle, or guarantee payments or refunds.",
       "❌ Cannot contact sellers or make deals on your behalf.",
       "❌ Cannot guarantee product quality or seller reliability.",
       "❌ Cannot provide medical, legal, or financial advice.",
       "❌ Cannot help with homework, exams, or non-marketplace academic questions.",
-      "❌ Cannot answer questions unrelated to the UniDeals marketplace.",
+      "❌ Cannot answer questions unrelated to the Unideals marketplace.",
       "✅ For disputes or scams: report via the app or contact support@campusmart.in.",
       "✅ For policy questions I can't fully answer: contact support@campusmart.in.",
     ],
@@ -1318,7 +1318,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "how long support reply", "urgent help", "emergency support",
     ],
     answer:
-      "Contact UniDeals support via /contact (Support Ticket form) or directly at support@campusmart.in. Response SLAs: Free users — 24-48 hours. Pro users — 12-24 hours. Pro+ users — same-day dedicated support. Include product links, user IDs, screenshots, and incident date in your report. For legal matters: legal@campusmart.in. For privacy/data: privacy@campusmart.in. For emergencies: contact campus security or local police FIRST.",
+      "Contact Unideals support via /contact (Support Ticket form) or directly at support@campusmart.in. Response SLAs: Free users — 24-48 hours. Pro users — 12-24 hours. Pro+ users — same-day dedicated support. Include product links, user IDs, screenshots, and incident date in your report. For legal matters: legal@campusmart.in. For privacy/data: privacy@campusmart.in. For emergencies: contact campus security or local police FIRST.",
     steps: [
       "Go to Contact (/contact) from the menu or profile area.",
       "Fill the Support Ticket form: name, email, issue category, and detailed description.",
@@ -1427,10 +1427,10 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "hi there", "hey there", "greetings", "namaskar",
     ],
     answer:
-      "Hey there! 👋 I'm UniDeals AI — your campus marketplace assistant. I can help you find products, estimate fair prices, write listings, navigate the platform, understand policies, and get safety tips. What would you like to do today?",
+      "Hey there! 👋 I'm Unideals AI — your campus marketplace assistant. I can help you find products, estimate fair prices, write listings, navigate the platform, understand policies, and get safety tips. What would you like to do today?",
     steps: [],
     route: null,
-    suggestions: ["Find products", "Help me sell something", "How does UniDeals work?", "Safety tips"],
+    suggestions: ["Find products", "Help me sell something", "How does Unideals work?", "Safety tips"],
   }),
 
   makeEntry({
@@ -1441,7 +1441,7 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "thank u", "ty", "thx", "thanks a lot", "bohot shukriya", "bahut dhanyavad",
     ],
     answer:
-      "You're welcome! 😊 Happy to help. If you have more questions about buying, selling, pricing, platform policies, or anything UniDeals, just ask anytime!",
+      "You're welcome! 😊 Happy to help. If you have more questions about buying, selling, pricing, platform policies, or anything Unideals, just ask anytime!",
     steps: [],
     route: null,
     suggestions: ["Find trending items", "How do I sell?", "Safety tips for meetups"],
@@ -1455,10 +1455,10 @@ export const ASSISTANT_KNOWLEDGE_BASE = [
       "good night", "cya", "later", "tata", "chalo bye", "ok bye",
     ],
     answer:
-      "Goodbye! 👋 Happy dealing on UniDeals. Come back anytime you need help with buying, selling, pricing, policies, or staying safe on campus. Have a great day!",
+      "Goodbye! 👋 Happy dealing on Unideals. Come back anytime you need help with buying, selling, pricing, policies, or staying safe on campus. Have a great day!",
     steps: [],
     route: null,
-    suggestions: ["Find products", "How does UniDeals work?", "Safety tips"],
+    suggestions: ["Find products", "How does Unideals work?", "Safety tips"],
   }),
 ];
 
@@ -1597,6 +1597,6 @@ export const UNKNOWN_KB_FALLBACK = {
     "Is advance UPI payment safe?",
     "Contact support",
   ],
-  source: "UniDeals knowledge base",
+  source: "Unideals knowledge base",
   confidence: "none",
 };

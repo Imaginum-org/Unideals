@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LOGO_PATHS } from "./BrandLoader.jsx";
 import { cn } from "../../utils/cn.js";
 
@@ -20,6 +20,11 @@ import { cn } from "../../utils/cn.js";
  *   tune this single number if it ever looks off.
  * - reversed: rest on the logo mark and morph back to the U on hover
  *   (auth screens), instead of U-first like the navbar.
+ * - markOnly: render just the morphing U/logo glyph (no "nideals"), e.g.
+ *   as an icon for the AI assistant launcher.
+ * - active: optional controlled morph target. When a boolean is passed,
+ *   it drives the morph (true = logo mark) instead of the glyph's own
+ *   hover, so a larger parent (a button) can own the hover area.
  */
 const TRACE_SIZE = 200;
 const N_POINTS = 160;
@@ -214,7 +219,10 @@ export default function Wordmark({
   opticalY = 1,
   className,
   reversed = false,
+  markOnly = false,
+  active,
 }) {
+  const controlled = typeof active === "boolean";
   const textRef = useRef(null);
   const restRef = useRef(null);
   const pathRef = useRef(null);
@@ -223,8 +231,9 @@ export default function Wordmark({
   const sampler2Ref = useRef(null);
   const modelRef = useRef(null);
   const rafRef = useRef(0);
-  const tRef = useRef(reversed ? 1 : 0);
-  const targetRef = useRef(reversed ? 1 : 0);
+  const initialT = controlled ? (active ? 1 : 0) : reversed ? 1 : 0;
+  const tRef = useRef(initialT);
+  const targetRef = useRef(initialT);
   const lastRef = useRef(0);
   const [fallback, setFallback] = useState(false);
   const [adv, setAdv] = useState(null);
@@ -311,7 +320,9 @@ export default function Wordmark({
       setAdv(adv);
       // exact ink bbox of the whole word (traced U + "nideals" text)
       try {
-        if (restRef.current) {
+        if (markOnly) {
+          setBox({ x: ub[0], y: ub[1], w: ub[2] - ub[0], h: ub[3] - ub[1] });
+        } else if (restRef.current) {
           const tb = restRef.current.getBBox();
           const gx0 = Math.min(ub[0], tb.x);
           const gy0 = Math.min(ub[1], tb.y);
@@ -410,7 +421,15 @@ export default function Wordmark({
       rafRef.current = 0;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fontSize, fontWeight, letterSpacing]);
+  }, [fontSize, fontWeight, letterSpacing, markOnly]);
+
+  // Controlled mode: the parent decides when the glyph morphs.
+  useEffect(() => {
+    if (!controlled) return;
+    targetRef.current = active ? 1 : 0;
+    kick();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, controlled]);
 
   const advTotal = (adv ?? fontSize * 0.72) + letterSpacing;
 
@@ -428,7 +447,7 @@ export default function Wordmark({
           aria-hidden="true"
         >
           <text x={0} y={0}>
-            Unideals
+            {markOnly ? "U" : "Unideals"}
           </text>
         </svg>
       </span>
@@ -439,10 +458,12 @@ export default function Wordmark({
     <span
       className="wm inline-flex"
       onMouseEnter={() => {
+        if (controlled) return;
         targetRef.current = reversed ? 0 : 1;
         kick();
       }}
       onMouseLeave={() => {
+        if (controlled) return;
         targetRef.current = reversed ? 1 : 0;
         kick();
       }}
@@ -450,14 +471,14 @@ export default function Wordmark({
       <svg
         ref={textRef}
         className={cn("block overflow-visible", className)}
-        width={box ? box.w : fontSize * 4.6}
+        width={box ? box.w : fontSize * (markOnly ? 0.72 : 4.6)}
         height={box ? box.h : fontSize * 1.2}
         viewBox={
           box
             ? `${box.x} ${box.y} ${box.w} ${box.h}`
-            : `0 ${-fontSize} ${fontSize * 4.6} ${fontSize * 1.3}`
+            : `0 ${-fontSize} ${fontSize * (markOnly ? 0.72 : 4.6)} ${fontSize * 1.3}`
         }
-        style={opticalY ? { transform: `translateY(${opticalY}px)` } : undefined}
+        style={opticalY && !markOnly ? { transform: `translateY(${opticalY}px)` } : undefined}
         fontFamily="Figtree, Inter, sans-serif"
         fontSize={fontSize}
         fontWeight={fontWeight}
@@ -467,9 +488,11 @@ export default function Wordmark({
       >
         {/* morphing U path (built at runtime) + static rest of the word */}
         <path ref={pathRef} d="" fill="currentColor" />
-        <text ref={restRef} x={advTotal} y={0} fill="currentColor">
-          nideals
-        </text>
+        {!markOnly && (
+          <text ref={restRef} x={advTotal} y={0} fill="currentColor">
+            nideals
+          </text>
+        )}
         {/* accent piece of the mark, fades in late in the morph */}
         <g
           ref={accentRef}
