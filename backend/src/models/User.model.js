@@ -163,6 +163,15 @@ const userSchema = new Schema(
       default: null,
     },
 
+    // Native app sign-in: sha256(verifier) the app sent when it started
+    // Google login. The app polls with the verifier (PKCE-style), so no
+    // code ever has to travel back through a browser redirect.
+    oauth_login_challenge: {
+      type: String,
+      select: false,
+      default: "",
+    },
+
     last_login_date: {
       type: Date,
       default: null,

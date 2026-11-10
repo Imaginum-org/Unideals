@@ -13,6 +13,7 @@ import {
   googleAuthRedirectController,
   googleAuthCallbackController,
   exchangeGoogleOAuthCodeController,
+  pollGoogleOAuthController,
   googleOneTapController,
   refreshAccessTokenController,
   checkEmailVerificationController,
@@ -64,6 +65,9 @@ authRouter.post("/login", strictAuthLimiter, loginController);
 authRouter.get("/google", googleAuthRedirectController);
 authRouter.get("/google/callback", googleAuthCallbackController);
 authRouter.post("/google/exchange", strictAuthLimiter, exchangeGoogleOAuthCodeController);
+// Polled ~1/s by the app while the Google tab is open; the 256-bit verifier
+// makes guessing pointless, so it sits outside the strict auth limiter.
+authRouter.post("/google/poll", pollGoogleOAuthController);
 authRouter.post("/google/one-tap", strictAuthLimiter, googleOneTapController);
 
 authRouter.post("/verify-email", probeLimiter, verifyEmailController);

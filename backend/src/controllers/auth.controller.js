@@ -56,6 +56,7 @@ const googleAudiences = () =>
 // Go's exp://.../--/oauth). Only the app's own URL schemes are accepted, so
 // this can never become an open redirect to a website.
 const MOBILE_RETURN_RE = /^(unideals|exp|exps):\/\/[^\s<>"]{1,250}$/;
+const sanitizeChallenge = (v) => (typeof v === "string" && /^[a-f0-9]{64}$/.test(v) ? v : null);
 export const sanitizeMobileReturn = (v) => (typeof v === "string" && MOBILE_RETURN_RE.test(v) ? v : null);
 const OAUTH_COOKIE_OPTS = () => ({
   httpOnly: true,
@@ -85,13 +86,15 @@ const redirectToApp = (res, base, params) => {
   return res
     .status(200)
     .type("html")
-    .send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unideals</title>
-<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#F7F8FA;color:#0F172A}
-.c{text-align:center;padding:32px 24px;max-width:340px}.l{width:56px;height:56px;border-radius:16px;background:#3838EC;color:#fff;font-weight:800;font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
-h1{font-size:20px;margin:0 0 6px}p{color:#64748B;font-size:14px;line-height:1.5;margin:0 0 22px}
-a{display:block;background:#3838EC;color:#fff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 20px;border-radius:14px}</style></head>
-<body><div class="c"><div class="l">U</div><h1>${ok ? "You're signed in" : "Sign-in didn't finish"}</h1><p>${ok ? "Taking you back to the Unideals app." : "Head back to the app and try again."}</p>
-<a id="go" href="${href}">Open Unideals</a></div>
+    .send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#3838EC"><title>Unideals</title>
+<style>html,body{margin:0;height:100%;background:#3838EC;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{display:flex;align-items:center;justify-content:center}
+.l{width:72px;height:72px;border-radius:22px;background:#fff;color:#3838EC;font-weight:800;font-size:38px;display:flex;align-items:center;justify-content:center;animation:p 1.1s ease-in-out infinite}
+@keyframes p{0%,100%{transform:scale(.94);opacity:.85}50%{transform:scale(1.04);opacity:1}}
+a{position:fixed;left:0;right:0;bottom:40px;text-align:center;color:rgba(255,255,255,.85);font-size:14px;text-decoration:underline;opacity:0;animation:f .3s 4s forwards}
+@keyframes f{to{opacity:1}}</style></head>
+<body><div class="l" aria-label="Unideals">U</div>
+<a id="go" href="${href}">${ok ? "Still here? Tap to open Unideals" : "Sign-in didn't finish. Tap to go back"}</a>
 <script nonce="${nonce}">location.replace(${JSON.stringify(target).replace(/</g, "\\u003c")});</script></body></html>`);
 };
 
@@ -417,10 +420,16 @@ export const googleAuthRedirectController = async (req, res) => {
       path: "/",
     });
     const mobileReturn = sanitizeMobileReturn(req.query?.return_to);
+    const challenge = mobileReturn ? sanitizeChallenge(req.query?.challenge) : null;
     if (mobileReturn) {
       res.cookie("oauth_mobile_return", mobileReturn, { ...OAUTH_COOKIE_OPTS(), maxAge: 5 * 60 * 1000 });
     } else {
       res.clearCookie("oauth_mobile_return", OAUTH_COOKIE_OPTS());
+    }
+    if (challenge) {
+      res.cookie("oauth_mobile_challenge", challenge, { ...OAUTH_COOKIE_OPTS(), maxAge: 5 * 60 * 1000 });
+    } else {
+      res.clearCookie("oauth_mobile_challenge", OAUTH_COOKIE_OPTS());
     }
     const authorizeUrl = oauth2Client.generateAuthUrl({
       // "online": we only need the ID token once; never request a Google
@@ -446,7 +455,9 @@ export const googleAuthCallbackController = async (req, res) => {
   try {
     const { code, state } = req.query;
     const mobileReturn = sanitizeMobileReturn(req.cookies?.oauth_mobile_return);
+    const challenge = mobileReturn ? sanitizeChallenge(req.cookies?.oauth_mobile_challenge) : null;
     if (mobileReturn) res.clearCookie("oauth_mobile_return", OAUTH_COOKIE_OPTS());
+    if (req.cookies?.oauth_mobile_challenge) res.clearCookie("oauth_mobile_challenge", OAUTH_COOKIE_OPTS());
     if (!code || typeof code !== "string") {
       return redirectOAuthError(res, "missing_code", mobileReturn);
     }
@@ -497,6 +508,7 @@ export const googleAuthCallbackController = async (req, res) => {
 
     await userModel.findByIdAndUpdate(user._id, {
       oauth_login_token: hashedOauthLoginCode,
+      oauth_login_challenge: challenge || "",
       oauth_login_expiry: new Date(Date.now() + 2 * 60 * 1000),
     });
 
@@ -598,6 +610,7 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
         oauth_login_expiry: { $gt: new Date() },
       },
       {
+        $unset: { oauth_login_challenge: 1 },
         $set: { oauth_login_token: "", oauth_login_expiry: null },
       },
       { new: false },
@@ -649,6 +662,55 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       success: false,
       error: true,
     });
+  }
+};
+
+/**
+ * Native app: "has my Google sign-in finished?" The app started the flow
+ * with challenge = sha256(verifier) and polls here with the verifier.
+ * 202 while pending; once the callback has run, the session is issued
+ * (single use) and the app closes the browser itself, so nothing has to
+ * redirect from the browser back into the app.
+ */
+export const pollGoogleOAuthController = async (req, res) => {
+  try {
+    const verifier = req.body?.verifier;
+    if (typeof verifier !== "string" || !/^[a-f0-9]{64}$/.test(verifier)) {
+      return res.status(400).json({ message: "Invalid sign-in session", success: false, error: true });
+    }
+    const user = await userModel.findOneAndUpdate(
+      {
+        oauth_login_challenge: sha256(verifier),
+        oauth_login_expiry: { $gt: new Date() },
+      },
+      { $set: { oauth_login_token: "", oauth_login_challenge: "", oauth_login_expiry: null } },
+      { new: false },
+    );
+    if (!user) return res.status(202).json({ success: true, error: false, pending: true });
+
+    const freshUser = await userModel.findById(user._id);
+    if (freshUser.status !== USER_STATUS.ACTIVE) {
+      return res.status(403).json({
+        message: `Your account is ${freshUser.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive"}. Please contact support.`,
+        success: false,
+        error: true,
+        accountBlocked: true,
+        accountStatus: freshUser.status,
+      });
+    }
+    freshUser.last_login_date = new Date();
+    await freshUser.save();
+    const accessToken = await generatedAccessToken(freshUser._id, freshUser.tokenVersion || 0);
+    const refreshToken = await generatedRefreshToken(freshUser._id, freshUser.tokenVersion || 0);
+    const tokens = issueSession(req, res, accessToken, refreshToken);
+    return res.status(200).json({
+      message: "Google login successful",
+      success: true,
+      error: false,
+      data: { user: sanitizeAuthUser(freshUser), ...tokens },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: safeErrorMessage(error, "Google login failed"), success: false, error: true });
   }
 };
 

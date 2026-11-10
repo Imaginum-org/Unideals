@@ -211,6 +211,48 @@ await test("mobile exchange of a one-time google code returns tokens in JSON", a
   assert.equal(again.status, 401);
 });
 
+await test("google start keeps the app challenge (hex-64 only, app return_to only)", async () => {
+  const ch = "a".repeat(64);
+  const ok = await get("/api/auth/google?return_to=" + encodeURIComponent("unideals://oauth") + "&challenge=" + ch);
+  assert.match(ok.headers.getSetCookie().join(";"), new RegExp("oauth_mobile_challenge=" + ch));
+  const bad = await get("/api/auth/google?return_to=" + encodeURIComponent("unideals://oauth") + "&challenge=xyz");
+  assert.doesNotMatch(bad.headers.getSetCookie().join(";"), /oauth_mobile_challenge=[a-f0-9]/);
+  const noApp = await get("/api/auth/google?challenge=" + ch);
+  assert.doesNotMatch(noApp.headers.getSetCookie().join(";"), /oauth_mobile_challenge=a/);
+});
+
+await test("google poll: pending → session once → pending again", async () => {
+  const { createHash, randomBytes } = await import("node:crypto");
+  const verifier = randomBytes(32).toString("hex");
+  const pending = await post("/api/auth/google/poll", { verifier }, MOBILE);
+  assert.equal(pending.status, 202);
+  assert.equal((await pending.json()).pending, true);
+  await User.updateOne(
+    { email: EMAIL },
+    { oauth_login_challenge: createHash("sha256").update(verifier).digest("hex"), oauth_login_token: "x", oauth_login_expiry: new Date(Date.now() + 60_000) },
+  );
+  const done = await post("/api/auth/google/poll", { verifier }, MOBILE);
+  assert.equal(done.status, 200);
+  const json = await done.json();
+  assert.ok(json.data.accessToken && json.data.refreshToken);
+  assert.equal(done.headers.getSetCookie().length, 0);
+  const again = await post("/api/auth/google/poll", { verifier }, MOBILE);
+  assert.equal(again.status, 202);
+  const malformed = await post("/api/auth/google/poll", { verifier: "nope" }, MOBILE);
+  assert.equal(malformed.status, 400);
+});
+
+await test("google poll ignores expired challenges", async () => {
+  const { createHash, randomBytes } = await import("node:crypto");
+  const verifier = randomBytes(32).toString("hex");
+  await User.updateOne(
+    { email: EMAIL },
+    { oauth_login_challenge: createHash("sha256").update(verifier).digest("hex"), oauth_login_expiry: new Date(Date.now() - 1000) },
+  );
+  const res = await post("/api/auth/google/poll", { verifier }, MOBILE);
+  assert.equal(res.status, 202);
+});
+
 server.close();
 await mongoose.disconnect();
 await mongod.stop();
