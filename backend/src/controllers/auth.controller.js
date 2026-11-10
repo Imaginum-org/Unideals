@@ -52,7 +52,25 @@ const googleAudiences = () =>
 // The Google callback is a top-level browser navigation: answering with
 // JSON left users staring at a raw JSON page. Send them back to /login with
 // a short error code the Login page turns into a friendly message.
-const redirectOAuthError = (res, code) => {
+// Native app sign-in (Expo): /google?return_to=unideals://oauth (or Expo
+// Go's exp://.../--/oauth). Only the app's own URL schemes are accepted, so
+// this can never become an open redirect to a website.
+const MOBILE_RETURN_RE = /^(unideals|exp|exps):\/\/[^\s<>"]{1,250}$/;
+export const sanitizeMobileReturn = (v) => (typeof v === "string" && MOBILE_RETURN_RE.test(v) ? v : null);
+const OAUTH_COOKIE_OPTS = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "Lax",
+  path: "/",
+});
+const redirectToApp = (res, base, params) => {
+  const url = new URL(base);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  return res.redirect(url.toString());
+};
+
+const redirectOAuthError = (res, code, mobileReturn = null) => {
+  if (mobileReturn) return redirectToApp(res, mobileReturn, { oauth_error: code });
   const base = String(process.env.FRONTEND_URL || "").split(",")[0].trim();
   if (!base) {
     return res.status(400).json({ success: false, error: true, message: "Google login failed." });
@@ -372,6 +390,12 @@ export const googleAuthRedirectController = async (req, res) => {
       maxAge: 5 * 60 * 1000,
       path: "/",
     });
+    const mobileReturn = sanitizeMobileReturn(req.query?.return_to);
+    if (mobileReturn) {
+      res.cookie("oauth_mobile_return", mobileReturn, { ...OAUTH_COOKIE_OPTS(), maxAge: 5 * 60 * 1000 });
+    } else {
+      res.clearCookie("oauth_mobile_return", OAUTH_COOKIE_OPTS());
+    }
     const authorizeUrl = oauth2Client.generateAuthUrl({
       // "online": we only need the ID token once; never request a Google
       // refresh token we don't store or use.
@@ -395,13 +419,15 @@ export const googleAuthRedirectController = async (req, res) => {
 export const googleAuthCallbackController = async (req, res) => {
   try {
     const { code, state } = req.query;
+    const mobileReturn = sanitizeMobileReturn(req.cookies?.oauth_mobile_return);
+    if (mobileReturn) res.clearCookie("oauth_mobile_return", OAUTH_COOKIE_OPTS());
     if (!code || typeof code !== "string") {
-      return redirectOAuthError(res, "missing_code");
+      return redirectOAuthError(res, "missing_code", mobileReturn);
     }
     // State must match the cookie set at redirect time — otherwise this
     // login was planted by someone else (login CSRF / session fixation).
     if (!state || state !== req.cookies?.oauth_state) {
-      return redirectOAuthError(res, "session_mismatch");
+      return redirectOAuthError(res, "session_mismatch", mobileReturn);
     }
     // Clear with the same flags used at set time or the cookie survives.
     res.clearCookie("oauth_state", {
@@ -413,7 +439,7 @@ export const googleAuthCallbackController = async (req, res) => {
 
     const { tokens } = await oauth2Client.getToken(code);
     if (!tokens?.id_token) {
-      return redirectOAuthError(res, "verify_failed");
+      return redirectOAuthError(res, "verify_failed", mobileReturn);
     }
 
     const ticket = await oauth2Client.verifyIdToken({
@@ -432,6 +458,7 @@ export const googleAuthCallbackController = async (req, res) => {
         previewUser.status === USER_STATUS.SUSPENDED
           ? "account_suspended"
           : "account_inactive",
+        mobileReturn,
       );
     }
     const user = await findOrCreateGoogleUser(payload);
@@ -447,13 +474,15 @@ export const googleAuthCallbackController = async (req, res) => {
       oauth_login_expiry: new Date(Date.now() + 2 * 60 * 1000),
     });
 
+    if (mobileReturn) return redirectToApp(res, mobileReturn, { oauth_code: oauthLoginCode });
+
     const redirectUrl = new URL(`${process.env.FRONTEND_URL}/login`);
     redirectUrl.searchParams.set("oauth_code", oauthLoginCode);
 
     return res.redirect(redirectUrl.toString());
   } catch (error) {
     console.error("Google auth callback error:", error?.message || error);
-    return redirectOAuthError(res, "failed");
+    return redirectOAuthError(res, "failed", sanitizeMobileReturn(req.cookies?.oauth_mobile_return));
   }
 };
 

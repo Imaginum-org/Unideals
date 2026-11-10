@@ -155,6 +155,55 @@ await test("mobile logout revokes the session", async () => {
   assert.equal(profile.status, 401);
 });
 
+// ── Google sign-in for the native app (server OAuth flow) ──
+const get = (path, headers = {}) => fetch(base + path, { redirect: "manual", headers });
+
+await test("google redirect remembers an app return_to (own schemes only)", async () => {
+  const res = await get("/api/auth/google?return_to=" + encodeURIComponent("unideals://oauth"));
+  assert.equal(res.status, 302);
+  assert.ok(res.headers.get("location").startsWith("https://accounts.google.com/"));
+  assert.match(res.headers.getSetCookie().join(";"), /oauth_mobile_return=unideals%3A%2F%2Foauth/);
+});
+
+await test("google redirect ignores web return_to values (no open redirect)", async () => {
+  const res = await get("/api/auth/google?return_to=" + encodeURIComponent("https://evil.example/steal"));
+  assert.equal(res.status, 302);
+  const cookies = res.headers.getSetCookie().join(";");
+  assert.doesNotMatch(cookies, /evil/);
+  assert.doesNotMatch(cookies, /oauth_mobile_return=[^;]+oauth/);
+});
+
+await test("google callback errors go back to the app, not the website", async () => {
+  const res = await get("/api/auth/google/callback?state=x", { cookie: "oauth_mobile_return=" + encodeURIComponent("unideals://oauth") });
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get("location"), "unideals://oauth?oauth_error=missing_code");
+  const mismatch = await get("/api/auth/google/callback?code=abc&state=nope", {
+    cookie: "oauth_state=other; oauth_mobile_return=" + encodeURIComponent("exp://192.168.0.5:8081/--/oauth"),
+  });
+  assert.equal(mismatch.headers.get("location"), "exp://192.168.0.5:8081/--/oauth?oauth_error=session_mismatch");
+});
+
+await test("google callback without the app cookie still redirects to the website", async () => {
+  const res = await get("/api/auth/google/callback?state=x");
+  assert.equal(res.headers.get("location"), "https://app.example.test/login?oauth_error=missing_code");
+});
+
+await test("mobile exchange of a one-time google code returns tokens in JSON", async () => {
+  const { createHash } = await import("node:crypto");
+  const code = "one-time-code-for-tests";
+  await User.updateOne(
+    { email: EMAIL },
+    { oauth_login_token: createHash("sha256").update(code).digest("hex"), oauth_login_expiry: new Date(Date.now() + 60_000) },
+  );
+  const res = await post("/api/auth/google/exchange", { code }, MOBILE);
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.ok(json.data.accessToken && json.data.refreshToken);
+  assert.equal(res.headers.getSetCookie().length, 0);
+  const again = await post("/api/auth/google/exchange", { code }, MOBILE);
+  assert.equal(again.status, 401);
+});
+
 server.close();
 await mongoose.disconnect();
 await mongod.stop();
