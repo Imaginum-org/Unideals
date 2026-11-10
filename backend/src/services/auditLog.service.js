@@ -46,7 +46,7 @@ export const auditMatchFromQuery = (query = {}) => {
   }
 
   if (query.target_type) {
-    const validTypes = ["user", "product", "campus", "report", "order"];
+    const validTypes = ["user", "product", "campus", "report", "order", "settings"];
     if (validTypes.includes(query.target_type)) {
       match.target_type = query.target_type;
     }

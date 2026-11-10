@@ -60,6 +60,8 @@ import {
 // Campus read (support-accessible)
 import { adminListCampuses } from "../controllers/campus.controller.js";
 import { getTrends, getBreakdowns, getJobAnalytics } from "../controllers/admin.analytics.controller.js";
+import { getAccess, updateSupportAccess, getAttention } from "../controllers/admin.access.controller.js";
+import { requireAccess } from "../middlewares/access.middleware.js";
 
 // Validations
 import {
@@ -115,7 +117,7 @@ router.post("/saved-views", ...staffOnly, createSavedView);
 router.delete("/saved-views/:id", ...staffOnly, deleteSavedView);
 
 // Individual reports + chat evidence for one reported item
-router.get("/moderation/reports", ...staffOnly, getTargetReports);
+router.get("/moderation/reports", auth, requireAccess("reports", "view"), getTargetReports);
 
 // Bulk moderation (admin only, max 100 items per request)
 const bulkLimiter = rateLimit({
@@ -125,14 +127,14 @@ const bulkLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: "Too many bulk actions, slow down" },
 });
-router.post("/products/bulk", bulkLimiter, ...adminOnly, bulkProducts);
-router.post("/users/bulk", bulkLimiter, ...adminOnly, bulkUsers);
+router.post("/products/bulk", bulkLimiter, auth, requireAccess("listings", "manage"), bulkProducts);
+router.post("/users/bulk", bulkLimiter, auth, requireAccess("users", "manage"), bulkUsers);
 
 // Background jobs: status for staff, manual runs for admins
-router.get("/system/status", ...staffOnly, systemStatus);
-router.get("/system/jobs", ...staffOnly, listJobs);
-router.get("/system/jobs/:key/runs", ...staffOnly, getJobRuns);
-router.post("/system/jobs/:key/run", ...adminOnly, triggerJob);
+router.get("/system/status", auth, requireAccess("systemStatus", "view"), systemStatus);
+router.get("/system/jobs", auth, requireAccess("jobs", "view"), listJobs);
+router.get("/system/jobs/:key/runs", auth, requireAccess("jobs", "view"), getJobRuns);
+router.post("/system/jobs/:key/run", auth, requireAccess("jobs", "manage"), triggerJob);
 // Analytics for charts (read-only, computed from live records)
 const analyticsLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -143,7 +145,13 @@ const analyticsLimiter = rateLimit({
 });
 router.get("/analytics/trends", analyticsLimiter, ...staffOnly, getTrends);
 router.get("/analytics/breakdown", analyticsLimiter, ...staffOnly, getBreakdowns);
-router.get("/analytics/jobs", analyticsLimiter, ...staffOnly, getJobAnalytics);
+router.get("/analytics/jobs", analyticsLimiter, auth, requireAccess("jobs", "view"), getJobAnalytics);
+
+// Role access: everyone reads their own; only Super Admins edit support access.
+router.get("/access", ...staffOnly, getAccess);
+router.put("/access/support", ...adminOnly, updateSupportAccess);
+// Sidebar/inbox counts, limited to sections the caller can see.
+router.get("/attention", ...staffOnly, getAttention);
 router.patch("/profile", ...staffOnly, updateMyProfile);
 router.post("/profile/change-password", passwordChangeLimiter, ...staffOnly, changeMyPassword);
 
@@ -152,7 +160,7 @@ router.post("/profile/change-password", passwordChangeLimiter, ...staffOnly, cha
 router.get(
   "/dashboard",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("dashboard", "view"),
   getDashboard,
 );
 
@@ -161,19 +169,19 @@ router.get(
 router.get(
   "/moderation/queue",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("reports", "view"),
   getModerationQueue,
 );
 router.post(
   "/moderation/dismiss",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("reports", "manage"),
   dismissReports,
 );
 router.post(
   "/moderation/resolve",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("reports", "manage"),
   resolveReports,
 );
 
@@ -182,7 +190,7 @@ router.post(
 router.get(
   "/users/stats",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("users", "view"),
   getUserStats,
 );
 
@@ -190,7 +198,7 @@ router.get(
 router.get(
   "/users",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("users", "view"),
   getUsers,
 );
 
@@ -198,7 +206,7 @@ router.get(
 router.get(
   "/users/:id",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("users", "view"),
   getUserDetails,
 );
 
@@ -206,7 +214,7 @@ router.get(
 router.patch(
   "/users/:id/status",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("users", "manage"),
   updateUserStatusWithAudit,
 );
 
@@ -221,13 +229,13 @@ router.patch(
 router.get(
   "/gender-requests",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("genderRequests", "view"),
   getGenderChangeRequests,
 );
 router.patch(
   "/gender-requests/:id",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("genderRequests", "manage"),
   reviewGenderChangeRequest,
 );
 
@@ -236,7 +244,7 @@ router.patch(
 router.get(
   "/products",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("listings", "view"),
   getProducts,
 );
 
@@ -244,7 +252,7 @@ router.get(
 router.get(
   "/products/:id",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("listings", "view"),
   getProductDetails,
 );
 
@@ -252,7 +260,7 @@ router.get(
 router.patch(
   "/products/:id/status",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("listings", "manage"),
   updateProductStatusWithAudit,
 );
 
@@ -260,7 +268,7 @@ router.patch(
 router.patch(
   "/products/:id/soft-delete",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("listings", "manage"),
   softDeleteProductWithAudit,
 );
 
@@ -268,7 +276,7 @@ router.patch(
 router.delete(
   "/products/:id",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("listings", "manage"),
   hardDeleteProductWithAudit,
 );
 
@@ -276,25 +284,25 @@ router.delete(
 router.get(
   "/orders/stats",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("orders", "view"),
   getOrderStats,
 );
 router.get(
   "/orders",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("orders", "view"),
   getOrders,
 );
 router.get(
   "/orders/:id",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("orders", "view"),
   getOrderDetails,
 );
 router.patch(
   "/orders/:id/status",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("orders", "manage"),
   updateOrderStatus,
 );
 
@@ -305,16 +313,18 @@ router.patch(
 router.get(
   "/reports",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("reports", "view"),
   getAdminReports,
 );
 router.patch(
   "/reports/:id",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("reports", "manage"),
   reviewAdminReport,
 );
 
+// Campus list stays readable by all staff: it is reference data for the
+// campus filters on other pages. "Campuses" access hides the page itself.
 router.get(
   "/campuses",
   auth,
@@ -325,7 +335,7 @@ router.get(
 router.post(
   "/campuses",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("campuses", "manage"),
   validate(createCampusSchema),
   createCampusWithAudit,
 );
@@ -333,7 +343,7 @@ router.post(
 router.patch(
   "/campuses/:id",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("campuses", "manage"),
   validate(updateCampusSchema),
   updateCampusWithAudit,
 );
@@ -341,7 +351,7 @@ router.patch(
 router.delete(
   "/campuses/:id",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("campuses", "manage"),
   deleteCampusWithAudit,
 );
 
@@ -350,7 +360,7 @@ router.delete(
 router.get(
   "/audit-log",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("auditLog", "view"),
   getAuditLogs,
 );
 
@@ -359,37 +369,37 @@ router.get(
 router.get(
   "/notifications/stats",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("notifications", "view"),
   adminGetStats,
 );
 router.get(
   "/notifications/history",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("notifications", "view"),
   adminGetHistory,
 );
 router.get(
   "/notifications/scheduled",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("notifications", "view"),
   adminGetScheduled,
 );
 router.get(
   "/notifications/estimate-recipients",
   auth,
-  requireRoles(USER_ROLES.ADMIN, USER_ROLES.SUPPORT),
+  requireAccess("notifications", "view"),
   adminEstimateRecipients,
 );
 router.post(
   "/notifications",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("notifications", "manage"),
   adminCreateNotification,
 );
 router.patch(
   "/notifications/:id/cancel",
   auth,
-  requireRoles(USER_ROLES.ADMIN),
+  requireAccess("notifications", "manage"),
   adminCancelScheduled,
 );
 

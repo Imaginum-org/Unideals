@@ -124,8 +124,10 @@ app.use(
 // Additive route guards (no behavior change to existing handlers):
 // - Razorpay retries legitimately burst, so the webhook gets a high 100/min
 //   ceiling that only blocks floods.
-// - Admin reads across all /api/admin GETs get a shared 60/min ceiling
-//   (writes/mutations untouched).
+// - Admin reads across all /api/admin GETs get a shared 240/min ceiling per
+//   IP (writes/mutations untouched). It was 60/min, but chart pages load
+//   several datasets each and staff often share one office IP; hitting the
+//   ceiling also fails the session check and signs people out.
 const paymentWebhookLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
@@ -136,7 +138,7 @@ const paymentWebhookLimiter = rateLimit({
 
 const adminReadLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 60,
+  max: 240,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { success: false, message: "Too many requests, try later" },
