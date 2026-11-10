@@ -24,6 +24,31 @@ import escapeHtml from "../utils/escapeHtml.js";
 const sha256 = (value) =>
   crypto.createHash("sha256").update(String(value)).digest("hex");
 
+// Native mobile app (Expo) mode. React Native has no reliable HttpOnly
+// cookie jar, so the app opts in with `x-client-type: mobile` and receives
+// tokens in the JSON body instead (stored in the OS keychain/keystore).
+// Browsers ALWAYS send an Origin on cross-origin requests carrying a custom
+// header, so requiring "no Origin" keeps a web XSS from flipping this mode
+// on to read tokens. In mobile mode the refresh token comes from the body
+// only — cookies are never read or set — so the web cookie session can
+// never be converted into a JSON-exposed token.
+const isMobileClient = (req) =>
+  String(req.headers["x-client-type"] || "").toLowerCase() === "mobile" &&
+  !req.headers.origin;
+
+const issueSession = (req, res, accessToken, refreshToken) => {
+  if (isMobileClient(req)) return { accessToken, refreshToken };
+  setAuthCookies(res, accessToken, refreshToken);
+  return {};
+};
+
+// Google ID tokens minted for the native apps carry their own client ID as
+// `aud`. Accept the web client plus any configured mobile client IDs.
+const googleAudiences = () =>
+  [process.env.GOOGLE_CLIENT_ID, ...String(process.env.GOOGLE_MOBILE_CLIENT_IDS || "").split(",")]
+    .map((s) => String(s || "").trim())
+    .filter(Boolean);
+
 // The Google callback is a top-level browser navigation: answering with
 // JSON left users staring at a raw JSON page. Send them back to /login with
 // a short error code the Login page turns into a friendly message.
@@ -311,16 +336,17 @@ export const loginController = async (req, res) => {
       req.body,
     );
 
-    setAuthCookies(res, accessToken, refreshToken);
-
-    // Tokens travel via HttpOnly cookies only — never in the JSON body,
-    // where any XSS could exfiltrate the 7-day refresh token.
+    // Web: tokens travel via HttpOnly cookies only — never in the JSON
+    // body, where any XSS could exfiltrate the 7-day refresh token.
+    // Native app (see isMobileClient): tokens in the body, no cookies.
+    const tokens = issueSession(req, res, accessToken, refreshToken);
     return res.status(200).json({
       message: "Login successfully",
       success: true,
       error: false,
       data: {
         user,
+        ...tokens,
       },
     });
   } catch (err) {
@@ -445,7 +471,7 @@ export const googleOneTapController = async (req, res) => {
 
     const ticket = await oauth2Client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: googleAudiences(),
     });
 
     const user = await findOrCreateGoogleUser(ticket.getPayload());
@@ -469,7 +495,7 @@ export const googleOneTapController = async (req, res) => {
     const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
     const refreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
 
-    setAuthCookies(res, accessToken, refreshToken);
+    const tokens = issueSession(req, res, accessToken, refreshToken);
 
     return res.status(200).json({
       message: "Google login successful",
@@ -477,6 +503,7 @@ export const googleOneTapController = async (req, res) => {
       error: false,
       data: {
         user: sanitizeAuthUser(user),
+        ...tokens,
       },
     });
   } catch (error) {
@@ -550,7 +577,7 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
     const accessToken = await generatedAccessToken(freshUser._id, freshUser.tokenVersion || 0);
     const refreshToken = await generatedRefreshToken(freshUser._id, freshUser.tokenVersion || 0);
 
-    setAuthCookies(res, accessToken, refreshToken);
+    const tokens = issueSession(req, res, accessToken, refreshToken);
 
     return res.status(200).json({
       message: "Google login successful",
@@ -558,6 +585,7 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
       error: false,
       data: {
         user: sanitizeAuthUser(freshUser),
+        ...tokens,
       },
     });
   } catch (error) {
@@ -672,9 +700,12 @@ export const logoutUser = async (req, res) => {
   try {
     // Prefer authenticated userId, fallback to refresh-cookie lookup
     // so legacy GET /logoutUser (no auth middleware) still revokes server-side.
+    const mobile = isMobileClient(req);
     if (req.userId) {
       await revokeRefreshToken(req.userId);
-    } else if (req.cookies?.refreshToken) {
+    } else if (mobile && typeof req.body?.refreshToken === "string") {
+      await revokeRefreshTokenByToken(req.body.refreshToken);
+    } else if (!mobile && req.cookies?.refreshToken) {
       await revokeRefreshTokenByToken(req.cookies.refreshToken);
     }
     clearAuthCookies(res);
@@ -697,23 +728,28 @@ export const logoutUser = async (req, res) => {
 
 export const refreshAccessTokenController = async (req, res) => {
   try {
+    const mobile = isMobileClient(req);
     const session = await refreshSession({
-      refreshToken: req.cookies?.refreshToken,
+      refreshToken: mobile
+        ? typeof req.body?.refreshToken === "string"
+          ? req.body.refreshToken
+          : undefined
+        : req.cookies?.refreshToken,
     });
 
-    setAuthCookies(res, session.accessToken, session.refreshToken);
+    const tokens = issueSession(req, res, session.accessToken, session.refreshToken);
 
     return res.status(200).json({
       message: "Token refreshed successfully",
       success: true,
       error: false,
-      data: { user: session.user },
+      data: { user: session.user, ...tokens },
     });
   } catch (err) {
     // Dead refresh token (401): wipe stale cookies so the browser stops
     // sending them. Other failures (429/5xx/network) keep cookies — they
     // may still be valid and the next attempt can succeed.
-    if ((err.statusCode || 401) === 401) {
+    if ((err.statusCode || 401) === 401 && !isMobileClient(req)) {
       clearAuthCookies(res);
     }
     return res.status(err.statusCode || 401).json({
