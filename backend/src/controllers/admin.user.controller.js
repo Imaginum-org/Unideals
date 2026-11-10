@@ -1,4 +1,5 @@
 import * as adminUserService from "../services/admin.user.service.js";
+import * as accessService from "../services/access.service.js";
 import * as auditLogService from "../services/auditLog.service.js";
 import { safeErrorMessage } from "../utils/response.js";
 
@@ -47,6 +48,9 @@ export const updateUserRole = async (req, res) => {
       req.params.id,
       req.body.role,
     );
+
+    // Custom access belongs to the support role; drop it when that role goes.
+    if (user.role !== "support") await accessService.dropPersonAccess(user.id || user._id);
 
     auditLogService
       .logAdminAction({

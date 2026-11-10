@@ -60,7 +60,7 @@ import {
 // Campus read (support-accessible)
 import { adminListCampuses } from "../controllers/campus.controller.js";
 import { getTrends, getBreakdowns, getJobAnalytics } from "../controllers/admin.analytics.controller.js";
-import { getAccess, updateSupportAccess, getAttention } from "../controllers/admin.access.controller.js";
+import { getAccess, updateSupportAccess, getAttention, updatePersonAccess, resetPersonAccess } from "../controllers/admin.access.controller.js";
 import { requireAccess } from "../middlewares/access.middleware.js";
 
 // Validations
@@ -150,6 +150,8 @@ router.get("/analytics/jobs", analyticsLimiter, auth, requireAccess("jobs", "vie
 // Role access: everyone reads their own; only Super Admins edit support access.
 router.get("/access", ...staffOnly, getAccess);
 router.put("/access/support", ...adminOnly, updateSupportAccess);
+router.put("/access/staff/:userId", ...adminOnly, updatePersonAccess);
+router.delete("/access/staff/:userId", ...adminOnly, resetPersonAccess);
 // Sidebar/inbox counts, limited to sections the caller can see.
 router.get("/attention", ...staffOnly, getAttention);
 router.patch("/profile", ...staffOnly, updateMyProfile);

@@ -29,6 +29,26 @@ export const updateSupportAccess = async (req, res) => {
   }
 };
 
+// PUT /admin/access/staff/:userId — Super Admin only; custom access for one support person.
+export const updatePersonAccess = async (req, res) => {
+  try {
+    const result = await accessService.setPersonAccess(req.user, req.params.userId, req.body?.permissions);
+    return ok(res, result.changes ? "Access updated for this person" : "Custom access saved", result);
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+// DELETE /admin/access/staff/:userId — Super Admin only; back to the role defaults.
+export const resetPersonAccess = async (req, res) => {
+  try {
+    const result = await accessService.resetPersonAccess(req.user, req.params.userId);
+    return ok(res, "This person now follows the Support role defaults", result);
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
 /**
  * GET /admin/attention — counts for the sidebar badges and inbox, limited to
  * the sections the caller can see (so support without Dashboard access still

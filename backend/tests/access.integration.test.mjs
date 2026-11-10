@@ -131,6 +131,61 @@ await test("role changes stay Super Admin only even with users access", async ()
   assert.equal((await call(support, "PATCH", `/users/${student}/role`, { role: "support" })).status, 403);
 });
 
+await test("two support people can have different access", async () => {
+  // Role: users visible, no user actions. Sam gets custom access; Tara follows the role.
+  await call(admin, "PUT", "/access/support", { permissions: { users: { view: true, manage: false }, orders: { view: true } } });
+  const tara = await mkStaff("support", "Tara");
+  const custom = await call(admin, "PUT", `/access/staff/${support._id}`, {
+    permissions: { users: { view: true, manage: true }, orders: { view: false } },
+  });
+  assert.equal(custom.status, 200);
+  assert.equal(custom.body.data.custom, true);
+
+  assert.equal((await call(support, "GET", "/orders")).status, 403, "Sam: orders hidden for him only");
+  assert.equal((await call(tara, "GET", "/orders")).status, 200, "Tara: role defaults");
+  assert.notEqual((await call(support, "PATCH", `/users/${student}/status`, { status: "suspended", reason: "t" })).status, 403);
+  assert.equal((await call(tara, "PATCH", `/users/${student}/status`, { status: "active" })).status, 403);
+
+  const mine = await call(support, "GET", "/access");
+  assert.equal(mine.body.data.mineIsCustom, true);
+  const overview = await call(admin, "GET", "/access");
+  const row = (id) => overview.body.data.staff.find((s) => s.id === String(id))
+  assert.equal(row(support._id).custom, true);
+  assert.equal(row(tara._id).custom, false);
+  assert.ok(await AuditLog.findOne({ action: "access.person_update", target_id: support._id }));
+});
+
+await test("role default changes don't touch custom access; reset puts the person back on the role", async () => {
+  await call(admin, "PUT", "/access/support", { permissions: { orders: { view: false } } });
+  const tara = await User.findOne({ name: "Tara" }).lean();
+  const taraWho = { token: jwt.sign({ id: String(tara._id), v: 0 }, process.env.SECRET_KEY_ACCESS_TOKEN) };
+  assert.equal((await call(taraWho, "GET", "/orders")).status, 403, "Tara follows the role");
+  assert.equal((await call(support, "GET", "/users")).status, 200, "Sam's custom set unchanged");
+
+  const reset = await call(admin, "DELETE", `/access/staff/${support._id}`);
+  assert.equal(reset.status, 200);
+  assert.equal(reset.body.data.custom, false);
+  assert.equal((await call(support, "PATCH", `/users/${student}/status`, { status: "active" })).status, 403, "back to role: no user actions");
+  assert.ok(await AuditLog.findOne({ action: "access.person_reset", target_id: support._id }));
+});
+
+await test("custom access is only for support staff and only Super Admins set it", async () => {
+  assert.equal((await call(admin, "PUT", `/access/staff/${student}`, { permissions: { users: { view: true } } })).status, 400);
+  assert.equal((await call(admin, "PUT", `/access/staff/${admin._id}`, { permissions: {} })).status, 400);
+  assert.equal((await call(admin, "PUT", "/access/staff/not-an-id", { permissions: {} })).status, 400);
+  assert.equal((await call(support, "PUT", `/access/staff/${support._id}`, { permissions: { users: { manage: true } } })).status, 403);
+});
+
+await test("removing someone's support role drops their custom access", async () => {
+  const tara = await User.findOne({ name: "Tara" }).lean();
+  await call(admin, "PUT", `/access/staff/${tara._id}`, { permissions: { jobs: { view: true, manage: true } } });
+  const { default: StaffAccess } = await import(B + "src/models/StaffAccess.model.js");
+  assert.ok(await StaffAccess.exists({ user_id: tara._id }));
+  const changed = await call(admin, "PATCH", `/users/${tara._id}/role`, { role: "user" });
+  assert.equal(changed.status, 200);
+  assert.equal(await StaffAccess.exists({ user_id: tara._id }), null);
+});
+
 await test("unknown or missing stored sections fall back to defaults", async () => {
   const normalized = access.normalizePermissions({ users: { view: false } });
   assert.equal(normalized.users.view, false);
