@@ -50,6 +50,8 @@ const describeFacts = (draft) => {
   if (estimate && !estimate.error) {
     lines.push(`Fair-price card: low ₹${estimate.low}, fair ₹${estimate.fair}, high ₹${estimate.high}, from ${estimate.sampleSize} campus listing(s)`);
   }
+  if (draft.facts) lines.push(draft.facts);
+  if (draft.comparison && !draft.facts) lines.push("A side-by-side comparison card is shown under your reply.");
   if (draft.draft) lines.push("A listing draft card is shown under your reply.");
   if (draft.checklist) lines.push("An inspection checklist card is shown under your reply.");
   if (draft.safetyTips) lines.push("A safety tips card is shown under your reply.");

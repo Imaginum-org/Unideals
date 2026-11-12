@@ -56,8 +56,11 @@ export const historyFor = (conversation) =>
 export const shownProductsFor = (conversation) =>
   (conversation?.messages || [])
     .slice(-6)
-    .flatMap((m) => m.products || [])
-    .map((p) => ({ _id: String(p._id), title: p.title, selling_price: p.selling_price }));
+    // `group` says which reply showed the card, so "the first one" means the
+    // first card of the latest list, not of the whole chat.
+    .flatMap((m, group) =>
+      (m.products || []).map((p) => ({ _id: String(p._id), title: p.title, selling_price: p.selling_price, group })),
+    );
 
 /**
  * Saves one exchange (masked). Creates the conversation on the first turn.

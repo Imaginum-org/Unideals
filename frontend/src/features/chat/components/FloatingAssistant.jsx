@@ -334,6 +334,123 @@ const WelcomeHero = ({ name, onPick }) => (
   </div>
 );
 
+/* ── Thought cloud above the launcher ──
+   "Thinks" (animated dots), then types a short line, and cycles through a few
+   prompts before settling on "Ask me anything". Click opens the assistant;
+   the × hides it for the rest of the session. */
+const CLOUD_DISMISSED_KEY = "unideals-assistant-cloud-dismissed";
+const CLOUD_THINK_MS = 1300;
+const CLOUD_TYPE_MS = 34;
+const CLOUD_HOLD_MS = 3200;
+
+const isCloudDismissed = () => {
+  try {
+    return sessionStorage.getItem(CLOUD_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const ThinkingDots = () => (
+  <span className="flex items-center gap-1 py-[3px]" aria-hidden="true">
+    {[0, 1, 2].map((dot) => (
+      <span
+        key={dot}
+        className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#4A4DFE]"
+        style={{ animationDelay: `${dot * 150}ms`, animationDuration: "900ms", opacity: 0.55 + dot * 0.2 }}
+      />
+    ))}
+  </span>
+);
+
+const ThoughtCloud = ({ lines, reducedMotion, onOpen, onDismiss }) => {
+  const [index, setIndex] = useState(0);
+  const [phase, setPhase] = useState(reducedMotion ? "shown" : "thinking");
+  const [chars, setChars] = useState(0);
+  const linesKey = lines.join("|");
+  const isLast = index >= lines.length - 1;
+  const line = lines[Math.min(index, lines.length - 1)] || "";
+
+  // A new set of lines (e.g. after signing in) restarts the cycle.
+  useEffect(() => {
+    setIndex(reducedMotion ? lines.length - 1 : 0);
+    setPhase(reducedMotion ? "shown" : "thinking");
+    setChars(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linesKey, reducedMotion]);
+
+  useEffect(() => {
+    if (reducedMotion) return undefined;
+    let timer;
+    if (phase === "thinking") {
+      timer = window.setTimeout(() => setPhase("typing"), CLOUD_THINK_MS);
+    } else if (phase === "typing") {
+      if (chars < line.length) timer = window.setTimeout(() => setChars((c) => c + 1), CLOUD_TYPE_MS);
+      else setPhase("shown");
+    } else if (phase === "shown" && !isLast) {
+      timer = window.setTimeout(() => {
+        setIndex((i) => i + 1);
+        setChars(0);
+        setPhase("thinking");
+      }, CLOUD_HOLD_MS);
+    }
+    return () => window.clearTimeout(timer);
+  }, [phase, chars, line, isLast, reducedMotion]);
+
+  const text = phase === "shown" || reducedMotion ? line : line.slice(0, chars);
+
+  return (
+    <motion.div
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.85 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.9 }}
+      transition={{ type: "spring", stiffness: 300, damping: 24 }}
+      style={{ transformOrigin: "bottom right" }}
+      className="group/cloud absolute bottom-full right-1 mb-5 [filter:drop-shadow(0_10px_22px_rgba(74,77,254,0.22))_drop-shadow(0_1px_2px_rgba(15,23,42,0.08))]"
+    >
+      <motion.div
+        animate={reducedMotion ? undefined : { y: [0, -3, 0] }}
+        transition={reducedMotion ? undefined : { duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        className="relative"
+      >
+        {/* cloud puffs: same fill as the body, so the shadow wraps one shape */}
+        <span aria-hidden="true" className="absolute -top-3 left-4 h-8 w-8 rounded-full bg-white dark:bg-[#272B35]" />
+        <span aria-hidden="true" className="absolute -top-[18px] left-[42%] h-10 w-10 rounded-full bg-white dark:bg-[#272B35]" />
+        <span aria-hidden="true" className="absolute -top-2.5 right-5 h-7 w-7 rounded-full bg-white dark:bg-[#272B35]" />
+        <button
+          type="button"
+          onClick={onOpen}
+          className="relative flex min-h-[40px] min-w-[150px] items-center justify-center gap-2 whitespace-nowrap rounded-full bg-white px-5 py-2.5 text-left text-[13.5px] font-semibold tracking-tight text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4A4DFE]/50 dark:bg-[#272B35] dark:text-white"
+          aria-label={`${line} Open Unideals AI`}
+        >
+          {phase === "thinking" ? (
+            <ThinkingDots />
+          ) : (
+            <span aria-live="polite">
+              {text}
+              {phase === "typing" && <span className="ml-0.5 inline-block h-[14px] w-[2px] translate-y-[2px] animate-pulse bg-[#4A4DFE]" />}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDismiss();
+          }}
+          aria-label="Hide this tip"
+          className="absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white opacity-100 shadow transition hover:bg-slate-900 sm:opacity-0 sm:group-hover/cloud:opacity-100 dark:bg-zinc-200 dark:text-zinc-900"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </motion.div>
+      {/* the trail of small bubbles leading down to the launcher */}
+      <span aria-hidden="true" className="absolute -bottom-3 right-5 h-3.5 w-3.5 rounded-full bg-white dark:bg-[#272B35]" />
+      <span aria-hidden="true" className="absolute -bottom-[22px] right-2.5 h-2 w-2 rounded-full bg-white dark:bg-[#272B35]" />
+    </motion.div>
+  );
+};
+
 const FloatingAssistant = () => {
   const location = useLocation();
   const prefersReducedMotion = useReducedMotion();
@@ -369,6 +486,8 @@ const FloatingAssistant = () => {
   const assistantVisibleRef = useRef(false);
   const [launcherHover, setLauncherHover] = useState(false);
   const [launcherPulse, setLauncherPulse] = useState(false);
+  const [cloudDismissed, setCloudDismissed] = useState(isCloudDismissed);
+  const [cloudReady, setCloudReady] = useState(false);
   assistantVisibleRef.current = isOpen && !isMinimized;
 
   const shouldHide = hiddenRoutes.some((route) => location.pathname.startsWith(route));
@@ -438,6 +557,25 @@ const FloatingAssistant = () => {
     };
   }, [prefersReducedMotion, isOpen, shouldHide]);
 
+  // The thought cloud appears a moment after the page settles, not instantly.
+  useEffect(() => {
+    if (cloudDismissed || isOpen || shouldHide) {
+      setCloudReady(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setCloudReady(true), 2200);
+    return () => window.clearTimeout(timer);
+  }, [cloudDismissed, isOpen, shouldHide]);
+
+  const dismissCloud = () => {
+    setCloudDismissed(true);
+    try {
+      sessionStorage.setItem(CLOUD_DISMISSED_KEY, "1");
+    } catch {
+      // Storage blocked: it stays hidden until the next page load.
+    }
+  };
+
   // Auto-grow the composer up to ~4 lines.
   useEffect(() => {
     const el = inputRef.current;
@@ -469,10 +607,25 @@ const FloatingAssistant = () => {
     setInput("");
     setIsTyping(true);
 
+    // Listings on screen, grouped by the reply that showed them, so a guest can
+    // say "is the 2nd one negotiable?" (signed-in chats use the saved history).
+    const shownProducts = messages
+      .filter((message) => message.sender === "assistant" && message.products?.length)
+      .slice(-3)
+      .flatMap((message, group) =>
+        message.products.slice(0, 6).map((product) => ({
+          _id: product._id,
+          title: product.title,
+          selling_price: product.selling_price,
+          group,
+        })),
+      );
+
     const replyId = nextId();
     const payload = {
       message: messageText,
       history,
+      shownProducts,
       conversationId: conversationId || undefined,
       attachments: attachments.map((attachment) => {
         const item = { ...attachment };
@@ -1205,9 +1358,32 @@ const FloatingAssistant = () => {
           and briefly every few seconds (same morph as the navbar wordmark) */}
       {!isOpen && (
         <div className="group relative flex items-center">
-          <span className="pointer-events-none absolute right-full mr-3 hidden whitespace-nowrap rounded-full bg-slate-900 px-3 py-1.5 text-[12px] font-semibold text-white opacity-0 shadow-lg transition duration-200 group-hover:translate-x-0 group-hover:opacity-100 sm:block sm:translate-x-1 dark:bg-white dark:text-slate-900">
-            {hasConversation ? "Continue chat" : "Ask Unideals AI"}
-          </span>
+          <AnimatePresence>
+            {cloudReady && (
+              <ThoughtCloud
+                key={hasConversation ? "continue" : "intro"}
+                lines={
+                  hasConversation
+                    ? ["Continue our chat? 💬"]
+                    : [
+                        firstName ? `Hi ${firstName}! 👋` : "Hi there! 👋",
+                        "Looking for a deal? 🔍",
+                        "Need a fair price check?",
+                        "Selling something? 🏷️",
+                        "Ask me anything ✨",
+                      ]
+                }
+                reducedMotion={Boolean(prefersReducedMotion)}
+                onOpen={openPanel}
+                onDismiss={dismissCloud}
+              />
+            )}
+          </AnimatePresence>
+          {!cloudReady && (
+            <span className="pointer-events-none absolute right-full mr-3 hidden whitespace-nowrap rounded-full bg-slate-900 px-3 py-1.5 text-[12px] font-semibold text-white opacity-0 shadow-lg transition duration-200 group-hover:translate-x-0 group-hover:opacity-100 sm:block sm:translate-x-1 dark:bg-white dark:text-slate-900">
+              {hasConversation ? "Continue chat" : "Ask Unideals AI"}
+            </span>
+          )}
           <motion.button
             type="button"
             onClick={openPanel}

@@ -20,6 +20,7 @@ import { PRODUCT_CATEGORY_LABELS, PRODUCT_CONDITION_LABELS, USER_TIER } from "..
 import { getPricingForViewer } from "./payment.service.js";
 import { PERSONA, composeReply, replyLanguage } from "./assistant.compose.js";
 import { describeViewerContext, getViewerContext } from "./assistant.context.js";
+import { planFollowUp } from "./assistant.followup.js";
 
 // ── In-memory LRU reply cache for instant repeated-question responses ──
 const CACHE_MAX = 120;
@@ -627,6 +628,197 @@ const buildPriceCheckReply = async (message) => {
 };
 
 // Persona and tone are shared with the reply writer (assistant.compose.js).
+// ── Follow-ups that depend on the conversation (see assistant.followup.js) ──
+
+const conditionText = (condition) =>
+  condition ? ` in ${String(PRODUCT_CONDITION_LABELS[condition] || condition).toLowerCase()} condition` : "";
+
+const priceRangeText = ({ maxPrice, minPrice }) =>
+  maxPrice !== undefined && minPrice !== undefined
+    ? ` between ${formatRupees(minPrice)} and ${formatRupees(maxPrice)}`
+    : maxPrice !== undefined
+      ? ` under ${formatRupees(maxPrice)}`
+      : minPrice !== undefined
+        ? ` above ${formatRupees(minPrice)}`
+        : "";
+
+// Everything the writer may say about one listing.
+const listingFacts = (p) =>
+  [
+    `Listing: ${p.title}`,
+    `Price: ${formatRupees(p.selling_price)}${p.original_price > p.selling_price ? ` (original price ${formatRupees(p.original_price)})` : ""}`,
+    p.conditionLabel ? `Condition: ${p.conditionLabel}` : "",
+    `Negotiable: ${p.is_negotiable ? "yes, the seller accepts offers" : "no, fixed price"}`,
+    p.brand ? `Brand: ${p.brand}` : "",
+    p.categoryLabel ? `Category: ${p.categoryLabel}` : "",
+    p.views_count ? `Views: ${p.views_count}` : "",
+    p.description ? `Seller's description: ${String(p.description).replace(/\s+/g, " ").slice(0, 600)}` : "",
+  ].filter(Boolean).join("\n");
+
+const listingGone = {
+  reply: "That listing isn't available anymore (it may have been sold or removed). Want me to find similar ones?",
+  intent: "product_details",
+  suggestions: ["Show similar items", "Show trending items"],
+  aiPowered: false,
+};
+
+const fetchListing = async (id) => {
+  try {
+    return (await toolHandlers.getProductDetails({ productId: String(id) })).product;
+  } catch {
+    return null;
+  }
+};
+
+const buildFollowUpSearchReply = async (plan) => {
+  const label = plan.query;
+  const filters = `${priceRangeText(plan)}${conditionText(plan.condition)}`;
+  const sortBy = plan.sortBy || "relevance";
+  const search = (overrides = {}) =>
+    toolHandlers.searchProducts({
+      query: plan.query,
+      maxPrice: plan.maxPrice,
+      minPrice: plan.minPrice,
+      condition: plan.condition,
+      sortBy,
+      limit: 6,
+      ...overrides,
+    });
+  const base = { intent: "product_search", searchQuery: label, aiPowered: false };
+  const chips = [plan.sortBy === "price_low" ? `Newest ${label}` : `Cheapest ${label}`, "Compare the first two", "Is the first one negotiable?"];
+
+  const exact = await search();
+  if (exact.products.length) {
+    const lead = plan.sortBy === "price_low" ? "Most affordable" : plan.sortBy === "price_high" ? "Top-end" : "Here are";
+    return {
+      ...base,
+      reply: `${lead} **${label}** listings${filters}${exact.exact ? "" : " (closest matches)"}:`,
+      products: exact.products,
+      productCards: exact.products,
+      suggestions: chips,
+    };
+  }
+
+  // Nothing matches every filter: drop the condition first, then the budget.
+  const relaxed = plan.condition ? await search({ condition: undefined }) : { products: [] };
+  if (relaxed.products.length) {
+    return {
+      ...base,
+      reply: `No **${label}**${filters} right now. These match everything except the condition:`,
+      products: relaxed.products,
+      productCards: relaxed.products,
+      missingItems: [`${label}${filters}`],
+      suggestions: chips,
+    };
+  }
+  if (plan.maxPrice !== undefined) {
+    const above = await search({ condition: undefined, maxPrice: undefined, minPrice: plan.maxPrice, sortBy: "price_low", limit: 4 });
+    if (above.products.length) {
+      return {
+        ...base,
+        reply: `No **${label}**${filters} right now. The cheapest ones just above that budget:`,
+        products: above.products,
+        productCards: above.products,
+        missingItems: [`${label}${filters}`],
+        suggestions: [`Show all ${label}`, `Fair price for ${label}`, "Show trending items"],
+      };
+    }
+  }
+  return {
+    ...base,
+    reply: `I couldn't find any **${label}**${filters} on campus right now. New listings come in daily, so check back soon.`,
+    products: [],
+    missingItems: [`${label}${filters}`],
+    suggestions: ["Show trending items", "Find something else", "Help me sell something"],
+  };
+};
+
+const buildListingDetailsReply = async (ref) => {
+  const p = await fetchListing(ref._id);
+  if (!p) return listingGone;
+  const was = p.original_price > p.selling_price ? ` (was ${formatRupees(p.original_price)})` : "";
+  const summary = String(p.description || "").replace(/\s+/g, " ").trim();
+  return {
+    reply: `**${p.title}**: ${formatRupees(p.selling_price)}${was}${p.conditionLabel ? `, ${p.conditionLabel.toLowerCase()}` : ""}. ${p.is_negotiable ? "The seller is open to offers." : "The price is fixed."}${summary ? `\n${summary.slice(0, 220)}${summary.length > 220 ? "…" : ""}` : ""}`,
+    intent: "product_details",
+    products: [p],
+    productCards: [p],
+    facts: `Details of the listing the student is asking about:\n${listingFacts(p)}\nAnswer their exact question from these details. If the details don't cover it, say so and suggest asking the seller in chat.`,
+    route: `/product/${p._id}`,
+    routeLabel: "View listing",
+    suggestions: ["Is it a fair price?", "What should I check before buying?", "Show similar items"],
+    aiPowered: false,
+  };
+};
+
+const buildListingPriceReply = async (ref) => {
+  const p = await fetchListing(ref._id);
+  if (!p) return listingGone;
+  const keyword = tokenizeSearchQuery(p.title).slice(0, 3).join(" ");
+  const estimate = keyword ? await toolHandlers.estimateFairPrice({ keyword, category: p.category }).catch(() => null) : null;
+  // The estimate needs listings other than this one to mean anything.
+  const usable = estimate && !estimate.error && estimate.sampleSize > 1;
+  let verdict = "There aren't enough similar listings on campus to compare it with yet. Check the original price and condition, and offer 10-20% less if it's negotiable.";
+  if (usable) {
+    const diff = p.selling_price - estimate.fair;
+    verdict = Math.abs(diff) <= estimate.fair * 0.1
+      ? `That's right around the campus fair price of **${formatRupees(estimate.fair)}**.`
+      : diff > 0
+        ? `That's about **${formatRupees(diff)}** above the campus fair price of **${formatRupees(estimate.fair)}**, so there's room to negotiate.`
+        : `That's about **${formatRupees(-diff)}** below the campus fair price of **${formatRupees(estimate.fair)}**, a good deal.`;
+  }
+  return {
+    reply: `**${p.title}** is listed at **${formatRupees(p.selling_price)}**${p.original_price > p.selling_price ? ` (original ${formatRupees(p.original_price)})` : ""}. ${verdict}`,
+    intent: "price_estimation",
+    products: [p],
+    productCards: [p],
+    estimate: usable ? estimate : null,
+    facts: `The listing being priced:\n${listingFacts(p)}`,
+    route: `/product/${p._id}`,
+    routeLabel: "View listing",
+    suggestions: ["Is it negotiable?", "What should I check before buying?", "Show similar items"],
+    aiPowered: false,
+  };
+};
+
+const buildCompareReply = async ([a, b]) => {
+  const [p1, p2] = await Promise.all([fetchListing(a._id), fetchListing(b._id)]);
+  if (!p1 || !p2) return listingGone;
+  const cheaper = p1.selling_price <= p2.selling_price ? p1 : p2;
+  const pricier = cheaper === p1 ? p2 : p1;
+  const diff = pricier.selling_price - cheaper.selling_price;
+  const verdict = diff === 0
+    ? `Both cost ${formatRupees(p1.selling_price)}, so compare condition and what's included.`
+    : `**${cheaper.title}** is ${formatRupees(diff)} cheaper than **${pricier.title}**.`;
+  return {
+    reply: `**${p1.title}** (${formatRupees(p1.selling_price)}${p1.conditionLabel ? `, ${p1.conditionLabel.toLowerCase()}` : ""}) vs **${p2.title}** (${formatRupees(p2.selling_price)}${p2.conditionLabel ? `, ${p2.conditionLabel.toLowerCase()}` : ""}). ${verdict}`,
+    intent: "comparison",
+    comparison: { product1: p1, product2: p2, verdict: verdict.replace(/\*\*/g, "") },
+    facts: `Listing A:\n${listingFacts(p1)}\n\nListing B:\n${listingFacts(p2)}\nA side-by-side comparison card is shown.`,
+    suggestions: [`Is the ${cheaper === p1 ? "first" : "second"} one negotiable?`, "What should I check before buying?", "Show similar items"],
+    aiPowered: false,
+  };
+};
+
+const buildWhichListingReply = (products) => ({
+  reply: `Which one do you mean?\n${products.map((p, i) => `${i + 1}. ${p.title} — ${formatRupees(p.selling_price)}`).join("\n")}`,
+  intent: "clarify",
+  suggestions: products.slice(0, 3).map((_, i) => `Tell me more about the ${["1st", "2nd", "3rd"][i]} one`),
+  aiPowered: false,
+  composeMode: false,
+});
+
+const buildFollowUpReply = (plan) => {
+  switch (plan.kind) {
+    case "search": return buildFollowUpSearchReply(plan);
+    case "product": return buildListingDetailsReply(plan.product);
+    case "price": return buildListingPriceReply(plan.product);
+    case "compare": return buildCompareReply(plan.products);
+    case "which": return buildWhichListingReply(plan.products);
+    default: return null;
+  }
+};
+
 const SYSTEM_PROMPT = `
 ${PERSONA}
 
@@ -1036,6 +1228,7 @@ const buildAssistantReplyForViewer = async ({
   user = null,
   attachments = [],
   shownProducts = [],
+  clientShownProducts = [],
   onText,
   signal,
 }) => {
@@ -1045,17 +1238,37 @@ const buildAssistantReplyForViewer = async ({
   const deadline = Date.now() + TURN_BUDGET_MS;
   const safeHistory = sanitizeHistory(history);
   const isFollowUp = FOLLOW_UP_PATTERN.test(message.trim());
+  // Follow-ups resolved from the conversation ("cheaper ones", "is it
+  // negotiable?", "compare the first two"). Guests' shown listings come from
+  // the client, so they're only used here: every id is re-fetched from the
+  // database, and their titles never reach the model's prompt.
+  const followUpPlan = attachments.length
+    ? null
+    : planFollowUp(
+        { message, history: safeHistory, shownProducts: shownProducts.length ? shownProducts : clientShownProducts },
+        { isShoppingQuery, parsePriceConstraint },
+      );
   // Final replies can mention the student's name, listings or plan, so they
   // are cached per person (see cacheKey). Follow-ups depend on the last turn.
   const viewerKey = user?._id ? `u:${user._id}` : "guest";
-  const cacheable = !attachments.length && !isFollowUp;
+  const cacheable = !attachments.length && !isFollowUp && !followUpPlan;
   if (cacheable) {
     const cached = getCachedReply(message, viewerKey);
     if (cached) return cached;
   }
 
   const context = await getViewerContext(user);
-  const draft = await buildDraftReply({ message, safeHistory, user, attachments, deadline, context, shownProducts, isFollowUp });
+  let draft = null;
+  if (followUpPlan) {
+    try {
+      draft = await buildFollowUpReply(followUpPlan);
+    } catch (error) {
+      console.warn("[Assistant] Follow-up failed, using the normal route:", error.message || error);
+    }
+  }
+  if (!draft) {
+    draft = await buildDraftReply({ message, safeHistory, user, attachments, deadline, context, shownProducts, isFollowUp });
+  }
 
   let result = draft;
   if (!draft.writtenByModel && draft.composeMode !== false) {
@@ -1085,7 +1298,7 @@ const buildAssistantReplyForViewer = async ({
       };
     }
   }
-  const { writtenByModel, composeMode, ...final } = result;
+  const { writtenByModel, composeMode, facts, ...final } = result;
   if (cacheable && final.aiPowered) setCachedReply(message, final, viewerKey);
   return final;
 };

@@ -23,6 +23,19 @@ const mediaKind = (attachments) => {
   return null;
 };
 
+// Guests' "listings on screen" (ids only matter: each is re-fetched from the
+// database with the normal visibility rules before anything is shown).
+const sanitizeClientShownProducts = (list) =>
+  (Array.isArray(list) ? list : [])
+    .slice(-24)
+    .filter((p) => p && /^[0-9a-f]{24}$/i.test(String(p._id)))
+    .map((p) => ({
+      _id: String(p._id),
+      title: typeof p.title === "string" ? p.title.slice(0, 120) : "",
+      selling_price: Number(p.selling_price) || 0,
+      group: Number.isInteger(p.group) && p.group >= 0 && p.group < 100 ? p.group : 0,
+    }));
+
 /**
  * Loads the conversation for a signed-in student (the stored history replaces
  * whatever the client sent). Guests keep the client-side history and nothing
@@ -42,6 +55,7 @@ const prepareTurn = async (req) => {
       message: body.message,
       history: user ? history.historyFor(conversation) : Array.isArray(body.history) ? body.history : [],
       shownProducts: user ? history.shownProductsFor(conversation) : [],
+      clientShownProducts: user ? [] : sanitizeClientShownProducts(body.shownProducts),
       user,
       attachments,
     },
