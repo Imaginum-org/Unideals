@@ -113,12 +113,12 @@ export const TERMS_AND_CONDITIONS = {
       rules: [
         "Unideals is not liable for transaction losses, disputes, product defects, or failed meetups between students.",
         "Platform liability is capped at ₹1,000 under applicable Indian law.",
-        "Users can report suspicious users or scams via the flag/report button on any product or user profile, or by emailing support@campusmart.in.",
+        "Users can report suspicious users or scams via the flag/report button on any product or user profile, or by emailing hi@unideals.in.",
         "For any safety emergency, contact campus security or local police first before reporting to Unideals.",
         "Unideals does NOT mediate financial disputes — students must resolve payment disagreements personally or through appropriate authorities.",
         "Unideals may cooperate with law enforcement agencies or campus administration in case of reported fraud, theft, or criminal activity.",
         "Abusing the dispute/report system by filing false reports will result in account penalties.",
-        "For formal complaints or legal notices, contact legal@campusmart.in.",
+        "For formal complaints or legal notices, contact hi@unideals.in.",
       ],
     },
     {
@@ -130,7 +130,7 @@ export const TERMS_AND_CONDITIONS = {
         "Second violation: Temporary account suspension (7 to 30 days depending on severity).",
         "Third violation OR any serious violation (fraud, prohibited items, harassment): Permanent account ban.",
         "Permanently banned users cannot create new accounts using the same identity, email, or device.",
-        "Appeals against account suspension can be submitted via support@campusmart.in with supporting evidence.",
+        "Appeals against account suspension can be submitted via hi@unideals.in with supporting evidence.",
         "Unideals reserves the right to permanently ban an account without prior warning in cases of severe violation (criminal activity, fraud).",
         "Banned users are NOT entitled to refunds for any paid subscription plans.",
       ],
@@ -292,10 +292,10 @@ export const PRIVACY_POLICY = {
       id: "user_rights",
       title: "Your Privacy Rights",
       points: [
-        "Right to Access: Request a copy of your personal data by emailing privacy@campusmart.in.",
+        "Right to Access: Request a copy of your personal data by emailing hi@unideals.in.",
         "Right to Correction: Request correction of inaccurate personal information.",
         "Right to Deletion: Request permanent deletion of your account and associated data.",
-        "Right to Grievance: File a complaint with our Grievance Officer at grievance@campusmart.in.",
+        "Right to Grievance: File a complaint with our Grievance Officer at hi@unideals.in.",
         "Right to Withdraw Consent: You may withdraw consent to optional data collection at any time via Settings.",
       ],
     },
@@ -313,8 +313,8 @@ export const PRIVACY_POLICY = {
       id: "contact_privacy",
       title: "Privacy Contact",
       points: [
-        "Privacy requests and data deletion: privacy@campusmart.in",
-        "Grievance officer contact: grievance@campusmart.in",
+        "Privacy requests and data deletion: hi@unideals.in",
+        "Grievance officer contact: hi@unideals.in",
         "Response time: Within 72 hours for routine requests; 30 days for complete data deletion.",
       ],
     },
@@ -335,7 +335,7 @@ export const REVIEW_RATING_POLICY = {
     "Fake reviews or incentivized reviews (receiving payment/gifts to write a good review) are strictly prohibited.",
     "A single completed deal allows one review per direction — buyer can review seller and seller can review buyer.",
     "Reviews cannot be edited once submitted (submit carefully).",
-    "If you believe a review about you is false, misleading, or malicious, report it via support@campusmart.in for moderation review.",
+    "If you believe a review about you is false, misleading, or malicious, report it via hi@unideals.in for moderation review.",
     "Unideals moderators will investigate and remove reviews that clearly violate these guidelines.",
     "Attempting to coerce or threaten another student into changing their review is grounds for account suspension.",
   ],
@@ -452,7 +452,7 @@ export const STEP_BY_STEP_GUIDES = [
       "Step 5: Submit the report. The campus moderation team reviews flagged items within 2 hours.",
       "Step 6: You will receive a notification once the moderation team takes action.",
       "Step 7: For urgent safety threats, contact campus security or local police FIRST, then report to Unideals.",
-      "Step 8: For emergency or persistent issues, email support@campusmart.in.",
+      "Step 8: For emergency or persistent issues, email hi@unideals.in.",
     ],
   },
   {
@@ -520,9 +520,9 @@ export const STEP_BY_STEP_GUIDES = [
       "Step 3: Attach screenshots, product links, or chat screenshots as evidence (strongly recommended for scam/fraud reports).",
       "Step 4: Submit the ticket. You'll receive a confirmation email with a ticket ID.",
       "Step 5: Response time: Standard support — 24-48 hours. Pro priority — 12-24 hours. Pro+ dedicated — same day.",
-      "Step 6: You can also directly email support@campusmart.in for urgent issues.",
-      "Step 7: For account-related legal requests or formal notices: legal@campusmart.in.",
-      "Step 8: For privacy and data deletion requests: privacy@campusmart.in.",
+      "Step 6: You can also directly email hi@unideals.in for urgent issues.",
+      "Step 7: For account-related legal requests or formal notices: hi@unideals.in.",
+      "Step 8: For privacy and data deletion requests: hi@unideals.in.",
     ],
   },
 ];
@@ -568,7 +568,7 @@ export const FAQ_SECTION_LIBRARY = {
       "Can I appeal an account suspension?",
     ],
     answer:
-      "Unideals is a student-only campus marketplace governed by Indian law (IT Act 2000, DPDP Act 2023). Users must be 18+, active Indian college students with verified student email. One account per person strictly — duplicates are permanently banned. Listings must be honest, legally owned, accurately described, and priced below original MRP. Strictly prohibited: alcohol, drugs, prescription medicines, tobacco, weapons, counterfeit goods, stolen items, adult content, exam leaks, academic cheating materials, bulk commercial reselling, digital-only products, and services. Platform activities banned: bait-and-switch, misrepresentation, harassment, scraping, off-platform deal solicitation. Unideals acts as a Section 79 IT Act intermediary — it facilitates, not participates in, transactions. Platform liability is capped at ₹1,000. Violations are penalized: warning → temporary suspension → permanent ban. Appeals go to support@campusmart.in.",
+      "Unideals is a student-only campus marketplace governed by Indian law (IT Act 2000, DPDP Act 2023). Users must be 18+, active Indian college students with verified student email. One account per person strictly — duplicates are permanently banned. Listings must be honest, legally owned, accurately described, and priced below original MRP. Strictly prohibited: alcohol, drugs, prescription medicines, tobacco, weapons, counterfeit goods, stolen items, adult content, exam leaks, academic cheating materials, bulk commercial reselling, digital-only products, and services. Platform activities banned: bait-and-switch, misrepresentation, harassment, scraping, off-platform deal solicitation. Unideals acts as a Section 79 IT Act intermediary — it facilitates, not participates in, transactions. Platform liability is capped at ₹1,000. Violations are penalized: warning → temporary suspension → permanent ban. Appeals go to hi@unideals.in.",
   },
   privacy: {
     title: "Privacy, data handling, DPDP compliance, and account management",
@@ -580,7 +580,7 @@ export const FAQ_SECTION_LIBRARY = {
       "dpdp", "gdpr", "digital personal data", "data protection", "right to access", "right to deletion", "right to correction",
       "third party data", "google oauth data", "imagekit", "mongodb", "grievance", "grievance officer", "72 hours",
       "30 days deletion", "data copy", "access my data", "withdraw consent", "optional data", "anonymized data",
-      "analytics data", "ad network", "advertising data", "privacy rights", "grievance@campusmart.in", "privacy@campusmart.in",
+      "analytics data", "ad network", "advertising data", "privacy rights", "hi@unideals.in", 
     ],
     questions: [
       "What data does Unideals collect?",
@@ -597,7 +597,7 @@ export const FAQ_SECTION_LIBRARY = {
       "Who handles privacy grievances?",
     ],
     answer:
-      "Unideals complies with India's Digital Personal Data Protection Act (DPDP), 2023. We collect account info, verification data, listing data, chat history, transaction interaction data, and anonymized usage analytics. We do NOT sell personal data or share it with advertisers. Your rights: Access your data, correct inaccuracies, request deletion (done within 30 days), file a grievance (privacy@campusmart.in), and withdraw consent to optional data. Google OAuth and ImageKit are used for sign-in and photo hosting respectively. Anonymized analytics are retained indefinitely. Email privacy@campusmart.in for all privacy requests.",
+      "Unideals complies with India's Digital Personal Data Protection Act (DPDP), 2023. We collect account info, verification data, listing data, chat history, transaction interaction data, and anonymized usage analytics. Unideals AI chats are saved only for signed-in users, with phone numbers, UPI IDs and emails hidden, no photos or voice notes kept, and are deleted automatically 90 days after the last message (or sooner from Recent chats in the assistant). Guest AI chats are never saved. We do NOT sell personal data or share it with advertisers. Your rights: Access your data, correct inaccuracies, request deletion (done within 30 days), file a grievance (hi@unideals.in), and withdraw consent to optional data. Google OAuth and ImageKit are used for sign-in and photo hosting respectively. Anonymized analytics are retained indefinitely. Email hi@unideals.in for all privacy requests.",
   },
   subscription: {
     title: "Plans, pricing, upgrades, boosts, and billing",
@@ -716,7 +716,7 @@ export const FAQ_SECTION_LIBRARY = {
       "Is late night meetup safe?",
     ],
     answer:
-      "Never pay before inspecting the item — not a single rupee in advance or token. NEVER scan QR codes a seller/buyer sends claiming you'll 'receive' money — this is a common reversal fraud. Always meet in public, well-lit campus areas during daylight: Library Gate, Main Canteen, Student Activity Center, Security Office. Avoid private hostel rooms, off-campus locations, and late-night meetings. For deals over ₹5,000, bring a trusted friend. Tell someone your meetup details. Red flags: pressure to pay fast, reluctance to meet on campus, suspicious QR codes, deals that seem too good to be true. Stop any deal that feels wrong and walk away. Report the user or listing using the in-app flag button. For emergencies or physical threats, contact campus security or local police FIRST, then report to Unideals via support@campusmart.in.",
+      "Never pay before inspecting the item — not a single rupee in advance or token. NEVER scan QR codes a seller/buyer sends claiming you'll 'receive' money — this is a common reversal fraud. Always meet in public, well-lit campus areas during daylight: Library Gate, Main Canteen, Student Activity Center, Security Office. Avoid private hostel rooms, off-campus locations, and late-night meetings. For deals over ₹5,000, bring a trusted friend. Tell someone your meetup details. Red flags: pressure to pay fast, reluctance to meet on campus, suspicious QR codes, deals that seem too good to be true. Stop any deal that feels wrong and walk away. Report the user or listing using the in-app flag button. For emergencies or physical threats, contact campus security or local police FIRST, then report to Unideals via hi@unideals.in.",
   },
   boosts: {
     title: "Boosting listings, boost rules, credits, and visibility",
@@ -769,11 +769,11 @@ export const FAQ_SECTION_LIBRARY = {
   support: {
     title: "Support, contact, complaints, tickets, SLAs, and escalations",
     keywords: [
-      "support", "help", "contact", "assistant", "email support", "support@campusmart.in", "report issue", "bug", "problem",
+      "support", "help", "contact", "assistant", "email support", "hi@unideals.in", "report issue", "bug", "problem",
       "can't log in", "technical issue", "complaint", "dispute", "chat bug", "payment issue", "feature request", "ask for help",
       "issue with listing", "seller not responding", "buyer not showing up", "need help with account",
       "ticket", "support ticket", "sla", "response time", "how long support", "when will i get a reply",
-      "legal contact", "legal@campusmart.in", "grievance officer", "grievance@campusmart.in", "privacy@campusmart.in",
+      "legal contact", "hi@unideals.in", "grievance officer",  
       "formal complaint", "legal notice", "technical bug", "app not working", "website down", "login not working",
     ],
     questions: [
@@ -786,7 +786,7 @@ export const FAQ_SECTION_LIBRARY = {
       "How do I file a formal complaint?",
     ],
     answer:
-      "Contact support via /contact (Support Ticket form) or directly at support@campusmart.in. SLAs: Free users — 24-48 hours. Pro users — 12-24 hours. Pro+ users — same day dedicated support. Include: product links, user IDs, screenshots, chat history, and incident date in your report. For privacy/data requests: privacy@campusmart.in (72 hours). For legal matters and formal notices: legal@campusmart.in. For grievances: grievance@campusmart.in. If you feel threatened or unsafe, contact campus security or local police FIRST — then report to Unideals. Moderation team reviews flagged listings/users within 2 hours.",
+      "Contact support via /contact (Support Ticket form) or directly at hi@unideals.in. SLAs: Free users — 24-48 hours. Pro users — 12-24 hours. Pro+ users — same day dedicated support. Include: product links, user IDs, screenshots, chat history, and incident date in your report. For privacy/data requests: hi@unideals.in (72 hours). For legal matters and formal notices: hi@unideals.in. For grievances: hi@unideals.in. If you feel threatened or unsafe, contact campus security or local police FIRST — then report to Unideals. Moderation team reviews flagged listings/users within 2 hours.",
   },
   deals: {
     title: "Deal lifecycle, offer flow, cancellation, and completion",
@@ -826,7 +826,7 @@ export const FAQ_SECTION_LIBRARY = {
       "How do I report an abusive review?",
     ],
     answer:
-      "Reviews can only be submitted after a deal is marked 'Completed'. Both buyer and seller can review each other (one review per completed deal per direction). Reviews must be honest and based on real transaction experience. You CANNOT edit a review after submission. Fake, incentivized, or paid reviews are strictly prohibited. Abusive or defamatory reviews will be removed by moderation. If you believe a review about you is false, report it via support@campusmart.in with evidence. Attempting to coerce someone to remove or change their review is grounds for account suspension.",
+      "Reviews can only be submitted after a deal is marked 'Completed'. Both buyer and seller can review each other (one review per completed deal per direction). Reviews must be honest and based on real transaction experience. You CANNOT edit a review after submission. Fake, incentivized, or paid reviews are strictly prohibited. Abusive or defamatory reviews will be removed by moderation. If you believe a review about you is false, report it via hi@unideals.in with evidence. Attempting to coerce someone to remove or change their review is grounds for account suspension.",
   },
   returns: {
     title: "Return policy, refunds, exchanges, and dispute resolution",
@@ -845,7 +845,7 @@ export const FAQ_SECTION_LIBRARY = {
       "Can I exchange an item?",
     ],
     answer:
-      "Unideals is a peer-to-peer marketplace — it does NOT process returns, refunds, or exchanges between students. This is exactly WHY we require you to inspect BEFORE paying. If item doesn't match the listing: do NOT pay — walk away. Report the seller immediately using the in-app flag/report. For serious fraud (scam, theft): contact campus security or local police first, then email support@campusmart.in with full evidence. Unideals can take platform action (account suspension) against fraudulent sellers. Financial recovery must be pursued through appropriate legal channels. Prevention is key: always inspect before paying.",
+      "Unideals is a peer-to-peer marketplace — it does NOT process returns, refunds, or exchanges between students. This is exactly WHY we require you to inspect BEFORE paying. If item doesn't match the listing: do NOT pay — walk away. Report the seller immediately using the in-app flag/report. For serious fraud (scam, theft): contact campus security or local police first, then email hi@unideals.in with full evidence. Unideals can take platform action (account suspension) against fraudulent sellers. Financial recovery must be pursued through appropriate legal channels. Prevention is key: always inspect before paying.",
   },
   ai: {
     title: "AI assistant features, capabilities, limitations, and usage",
@@ -908,7 +908,7 @@ export const FAQ_SECTION_LIBRARY = {
       "What if I didn't receive the verification email?",
     ],
     answer:
-      "For password reset: Go to Login → Forgot Password → enter your email → check inbox (and spam) for reset link → set new password. Google OAuth users don't need a separate password — click 'Sign in with Google'. Email verification: Sign up → check inbox for verification email → click the link → all features unlocked. If verification email doesn't arrive, check spam or request a resend from the login page. For account hacking or unauthorized access, immediately contact support@campusmart.in. Two-factor authentication details will be available in the Security settings once enabled.",
+      "For password reset: Go to Login → Forgot Password → enter your email → check inbox (and spam) for reset link → set new password. Google OAuth users don't need a separate password — click 'Sign in with Google'. Email verification: Sign up → check inbox for verification email → click the link → all features unlocked. If verification email doesn't arrive, check spam or request a resend from the login page. For account hacking or unauthorized access, immediately contact hi@unideals.in. Two-factor authentication details will be available in the Security settings once enabled.",
   },
 };
 
@@ -924,7 +924,7 @@ const FAQ_PRIORITY = [
 
 export const UNKNOWN_QUESTION_FALLBACK = {
   reply:
-    "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but don't worry, our team is continuously expanding my knowledge and I'll soon be able to answer it fully!\n\nIn the meantime, here's what you can do:\n• 📧 Email us directly at **support@campusmart.in** — our team will reply within 24-48 hours.\n• 🎫 Submit a support ticket at **/contact** and a campus team member will assist you.\n• 📚 Browse our Terms & Conditions at **/termscondition** or Privacy Policy at **/privacy-policy** for official platform policies.\n\nThanks for your patience — we're always improving! 🙌",
+    "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but don't worry, our team is continuously expanding my knowledge and I'll soon be able to answer it fully!\n\nIn the meantime, here's what you can do:\n• 📧 Email us directly at **hi@unideals.in** — our team will reply within 24-48 hours.\n• 🎫 Submit a support ticket at **/contact** and a campus team member will assist you.\n• 📚 Browse our Terms & Conditions at **/termscondition** or Privacy Policy at **/privacy-policy** for official platform policies.\n\nThanks for your patience — we're always improving! 🙌",
   route: "/contact",
   suggestions: [
     "What are the platform rules?",

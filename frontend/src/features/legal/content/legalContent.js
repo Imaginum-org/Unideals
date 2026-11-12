@@ -7,7 +7,7 @@
  * { note, tone: "info" | "warn" }. Wrap words in **double stars** for bold.
  */
 
-export const LEGAL_UPDATED = "9 November 2026";
+export const LEGAL_UPDATED = "11 November 2026";
 export const LEGAL_EMAIL = "hi@unideals.in";
 
 export const PRIVACY = {
@@ -49,6 +49,7 @@ export const PRIVACY = {
             { label: "Listings", text: "Titles, descriptions, photos, prices, categories, condition, pickup spots and drafts." },
             { label: "Activity", text: "Wishlist saves, deals and their stages, ratings, boosts, plans, XP, badges and ranks." },
             { label: "Messages", text: "Your chats, so conversations continue across devices. Every message passes an automatic safety check (see “How we use it”)." },
+            { label: "Unideals AI", text: "If you're signed in, your chats with the Unideals AI assistant and any thumbs up or down you give. Phone numbers, UPI IDs, emails and card or Aadhaar numbers are hidden before saving, and photos or voice notes you send are never stored. As a guest, nothing is saved on our servers." },
             { label: "Payments", text: "The plan, amount and Razorpay order and payment IDs. Never card numbers, UPI PINs or bank logins." },
             { label: "Support", text: "Anything you send us through Help & support, reports or feedback." },
             { label: "Technical", text: "Basic logs (pages visited, searches, errors), device and browser type, and one view per person per listing so view counts are accurate." },
@@ -70,6 +71,7 @@ export const PRIVACY = {
             "Send the messages you'd expect: verification, password resets, deal updates, price-drop alerts and replies to reports",
             "Keep the community safe: check reported content and catch spam, scams, fake accounts and abuse",
             "Screen chat messages automatically. Messages with abuse, threats or sexual content are hidden and sent to our team for review. A computer never bans anyone on its own",
+            "Answer you in Unideals AI using your campus, plan and your own listings, wishlist and deals, so replies fit you. It never sees your phone number or email. Your AI chats and ratings also help us find and fix answers that miss",
             "Understand how Unideals is used, through combined, anonymous numbers, so we can improve it",
             "Meet our legal duties, for example keeping payment records",
           ],
@@ -101,6 +103,7 @@ export const PRIVACY = {
         {
           list: [
             { label: "Service providers", text: "Hosting and database, image storage, Razorpay for payments, and email and Google sign-in providers. They may use your data only to provide their service to us." },
+            { label: "AI provider", text: "What you type, photograph or record in Unideals AI is sent to Google's Gemini service to write the reply, along with the marketplace details needed to answer (never your phone number or email)." },
             { label: "Safety", text: "Our moderation team sees reported listings, chats and accounts." },
             { label: "The law", text: "When a court, the police or a regulator in India lawfully requires it." },
             { label: "Business changes", text: "If Unideals merges or is acquired, your data stays protected by this policy." },
@@ -145,6 +148,7 @@ export const PRIVACY = {
           list: [
             "Account data is kept while your account is active",
             "Sold listings disappear from the marketplace straight away and are deleted with their photos after about 15 days",
+            "Unideals AI chats are deleted automatically 90 days after your last message in them. You can delete them sooner from Recent chats in the assistant",
             "When you delete your account, we erase your data within 30 days",
             "Some records are kept longer when the law or safety requires it: payment records (tax law), and minimal moderation history to stop banned users from coming back",
             "Backups are overwritten on their normal schedule",
@@ -198,7 +202,7 @@ export const PRIVACY = {
         {
           list: [
             "Go to Settings → Profile → Account → Delete account and confirm with your password. If you sign in with Google, first set a password using “Forgot password”",
-            "Your profile, listings, wishlist, pickup spots and unused boosts are removed, and you're signed out everywhere",
+            "Your profile, listings, wishlist, pickup spots, unused boosts and Unideals AI chats are removed, and you're signed out everywhere",
             "Reported chats, reports, payment records and moderation history may be kept in limited form, as explained in “How long we keep it”",
             "To come back, you'll need to create a new account",
           ],

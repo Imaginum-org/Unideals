@@ -1,4 +1,9 @@
-import ai, { GEMINI_MODEL, GEMINI_TIMEOUT } from "../config/gemini.js";
+import {
+  TURN_BUDGET_MS,
+  callGeminiWithFallback,
+  isGeminiAvailable,
+  parseJsonResponse,
+} from "./assistant.gemini.js";
 import {
   toolDeclarations,
   toolHandlers,
@@ -10,21 +15,25 @@ import {
 import {
   findKnowledgeBaseAnswer,
   formatKnowledgeReply,
-  getFullKnowledgeText,
 } from "./assistant.knowledge.js";
 import { PRODUCT_CATEGORY_LABELS, PRODUCT_CONDITION_LABELS, USER_TIER } from "../config/constants.js";
 import { getPricingForViewer } from "./payment.service.js";
+import { PERSONA, composeReply, replyLanguage } from "./assistant.compose.js";
+import { describeViewerContext, getViewerContext } from "./assistant.context.js";
 
 // ── In-memory LRU reply cache for instant repeated-question responses ──
 const CACHE_MAX = 120;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const _replyCache = new Map();
 
-const cacheKey = (msg) =>
-  `${viewerCanSeeGirlsListings() ? "g" : "p"}|${msg.trim().toLowerCase().replace(/\s+/g, " ")}`;
+// `viewerKey` scopes a reply to one person. Gemini replies can mention the
+// user's name or plan, so they are cached per viewer; deterministic replies
+// (search results, knowledge base answers) carry nothing personal and are shared.
+const cacheKey = (msg, viewerKey = "shared") =>
+  `${viewerKey}|${viewerCanSeeGirlsListings() ? "g" : "p"}|${msg.trim().toLowerCase().replace(/\s+/g, " ")}`;
 
-const getCachedReply = (msg) => {
-  const key = cacheKey(msg);
+const getCachedReply = (msg, viewerKey) => {
+  const key = cacheKey(msg, viewerKey);
   const entry = _replyCache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.ts > CACHE_TTL_MS) { _replyCache.delete(key); return null; }
@@ -34,8 +43,8 @@ const getCachedReply = (msg) => {
   return entry.data;
 };
 
-const setCachedReply = (msg, data) => {
-  const key = cacheKey(msg);
+const setCachedReply = (msg, data, viewerKey) => {
+  const key = cacheKey(msg, viewerKey);
   if (_replyCache.size >= CACHE_MAX) {
     const oldest = _replyCache.keys().next().value;
     _replyCache.delete(oldest);
@@ -409,7 +418,65 @@ export const parsePriceConstraint = (message = "") => {
   };
 };
 
-const NOT_SHOPPING_PATTERN = /\b(sell|selling|sold|list my|post my|upload|worth|estimate|fair price|valuation|how much (?:is|should|can|will|do)|scam|scams|safe|safety|policy|policies|refund|return|terms|privacy|boost|subscription|plan|plans|report|account|password|login|sign ?up|verify|verification|inspect|inspection|checklist|compare|trip|travel|packing|bundle|how (?:do|to|can|does)|what is|what are|why|who)\b/i;
+const NOT_SHOPPING_PATTERN = /\b(sell|selling|sold|list my|post my|upload|worth|estimate|fair price|valuation|how much (?:is|should|can|will|do)|scam|scams|safe|safety|policy|policies|refund|return|terms|privacy|boost|boosts|boosting|subscription|subscriptions|plan|plans|report|account|password|login|sign ?up|verify|verification|inspect|inspection|checklist|compare|trip|travel|packing|bundle|how (?:do|to|can|does)|what is|what are|why|who)\b/i;
+
+// Greetings, thanks, goodbyes and acknowledgements. Matched on the whole
+// message so "hi, need a cycle" still goes to search.
+const SMALL_TALK_PATTERN = /^(?:(?:hi+|hello+|hey+|hlo|helo|yo|sup|wassup|namaste|namaskar|good (?:morning|afternoon|evening|night))(?:\s+(?:there|everyone|all|bro|bhai|dude|unideals|ai|team))?|how are you(?: doing)?|kaise ho|kya haal(?: hai)?|thanks?(?: a lot| so much| bro| bhai)?|thank (?:you|u)(?: so much| very much)?|thanku|thnx|thx|ty|shukriya|dhanyavad|bye+|bye bye|goodbye|see you|see ya|cya|ok(?:ay)?(?: bye| thanks| thank you)?|okk+|cool|nice|great|got it|alright)[\s!.?,😊👋🙏👍]*$/i;
+
+export const isSmallTalk = (message = "") => SMALL_TALK_PATTERN.test(String(message).trim());
+
+const firstNameOf = (user) => String(user?.name || "").trim().split(/\s+/)[0] || "";
+
+const smallTalkReply = (message, user) => {
+  const text = String(message).trim().toLowerCase();
+  const name = firstNameOf(user);
+  const base = { intent: "conversation", products: [], productCards: [], aiPowered: false };
+  if (/^(?:thanks?|thank|thanku|thnx|thx|ty|shukriya|dhanyavad)/.test(text)) {
+    return {
+      ...base,
+      reply: `Anytime${name ? `, ${name}` : ""}! 😊 Shout if you need anything else.`,
+      suggestions: ["Show trending items", "Help me sell something", "Safety tips for meetups"],
+    };
+  }
+  if (/^(?:bye|goodbye|see you|see ya|cya|ok(?:ay)? bye|good night)/.test(text)) {
+    return {
+      ...base,
+      reply: `Bye${name ? ` ${name}` : ""}! 👋 Happy dealing, and stay safe at meetups.`,
+      suggestions: ["Show trending items", "How does Unideals work?"],
+    };
+  }
+  if (/^(?:ok|okk|cool|nice|great|got it|alright)/.test(text)) {
+    return {
+      ...base,
+      reply: "👍 Anything else I can help you find or sell?",
+      suggestions: ["Show trending items", "Help me sell something", "Check a fair price"],
+    };
+  }
+  if (/^(?:how are you|kaise ho|kya haal)/.test(text)) {
+    return {
+      ...base,
+      reply: `Doing great, thanks for asking${name ? `, ${name}` : ""}! 😄 Looking for something on campus today, or planning to sell?`,
+      suggestions: ["Show trending items", "Help me sell something", "Find a laptop under ₹30000"],
+    };
+  }
+  const hello = /^namaste|^namaskar/.test(text) ? "Namaste" : "Hey";
+  return {
+    ...base,
+    reply: `${hello}${name ? ` ${name}` : " there"}! 👋 What are you after today? I can find listings on your campus, price something you want to sell, or help with a deal.`,
+    suggestions: ["Show trending items", "Help me sell something", "How does Unideals work?", "Safety tips"],
+  };
+};
+
+// "Show trending items" / "what's popular" with no specific product.
+const TRENDING_PATTERN = /\b(?:trending|popular|what'?s hot|hot right now|most viewed|best ?sellers?)\b/i;
+const TRENDING_FILLER = /^(?:trending|popular|hot|latest|new|best|top|deals?|items?|listings?|products?|stuff|things|now|today|right|campus|viewed|most)$/i;
+
+const isTrendingRequest = (message = "") => {
+  if (!TRENDING_PATTERN.test(message)) return false;
+  const tokens = tokenizeSearchQuery(message);
+  return tokens.every((token) => TRENDING_FILLER.test(token));
+};
 const SHOPPING_VERB_PATTERN = /\b(find|search|show|looking for|look for|need|want|buy|get me|do you have|have any|any|available|in stock|recommend|suggest|cheap|cheaper|cheapest|affordable|under|below|budget|chahiye|dikhao)\b/i;
 
 export const isShoppingQuery = (message = "") => {
@@ -559,75 +626,41 @@ const buildPriceCheckReply = async (message) => {
   };
 };
 
+// Persona and tone are shared with the reply writer (assistant.compose.js).
 const SYSTEM_PROMPT = `
-You are Unideals AI, a friendly campus marketplace shopping assistant for Indian college students.
-You help users understand Unideals, search products, estimate prices, write listings, compare products, plan budgets, follow website steps, understand terms/privacy rules, and stay safe.
-Always respond naturally and concisely in the SAME language the user wrote in. Default to English; reply in Hindi or Hinglish only when the user's message is in Hindi or Hinglish.
-Keep replies short: 2-5 sentences or a short numbered list. Use **bold** for key points; no headings or tables.
-Use ₹ for all prices, format with Indian number system.
+${PERSONA}
+
+What you help with: finding listings, fair prices, selling and writing listings, comparing items, budgets, how to use the website, the platform's terms and privacy rules, and staying safe at meetups.
 Available categories: ${Object.values(PRODUCT_CATEGORY_LABELS || {}).join(", ")}.
 Available conditions: ${Object.values(PRODUCT_CONDITION_LABELS || {}).join(", ")}.
-NEVER share personal information or contact details of specific users.
-Always recommend meeting in public campus locations.
-Be encouraging about the campus marketplace community.
 
-CRITICAL RULES:
-- You are ONLY a Unideals assistant. NEVER answer questions unrelated to Unideals, campus buying/selling, or student marketplace topics.
-- NEVER answer from your general training knowledge. Use ONLY the platform knowledge, tools, and Knowledge Base Context provided below.
-- If a user asks something outside your scope, politely redirect: "I'm the Unideals assistant — I can help with buying, selling, pricing, safety, platform policies, and navigating the platform!"
-- If a Knowledge Base Context is provided below, treat it as the ABSOLUTE source of truth and answer from it first before calling tools.
-- For terms, privacy, website navigation, account, upload, wishlist, chat, report, address, and boosting questions, use the Knowledge Base Context BEFORE calling any tools.
-- NEVER invent, guess, or hallucinate policies, rules, prices, timelines, penalties, features, or procedures. ONLY state what is explicitly in the knowledge base or tool results.
-- Current subscription prices and viewer-specific offers must come from live plan pricing; direct users to /price rather than guessing.
-- CRITICAL NO-HALLUCINATION RULE: If a user asks a policy or procedure question that is NOT covered in the Knowledge Base Context or tool results, DO NOT make up an answer. Instead respond with: "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but our team is continuously expanding my knowledge and I'll soon be able to answer it! Please reach out to support@campusmart.in or visit /contact for direct assistance." Then provide suggestions from the platform.
+Facts and honesty:
+- Unideals rules, policies, prices, plan details, timelines and procedures come ONLY from the Knowledge Base Context, the student context or tool results. Never guess them.
+- If a policy or procedure question isn't covered, say honestly that you're not sure about that one, and that the team can confirm at hi@unideals.in or /contact. One sentence, no drama.
+- General buying and selling know-how (what specs matter, what to inspect, how to negotiate politely, what's a reasonable condition for the price) can come from common knowledge, as long as you don't present it as an Unideals rule.
+- If something is clearly unrelated to students buying, selling or using the marketplace (homework, coding, news, politics), don't answer it: in one warm line say it's not your thing and offer something nearby you can help with.
+- Never share personal details or contact info of other users. Always suggest meeting in a public campus spot and inspecting before paying.
+- Current subscription prices and offers come from live plan pricing; point to /price rather than guessing.
 
-MANDATORY TOOL USAGE:
-- For ANY question about how to use the website, features, steps, or navigation → call getPlatformGuide
-- For ANY question about rules, terms, policies, prohibited items, eligibility → call getTermsAndPolicies
-- For ANY question about returns, refunds, reviews, privacy, data deletion, subscription rules, boost rules, moderation, account security, content/photo rules, deal lifecycle, payment safety, listing price rules → call getPolicyOrProcedure with the matching topic
-- When user asks about products → call searchProducts or getTrendingProducts
-- When user asks about pricing → call estimateFairPrice
-- When user wants to sell something → call generateListingDraft
-- When user asks to compare → call compareTwoProducts
-- When user has a budget → call getBudgetBundle
-- For safety questions → call getSafetyTips
-- For inspection advice → call getInspectionChecklist
+Tools (call them instead of guessing):
+- How to use the website, features, steps, navigation → getPlatformGuide
+- Rules, terms, prohibited items, eligibility → getTermsAndPolicies
+- Returns, refunds, reviews, privacy, data deletion, subscription or boost rules, moderation, account security, photo rules, deal lifecycle, payment safety, listing price rules → getPolicyOrProcedure with the matching topic
+- Products → searchProducts or getTrendingProducts. Prices → estimateFairPrice. Selling → generateListingDraft. Comparing → compareTwoProducts (listings shown earlier in the chat are listed below with their ids). Budget → getBudgetBundle. Safety → getSafetyTips. Inspection → getInspectionChecklist.
 
-GRACEFUL FALLBACK RULE:
-If after exhausting all knowledge base context and tool results you still cannot provide a confident, grounded answer to a policy or procedure question, ALWAYS respond with:
-"That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but don't worry, our team is continuously expanding my knowledge and I'll soon be able to answer it fully! In the meantime: 📧 Email us at support@campusmart.in (24-48h response) or 🎫 Submit a ticket at /contact. Thanks for your patience! 🙌"
+Platform basics you can rely on:
+- Eligibility: 18+ currently enrolled Indian university students with a verified college email. One account per person.
+- Unideals is an intermediary (Section 79 IT Act): it doesn't hold money, run escrow or deliver. Liability capped at ₹1,000.
+- Safety: meet in public campus spots in daylight, inspect before paying, UPI or cash at the meetup only, never pay advance or token money, beware reverse QR scams.
+- Listing rules: price can't exceed the original MRP, max 3 real photos (no stock images), honest condition.
 
-PLATFORM CORE GROUNDING:
-- Eligibility: 18+ currently enrolled Indian university students with verified college email. Strict 1 account per person.
-- Role: Intermediary under Section 79 IT Act. Unideals does NOT hold funds, manage escrow, or arrange delivery. Liability capped at ₹1,000.
-- Safety: Meet in public campus spots during daylight (Library Gate, Canteen). Inspect before paying. UPI or cash only at meetup. NEVER pay advance or token money. Beware reverse QR scams.
-- Listing Rules: Selling price cannot exceed original MRP. Max 3 real photos (no stock images). Condition disclosed honestly.
-- Plan entitlements and current prices must be checked against the live plan data or the official pricing page.
-
-RESPONSE FORMAT:
-Always suggest 3-4 relevant follow-up prompts.
-Return ONLY a valid JSON object with this structure:
+Return ONLY a JSON object:
 {
-  "reply": "Direct, polished answer. Use numbered steps if the user asks how to do something.",
+  "reply": "your reply, following the style above",
   "intent": "knowledge_base | marketplace_overview | product_search | price_estimation | listing_creation | comparison | budget_planning | advice | policy | conversation",
-  "suggestions": ["short follow-up", "short follow-up", "short follow-up"]
+  "suggestions": ["2-4 short follow-ups the student might tap next, in their language"]
 }
 `;
-
-const CANDIDATE_MODELS = [
-  GEMINI_MODEL || "gemini-flash-latest",
-  // Tried in order when the primary model times out or is overloaded (503).
-  // The lite model is a sensible default: it's fast and rarely saturated.
-  ...String(process.env.GEMINI_FALLBACK_MODELS || "gemini-flash-lite-latest")
-    .split(",")
-    .map((model) => model.trim()),
-].filter(Boolean);
-
-// Per-model budget. Kept short so an overloaded model falls through to the
-// next one quickly instead of leaving the user staring at "thinking...".
-const PER_MODEL_TIMEOUT_MS = Math.min(GEMINI_TIMEOUT, 9000);
-const MODEL_COOLDOWN_MS = 2 * 60_000;
-const modelCooldownUntil = new Map();
 
 const isPlanPricingQuestion = (message) =>
   /\b(?:price|pricing|cost|how much|offer|charge)\b/i.test(message) &&
@@ -669,91 +702,6 @@ const isSupportedAssistantMessage = (message) => {
   const hasProduct = /\b(?:items?|products?|listings?|laptops?|phones?|tablets?|electronics?|headphones?|chargers?|books?|textbooks?|cycles?|bicycles?|bikes?|furniture|clothing|shoes|bags?|backpacks?|cameras?|keyboards?|mice|helmets?|calculators?|monitors?|chairs?|tables?|bottles?|lamps?|hostel essentials|lab equipment|event passes|trip|travel|packing|bundle|essentials)\b/i.test(text);
   const hasMarketplaceAction = /\b(?:find|finding|search|searching|show|recommend|compare|comparing|buy|buying|bought|purchase|purchasing|sell|selling|list|listing|estimate|price|pricing|priced|cost|worth|budget|under|below|cheaper|cheap|similar|available|looking for|need|want|how much|plan|second[- ]hand|used|inspect|check|tips|advice|keep in mind|negotiate|negotiating|deal)\b/i.test(text);
   return hasProduct && hasMarketplaceAction;
-};
-
-let geminiRateLimitedUntil = 0;
-
-export const isGeminiAvailable = () => {
-  return Boolean(process.env.GEMINI_API_KEY) && Date.now() > geminiRateLimitedUntil;
-};
-
-const withTimeout = (promise, timeoutMs = 6000, label = "Gemini API") =>
-  Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
-    ),
-  ]);
-
-const callGeminiWithFallback = async (params) => {
-  if (!isGeminiAvailable()) {
-    throw new Error("Gemini API is temporarily in cooldown due to rate limit.");
-  }
-
-  let lastError = null;
-  const allModels = [...new Set(CANDIDATE_MODELS)];
-  const now = Date.now();
-  // Skip models that recently timed out / were overloaded, unless every model is.
-  const healthyModels = allModels.filter((model) => (modelCooldownUntil.get(model) || 0) <= now);
-  const uniqueModels = healthyModels.length ? healthyModels : allModels;
-
-  for (const model of uniqueModels) {
-    try {
-      const response = await withTimeout(
-        ai.models.generateContent({
-          ...params,
-          model,
-        }),
-        PER_MODEL_TIMEOUT_MS,
-        `Model ${model}`
-      );
-      return { response, model };
-    } catch (err) {
-      lastError = err;
-      const status = err.status || err.statusCode;
-      const isRateLimited =
-        status === 429 ||
-        err.code === 429 ||
-        status === "RESOURCE_EXHAUSTED" ||
-        String(err.message || "").includes("429") ||
-        String(err.message || "").includes("RESOURCE_EXHAUSTED");
-
-      // If quota exceeded (429), activate circuit breaker for 60 seconds and stop retrying immediately
-      if (isRateLimited) {
-        geminiRateLimitedUntil = Date.now() + 60000;
-        console.warn("[Assistant] Gemini quota/rate limit detected (429). Circuit breaker enabled for 60s.");
-        break;
-      }
-
-      // If client-side error (bad request, auth), do not retry
-      if (status === 400 || status === 401 || status === 403) {
-        break;
-      }
-
-      // Overloaded (503), timed out, or retired (404): park this model so the
-      // next requests go straight to a healthy fallback.
-      const isTimeout = /timed out/i.test(String(err.message || ""));
-      if (isTimeout || status === 503 || status === 500 || status === 404) {
-        modelCooldownUntil.set(model, Date.now() + (status === 404 ? 30 * 60_000 : MODEL_COOLDOWN_MS));
-        console.warn(`[Assistant] Model ${model} unavailable (${status || "timeout"}); trying fallback.`);
-      }
-    }
-  }
-  throw lastError;
-};
-
-const parseJsonResponse = (text = "") => {
-  try {
-    return JSON.parse(text.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim());
-  } catch {
-    const objectMatch = text.match(/\{[\s\S]*\}/);
-    if (!objectMatch) return null;
-    try {
-      return JSON.parse(objectMatch[0]);
-    } catch {
-      return null;
-    }
-  }
 };
 
 const buildMediaSearchQueries = (value = "") => {
@@ -990,7 +938,7 @@ const fallbackLocalSearch = async (message) => {
 
     if (isPolicyQuestion && !knowledgeMatch) {
       return {
-        reply: "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but don't worry, our team is continuously expanding my knowledge and I'll soon be able to answer it fully!\n\nIn the meantime, here's what you can do:\n📧 Email us directly at **support@campusmart.in** — our team will reply within 24-48 hours.\n🎫 Submit a support ticket at **/contact** and a campus team member will assist you.\n📚 Browse our Terms & Conditions at **/termscondition** or Privacy Policy at **/privacy-policy**.\n\nThanks for your patience — we're always improving! 🙌",
+        reply: "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but don't worry, our team is continuously expanding my knowledge and I'll soon be able to answer it fully!\n\nIn the meantime, here's what you can do:\n📧 Email us directly at **hi@unideals.in** — our team will reply within 24-48 hours.\n🎫 Submit a support ticket at **/contact** and a campus team member will assist you.\n📚 Browse our Terms & Conditions at **/termscondition** or Privacy Policy at **/privacy-policy**.\n\nThanks for your patience — we're always improving! 🙌",
         intent: "policy",
         route: "/contact",
         suggestions: [
@@ -1054,18 +1002,104 @@ const fallbackLocalSearch = async (message) => {
 export const buildAssistantReply = (params = {}) =>
   runWithViewer(params.user, () => buildAssistantReplyForViewer(params));
 
-const buildAssistantReplyForViewer = async ({ message, history = [], user = null, attachments = [] }) => {
-  if (!message || typeof message !== "string" || message.trim() === "") {
-    throw new Error("Message is required");
-  }
+// "show cheaper ones", "compare them": only meaningful with the previous turn.
+const FOLLOW_UP_PATTERN = /^(and\s+)?(show|find|give|any|what about|how about)?\s*(cheaper|more affordable|similar|more like that|another|other ones?|those|these|the blue one|the black one|under\s+\d+|below\s+\d+|for\s+\d+)\b|^(tell me more|show more|more options|anything else|which one|compare them)\b/i;
 
-  const safeHistory = (Array.isArray(history) ? history : [])
+const PROMPT_INJECTION_PATTERN = /\b(?:ignore|disregard|forget|override|bypass)\b.{0,80}\b(?:rules?|instructions?|prompts?|guardrails?)\b/i;
+
+const sanitizeHistory = (history) =>
+  (Array.isArray(history) ? history : [])
     .filter((entry) => (entry?.sender === "user" || entry?.sender === "assistant") && typeof entry.text === "string")
     .slice(-8);
+
+// Used when Gemini can't write a redirect itself (down, or a manipulation attempt).
+const offTopicReply = (user) => {
+  const name = firstNameOf(user);
+  return {
+    reply: `That one's a bit outside my lane${name ? `, ${name}` : ""}. I'm best with campus deals: finding something, pricing an item, selling, or staying safe at a meetup. What do you need?`,
+    intent: "out_of_scope",
+    products: [],
+    suggestions: ["Find a campus listing", "Check a fair price", "Help me sell something"],
+    aiPowered: false,
+  };
+};
+
+/**
+ * One assistant turn: builds a draft from the facts (search, knowledge base,
+ * pricing...), then lets the reply writer turn it into a human reply in the
+ * student's language. `onText` streams the reply as it's written; the
+ * returned object is always the final reply.
+ */
+const buildAssistantReplyForViewer = async ({
+  message,
+  history = [],
+  user = null,
+  attachments = [],
+  shownProducts = [],
+  onText,
+  signal,
+}) => {
+  if (!message || typeof message !== "string" || message.trim() === "") {
+    throw Object.assign(new Error("Message is required"), { statusCode: 400 });
+  }
+  const deadline = Date.now() + TURN_BUDGET_MS;
+  const safeHistory = sanitizeHistory(history);
+  const isFollowUp = FOLLOW_UP_PATTERN.test(message.trim());
+  // Final replies can mention the student's name, listings or plan, so they
+  // are cached per person (see cacheKey). Follow-ups depend on the last turn.
+  const viewerKey = user?._id ? `u:${user._id}` : "guest";
+  const cacheable = !attachments.length && !isFollowUp;
+  if (cacheable) {
+    const cached = getCachedReply(message, viewerKey);
+    if (cached) return cached;
+  }
+
+  const context = await getViewerContext(user);
+  const draft = await buildDraftReply({ message, safeHistory, user, attachments, deadline, context, shownProducts, isFollowUp });
+
+  let result = draft;
+  if (!draft.writtenByModel && draft.composeMode !== false) {
+    let composed = null;
+    try {
+      composed = await composeReply({
+        message,
+        draft,
+        context,
+        history: safeHistory,
+        mode: draft.composeMode || "rewrite",
+        deadline,
+        signal,
+        onText,
+      });
+    } catch (error) {
+      // Failed mid-stream: the final reply (the draft) replaces what was sent.
+      console.warn("[Assistant] Reply writer failed mid-stream:", error.message || error);
+    }
+    if (composed?.reply) {
+      result = {
+        ...draft,
+        reply: composed.reply,
+        suggestions: composed.suggestions?.length ? composed.suggestions : draft.suggestions,
+        aiPowered: true,
+        model: composed.model,
+      };
+    }
+  }
+  const { writtenByModel, composeMode, ...final } = result;
+  if (cacheable && final.aiPowered) setCachedReply(message, final, viewerKey);
+  return final;
+};
+
+const buildDraftReply = async ({ message, safeHistory, user, attachments, deadline, context, shownProducts, isFollowUp }) => {
+  // Greetings, thanks and goodbyes: answer before any search logic (short
+  // messages would otherwise be treated as product names).
+  if (!attachments.length && isSmallTalk(message)) {
+    return { ...smallTalkReply(message, user), composeMode: "smalltalk" };
+  }
+
   // Resolve short follow-ups against the latest concrete user request. Without
   // this, deterministic search paths treat “show cheaper ones” as a literal query.
   const latestRequest = [...safeHistory].reverse().find((entry) => entry.sender === "user" && entry.text.trim())?.text.trim();
-  const isFollowUp = /^(and\s+)?(show|find|give|any|what about|how about)?\s*(cheaper|more affordable|similar|more like that|another|other ones?|those|these|the blue one|the black one|under\s+\d+|below\s+\d+|for\s+\d+)\b|^(tell me more|show more|more options|anything else|which one|compare them)\b/i.test(message.trim());
   const hasMarketplaceFollowUpContext = isFollowUp && latestRequest && isSupportedAssistantMessage(latestRequest);
 
   if (
@@ -1086,13 +1120,13 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
         console.warn("[Assistant] Direct search failed:", error.message || error);
       }
     }
-    return {
-      reply: "I'm the Unideals assistant. I can help with campus marketplace listings, prices, buying and selling, platform policies, and transaction safety. What would you like help with?",
-      intent: "out_of_scope",
-      products: [],
-      suggestions: ["Find a campus listing", "Check a fair price", "Get safe buying tips"],
-      aiPowered: false,
-    };
+    // Manipulation attempts never reach the model.
+    if (PROMPT_INJECTION_PATTERN.test(message) || !isGeminiAvailable()) {
+      return { ...offTopicReply(user), composeMode: false };
+    }
+    // Anything else (general buying advice, odd phrasings) goes to Gemini,
+    // which answers related questions and warmly redirects unrelated ones.
+    return answerWithGemini({ message, safeHistory, user, attachments, deadline, context, shownProducts, offTopic: true });
   }
 
   if (!attachments.length && isPlanPricingQuestion(message)) {
@@ -1151,6 +1185,8 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
       const mediaResult = await buildMediaReply({ message, attachments });
       if (mediaResult) return mediaResult;
     } catch (error) {
+      // Logged here only; internal error text never goes to the client.
+      console.warn("[Assistant] Media reply failed:", error.message || error);
       return {
         reply: "I could not process that media right now. Please try a clearer image or a shorter audio recording.",
         intent: "conversation",
@@ -1158,8 +1194,25 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
         productCards: [],
         suggestions: ["Try again", "Type the product name", "Search campus listings"],
         aiPowered: false,
-        error: error.message,
       };
+    }
+  }
+
+  if (!attachments.length && !isFollowUp && isTrendingRequest(message)) {
+    try {
+      const { products } = await toolHandlers.getTrendingProducts({ limit: 6 });
+      return {
+        reply: products.length
+          ? "Here's what's getting the most attention on campus right now:"
+          : "Nothing is trending yet. New listings come in daily, so check back soon!",
+        intent: "product_search",
+        products,
+        productCards: products,
+        suggestions: ["Find something under ₹1000", "Help me sell something", "Safety tips for meetups"],
+        aiPowered: false,
+      };
+    } catch (error) {
+      console.warn("[Assistant] Trending lookup failed:", error.message || error);
     }
   }
 
@@ -1289,7 +1342,7 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
 
   // ── FAST PATH: high or medium confidence KB match → skip Gemini entirely (serves in ~3ms) ──
   const fastKB = findKnowledgeBaseAnswer(message);
-  if (fastKB && (fastKB.confidence === "high" || fastKB.confidence === "medium" || (fastKB.score && fastKB.score >= 8))) {
+  if (fastKB && (fastKB.confidence === "high" || fastKB.confidence === "medium")) {
     const fastResult = {
       reply: formatKnowledgeReply(fastKB),
       intent: "knowledge_base",
@@ -1302,6 +1355,19 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
     return fastResult;
   }
 
+  return answerWithGemini({ message, safeHistory, user, attachments, deadline, context, shownProducts, knowledgeMatch: fastKB });
+};
+
+const describeShownProducts = (products = []) =>
+  products.length
+    ? `\nListings shown earlier in this chat (use these ids for compareTwoProducts or getProductDetails):\n${products
+        .slice(-8)
+        .map((p, i) => `${i + 1}. ${p.title} — ₹${Number(p.selling_price || 0).toLocaleString("en-IN")} (id: ${p._id})`)
+        .join("\n")}\n`
+    : "";
+
+// The open-ended path: Gemini with function tools writes the whole reply.
+const answerWithGemini = async ({ message, safeHistory, user, attachments, deadline, context, shownProducts = [], knowledgeMatch: fastKB = null, offTopic = false }) => {
   // ── CIRCUIT BREAKER: If Gemini is in rate-limit cooldown, serve local search instantly ──
   if (!isGeminiAvailable()) {
     console.log("[Assistant] Gemini API is in rate-limit cooldown. Serving immediate local fallback.");
@@ -1317,11 +1383,11 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
 
   const userTier = user?.subscription || USER_TIER?.BASE_USER || "base_user";
   const userName = user?.name ? `User's name is ${user.name}. ` : "";
-  const knowledgeMatch = fastKB || findKnowledgeBaseAnswer(message);
+  const knowledgeMatch = fastKB || (offTopic ? null : findKnowledgeBaseAnswer(message));
   const knowledgeContext = knowledgeMatch
     ? `\nKnowledge Base Context:\nTitle: ${knowledgeMatch.title}\nAnswer: ${knowledgeMatch.answer}\nSteps:\n${knowledgeMatch.steps?.map((step, index) => `${index + 1}. ${step}`).join("\n") || "N/A"}\nRelevant route: ${knowledgeMatch.route || "N/A"}\nSource: ${knowledgeMatch.source}\n`
     : "";
-  const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n${userName}User Tier: ${userTier}.\n${knowledgeContext}`;
+  const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n${userName}User Tier: ${userTier}.\nAbout the student (use only when it genuinely helps):\n${describeViewerContext(context)}\n${describeShownProducts(shownProducts)}${knowledgeContext}\nReply in: ${replyLanguage(message.replace(/ \(continuing the request about:.*\)$/, ""))}\n`;
 
   const mediaParts = attachments
     .filter((attachment) => attachment?.data && attachment?.mimeType)
@@ -1339,15 +1405,15 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
   ];
 
   try {
-    let { response } = await callGeminiWithFallback({
+    let { response, model: usedModel } = await callGeminiWithFallback({
       contents,
       config: {
         systemInstruction: enhancedSystemPrompt,
         tools: [{ functionDeclarations: toolDeclarations }],
-        temperature: 0.3,
+        temperature: 0.6,
         maxOutputTokens: 1024,
       },
-    });
+    }, { deadline });
 
     const MAX_TOOL_ROUNDS = 2;
     let rounds = 0;
@@ -1411,11 +1477,12 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
         config: {
           systemInstruction: enhancedSystemPrompt,
           tools: [{ functionDeclarations: toolDeclarations }],
-          temperature: 0.3,
+          temperature: 0.6,
           maxOutputTokens: 1024,
         },
-      });
+      }, { deadline });
       response = nextCall.response;
+      usedModel = nextCall.model;
     }
 
     const text = response.text || "";
@@ -1461,11 +1528,14 @@ const buildAssistantReplyForViewer = async ({ message, history = [], user = null
       sources: knowledgeMatch ? [knowledgeMatch.source] : parsed.sources,
       route: knowledgeMatch?.route || parsed.route,
       aiPowered: true,
+      model: usedModel,
+      // Already in the persona's voice: the reply writer skips it.
+      writtenByModel: true,
     };
-    setCachedReply(message, result);
     return result;
   } catch (error) {
     console.warn("Gemini fallback triggered:", error.message || error);
+    if (offTopic) return { ...offTopicReply(user), composeMode: false };
     return await fallbackLocalSearch(message);
   }
 };
@@ -1508,10 +1578,11 @@ Return ONLY a JSON object with this structure:
     }
     return JSON.parse(cleanText);
   } catch (error) {
+    const item = String(itemDescription || "Item").trim();
     return {
-      title: `${itemDescription.slice(0, 40)} - student owned`,
-      description: `Selling ${itemDescription}. In ${condition || "good"} condition. Ready for quick campus pickup.`,
-      tags: ["studentdeal", "campuspikcup"],
+      title: `${item.slice(0, 40)} - student owned`,
+      description: `Selling ${item}. In ${condition || "good"} condition. Ready for quick campus pickup.`,
+      tags: ["studentdeal", "campuspickup"],
     };
   }
 };

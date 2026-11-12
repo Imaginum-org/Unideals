@@ -40,13 +40,9 @@ import { avatarUrl, formatName } from "../../features/chat/utils/display.js";
 import { levelProgress, rankName, RANK_CONFIG, xpToNextLevel } from "../../utils/badgeConfig.js";
 import { useNotification } from "../../context/NotificationContext.jsx";
 import {
-  Tag,
-  MessageSquare,
-  Package,
-  Bell,
-  Megaphone,
-  ShieldAlert,
-} from "lucide-react";
+  formatNotificationTime,
+  getNotificationMeta,
+} from "../../features/notification/utils/notificationMeta.js";
 import { productPath } from "../../utils/productPath.js";
 
 const ProfileDropdown = ({
@@ -618,9 +614,8 @@ const Header = () => {
   const {
     notifications,
     unreadCount,
-    markRead,
     markAllRead,
-    trackClick,
+    openNotification,
   } = useNotification();
 
   // Campus marketplace scope (locked for members — changed only via
@@ -1004,39 +999,25 @@ const Header = () => {
   }, [showmenu]);
 
 
-  // Map notification type string -> icon metadata for dropdown rows
-  const notifIconMeta = (type = "") => {
-    const norm = String(type).toUpperCase();
-    if (norm.includes("MESSAGE")) return { Icon: MessageSquare, iconColor: "text-sky-500", dotColor: "bg-sky-500" };
-    if (norm.includes("ORDER")) return { Icon: Package, iconColor: "text-emerald-500", dotColor: "bg-emerald-500" };
-    if (norm.includes("OFFER") || norm.includes("PROMO") || norm.includes("WISHLIST") || norm.includes("PRICE"))
-      return { Icon: Tag, iconColor: "text-amber-500", dotColor: "bg-amber-500" };
-    if (norm.includes("ANNOUNCE")) return { Icon: Megaphone, iconColor: "text-indigo-500", dotColor: "bg-indigo-500" };
-    if (norm.includes("MODERAT") || norm.includes("REVIEW") || norm.includes("FLAG"))
-      return { Icon: ShieldAlert, iconColor: "text-rose-500", dotColor: "bg-rose-500" };
-    return { Icon: Bell, iconColor: "text-slate-500", dotColor: "bg-slate-500" };
-  };
-
   const toggleNotif = () => {
     setShowMsg(false);
     setShowNotif((prev) => !prev);
   };
 
-  const openNotif = async (item) => {
+  const openNotif = (item) => {
     setShowNotif(false);
-    await trackClick(item.id);
-    await markRead(item.id);
-    navigate(item.actionPath || "/notification");
+    openNotification(item, navigate);
   };
 
   const markAllNotifRead = () => markAllRead();
   const notifItems = notifications.slice(0, 5).map((notification) => {
-    const meta = notifIconMeta(notification.type);
+    const meta = getNotificationMeta(notification);
     return {
       ...notification,
       icon: meta.Icon,
       iconColor: meta.iconColor,
       dotColor: meta.dotColor,
+      time: formatNotificationTime(notification.createdAt),
     };
   });
 

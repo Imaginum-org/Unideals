@@ -25,6 +25,28 @@ export const emitToUser = (userId, event, payload) => {
   }
 };
 
+// One emit across many user rooms: socket.io de-duplicates sockets that sit
+// in several of the rooms, so nobody gets the event twice.
+export const emitToUsers = (userIds, event, payload) => {
+  try {
+    if (!ioInstance || !userIds?.length) return;
+    ioInstance.to(userIds.map((id) => `user:${id}`)).emit(event, payload);
+  } catch {
+    // ignore
+  }
+};
+
+// Distinct user ids currently connected to any of the given rooms.
+export const onlineUserIdsIn = async (rooms) => {
+  try {
+    if (!ioInstance || !rooms?.length) return new Set();
+    const sockets = await ioInstance.in(rooms).fetchSockets();
+    return new Set(sockets.map((s) => s.userId).filter(Boolean).map(String));
+  } catch {
+    return new Set();
+  }
+};
+
 export const emitToCampus = (campusId, event, payload) => {
   try {
     ioInstance?.to(`campus:${campusId}`)?.emit(event, payload);

@@ -8,21 +8,39 @@ import {
   useRef,
 } from "react";
 import { notificationApi } from "../features/notification/api/notificationApi.js";
+import {
+  followNotificationTarget,
+  resolveNotificationTarget,
+} from "../features/notification/utils/notificationMeta.js";
 import { useUser } from "./useUserContext.jsx";
 import { toast } from "../components/ui/toast.js";
 import { acquireSocket, releaseSocket } from "../services/realtime.js";
 
 const NotificationContext = createContext(null);
+const MAX_ITEMS = 100;
+const RESYNC_MIN_GAP_MS = 30000;
 
-// Notification links come from the server (incl. admin campaigns). Only
-// in-app paths are navigated to; anything else (absolute URLs,
-// protocol-relative "//host", javascript:) falls back to the inbox.
+// Kept for existing imports: an in-app path for a server-supplied link.
 // eslint-disable-next-line react-refresh/only-export-components
-export const safeActionPath = (value, fallback = "/notification") => {
-  if (typeof value !== "string") return fallback;
-  const v = value.trim();
-  if (v.startsWith("/") && !v.startsWith("//") && !v.includes("\\")) return v;
-  return fallback;
+export const safeActionPath = (value, fallback = "/notification") =>
+  resolveNotificationTarget(value, fallback).path || fallback;
+
+// One client shape for feed rows and live socket pushes.
+const normalize = (n, { unread } = {}) => {
+  const id = String(n.id || n._id);
+  return {
+    id,
+    kind: n.kind,
+    type: n.type,
+    title: n.title || "New notification",
+    description: n.message || n.description || "",
+    target: resolveNotificationTarget(n.actionPath || n.action_url),
+    actionLabel: n.actionLabel || n.action_label || "View",
+    imageUrl: n.imageUrl || n.image_url || null,
+    count: n.count || 1,
+    createdAt: n.createdAt || new Date().toISOString(),
+    unread: unread ?? Boolean(n.unread),
+  };
 };
 
 // eslint-disable-next-line react/prop-types
@@ -31,37 +49,24 @@ export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const socketRef = useRef(null);
   const mountedRef = useRef(true);
-  const notificationIdsRef = useRef(new Set());
+  const listRef = useRef(notifications);
+  listRef.current = notifications;
 
   const fetchNotifications = useCallback(async () => {
     if (!isLoggedIn) return;
     try {
+      // notificationApi already unwraps axios: `res` is the JSON body,
+      // { success, data: Notification[], unreadCount }.
       const res = await notificationApi.getNotifications();
-      const items = (res.data?.data || []).map((n) => ({
-        id: n.id || n._id,
-        title: n.title,
-        description: n.message || n.description,
-        time: n.time || "Just now",
-        actionPath: safeActionPath(n.actionPath || n.action_url),
-        unread: Boolean(n.unread),
-        type: n.type,
-        imageUrl: n.imageUrl || n.image_url,
-        actionLabel: n.actionLabel || n.action_label,
-        _id: n._id,
-        createdAt: n.createdAt,
-      }));
+      const items = (Array.isArray(res?.data) ? res.data : []).map((n) => normalize(n));
       if (mountedRef.current) {
-        notificationIdsRef.current = new Set(items.map((item) => String(item.id)));
         setNotifications(items);
         setError("");
       }
     } catch (fetchError) {
       console.error("Failed to load notifications:", fetchError);
-      if (mountedRef.current) {
-        setError("Notifications could not be loaded. Please try again.");
-      }
+      if (mountedRef.current) setError("Notifications could not be loaded. Please try again.");
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -72,7 +77,6 @@ export function NotificationProvider({ children }) {
 
     mountedRef.current = true;
     if (!isLoggedIn) {
-      notificationIdsRef.current.clear();
       setNotifications([]);
       setLoading(false);
       setError("");
@@ -81,120 +85,119 @@ export function NotificationProvider({ children }) {
 
     setLoading(true);
     fetchNotifications();
-    // Throttled re-sync: the socket "connect" event fires right after the
-    // mount fetch (double request on every page load), and every tab switch
-    // refetched. Live items arrive via "notification:new"; a re-sync is only
-    // needed after a real gap, so skip it if we synced < 30s ago.
+
+    // Live items arrive via "notification:new"; a full re-sync is only needed
+    // after a real gap (reconnect, tab coming back), and never twice in 30s —
+    // "connect" fires right after the mount fetch.
     let lastSync = Date.now();
     const resync = () => {
-      if (Date.now() - lastSync < 30000) return;
+      if (Date.now() - lastSync < RESYNC_MIN_GAP_MS) return;
       lastSync = Date.now();
       fetchNotifications();
     };
 
     const socket = acquireSocket();
-    socketRef.current = socket;
-
     const onConnectError = (socketError) => {
       console.error("Notification realtime connection failed:", socketError?.message);
     };
-    const onNotification = (item) => {
-      if (!mountedRef.current || !item) return;
-
-      const id = item.id || item._id;
-      if (!id || notificationIdsRef.current.has(String(id))) return;
-      notificationIdsRef.current.add(String(id));
-
-      const newItem = {
-        id,
-        title: item.title || "New Notification",
-        description: item.description || item.message || "",
-        time: "Just now",
-        actionPath: safeActionPath(item.actionPath || item.action_url),
-        unread: true,
-        type: item.type,
-        imageUrl: item.imageUrl || item.image_url,
-        actionLabel: item.actionLabel || item.action_label,
-        _id: item._id || id,
-        createdAt: item.createdAt || new Date().toISOString(),
-      };
-      setNotifications((current) => [newItem, ...current].slice(0, 100));
-      toast(newItem.title);
+    // Upsert: a known id means a grouped item was updated ("3 new messages
+    // from Sam"), so replace it and move it to the top as unread.
+    const onNotification = (raw) => {
+      if (!mountedRef.current || !raw || !(raw.id || raw._id)) return;
+      const item = normalize(raw, { unread: true });
+      setNotifications((current) =>
+        [item, ...current.filter((n) => n.id !== item.id)].slice(0, MAX_ITEMS),
+      );
+      toast(item.title);
     };
+    const onVisibility = () => {
+      if (!document.hidden) resync();
+    };
+
     socket.on("connect", resync);
     socket.on("connect_error", onConnectError);
     socket.on("notification:new", onNotification);
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) resync();
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       mountedRef.current = false;
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", onVisibility);
       socket.off("connect", resync);
       socket.off("connect_error", onConnectError);
       socket.off("notification:new", onNotification);
-      if (socketRef.current === socket) socketRef.current = null;
       releaseSocket(socket);
     };
   }, [fetchNotifications, isLoggedIn, userLoading]);
 
-  const markRead = useCallback(async (id) => {
-    const currentNotification = notifications.find((notification) => notification.id === id);
-    if (!currentNotification?.unread) return;
-    setNotifications((current) =>
-      current.map((n) => (n.id === id ? { ...n, unread: false } : n))
-    );
-    try {
-      await notificationApi.markRead(id);
-    } catch (requestError) {
-      console.error("Failed to mark notification as read:", requestError);
-      toast.error("Could not update this notification. Refresh and try again.");
-      await fetchNotifications();
-    }
-  }, [fetchNotifications, notifications]);
+  // Optimistic update, then re-sync from the server if the request fails.
+  const optimistic = useCallback(
+    async (apply, request, failMessage) => {
+      setNotifications(apply);
+      try {
+        await request();
+      } catch (requestError) {
+        console.error(failMessage, requestError);
+        toast.error(failMessage);
+        await fetchNotifications();
+      }
+    },
+    [fetchNotifications],
+  );
 
-  const markAllRead = useCallback(async () => {
-    setNotifications((current) => current.map((n) => ({ ...n, unread: false })));
-    try {
-      await notificationApi.markAllRead();
-    } catch (requestError) {
-      console.error("Failed to mark all notifications as read:", requestError);
-      toast.error("Could not update your notifications. Refresh and try again.");
-      await fetchNotifications();
-    }
-  }, [fetchNotifications]);
+  const markRead = useCallback(
+    async (id) => {
+      if (!listRef.current.find((n) => n.id === id)?.unread) return;
+      await optimistic(
+        (list) => list.map((n) => (n.id === id ? { ...n, unread: false } : n)),
+        () => notificationApi.markRead(id),
+        "Could not update this notification. Refresh and try again.",
+      );
+    },
+    [optimistic],
+  );
 
+  const markAllRead = useCallback(
+    () =>
+      optimistic(
+        (list) => list.map((n) => ({ ...n, unread: false })),
+        () => notificationApi.markAllRead(),
+        "Could not update your notifications. Refresh and try again.",
+      ),
+    [optimistic],
+  );
+
+  const dismiss = useCallback(
+    (id) =>
+      optimistic(
+        (list) => list.filter((n) => n.id !== id),
+        () => notificationApi.dismiss(id),
+        "Could not dismiss this notification. Please try again.",
+      ),
+    [optimistic],
+  );
+
+  // Click analytics are best-effort — never interrupt the user over them.
   const trackClick = useCallback(async (id) => {
     try {
       await notificationApi.trackClick(id);
     } catch {
-      // Click analytics are best-effort — never interrupt the user with an
-      // error toast for a background tracking call.
+      // ignore
     }
   }, []);
 
-  const dismiss = useCallback(async (id) => {
-    setNotifications((current) => current.filter((notification) => notification.id !== id));
-    notificationIdsRef.current.delete(String(id));
-    try {
-      await notificationApi.dismiss(id);
-    } catch (requestError) {
-      console.error("Failed to dismiss notification:", requestError);
-      toast.error("Could not dismiss this notification. Please try again.");
-      await fetchNotifications();
-    }
-  }, [fetchNotifications]);
-
-  const unreadCount = useMemo(
-    () => notifications.filter((notification) => notification.unread).length,
-    [notifications],
+  // Shared click handler for the dropdown and the inbox: navigate first so
+  // the UI feels instant, record click + read in the background.
+  const openNotification = useCallback(
+    (notification, navigate) => {
+      followNotificationTarget(notification.target, navigate);
+      trackClick(notification.id);
+      markRead(notification.id);
+    },
+    [markRead, trackClick],
   );
 
-  // Memoized: a fresh object every render re-rendered every consumer
-  // (Header, inbox page) on any provider render.
+  const unreadCount = useMemo(() => notifications.filter((n) => n.unread).length, [notifications]);
+
   const value = useMemo(
     () => ({
       notifications,
@@ -205,32 +208,18 @@ export function NotificationProvider({ children }) {
       markAllRead,
       trackClick,
       dismiss,
+      openNotification,
       fetchNotifications,
     }),
-    [
-      notifications,
-      unreadCount,
-      loading,
-      error,
-      markRead,
-      markAllRead,
-      trackClick,
-      dismiss,
-      fetchNotifications,
-    ],
+    [notifications, unreadCount, loading, error, markRead, markAllRead, trackClick, dismiss, openNotification, fetchNotifications],
   );
 
-  return (
-    <NotificationContext.Provider value={value}>
-      {children}
-    </NotificationContext.Provider>
-  );
+  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNotification() {
   const context = useContext(NotificationContext);
-  if (!context) {
-    throw new Error("useNotification must be used within a NotificationProvider");
-  }
+  if (!context) throw new Error("useNotification must be used within a NotificationProvider");
   return context;
 }

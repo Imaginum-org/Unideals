@@ -161,7 +161,9 @@ const standardJsonParser = express.json({ limit: "10kb" });
 const assistantJsonParser = express.json({ limit: "5mb" });
 app.use((req, res, next) => {
   const parser =
-    req.path === "/api/chat/assistant" ? assistantJsonParser : standardJsonParser;
+    req.path === "/api/chat/assistant" || req.path === "/api/chat/assistant/stream"
+      ? assistantJsonParser
+      : standardJsonParser;
   parser(req, res, next);
 });
 app.use(express.urlencoded({ extended: true, limit: "10kb" })); // Handles form data from frontend

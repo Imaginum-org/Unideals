@@ -1,288 +1,160 @@
-# Notification Feature Architecture & Event Trigger Specification
+# Notification Architecture
 
-## 1. Executive Summary
+Status as of 2026-11-11. Covers the backend engine and the marketplace web client in this repo. The admin portal (`Campus-Mart-Admin`) consumes `/api/admin/notifications` but lives in a separate repo.
 
-UniDeals implements a **100% in-house, zero-external-broker real-time notification engine**. It connects three core application components:
+## 1. What it is
 
-1. **Admin Portal (`Campus-Mart-Admin`)**: Campaign creation, audience filtering, live preview, scheduled broadcasts, and deliverability analytics.
-2. **Backend Engine (`Campus-Mart/backend`)**: Mongoose data models, Socket.IO rooms and real-time push dispatch, node-cron background schedule runner, and recipient resolution engine.
-3. **Main User Marketplace (`Campus-Mart/frontend`)**: Real-time WebSocket listeners, header bell counter, profile sidebar badge, floating toast alerts, and interactive `/notification` inbox.
-
----
-
-## 2. High-Level System Architecture
+An in-house, **in-app** notification system: MongoDB is the source of truth, Socket.IO pushes new items to users who are online, and the web client shows a header bell, a toast, and the `/notification` inbox. There is **no OS-level (system) push yet**. If the tab is closed, the user sees the item the next time they open the site. See [§8](#8-system-push-notifications-recommendation) for how to add it.
 
 ```mermaid
-flowchart TD
-    subgraph TriggerSources [Notification Triggers]
-        T1[Admin Portal Broadcast / Schedule]
-        T2[Chat Message sent in conversation]
-        T3[Deal / Order Status Transition]
-        T4[Wishlist / Price Drop Alert]
-        T5[Moderation / Safety Actions]
-    end
-
-    subgraph BackendEngine [Backend Processing]
-        T1 & T2 & T3 & T4 & T5 --> Core[notification.service.js]
-        Core --> DB[(MongoDB: Notification & NotificationReceipt)]
-
-        Cron[node-cron: * * * * *] -->|Every minute| Core
-
-        Core --> TargetEngine[Recipient & Room Engine]
-        TargetEngine --> Sockets[Socket.IO Server]
-    end
-
-    subgraph Rooms [Socket.IO Broadcast Rooms]
-        Sockets -->|emit to user:id| R1[Single User Private Room]
-        Sockets -->|emit to campus:id| R2[Campus-Scoped Room]
-        Sockets -->|emit to broadcast:all| R3[All Connected Clients]
-    end
-
-    subgraph ClientUI [Main Marketplace Website]
-        R1 & R2 & R3 --> Listener[useNotificationSocket / Realtime Listener]
-        Listener --> Bell[Header Bell Badge +1]
-        Listener --> Toast[Floating Toast Popup]
-        Listener --> Feed[/notification Inbox Card Feed]
-        Listener --> Side[Profile Menu Badge]
-    end
+flowchart LR
+  subgraph Triggers
+    A[Admin campaign\nnow / scheduled]
+    D[Deal events]
+    M[Chat message]
+    W[Wishlist price drop]
+    R[Moderation / reports / roles]
+  end
+  A --> S[notification.service.js]
+  D & M & W & R -->|notifyX, fire-and-forget| S
+  J[job runner: every minute] -->|dispatchDueScheduledNotifications| S
+  S --> DB[(MongoDB\nNotification + NotificationReceipt)]
+  S -->|notification:new| IO[Socket.IO rooms\nuser:id · campus:id · broadcast:all]
+  IO --> C[NotificationContext\nbell · toast · inbox]
+  C -->|REST: feed, read, dismiss, click| S
 ```
 
----
+## 2. Code map
 
-## 3. Technology Stack & Design Decisions
+| Concern | File |
+| --- | --- |
+| Schema, retention, enums | `backend/src/models/Notification.model.js` |
+| Engine (all logic) | `backend/src/services/notification.service.js` |
+| User API | `backend/src/routes/notification.routes.js` → `controllers/notification.controller.js` |
+| Admin API | `backend/src/routes/admin.routes.js` (`requireAccess("notifications", view/manage)`, campus-scoped) |
+| Scheduler | `backend/src/jobs/dispatchScheduledNotifications.job.js` (every minute) |
+| Socket rooms + emit helpers | `backend/src/sockets/index.js`, `backend/src/utils/socket.js` |
+| Client state + realtime | `frontend/src/context/NotificationContext.jsx` |
+| Icon/label/time/link helpers | `frontend/src/features/notification/utils/notificationMeta.js` |
+| Inbox page / header dropdown | `frontend/src/features/notification/pages/Notification.jsx`, `frontend/src/components/layout/Header.jsx` |
+| Tests | `backend/tests/notifications.integration.test.mjs` |
 
-| Layer                   | Technology                             | Architecture Rationale                                                                                     |
-| ----------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Data Persistence**    | MongoDB + Mongoose                     | Fast document queries, indexing on campus/roles, dual model for broadcasts vs direct receipts.             |
-| **Real-time Push**      | WebSockets via `socket.io` (v4.8+)     | Sub-50ms push delivery to online clients without HTTP polling overhead.                                    |
-| **Task Scheduling**     | `node-cron` (v3.0+)                    | Lightweight, runs in-process every minute to check and trigger scheduled campaigns without RabbitMQ/Redis. |
-| **Client UI**           | React 19 + Tailwind CSS + Lucide Icons | Responsive layout, dark/light mode compatible, instant preview matching admin creation controls.           |
-| **Infrastructure Cost** | **$0 / Zero Third-Party Dependencies** | No Firebase Cloud Messaging, OneSignal, Pusher, Novu, or external queue clusters required.                 |
+## 3. Two kinds of notification
 
----
-
-## 4. When Notifications Are Triggered ("Event Trigger Matrix")
-
-Below is the complete specification of **every scenario when a notification is created**, who receives it, and what actions are taken.
-
-| #      | Trigger Event                       | Trigger Source                                    | Target Audience                                           | Notification Type                        | Badge                                | Title & Message Template                                                                                                                         | Action CTA                                                                  |
-| ------ | ----------------------------------- | ------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| **1**  | **Admin Instant Broadcast**         | Admin clicks "Send Notification" in Admin Portal  | • All Users<br>• Specific Campus<br>• Buyers<br>• Sellers | `promotion` / `announcement` / `general` | `OFFER` / `ANNOUNCEMENT` / `GENERAL` | **Title**: As configured by admin<br>**Body**: Custom announcement message<br>**Image**: Attached promotional banner                             | `[Action Label ↗]` → Configured target URL (e.g., `/deals`, `/product/:id`) |
-| **2**  | **Admin Scheduled Broadcast**       | Cron runner executes at `scheduled_at`            | • Selected Audience<br>• Selected Campus                  | `promotion` / `announcement` / `general` | `OFFER` / `ANNOUNCEMENT`             | Dispatched automatically when schedule time arrives                                                                                              | Configured URL                                                              |
-| **3**  | **Direct Chat Message**             | User sends message in active conversation         | Conversation recipient (`receiverId`)                     | `message`                                | `DIRECT MESSAGE`                     | **Title**: `New message from {Sender Name}`<br>**Body**: Excerpt of message text<br>_(Suppressed if recipient is already inside that chat room)_ | `[Reply in Chat ↗]` → `/chat?conversationId={id}`                           |
-| **4**  | **New Deal Offer**                  | Buyer makes an offer on a listed item             | Seller of the product (`seller_id`)                       | `order`                                  | `ORDER UPDATE`                       | **Title**: `New Offer Received!`<br>**Body**: `{Buyer Name} offered ₹{Amount} for {Product Title}`                                               | `[View Offer ↗]` → `/chat?conversationId={id}`                              |
-| **5**  | **Offer Accepted / Deal Confirmed** | Seller accepts offer / deal agreed                | Buyer (`buyer_id`)                                        | `order`                                  | `ORDER UPDATE`                       | **Title**: `Offer Accepted!`<br>**Body**: `{Seller Name} accepted your offer for {Product Title}. Schedule pickup now.`                          | `[View Deal ↗]` → `/myorders`                                               |
-| **6**  | **Pickup Spot Scheduled**           | Either party proposes/confirms pickup spot & time | Counterparty                                              | `order`                                  | `ORDER UPDATE`                       | **Title**: `Pickup Spot Confirmed`<br>**Body**: `Meeting scheduled at {Spot Name} on {Date & Time}`                                              | `[View Pickup ↗]` → `/myorders`                                             |
-| **7**  | **Item Received & Deal Completed**  | Buyer confirms item inspected & received          | Seller (`seller_id`)                                      | `order`                                  | `ORDER UPDATE`                       | **Title**: `Deal Completed Successfully 🎉`<br>**Body**: `{Buyer Name} confirmed receiving {Product Title}. Payment balance updated.`            | `[View Order Details ↗]` → `/myorders`                                      |
-| **8**  | **Deal Cancelled**                  | Either party cancels active deal                  | Counterparty                                              | `order`                                  | `ORDER UPDATE`                       | **Title**: `Deal Cancelled`<br>**Body**: `Deal for {Product Title} was cancelled by {Name}`                                                      | `[View Details ↗]` → `/myorders`                                            |
-| **9**  | **Price Drop Alert**                | Seller reduces price of a listed item             | Users who saved item to **Wishlist**                      | `promotion`                              | `OFFER / PROMO`                      | **Title**: `Price Drop Alert!`<br>**Body**: `{Product Title} dropped by ₹{Diff}. Grab it before it sells out!`                                   | `[Buy Now ↗]` → `/product/{id}`                                             |
-| **10** | **Listing Moderation Warning**      | Admin/System flags listing for safety violation   | Product Owner (`seller_id`)                               | `general`                                | `GENERAL`                            | **Title**: `Listing Under Review`<br>**Body**: `Your listing for {Product Title} has been flagged for moderation review.`                        | `[Review Guidelines ↗]` → `/productlisted`                                  |
-| **11** | **Support Role Assigned**           | Admin promotes a user to Support role             | Assigned User                                             | `general`                                | `GENERAL`                            | **Title**: `Staff Role Updated`<br>**Body**: `You have been granted Support permissions on UniDeals Admin Portal.`                               | `[Open Admin Portal ↗]` → `/dashboard`                                      |
-
----
-
-## 5. Database Schema & Data Models
-
-### A. `Notification` Model (Campaigns & Direct Events)
-
-Stored in MongoDB collection: `notifications`
-
-```javascript
-{
-  _id: ObjectId,
-  title: String,             // Max 100 chars, required
-  message: String,           // Max 500 chars, required
-  type: String,              // "general" | "promotion" | "order" | "announcement" | "message"
-  target_audience: String,   // "all" | "buyers" | "sellers" | "campus"
-  target_campus: ObjectId,   // Ref: "Campus" (indexed)
-  image_url: String,         // Optional ImageKit or remote banner URL
-  action_url: String,        // Deep-link (e.g. "/deals", "/chat?id=123")
-  action_label: String,      // CTA text (e.g. "View Offers", "Reply in Chat")
-  schedule_type: String,     // "now" | "scheduled"
-  scheduled_at: Date,        // If scheduled, execution timestamp (indexed)
-  status: String,            // "draft" | "scheduled" | "sent" | "cancelled"
-  sent_by: ObjectId,         // Ref: "User" (Admin or Sender ID)
-  is_broadcast: Boolean,     // true = global/campus campaign; false = 1-to-1 event
-  recipient_id: ObjectId,    // Target user (when is_broadcast === false)
-  is_read: Boolean,          // Read status for 1-to-1 notifications
-  is_dismissed: Boolean,     // Hidden from the recipient's feed
-  read_at: Date,             // Timestamp when 1-to-1 was read
-  stats: {
-    total_sent: Number,      // Target recipient count
-    delivered: Number,       // Active users reached
-    clicked: Number          // Click interactions recorded
-  },
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
-### B. `NotificationReceipt` Model (Broadcast Read & Click Tracking)
-
-Stored in MongoDB collection: `notificationreceipts`
-
-Allows millions of broadcast reads without cloning whole notification payloads into thousands of individual documents:
-
-```javascript
-{
-  _id: ObjectId,
-  notification_id: ObjectId, // Ref: "Notification" (indexed)
-  user_id: ObjectId,         // Ref: "User" (indexed)
-  is_read: Boolean,          // default: true
-  is_dismissed: Boolean,     // default: false; per-recipient feed dismissal
-  read_at: Date,
-  is_clicked: Boolean,       // default: false
-  clicked_at: Date
-}
-// Unique Compound Index: { notification_id: 1, user_id: 1 }
-```
-
-### C. Automatic Self-Cleaning (30-Day MongoDB TTL Index)
-
-To prevent the database from filling up with old notifications:
-
-- Both `Notification` and `NotificationReceipt` records expire after 30 days:
-  ```javascript
-  notificationSchema.index(
-    { createdAt: 1 },
-    { expireAfterSeconds: 30 * 24 * 60 * 60 }, // Automatically expires after 30 days
-  );
-  ```
-- MongoDB's internal background thread automatically cleans up documents older than 30 days.
-
----
-
-## 6. Endpoints & API Contract
-
-### User Marketplace Endpoints (`/api/notifications`)
-
-All routes require standard user authentication cookie/bearer token:
-
-- **`GET /api/notifications`**
-  - Fetches combined personalized feed: broadcast campaigns matching user's campus + direct notifications (messages, orders).
-  - Returns: `{ success: true, data: Notification[], unreadCount: Number }`
-- **`PATCH /api/notifications/:id/read`**
-  - Marks single item as read (updates receipt or direct document).
-- **`PATCH /api/notifications/read-all`**
-  - Marks all visible items as read in bulk.
-- **`POST /api/notifications/:id/click`**
-  - Increments click analytics counter and records `is_clicked: true`.
-- **`DELETE /api/notifications/:id`**
-  - Dismisses a notification for the authenticated recipient (receipt-scoped for broadcasts).
-
-### Admin Portal Endpoints (`/api/admin/notifications`)
-
-Protected by role authorization:
-
-- `admin` role has full permissions (create, schedule, cancel).
-- `support` role has read-only access (stats, history, scheduled preview).
-
-- **`POST /api/admin/notifications`** _(Admin only)_
-  - Creates and dispatches instant notification, or schedules for later.
-- **`GET /api/admin/notifications/stats`** _(Admin & Support)_
-  - Returns `{ totalSent, delivered, deliveredPercent, clicked, clickedPercent, activeUsers }`.
-- **`GET /api/admin/notifications/history?page=1&limit=20`** _(Admin & Support)_
-  - Paginated list of sent campaigns with stats.
-- **`GET /api/admin/notifications/scheduled`** _(Admin & Support)_
-  - List of pending scheduled campaigns.
-- **`PATCH /api/admin/notifications/:id/cancel`** _(Admin only)_
-  - Cancels a pending scheduled campaign.
-- **`GET /api/admin/notifications/estimate-recipients?target_audience=&target_campus=`**
-  - Live estimate of recipients for form preview.
-
----
-
-## 7. Socket.IO Real-Time Delivery Lifecycle
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Admin as Admin Portal
-    participant Server as Backend API
-    participant Socket as Socket.IO Hub
-    actor UserOnline as User A (Online)
-    actor UserOffline as User B (Offline)
-
-    Admin->>Server: POST /api/admin/notifications (Send Now)
-    Server->>Server: Save Notification to MongoDB
-    Server->>Socket: emitToCampus(campusId, 'notification:new', payload)
-
-    Socket-->>UserOnline: Pushed via WebSocket (<50ms)
-    Note over UserOnline: Header Bell increments (+1)<br/>Toast pop-up displays<br/>/notification feed prepends item
-
-    Note over UserOffline: WebSocket not connected.<br/>Event dropped safely.
-
-    UserOffline->>Server: Logs in later -> GET /api/notifications
-    Server-->>UserOffline: Fetches unread notification from MongoDB
-    Note over UserOffline: Unread bell count displayed accurately
-```
-
----
-
-## 8. Anti-Spam & Smart Handling Features
-
-1. **Active Chat Presence Awareness**:
-   When a direct chat message is sent, the backend checks whether the recipient is already in that active chat room (`conversation:{id}`). If they are actively reading/typing in that chat, the bell notification is bypassed to avoid alert noise.
-2. **Offline Resilience**:
-   Users who are not online when a push event is broadcast will still receive it in their `/notification` feed the moment they next log in.
-3. **Campus Partitioning**:
-   Notifications sent with `target_audience: "campus"` are strictly delivered to students of that campus; students from other colleges will never receive irrelevant college-specific deals or alerts.
-4. **Dynamic Recipient Preview**:
-   Admins get real-time feedback on how many users will receive the notification before clicking "Send".
-
----
-
-## 9. Future Roadmap & Extensibility
-
-- **Browser Web Push API (Service Worker)**:
-  Integrate Web Push Notifications so users receive desktop/mobile OS notifications even when the browser tab is completely closed.
-- **Custom Notification Sound**:
-  Audio chime toggle in User Settings when high-priority notifications (deals or messages) arrive.
-- **Email Digest Option**:
-  Daily/weekly email summary of unread notifications for inactive users.
-
-# Notification System — Audit & Gap Analysis
-
-## ✅ What Is Fully Built
-
-| #   | Trigger                                | Status                                                                                            |
-| --- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 1   | **Admin Instant Broadcast**            | ✅ Built & working — `createAdminNotification()` → Socket.IO emitToAll/emitToCampus               |
-| 2   | **Admin Scheduled Broadcast**          | ✅ Built — `dispatchDueScheduledNotifications()` via cron job every minute                        |
-| 3   | **Direct Chat Message**                | ✅ Built — `notifyNewMessage()` called in `message.service.js`, chat-room presence check included |
-| —   | **Header Bell Badge**                  | ✅ Built — Socket.IO listener in `Header.jsx` increments count live                               |
-| —   | **Toast on new notification**          | ✅ Built — `toast.info()` fires in Header on `notification:new`                                   |
-| —   | **`/notification` Inbox Page**         | ✅ Built — full card feed with read/mark-all/click-track                                          |
-| —   | **Mark Read / Mark All Read**          | ✅ Built — PATCH endpoints + service functions                                                    |
-| —   | **Click tracking analytics**           | ✅ Built — POST endpoint increments `stats.clicked`                                               |
-| —   | **Admin notification stats & history** | ✅ Built — GET endpoints for admin portal                                                         |
-| —   | **30-day TTL auto-cleanup**            | ✅ Defined in schema                                                                              |
-
----
-
-## 10. Current Implementation Status
-
-The trigger-gap checklist above was previously reported as missing, but those entries are implemented and wired in the current code:
-
-| # | Trigger | Current implementation |
+| | Broadcast (campaign) | Direct (system event) |
 | --- | --- | --- |
-| 1–2 | Admin instant and scheduled broadcasts | Implemented through the admin notification API, recipient dispatch, Socket.IO, and the scheduled-dispatch job. |
-| 3 | Direct chat message | Implemented in `backend/src/services/message.service.js`; suppressed while the recipient is in the conversation room. |
-| 4 | New deal offer | Implemented in `backend/src/services/deal.service.js`; notifies the seller. |
-| 5 | Offer accepted | Implemented in `backend/src/services/deal.service.js`; notifies the buyer who made the offer. |
-| 6 | Pickup scheduled | Implemented in `backend/src/services/deal.service.js`; notifies the buyer. |
-| 7 | Deal completed | Implemented in `backend/src/services/deal.service.js`; notifies the seller. |
-| 8 | Deal cancelled | Implemented in `backend/src/services/deal.service.js`; notifies the other party. |
-| 9 | Wishlist price drop | Implemented in `backend/src/services/product.service.js`; fans out direct alerts to wishlist owners. |
-| 10 | Listing moderation action | Implemented in `backend/src/services/report.service.js`; notifies the seller when a product report is actioned. |
-| 11 | Support role assignment | Implemented in `backend/src/services/admin.user.service.js`; notifies on a role change to support. |
+| Docs | 1 `Notification` per campaign | 1 `Notification` per recipient |
+| `is_broadcast` | `true` | `false`, `recipient_id` set |
+| Read / dismiss / click | per-user `NotificationReceipt` | fields on the doc itself |
+| Who sees it | audience match (`all`, `campus`, `buyers`, `sellers`) **and** user joined before `sent_at` | the recipient |
 
-The marketplace uses a single shared notification context for the header, profile navigation badge, and inbox. Broadcast receipts hold per-user read and dismiss state; direct notifications hold their own read and dismiss state. Admin delivery analytics count eligible recipients and currently connected eligible users rather than returning sample values.
+**Lifecycle (`status`):** `scheduled → sending → sent`, plus `failed` and `cancelled`. Instant sends start at `sending`. The scheduler claims each due row atomically, so overlapping ticks or several instances never double-send. It also re-claims rows stuck in `sending` for more than 10 minutes (crash recovery), and marks a dispatch that throws as `failed` with a `failure_reason`.
 
-The user marketplace and backend are present in this repository. The separate admin portal that consumes the `/api/admin/notifications` endpoints is not part of this repository, so its form, preview, and rendering cannot be verified here.
+**Retention:** a TTL index on `expires_at` = `sent_at` + 30 days. Rows still waiting to send have no expiry. Receipts use a 30-day TTL on `createdAt`.
 
-## 11. Remaining Roadmap
+**Grouping:** while a chat alert is unread, more messages in that conversation update the same row (`group_key`, `group_count`), e.g. "3 new messages from Sam", instead of stacking. Price-drop alerts allow one per user per product per 24h.
 
-- **Browser Web Push API (Service Worker):** Deliver OS-level notifications when the site is closed.
-- **Custom Notification Sound:** Add an opt-in sound control for high-priority notifications.
-- **Email Digest Option:** Send periodic unread-notification summaries to inactive users.
+## 4. Event triggers
+
+| Event | Recipient | Source |
+| --- | --- | --- |
+| Admin campaign (now / scheduled) | audience | `createAdminNotification`, scheduler |
+| Chat message (skipped if the recipient has that chat open; grouped) | receiver | `message.service.js` |
+| New offer | seller | `deal.service.js · makeOffer` |
+| Offer accepted | offerer | `respondOffer` |
+| **Offer declined** (new) | offerer | `respondOffer` |
+| **Deal locked** (new) | buyer | `confirmDeal` |
+| Pickup scheduled | buyer | `schedulePickup` |
+| **Payment confirmed** (new) | buyer | `confirmPayment` |
+| Deal completed | seller | `confirmItemReceived` |
+| Deal cancelled | other party | `cancelDeal` |
+| Wishlist price drop | wishlist holders | `product.service.js` |
+| Listing blocked / hidden / deleted / auto-hidden / reinstated | seller | `moderation.service.js`, `report.service.js` |
+| Report actioned (warning) | seller | `report.service.js` |
+| Report outcome | each reporter | `moderation.service.js` |
+| Promoted to support | user | `admin.user.service.js` |
+
+Every `notifyX` helper is fire-and-forget and never throws, so a notification failure can't break the action that caused it.
+
+## 5. API
+
+User (`/api/notifications`, auth required):
+
+| Method | Path | Does |
+| --- | --- | --- |
+| GET | `/` | Feed: up to 50 broadcasts + 50 direct, newest first, with `unreadCount` |
+| PATCH | `/:id/read` | Mark one read |
+| PATCH | `/read-all` | Mark all read |
+| POST | `/:id/click` | Record a click (counted once per user) |
+| DELETE | `/:id` | Dismiss for this user only |
+
+Admin (`/api/admin/notifications`): `POST /` (manage), `GET /stats`, `GET /history`, `GET /scheduled`, `GET /estimate-recipients` (view), `PATCH /:id/cancel` (manage). Campus-limited staff can only target, and only see, their own campuses.
+
+**Client payload** (feed rows and `notification:new` are the same shape, built by `toClientNotification`):
+
+```js
+{ id, kind,            // kind = raw type: message | order | price_drop | promotion | announcement | moderation | general
+  type,                // display label kept for older clients: "DIRECT MESSAGE", "ORDER UPDATE", "PROMOTION", ...
+  title, message, imageUrl, actionPath, actionLabel,
+  count,               // >1 for grouped chat alerts
+  createdAt,           // = sent_at
+  unread, isBroadcast,
+  /* legacy aliases, still sent: _id, description, image_url, action_url, action_label, time */ }
+```
+
+New client code should use `kind` and the camelCase fields. A socket push with an id the client already has replaces that row (this is how grouped chat alerts update).
+
+**Links:** the server accepts in-app paths (`/deals`) or `https://` links. The client navigates in-app for paths, opens https links in a new tab, and sends anything else to the inbox.
+
+## 6. Analytics semantics
+
+- `total_sent`: active users in the audience at send time.
+- `delivered`: of those, the users connected over Socket.IO at send time. It is not a real delivery receipt. Offline users still get the item in their feed.
+- `clicked`: unique users who clicked, so click-through can't exceed 100%.
+
+## 7. Known gaps / backlog
+
+Ordered by impact.
+
+1. **No system (OS) push.** Users who close the tab learn about offers, deals and messages only when they come back. This is the biggest product gap for a marketplace. See §8.
+2. **No user preferences.** No per-category mute (e.g. turn off promotions but keep deal updates), no quiet hours, no unsubscribe. This is needed before push or email: without it, push opt-outs will be high.
+3. **No email fallback or digest.** Resend is already a dependency (auth emails). An "unread for 24h → email" digest for deal events would recover inactive users.
+4. **Single-instance realtime.** Socket.IO has no Redis adapter. With more than one backend instance, emits and `delivered` counts only cover users on the same instance. Add `@socket.io/redis-adapter` before scaling out.
+5. **Missing triggers:** subscription expiring/expired, boost ending, new review on a seller, stale-deal follow-ups (`GET /api/deals/pending-followups` exists but nothing sends them), account suspension, role demotion or admin promotion.
+6. **Feed has no pagination.** It is capped at 50 + 50 with no "load more", and there is no lightweight unread-count endpoint (the bell loads the whole feed).
+7. **Campus room is fixed at connect time.** A user who changes campus keeps the old `campus:` room until they reconnect.
+8. **Audience resolution for `buyers`/`sellers`** scans `distinct()` over all conversations/products. Fine now; precompute flags on `User` as data grows.
+
+## 8. System push notifications: recommendation
+
+**You can't fully build OS push in-house.** Every OS notification is delivered by the platform's push service: Google FCM (Chrome / Android), Apple APNs (Safari / iOS), Mozilla autopush (Firefox). What you own in-house is everything up to that hop: who gets notified, when, the content, preferences and token management.
+
+| Option | What it is | Cost | Fits when |
+| --- | --- | --- | --- |
+| **Web Push (VAPID) + `web-push` npm** | Standard browser push. A service worker on the site, and the backend signs and sends to each browser's push endpoint. | Free | Web-only users. iOS works only when the site is installed to the home screen (iOS 16.4+). |
+| **Firebase Cloud Messaging (`firebase-admin`)** | One API for web, Android and iOS (relays to APNs). | Free | You have, or will have, a mobile app. **Recommended.** |
+| OneSignal | Hosted push + segmentation + dashboard. | Free tier, paid at scale | You want minimal code and accept a vendor holding user device data. |
+| Novu (open source) / Knock / Courier | Full notification infrastructure: inbox, push, email, preferences, digests. | Novu self-host free; others paid | You'd rather replace the in-house engine than extend it. |
+
+**Recommended path: keep the in-house engine and add a push channel on FCM.** The in-app engine already does the hard parts (triggers, audiences, scheduling, grouping), and FCM covers web and a mobile app with one integration at no cost.
+
+In-house work needed:
+
+1. `DeviceToken` model: `user_id`, `token`, `platform` (web/android/ios), `last_seen_at`. Endpoints to register and remove tokens. Remove on logout.
+2. Web: `firebase-messaging-sw.js` service worker, plus a permission prompt shown after a meaningful action (first offer or first message), never on page load.
+3. `NotificationPreference` on `User`: per-category on/off for in-app, push and email, plus quiet hours.
+4. A channel dispatcher in `sendDirect` / `dispatchNotificationDocument`. After the DB write and socket emit, send push when the category allows it and the user is offline (or always for deal events). Use `sendEachForMulticast` for campaigns in batches of 500.
+5. Prune tokens on FCM `registration-token-not-registered` errors. Rate-limit promotional campaigns per user.
+6. Tap action: the push payload carries `actionPath`, and the service worker opens or focuses the site at that path.
+
+Rough size: 1–2 weeks for one developer for web push with preferences. The mobile app adds its own SDK wiring on top.
+
+## 9. Deploying this version
+
+The retention change needs a one-off migration. Mongoose creates the new `expires_at` index but never drops the old `createdAt` TTL index, which would keep deleting scheduled campaigns:
+
+```bash
+cd backend && MONGO_URL=... node scripts/migrateNotificationExpiry.js
+```
+
+It is idempotent: it backfills `sent_at` / `expires_at` on existing rows, drops the legacy TTL index, then ensures the new indexes. Run it right after deploying.

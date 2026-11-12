@@ -508,6 +508,13 @@ export const deleteAccount = async (req, res) => {
     } catch {
       // best-effort only
     }
+    // Unideals AI chats are personal data with no reason to outlive the account.
+    try {
+      const AssistantConversation = (await import("../models/AssistantConversation.model.js")).default;
+      await AssistantConversation.deleteMany({ user_id: userId });
+    } catch {
+      // best-effort only
+    }
 
     // Reuse the shared clearer so Secure/SameSite/Path always match the
     // flags the cookies were set with (a mismatched clear leaves orphans).

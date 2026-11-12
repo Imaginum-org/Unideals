@@ -41,6 +41,7 @@ const { default: PhotoHandoff } = await M("PhotoHandoff.model.js");
 const { default: PickupSpot } = await M("PickupSpot.model.js");
 const { default: StaffAccess } = await M("StaffAccess.model.js");
 const { default: AuditLog } = await M("AuditLog.model.js");
+const { default: AssistantConversation } = await M("AssistantConversation.model.js");
 
 let passed = 0;
 let failed = 0;
@@ -116,6 +117,10 @@ await BadgeEvent.collection.insertOne({ _id: oid(), user_id: del._id, badge_id: 
 await ChatCooldown.collection.insertOne({ _id: oid(), user_id: del._id, strikes: 1, createdAt: now });
 await PhotoHandoff.collection.insertOne({ _id: oid(), code: "abc", user: del._id, images: [], createdAt: now });
 await PickupSpot.collection.insertOne({ _id: oid(), user: del._id, name: "Gate", createdAt: now });
+await AssistantConversation.collection.insertMany([
+  { _id: oid(), user_id: del._id, title: "Cycles", messages: [{ _id: oid(), role: "user", text: "cycle" }], last_active_at: now },
+  { _id: oid(), user_id: other._id, title: "Books", messages: [], last_active_at: now },
+]);
 
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, resolve));
@@ -171,6 +176,7 @@ await test("deletes the user and everything linked to them", async () => {
     [ChatCooldown, { user_id: del._id }],
     [PhotoHandoff, { user: del._id }],
     [PickupSpot, { user: del._id }],
+    [AssistantConversation, { user_id: del._id }],
   ]) {
     assert.equal(await Model.countDocuments(filter), 0, `${Model.modelName} left behind`);
   }
@@ -183,6 +189,7 @@ await test("other people's data stays, and points at nothing deleted", async () 
   assert.deepEqual(olive.rating, { avg: 0, count: 0 }, "Dev's review no longer counts");
   assert.ok(await Product.exists({ _id: chair }), "Olive's own listing stays");
   assert.ok(await Report.exists({ _id: otherReport }), "unrelated reports stay");
+  assert.equal(await AssistantConversation.countDocuments({ user_id: other._id }), 1, "Olive's AI chats stay");
 });
 
 await test("the deletion is audited and can't be repeated", async () => {

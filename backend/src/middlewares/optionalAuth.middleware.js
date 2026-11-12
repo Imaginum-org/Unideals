@@ -3,14 +3,14 @@ import User from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
 
 const optionalAuth = async (req, res, next) => {
+  let token;
   try {
-    let token;
     if (req.cookies?.accessToken) {
       token = req.cookies.accessToken;
     } else if (req.headers.authorization?.startsWith("Bearer ")) {
       token = req.headers.authorization.split(" ")[1];
     }
-    
+
     if (!token) {
       req.user = null;
       req.userId = null;
@@ -32,6 +32,9 @@ const optionalAuth = async (req, res, next) => {
   } catch (err) {
     req.user = null;
     req.userId = null;
+    // A token was sent but has expired: routes that care (the assistant
+    // stream) can ask the client to refresh instead of treating it as a guest.
+    req.authExpired = Boolean(token) && err?.name === "TokenExpiredError";
     next();
   }
 };

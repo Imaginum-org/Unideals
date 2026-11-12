@@ -16,8 +16,24 @@ import {
   PRIVACY_POLICY,
   REVIEW_RATING_POLICY,
   UNKNOWN_QUESTION_FALLBACK,
-  FAQ_SECTION_LIBRARY,
 } from "../config/knowledgeBase.js";
+import { USER_TIER } from "../config/constants.js";
+import { BOOST_ADDONS } from "../config/boostAddons.js";
+import { getBoostPlanRules } from "../config/boostPlans.js";
+
+// Boost credits per plan, read from the live plan config (never hard-coded).
+const rupees = (paise) => `₹${Math.round(paise / 100)}`;
+const addonSummary = () =>
+  Object.values(BOOST_ADDONS)
+    .map((addon) => `${rupees(addon.amountInPaise)}/${Math.round(addon.durationHours / 24)}-day`)
+    .join(", ");
+const creditLine = (tier) => {
+  const rules = getBoostPlanRules(tier);
+  if (!rules.monthlyLimit) return `0 monthly credits — can purchase add-ons (${addonSummary()}).`;
+  const days = Math.round(rules.durationHours / 24);
+  const active = rules.maxActiveBoosts === 1 ? "Max 1 active boost at a time." : `Up to ${rules.maxActiveBoosts} active boosts simultaneously.`;
+  return `${rules.monthlyLimit} boost credits/month (${days}-day each). ${active}`;
+};
 
 const compactProduct = (product) => {
   if (!product) return null;
@@ -616,7 +632,7 @@ export const toolHandlers = {
           "If item doesn't match the listing: do NOT pay — walk away.",
           "Report fraudulent sellers via the in-app report/flag button.",
           "For serious fraud (theft, criminal scam): contact campus security or local police first.",
-          "Email support@campusmart.in with full evidence for platform action against the seller.",
+          "Email hi@unideals.in with full evidence for platform action against the seller.",
           "Unideals can suspend/ban fraudulent sellers but cannot recover funds.",
         ]
       },
@@ -656,9 +672,9 @@ export const toolHandlers = {
         rules: SUBSCRIPTION_PLANS.boostRules,
         addons: SUBSCRIPTION_PLANS.boostAddons,
         planCredits: {
-          free: "0 monthly credits — can purchase add-ons (₹29/3-day, ₹49/7-day).",
-          pro: "2 boost credits/month (3-day each). Max 1 active boost at a time.",
-          pro_plus: "5 boost credits/month (7-day each). Up to 3 active boosts simultaneously.",
+          free: creditLine(USER_TIER.BASE_USER),
+          pro: creditLine(USER_TIER.PRO),
+          pro_plus: creditLine(USER_TIER.PRO_PLUS),
         }
       },
       moderation_penalties: {
@@ -669,7 +685,7 @@ export const toolHandlers = {
           "2nd violation: Temporary suspension (7-30 days depending on severity).",
           "3rd violation or any serious offense: Permanent account ban.",
           "Permanently banned users cannot create new accounts.",
-          "Appeals: email support@campusmart.in with evidence.",
+          "Appeals: email hi@unideals.in with evidence.",
           "Banned accounts forfeit subscription benefits — no refunds.",
         ],
         sectionRef: TERMS_AND_CONDITIONS.sections.find(s => s.id === "moderation_penalties"),
@@ -687,7 +703,7 @@ export const toolHandlers = {
           "Google OAuth users: no separate password — sign in with Google account.",
           "Email verification required for full access (listing, chat, wishlist, etc.).",
           "If verification email not received: check spam or request resend from login page.",
-          "Account hacking/unauthorized access: contact support@campusmart.in immediately.",
+          "Account hacking/unauthorized access: contact hi@unideals.in immediately.",
           "Password change: Settings → Security (only for email-based accounts).",
           "Google users manage passwords via Google account settings.",
         ]

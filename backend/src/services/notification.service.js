@@ -1,7 +1,22 @@
+// In-app notification engine.
+//
+//   Broadcasts (admin campaigns)  -> ONE Notification doc + per-user
+//                                    NotificationReceipt for read/dismiss/click.
+//   Direct (system events)        -> one Notification doc per recipient,
+//                                    read/dismiss/click state on the doc.
+//
+// Delivery is MongoDB (source of truth) + a best-effort Socket.IO push on
+// "notification:new". Offline users pick items up on their next feed fetch.
+// Every notifyX() helper is fire-and-forget: it never throws, so a failed
+// notification can never fail the deal / message / moderation that caused it.
 import mongoose from "mongoose";
-import Notification, { NotificationReceipt } from "../models/Notification.model.js";
+import Notification, {
+  NotificationReceipt,
+  CAMPAIGN_TYPES,
+  NOTIFICATION_AUDIENCES,
+  retentionDate,
+} from "../models/Notification.model.js";
 import User from "../models/User.model.js";
-import Campus from "../models/Campus.model.js";
 import Conversation from "../models/conversation.model.js";
 import Product from "../models/Product.model.js";
 import { USER_STATUS } from "../config/constants.js";
@@ -9,1098 +24,34 @@ import {
   emitToAll,
   emitToCampus,
   emitToUser,
+  emitToUsers,
   getActiveUserCount,
-  getIO,
+  onlineUserIdsIn,
 } from "../utils/socket.js";
 import { AppError } from "../utils/appError.js";
 
-/**
- * Estimate recipient count based on target audience and campus filters
- */
-export const estimateRecipients = async ({ targetAudience = "all", targetCampus = null }) => {
-  if (targetAudience === "campus") {
-    if (!targetCampus || !mongoose.Types.ObjectId.isValid(targetCampus)) {
-      throw new AppError("A valid campus must be selected for campus targeting", 400);
-    }
-    return User.countDocuments({
-      status: USER_STATUS.ACTIVE,
-      campus_id: targetCampus,
-    });
-  }
+const EVENT = "notification:new";
+const SENDING_STALE_MS = 10 * 60 * 1000; // a "sending" row older than this crashed mid-dispatch
+const PRICE_DROP_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
-  if (targetAudience === "buyers" || targetAudience === "sellers") {
-    const ids = targetAudience === "buyers"
-      ? await Conversation.distinct("buyer_id")
-      : await Product.distinct("seller_id");
-    return User.countDocuments({
-      _id: { $in: ids },
-      status: USER_STATUS.ACTIVE,
-    });
-  }
+const clip = (value, max) => String(value ?? "").trim().slice(0, max);
+const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+const chatPath = (conversationId) => `/chat?conversationId=${conversationId}`;
 
-  if (targetAudience !== "all") {
-    throw new AppError("Invalid notification audience", 400);
-  }
+// ==================== CLIENT PAYLOAD ====================
 
-  return User.countDocuments({ status: USER_STATUS.ACTIVE });
+// Display label sent as `type`. Direct-event labels are kept verbatim from
+// the original API so existing clients (web + app) keep matching on them.
+const DIRECT_TYPE_LABELS = {
+  message: "DIRECT MESSAGE",
+  order: "ORDER UPDATE",
+  price_drop: "PRICE DROP",
+  moderation: "MODERATION",
 };
 
-/**
- * Dispatches a notification document via Socket.IO
- */
-export const dispatchNotificationDocument = async (notification) => {
-  const payload = {
-    id: String(notification._id),
-    _id: String(notification._id),
-    title: notification.title,
-    message: notification.message,
-    description: notification.message,
-    type: notification.type,
-    image_url: notification.image_url,
-    imageUrl: notification.image_url,
-    action_url: notification.action_url,
-    actionPath: notification.action_url,
-    action_label: notification.action_label,
-    actionLabel: notification.action_label,
-    createdAt: notification.createdAt,
-    time: "Just now",
-    unread: true,
-  };
-
-  const recipientCount = await estimateRecipients({
-    targetAudience: notification.target_audience,
-    targetCampus: notification.target_campus,
-  });
-
-  let targetUserIds = null;
-  if (notification.target_audience === "buyers") {
-    targetUserIds = await User.find({
-      _id: { $in: await Conversation.distinct("buyer_id") },
-      status: USER_STATUS.ACTIVE,
-    }).distinct("_id");
-  } else if (notification.target_audience === "sellers") {
-    targetUserIds = await User.find({
-      _id: { $in: await Product.distinct("seller_id") },
-      status: USER_STATUS.ACTIVE,
-    }).distinct("_id");
-  }
-
-  const io = getIO();
-  let delivered = 0;
-  if (io) {
-    let sockets;
-    if (notification.target_audience === "all") {
-      sockets = await io.in("broadcast:all").fetchSockets();
-    } else if (notification.target_audience === "campus" && notification.target_campus) {
-      sockets = await io.in(`campus:${notification.target_campus}`).fetchSockets();
-    } else if (targetUserIds?.length) {
-      sockets = await io.in(targetUserIds.map((userId) => `user:${userId}`)).fetchSockets();
-    } else {
-      sockets = [];
-    }
-    delivered = new Set(sockets.map((socket) => socket.userId).filter(Boolean)).size;
-  }
-
-  notification.status = "sent";
-  notification.stats = {
-    total_sent: recipientCount,
-    delivered,
-    clicked: notification.stats?.clicked || 0,
-  };
-  await notification.save();
-
-  if (notification.target_audience === "campus" && notification.target_campus) {
-    emitToCampus(notification.target_campus, "notification:new", payload);
-  } else if (notification.target_audience === "all") {
-    emitToAll("notification:new", payload);
-  } else {
-    targetUserIds?.forEach((userId) => emitToUser(userId, "notification:new", payload));
-  }
-
-  return notification;
-};
-
-const NOTIFICATION_TYPES = ["general", "promotion", "order", "announcement", "message"];
-const NOTIFICATION_AUDIENCES = ["all", "buyers", "sellers", "campus"];
-
-// action_url is followed by the client on click. Only allow in-app paths
-// ("/deals") or absolute https links — never javascript:, data:, or
-// protocol-relative "//host" URLs.
-const sanitizeActionUrl = (value) => {
-  if (value === null || value === undefined || value === "") return null;
-  if (typeof value !== "string") throw new AppError("Invalid action URL", 400);
-  const v = value.trim().slice(0, 500);
-  if (!v) return null;
-  if (v.startsWith("/") && !v.startsWith("//") && !v.includes("\\")) return v;
-  try {
-    const u = new URL(v);
-    if (u.protocol === "https:") return u.toString();
-  } catch {
-    // fall through
-  }
-  throw new AppError("Action URL must be an in-app path (/...) or an https:// link", 400);
-};
-
-const sanitizeImageUrl = (value) => {
-  if (value === null || value === undefined || value === "") return null;
-  if (typeof value !== "string") throw new AppError("Invalid image URL", 400);
-  const v = value.trim().slice(0, 2048);
-  if (!v) return null;
-  try {
-    const u = new URL(v);
-    if (u.protocol === "https:") return u.toString();
-  } catch {
-    // fall through
-  }
-  throw new AppError("Image URL must be an https:// link", 400);
-};
-
-/**
- * Create a new notification campaign from the admin portal
- */
-export const createAdminNotification = async ({
-  title,
-  message,
-  type = "general",
-  target_audience = "all",
-  target_campus = null,
-  image_url = null,
-  action_url = null,
-  action_label = "View Offers",
-  schedule_type = "now",
-  scheduled_at = null,
-  sent_by = null,
-}) => {
-  if (typeof title !== "string" || !title.trim()) {
-    throw new AppError("Notification title is required", 400);
-  }
-  if (typeof message !== "string" || !message.trim()) {
-    throw new AppError("Notification message is required", 400);
-  }
-  if (title.trim().length > 100) throw new AppError("Title cannot exceed 100 characters", 400);
-  if (message.trim().length > 500) throw new AppError("Message cannot exceed 500 characters", 400);
-  if (!NOTIFICATION_TYPES.includes(type)) throw new AppError("Invalid notification type", 400);
-  if (!NOTIFICATION_AUDIENCES.includes(target_audience)) {
-    throw new AppError("Invalid notification audience", 400);
-  }
-  const safeActionUrl = sanitizeActionUrl(action_url);
-  const safeImageUrl = sanitizeImageUrl(image_url);
-  const safeActionLabel =
-    typeof action_label === "string" && action_label.trim()
-      ? action_label.trim().slice(0, 40)
-      : "View Offers";
-
-  let campusId = null;
-  if (target_audience === "campus") {
-    if (!target_campus || !mongoose.Types.ObjectId.isValid(target_campus)) {
-      throw new AppError("A valid campus must be selected for campus targeting", 400);
-    }
-    campusId = target_campus;
-  }
-
-  let scheduledDate = null;
-  if (schedule_type === "scheduled") {
-    scheduledDate = new Date(scheduled_at);
-    if (!scheduled_at || Number.isNaN(scheduledDate.getTime()) || scheduledDate <= new Date()) {
-      throw new AppError("Scheduled notifications require a future date and time", 400);
-    }
-  }
-  const isScheduled = schedule_type === "scheduled";
-
-  const notification = new Notification({
-    title: title.trim(),
-    message: message.trim(),
-    type,
-    target_audience,
-    target_campus: campusId,
-    image_url: safeImageUrl,
-    action_url: safeActionUrl,
-    action_label: safeActionLabel,
-    schedule_type: isScheduled ? "scheduled" : "now",
-    scheduled_at: scheduledDate,
-    status: isScheduled ? "scheduled" : "draft",
-    sent_by,
-    is_broadcast: true,
-  });
-
-  await notification.save();
-
-  if (!isScheduled) {
-    await dispatchNotificationDocument(notification);
-  }
-
-  return notification;
-};
-
-/**
- * Dispatches due scheduled notifications (called periodically by node-cron)
- */
-export const dispatchDueScheduledNotifications = async () => {
-  try {
-    // Claim each due row atomically (scheduled -> draft) before sending, so
-    // an overlapping cron tick or a second server instance can never
-    // dispatch the same campaign twice.
-    let count = 0;
-    for (let i = 0; i < 100; i++) {
-      const notif = await Notification.findOneAndUpdate(
-        { status: "scheduled", scheduled_at: { $lte: new Date() } },
-        { $set: { status: "draft" } },
-        { new: true, sort: { scheduled_at: 1 } },
-      );
-      if (!notif) break;
-      try {
-        await dispatchNotificationDocument(notif);
-        count += 1;
-      } catch (err) {
-        console.error("Scheduled notification dispatch failed:", err?.message);
-      }
-    }
-    return count;
-  } catch (error) {
-    console.error("Failed to dispatch scheduled notifications:", error);
-    return 0;
-  }
-};
-
-/**
- * Notify a user of a new direct message
- */
-export const notifyNewMessage = async ({
-  conversationId,
-  senderId,
-  receiverId,
-  senderName,
-  textSnippet,
-}) => {
-  try {
-    // If the recipient is currently inside this conversation room, avoid duplicate bell alerts
-    const io = getIO();
-    if (io) {
-      const room = `conversation:${conversationId}`;
-      const sockets = await io.in(room).fetchSockets();
-      const isRecipientInRoom = sockets.some((s) => String(s.userId) === String(receiverId));
-      if (isRecipientInRoom) {
-        return null;
-      }
-    }
-
-    const notification = await Notification.create({
-      title: `New message from ${senderName || "User"}`,
-      message: textSnippet ? String(textSnippet).slice(0, 150) : "You received a new message",
-      type: "message",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: receiverId,
-      sent_by: senderId,
-      action_url: `/chat?conversationId=${conversationId}`,
-      action_label: "Reply in Chat",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-
-    const payload = {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title: notification.title,
-      message: notification.message,
-      description: notification.message,
-      type: "DIRECT MESSAGE",
-      actionPath: `/chat?conversationId=${conversationId}`,
-      actionLabel: "Reply in Chat",
-      action_url: `/chat?conversationId=${conversationId}`,
-      action_label: "Reply in Chat",
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    };
-
-    emitToUser(receiverId, "notification:new", payload);
-    return notification;
-  } catch (error) {
-    console.error("Failed to notify new message:", error);
-    return null;
-  }
-};
-
-/**
- * Fetch a user's notification feed with unread counts
- */
-export const getUserNotificationFeed = async (userId) => {
-  const user = await User.findById(userId).select("campus_id createdAt role").lean();
-  if (!user) throw new AppError("User not found", 404);
-
-  // Broadcast criteria
-  // Direct notifications criteria
-  const directQuery = {
-    is_broadcast: false,
-    recipient_id: userId,
-    status: "sent",
-    $or: [
-      { is_dismissed: false },
-      { is_dismissed: { $exists: false } },
-    ],
-  };
-  const matchedBroadcastQuery = await getUserBroadcastQuery(user);
-
-  const [broadcasts, directNotifications] = await Promise.all([
-    Notification.find(matchedBroadcastQuery).sort({ createdAt: -1 }).limit(50).lean(),
-    Notification.find(directQuery).sort({ createdAt: -1 }).limit(50).lean(),
-  ]);
-  // Only the receipts for the broadcasts being shown (was: every receipt
-  // the user ever had, unbounded).
-  const receipts = broadcasts.length
-    ? await NotificationReceipt.find({
-        user_id: userId,
-        notification_id: { $in: broadcasts.map((b) => b._id) },
-      }).lean()
-    : [];
-
-  const readReceiptMap = new Map();
-  receipts.forEach((r) => {
-    readReceiptMap.set(String(r.notification_id), r);
-  });
-
-  const formattedBroadcasts = broadcasts.map((b) => {
-    const receipt = readReceiptMap.get(String(b._id));
-    const isRead = Boolean(receipt?.is_read);
-    return {
-      id: String(b._id),
-      _id: String(b._id),
-      title: b.title,
-      message: b.message,
-      description: b.message,
-      type: b.type.toUpperCase(),
-      imageUrl: b.image_url,
-      image_url: b.image_url,
-      actionPath: b.action_url || "/deals",
-      actionLabel: b.action_label || "View Offers",
-      action_url: b.action_url || "/deals",
-      action_label: b.action_label || "View Offers",
-      time: formatRelativeTime(b.createdAt),
-      createdAt: b.createdAt,
-      unread: !isRead,
-      isBroadcast: true,
-    };
-  });
-
-  const formattedDirect = directNotifications.map((d) => ({
-    id: String(d._id),
-    _id: String(d._id),
-    title: d.title,
-    message: d.message,
-    description: d.message,
-    type: d.type === "message" ? "DIRECT MESSAGE" : d.type.toUpperCase(),
-    imageUrl: d.image_url,
-    image_url: d.image_url,
-    actionPath: d.action_url || "/chat",
-    actionLabel: d.action_label || "View Details",
-    action_url: d.action_url || "/chat",
-    action_label: d.action_label || "View Details",
-    time: formatRelativeTime(d.createdAt),
-    createdAt: d.createdAt,
-    unread: !d.is_read,
-    isBroadcast: false,
-  }));
-
-  const combined = [...formattedBroadcasts, ...formattedDirect].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-
-  const visibleNotifications = combined.filter((notification) => {
-    if (!notification.isBroadcast) return true;
-    return !readReceiptMap.get(String(notification._id))?.is_dismissed;
-  });
-  const unreadCount = visibleNotifications.filter((n) => n.unread).length;
-
-  return {
-    notifications: visibleNotifications,
-    unreadCount,
-  };
-};
-
-const getUserBroadcastQuery = async (user) => {
-  const audiences = [{ target_audience: "all" }];
-  if (user.campus_id) {
-    audiences.push({
-      target_audience: "campus",
-      target_campus: user.campus_id,
-    });
-  }
-
-  const [isBuyer, isSeller] = await Promise.all([
-    // Deal docs have no buyer_id (they hang off conversations), so the old
-    // Deal.exists({ buyer_id }) never matched and "buyers" campaigns
-    // reached nobody. Buyers = users who started a conversation.
-    Conversation.exists({ buyer_id: user._id }),
-    Product.exists({ seller_id: user._id }),
-  ]);
-  if (isBuyer) audiences.push({ target_audience: "buyers" });
-  if (isSeller) audiences.push({ target_audience: "sellers" });
-
-  return {
-    is_broadcast: true,
-    status: "sent",
-    createdAt: { $gte: new Date(user.createdAt || 0) },
-    $or: audiences,
-  };
-};
-
-/**
- * Mark a single notification as read
- */
-export const markNotificationRead = async (notificationId, userId) => {
-  if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-    throw new AppError("Invalid notification ID", 400);
-  }
-
-  const notification = await Notification.findById(notificationId);
-  if (!notification) throw new AppError("Notification not found", 404);
-
-  if (!notification.is_broadcast) {
-    if (String(notification.recipient_id) !== String(userId)) {
-      throw new AppError("Notification not found", 404);
-    }
-    notification.is_read = true;
-    notification.read_at = new Date();
-    await notification.save();
-  } else {
-    const user = await User.findById(userId).select("_id campus_id createdAt").lean();
-    if (!user || !(await Notification.exists({
-      _id: notificationId,
-      ...(await getUserBroadcastQuery(user)),
-    }))) {
-      throw new AppError("Notification not found", 404);
-    }
-    await NotificationReceipt.findOneAndUpdate(
-      { notification_id: notificationId, user_id: userId },
-      { $set: { is_read: true, read_at: new Date() } },
-      { upsert: true, new: true }
-    );
-  }
-
-  return { ok: true };
-};
-
-/**
- * Mark all notifications as read for a user
- */
-export const markAllNotificationsRead = async (userId) => {
-  // Mark direct notifications
-  await Notification.updateMany(
-    { recipient_id: userId, is_broadcast: false, status: "sent", is_read: false },
-    { $set: { is_read: true, read_at: new Date() } }
-  );
-
-  // Mark broadcasts by creating receipts
-  const user = await User.findById(userId).select("_id campus_id createdAt").lean();
-  if (user) {
-    const broadcastQuery = await getUserBroadcastQuery(user);
-    const broadcasts = await Notification.find(broadcastQuery).select("_id").lean();
-    const ops = broadcasts.map((b) => ({
-      updateOne: {
-        filter: { notification_id: b._id, user_id: userId },
-        update: { $set: { is_read: true, read_at: new Date() } },
-        upsert: true,
-      },
-    }));
-
-    if (ops.length > 0) {
-      await NotificationReceipt.bulkWrite(ops);
-    }
-  }
-
-  return { ok: true };
-};
-
-/**
- * Dismiss a notification for its intended recipient only
- */
-export const dismissNotification = async (notificationId, userId) => {
-  if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-    throw new AppError("Invalid notification ID", 400);
-  }
-
-  const notification = await Notification.findById(notificationId);
-  if (!notification) throw new AppError("Notification not found", 404);
-
-  if (!notification.is_broadcast) {
-    if (String(notification.recipient_id) !== String(userId)) {
-      throw new AppError("Notification not found", 404);
-    }
-    await Notification.updateOne(
-      { _id: notificationId, recipient_id: userId },
-      { $set: { is_dismissed: true, is_read: true, read_at: new Date() } },
-    );
-    return { ok: true };
-  }
-
-  const user = await User.findById(userId).select("_id campus_id createdAt").lean();
-  if (!user || !(await Notification.exists({
-    _id: notificationId,
-    ...(await getUserBroadcastQuery(user)),
-  }))) {
-    throw new AppError("Notification not found", 404);
-  }
-
-  await NotificationReceipt.findOneAndUpdate(
-    { notification_id: notificationId, user_id: userId },
-    {
-      $set: { is_dismissed: true, is_read: true, read_at: new Date() },
-    },
-    { upsert: true, new: true },
-  );
-  return { ok: true };
-};
-
-/**
- * Track notification click
- */
-export const trackNotificationClick = async (notificationId, userId) => {
-  if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-    throw new AppError("Invalid notification ID", 400);
-  }
-
-  const notification = await Notification.findById(notificationId).lean();
-  if (!notification) throw new AppError("Notification not found", 404);
-
-  if (notification.is_broadcast) {
-    const user = await User.findById(userId).select("_id campus_id createdAt").lean();
-    if (!user || !(await Notification.exists({
-      _id: notificationId,
-      ...(await getUserBroadcastQuery(user)),
-    }))) {
-      throw new AppError("Notification not found", 404);
-    }
-    await NotificationReceipt.findOneAndUpdate(
-      { notification_id: notificationId, user_id: userId },
-      {
-        $set: { is_clicked: true, clicked_at: new Date() },
-        $setOnInsert: { is_read: false, read_at: null },
-      },
-      { upsert: true },
-    );
-  } else {
-    if (String(notification.recipient_id) !== String(userId)) {
-      throw new AppError("Notification not found", 404);
-    }
-  }
-
-  await Notification.updateOne(
-    { _id: notificationId },
-    { $inc: { "stats.clicked": 1 } },
-  );
-
-  if (!notification.is_broadcast) {
-    await NotificationReceipt.findOneAndUpdate(
-      { notification_id: notificationId, user_id: userId },
-      { $set: { is_clicked: true, clicked_at: new Date() } },
-      { upsert: true },
-    );
-  }
-};
-
-/**
- * Fetch analytics and stats for the admin push notifications view
- */
-// campuses: null (everything) or the campus ids a limited staff member covers.
-const campusAudience = (campuses) => (campuses ? { target_audience: "campus", target_campus: { $in: campuses } } : {});
-
-export const getAdminNotificationStats = async ({ campuses = null } = {}) => {
-  const [totals, activeCount] = await Promise.all([
-    Notification.aggregate([
-      { $match: { is_broadcast: true, status: "sent", ...campusAudience(campuses) } },
-      {
-        $group: {
-          _id: null,
-          totalSent: { $sum: "$stats.total_sent" },
-          delivered: { $sum: "$stats.delivered" },
-          clicked: { $sum: "$stats.clicked" },
-        },
-      },
-    ]),
-    getActiveUserCount(),
-  ]);
-
-  const stats = totals[0] || { totalSent: 0, delivered: 0, clicked: 0 };
-  const deliveredPct = stats.totalSent > 0
-    ? Math.round((stats.delivered / stats.totalSent) * 100)
-    : 0;
-  const clickedPct = stats.totalSent > 0
-    ? Math.round((stats.clicked / stats.totalSent) * 100)
-    : 0;
-
-  return {
-    totalSent: stats.totalSent || 0,
-    delivered: stats.delivered || 0,
-    deliveredPercent: deliveredPct,
-    clicked: stats.clicked || 0,
-    clickedPercent: clickedPct,
-    activeUsers: activeCount,
-  };
-};
-
-/**
- * Fetch history of sent notifications
- */
-export const getAdminNotificationHistory = async ({ page = 1, limit = 20, campuses = null }) => {
-  // NaN / negative / huge values from the query string used to reach
-  // .skip()/.limit() directly.
-  page = Math.min(Math.max(Number.parseInt(page, 10) || 1, 1), 1000);
-  limit = Math.min(Math.max(Number.parseInt(limit, 10) || 20, 1), 100);
-  const skip = (page - 1) * limit;
-  const [items, total] = await Promise.all([
-    Notification.find({ is_broadcast: true, status: "sent", ...campusAudience(campuses) })
-      .populate("target_campus", "name code")
-      .populate("sent_by", "name email")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-    Notification.countDocuments({ is_broadcast: true, status: "sent", ...campusAudience(campuses) }),
-  ]);
-
-  return {
-    items,
-    total,
-    page: Number(page),
-    totalPages: Math.ceil(total / limit),
-  };
-};
-
-/**
- * Fetch scheduled notifications
- */
-export const getAdminScheduledNotifications = async ({ campuses = null } = {}) => {
-  return await Notification.find({ status: "scheduled", ...campusAudience(campuses) })
-    .populate("target_campus", "name code")
-    .populate("sent_by", "name email")
-    .sort({ scheduled_at: 1 })
-    .lean();
-};
-
-/**
- * Cancel a scheduled notification
- */
-export const cancelScheduledNotification = async (notificationId, { campuses = null } = {}) => {
-  if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-    throw new AppError("Invalid notification ID", 400);
-  }
-  const notif = await Notification.findOneAndUpdate(
-    { _id: notificationId, status: "scheduled", ...campusAudience(campuses) },
-    { $set: { status: "cancelled" } },
-    { new: true }
-  );
-  if (!notif) throw new AppError("Scheduled notification not found", 404);
-  return notif;
-};
-
-/**
- * Notify seller when a buyer makes a new offer
- */
-export const notifyNewOffer = async ({
-  conversationId,
-  buyerId,
-  buyerName,
-  amount,
-  productTitle,
-  sellerId,
-}) => {
-  try {
-    const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-    const notification = await Notification.create({
-      title: "New Offer Received!",
-      message: `${buyerName || "A buyer"} offered ${inr(amount)} for "${productTitle || "your item"}".`,
-      type: "order",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: sellerId,
-      sent_by: buyerId,
-      action_url: `/chat?conversationId=${conversationId}`,
-      action_label: "View Offer",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-    emitToUser(sellerId, "notification:new", {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title: notification.title,
-      message: notification.message,
-      description: notification.message,
-      type: "ORDER UPDATE",
-      actionPath: `/chat?conversationId=${conversationId}`,
-      actionLabel: "View Offer",
-      action_url: `/chat?conversationId=${conversationId}`,
-      action_label: "View Offer",
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    });
-    return notification;
-  } catch (error) {
-    console.error("Failed to notify new offer:", error);
-    return null;
-  }
-};
-
-/**
- * Notify buyer when their offer is accepted / deal is confirmed
- */
-export const notifyOfferAccepted = async ({
-  conversationId,
-  sellerName,
-  productTitle,
-  amount,
-  buyerId,
-}) => {
-  try {
-    const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-    const notification = await Notification.create({
-      title: "Offer Accepted! 🎉",
-      message: `${sellerName || "The seller"} accepted your offer of ${inr(amount)} for "${productTitle || "the item"}". Schedule pickup now.`,
-      type: "order",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: buyerId,
-      action_url: `/myorders`,
-      action_label: "View Deal",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-    emitToUser(buyerId, "notification:new", {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title: notification.title,
-      message: notification.message,
-      description: notification.message,
-      type: "ORDER UPDATE",
-      actionPath: `/myorders`,
-      actionLabel: "View Deal",
-      action_url: `/myorders`,
-      action_label: "View Deal",
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    });
-    return notification;
-  } catch (error) {
-    console.error("Failed to notify offer accepted:", error);
-    return null;
-  }
-};
-
-/**
- * Notify counterparty when pickup is scheduled
- */
-export const notifyPickupScheduled = async ({
-  conversationId,
-  location,
-  scheduledDate,
-  recipientId,
-}) => {
-  try {
-    const dateLabel = scheduledDate
-      ? new Date(scheduledDate).toLocaleDateString("en-IN", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : "a scheduled date";
-    const notification = await Notification.create({
-      title: "Pickup Spot Confirmed 📍",
-      message: `Meeting scheduled at "${location || "a spot"}" on ${dateLabel}.`,
-      type: "order",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: recipientId,
-      action_url: `/myorders`,
-      action_label: "View Pickup",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-    emitToUser(recipientId, "notification:new", {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title: notification.title,
-      message: notification.message,
-      description: notification.message,
-      type: "ORDER UPDATE",
-      actionPath: `/myorders`,
-      actionLabel: "View Pickup",
-      action_url: `/myorders`,
-      action_label: "View Pickup",
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    });
-    return notification;
-  } catch (error) {
-    console.error("Failed to notify pickup scheduled:", error);
-    return null;
-  }
-};
-
-/**
- * Notify seller when buyer confirms item received (deal completed)
- */
-export const notifyDealCompleted = async ({
-  conversationId,
-  buyerName,
-  productTitle,
-  sellerId,
-}) => {
-  try {
-    const notification = await Notification.create({
-      title: "Deal Completed Successfully 🎉",
-      message: `${buyerName || "The buyer"} confirmed receiving "${productTitle || "the item"}". Payment balance updated.`,
-      type: "order",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: sellerId,
-      action_url: `/myorders`,
-      action_label: "View Order Details",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-    emitToUser(sellerId, "notification:new", {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title: notification.title,
-      message: notification.message,
-      description: notification.message,
-      type: "ORDER UPDATE",
-      actionPath: `/myorders`,
-      actionLabel: "View Order Details",
-      action_url: `/myorders`,
-      action_label: "View Order Details",
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    });
-    return notification;
-  } catch (error) {
-    console.error("Failed to notify deal completed:", error);
-    return null;
-  }
-};
-
-/**
- * Notify counterparty when a deal is cancelled
- */
-export const notifyDealCancelled = async ({
-  conversationId,
-  productTitle,
-  cancellerName,
-  recipientId,
-}) => {
-  try {
-    const notification = await Notification.create({
-      title: "Deal Cancelled",
-      message: `Deal for "${productTitle || "the item"}" was cancelled by ${cancellerName || "the other party"}.`,
-      type: "order",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: recipientId,
-      action_url: `/myorders`,
-      action_label: "View Details",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-    emitToUser(recipientId, "notification:new", {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title: notification.title,
-      message: notification.message,
-      description: notification.message,
-      type: "ORDER UPDATE",
-      actionPath: `/myorders`,
-      actionLabel: "View Details",
-      action_url: `/myorders`,
-      action_label: "View Details",
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    });
-    return notification;
-  } catch (error) {
-    console.error("Failed to notify deal cancelled:", error);
-    return null;
-  }
-};
-
-/**
- * Fan-out price drop alerts to all users who have the product in their wishlist
- */
-export const notifyPriceDrop = async ({
-  productId,
-  productTitle,
-  oldPrice,
-  newPrice,
-}) => {
-  try {
-    const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-    const diff = Number(oldPrice) - Number(newPrice);
-    if (diff <= 0) return null; // Only notify on actual price drop
-
-    // Find all users who have this product in their wishlist
-    const wishlistUsers = await User.find({ wishlist: productId })
-      .select("_id")
-      .lean();
-    if (!wishlistUsers.length) return null;
-
-    const message = `"${productTitle || "An item"}" on your wishlist dropped by ${inr(diff)}! Now at ${inr(newPrice)}. Grab it before it sells out!`;
-
-    // Create individual direct notifications (not a broadcast) for each wishlist user
-    const ops = wishlistUsers.map((u) => ({
-      title: "Price Drop Alert! 🔥",
-      message,
-      type: "promotion",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: u._id,
-      action_url: `/product/${productId}`,
-      action_label: "Buy Now",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    }));
-
-    const notifications = await Notification.insertMany(ops, { ordered: true });
-    const notificationByRecipient = new Map(
-      notifications.map((notification) => [
-        String(notification.recipient_id),
-        notification,
-      ]),
-    );
-
-    // Push live to each wishlist holder
-    for (const u of wishlistUsers) {
-      const notification = notificationByRecipient.get(String(u._id));
-      if (!notification) continue;
-      emitToUser(u._id, "notification:new", {
-        id: String(notification._id),
-        _id: String(notification._id),
-        title: notification.title,
-        message: notification.message,
-        description: notification.message,
-        type: "OFFER / PROMO",
-        actionPath: notification.action_url,
-        actionLabel: notification.action_label,
-        action_url: notification.action_url,
-        action_label: notification.action_label,
-        createdAt: notification.createdAt,
-        time: "Just now",
-        unread: true,
-      });
-    }
-
-    return notifications;
-  } catch (error) {
-    console.error("Failed to notify price drop:", error);
-    return null;
-  }
-};
-
-/**
- * Notify seller when their listing is flagged/actioned by moderation
- */
-export const notifyModerationWarning = async ({
-  productId,
-  productTitle,
-  sellerId,
-  adminNote = null,
-}) => {
-  try {
-    const message = adminNote
-      ? `Your listing "${productTitle || "a product"}" has been flagged: ${adminNote}`
-      : `Your listing "${productTitle || "a product"}" has been flagged for moderation review. Please review our guidelines.`;
-
-    const notification = await Notification.create({
-      title: "Listing Under Review ⚠️",
-      message,
-      type: "general",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: sellerId,
-      action_url: `/productlisted`,
-      action_label: "Review Guidelines",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-    emitToUser(sellerId, "notification:new", {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title: notification.title,
-      message: notification.message,
-      description: notification.message,
-      type: "GENERAL",
-      actionPath: `/productlisted`,
-      actionLabel: "Review Guidelines",
-      action_url: `/productlisted`,
-      action_label: "Review Guidelines",
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    });
-    return notification;
-  } catch (error) {
-    console.error("Failed to notify moderation warning:", error);
-    return null;
-  }
-};
-
-/**
- * Notify user when their role is updated (e.g., promoted to support)
- */
-export const notifyRoleAssigned = async ({ userId, newRole }) => {
-  try {
-    const roleLabel =
-      newRole === "support" ? "Support Staff" : newRole.charAt(0).toUpperCase() + newRole.slice(1);
-    const notification = await Notification.create({
-      title: "Staff Role Updated",
-      message: `You have been granted ${roleLabel} permissions on Unideals Admin Portal.`,
-      type: "general",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: userId,
-      action_url: `/profile`,
-      action_label: "View Profile",
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-    emitToUser(userId, "notification:new", {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title: notification.title,
-      message: notification.message,
-      description: notification.message,
-      type: "GENERAL",
-      actionPath: `/profile`,
-      actionLabel: "View Profile",
-      action_url: `/profile`,
-      action_label: "View Profile",
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    });
-    return notification;
-  } catch (error) {
-    console.error("Failed to notify role assigned:", error);
-    return null;
-  }
-};
-
-// Helper function for human-readable relative time
 const formatRelativeTime = (date) => {
   if (!date) return "Just now";
-  const diffSec = Math.floor((new Date() - new Date(date)) / 1000);
+  const diffSec = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   if (diffSec < 60) return "Just now";
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
   if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
@@ -1109,46 +60,296 @@ const formatRelativeTime = (date) => {
 };
 
 /**
- * One-off in-app notification to a single user (stored + pushed live).
- * Never throws: moderation must not fail because a notification did.
+ * The single shape every client receives, from the feed and from the socket.
+ * Both camelCase and the legacy snake_case aliases are included because
+ * shipped clients read either; new code should use the camelCase fields and
+ * `kind` (the raw type) rather than the display `type`.
  */
-export const notifyUser = async ({ userId, title, message, actionUrl = null, actionLabel = null }) => {
-  if (!userId) return null;
+export const toClientNotification = (doc, { unread = true } = {}) => {
+  const isBroadcast = doc.is_broadcast !== false;
+  const kind = doc.type || "general";
+  const at = doc.sent_at || doc.createdAt || new Date();
+  const actionPath = doc.action_url || (isBroadcast ? "/deals" : "/notification");
+  const actionLabel = doc.action_label || (isBroadcast ? "View Offers" : "View Details");
+  const id = String(doc._id);
+  return {
+    id,
+    _id: id,
+    kind,
+    type: (!isBroadcast && DIRECT_TYPE_LABELS[kind]) || kind.toUpperCase(),
+    title: doc.title,
+    message: doc.message,
+    description: doc.message,
+    imageUrl: doc.image_url || null,
+    image_url: doc.image_url || null,
+    actionPath,
+    action_url: actionPath,
+    actionLabel,
+    action_label: actionLabel,
+    count: doc.group_count || 1,
+    createdAt: at,
+    time: formatRelativeTime(at),
+    unread,
+    isBroadcast,
+  };
+};
+
+// ==================== DIRECT (ONE USER) ====================
+
+const directDoc = ({
+  recipientId,
+  type = "general",
+  title,
+  message,
+  actionUrl = null,
+  actionLabel = null,
+  senderId = null,
+  imageUrl = null,
+  groupKey = null,
+  now = new Date(),
+}) => ({
+  title: clip(title, 100),
+  message: clip(message, 500),
+  type,
+  target_audience: "all",
+  is_broadcast: false,
+  recipient_id: recipientId,
+  sent_by: senderId,
+  action_url: actionUrl,
+  action_label: actionLabel,
+  image_url: imageUrl,
+  group_key: groupKey,
+  status: "sent",
+  sent_at: now,
+  expires_at: retentionDate(now),
+  is_read: false,
+  stats: { total_sent: 1 },
+});
+
+/** Store + push one direct notification. Never throws; returns the doc or null. */
+const sendDirect = async (input) => {
+  if (!input?.recipientId) return null;
   try {
-    const notification = await Notification.create({
-      title,
-      message,
-      type: "general",
-      target_audience: "all",
-      is_broadcast: false,
-      recipient_id: userId,
-      action_url: actionUrl,
-      action_label: actionLabel,
-      status: "sent",
-      is_read: false,
-      stats: { total_sent: 1, delivered: 1, clicked: 0 },
-    });
-    emitToUser(userId, "notification:new", {
-      id: String(notification._id),
-      _id: String(notification._id),
-      title,
-      message,
-      description: message,
-      type: "GENERAL",
-      actionPath: actionUrl,
-      actionLabel,
-      action_url: actionUrl,
-      action_label: actionLabel,
-      createdAt: notification.createdAt,
-      time: "Just now",
-      unread: true,
-    });
+    const notification = await Notification.create(directDoc(input));
+    emitToUser(input.recipientId, EVENT, toClientNotification(notification));
     return notification;
   } catch (error) {
-    console.error("Failed to send user notification:", error.message);
+    console.error(`Failed to send "${input.type || "general"}" notification:`, error?.message);
     return null;
   }
 };
+
+/**
+ * One-off in-app notification to a single user (stored + pushed live).
+ * Never throws: moderation must not fail because a notification did.
+ */
+export const notifyUser = ({ userId, title, message, actionUrl = null, actionLabel = null, type = "general" }) =>
+  sendDirect({ recipientId: userId, type, title, message, actionUrl, actionLabel });
+
+/**
+ * Chat message. Suppressed while the recipient is inside that conversation,
+ * and grouped: while the previous alert for this chat is unread, new messages
+ * update it ("3 new messages from Rahul") instead of stacking new rows.
+ */
+export const notifyNewMessage = async ({ conversationId, senderId, receiverId, senderName, textSnippet }) => {
+  try {
+    if (!receiverId) return null;
+    const inRoom = await onlineUserIdsIn([`conversation:${conversationId}`]);
+    if (inRoom.has(String(receiverId))) return null;
+
+    const name = senderName || "User";
+    const message = textSnippet ? clip(textSnippet, 150) : "You received a new message";
+    const groupKey = `conversation:${conversationId}`;
+    const now = new Date();
+
+    const grouped = await Notification.findOneAndUpdate(
+      {
+        recipient_id: receiverId,
+        is_broadcast: false,
+        status: "sent",
+        group_key: groupKey,
+        is_read: false,
+        is_dismissed: { $ne: true },
+      },
+      { $set: { message, sent_at: now, expires_at: retentionDate(now) }, $inc: { group_count: 1 } },
+      { returnDocument: "after" },
+    ).lean();
+
+    if (grouped) {
+      grouped.title = clip(`${grouped.group_count} new messages from ${name}`, 100);
+      await Notification.updateOne({ _id: grouped._id }, { $set: { title: grouped.title } });
+      emitToUser(receiverId, EVENT, toClientNotification(grouped));
+      return grouped;
+    }
+
+    return sendDirect({
+      recipientId: receiverId,
+      senderId,
+      type: "message",
+      title: `New message from ${name}`,
+      message,
+      actionUrl: chatPath(conversationId),
+      actionLabel: "Reply in Chat",
+      groupKey,
+      now,
+    });
+  } catch (error) {
+    console.error("Failed to notify new message:", error?.message);
+    return null;
+  }
+};
+
+// ---- Deal lifecycle ----
+
+export const notifyNewOffer = ({ conversationId, buyerId, buyerName, amount, productTitle, sellerId }) =>
+  sendDirect({
+    recipientId: sellerId,
+    senderId: buyerId,
+    type: "order",
+    title: "New Offer Received!",
+    message: `${buyerName || "A buyer"} offered ${inr(amount)} for "${productTitle || "your item"}".`,
+    actionUrl: chatPath(conversationId),
+    actionLabel: "View Offer",
+  });
+
+export const notifyOfferAccepted = ({ conversationId, sellerName, productTitle, amount, buyerId }) =>
+  sendDirect({
+    recipientId: buyerId,
+    type: "order",
+    title: "Offer Accepted! 🎉",
+    message: `${sellerName || "The seller"} accepted your offer of ${inr(amount)} for "${productTitle || "the item"}". Sort out the pickup in chat.`,
+    actionUrl: chatPath(conversationId),
+    actionLabel: "View Deal",
+  });
+
+export const notifyOfferDeclined = ({ conversationId, responderName, productTitle, amount, recipientId }) =>
+  sendDirect({
+    recipientId,
+    type: "order",
+    title: "Offer declined",
+    message: `${responderName || "The seller"} passed on your ${inr(amount)} offer for "${productTitle || "the item"}". You can make another one.`,
+    actionUrl: chatPath(conversationId),
+    actionLabel: "Make New Offer",
+  });
+
+export const notifyDealConfirmed = ({ conversationId, sellerName, productTitle, amount, buyerId }) =>
+  sendDirect({
+    recipientId: buyerId,
+    type: "order",
+    title: "Deal locked 🔒",
+    message: `${sellerName || "The seller"} reserved "${productTitle || "the item"}" for you at ${inr(amount)}. Pickup details coming next.`,
+    actionUrl: chatPath(conversationId),
+    actionLabel: "View Deal",
+  });
+
+export const notifyPickupScheduled = ({ conversationId, location, scheduledDate, recipientId }) => {
+  const dateLabel = scheduledDate
+    ? new Date(scheduledDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : "a scheduled date";
+  return sendDirect({
+    recipientId,
+    type: "order",
+    title: "Pickup Spot Confirmed 📍",
+    message: `Meeting scheduled at "${location || "a spot"}" on ${dateLabel}.`,
+    actionUrl: "/myorders",
+    actionLabel: "View Pickup",
+  });
+};
+
+export const notifyPaymentConfirmed = ({ conversationId, productTitle, buyerId }) =>
+  sendDirect({
+    recipientId: buyerId,
+    type: "order",
+    title: "Payment confirmed",
+    message: `The seller confirmed your payment for "${productTitle || "the item"}". Tap "Item received" once it's in your hands.`,
+    actionUrl: chatPath(conversationId),
+    actionLabel: "Confirm Receipt",
+  });
+
+export const notifyDealCompleted = ({ buyerName, productTitle, sellerId }) =>
+  sendDirect({
+    recipientId: sellerId,
+    type: "order",
+    title: "Deal Completed Successfully 🎉",
+    message: `${buyerName || "The buyer"} confirmed receiving "${productTitle || "the item"}". Payment balance updated.`,
+    actionUrl: "/myorders",
+    actionLabel: "View Order Details",
+  });
+
+export const notifyDealCancelled = ({ productTitle, cancellerName, recipientId }) =>
+  sendDirect({
+    recipientId,
+    type: "order",
+    title: "Deal Cancelled",
+    message: `Deal for "${productTitle || "the item"}" was cancelled by ${cancellerName || "the other party"}.`,
+    actionUrl: "/myorders",
+    actionLabel: "View Details",
+  });
+
+// ---- Wishlist ----
+
+/**
+ * Fan-out price drop alerts to wishlist holders. Each user gets at most one
+ * alert per product per 24h, so a seller nudging the price down repeatedly
+ * doesn't spam everyone who saved it.
+ */
+export const notifyPriceDrop = async ({ productId, productTitle, oldPrice, newPrice }) => {
+  try {
+    const diff = Number(oldPrice) - Number(newPrice);
+    if (!(diff > 0)) return null;
+
+    const groupKey = `price_drop:${productId}`;
+    const [holders, recentlyAlerted] = await Promise.all([
+      User.find({ wishlist: productId, status: USER_STATUS.ACTIVE }).distinct("_id"),
+      Notification.find({
+        group_key: groupKey,
+        is_broadcast: false,
+        sent_at: { $gte: new Date(Date.now() - PRICE_DROP_COOLDOWN_MS) },
+      }).distinct("recipient_id"),
+    ]);
+    const skip = new Set(recentlyAlerted.map(String));
+    const recipients = holders.filter((id) => !skip.has(String(id)));
+    if (!recipients.length) return null;
+
+    const now = new Date();
+    const notifications = await Notification.insertMany(
+      recipients.map((recipientId) =>
+        directDoc({
+          recipientId,
+          type: "price_drop",
+          title: "Price Drop Alert! 🔥",
+          message: `"${productTitle || "An item"}" on your wishlist dropped by ${inr(diff)}! Now at ${inr(newPrice)}. Grab it before it sells out!`,
+          actionUrl: `/product/${productId}`,
+          actionLabel: "Buy Now",
+          groupKey,
+          now,
+        }),
+      ),
+      { ordered: false },
+    );
+    for (const notification of notifications) {
+      emitToUser(notification.recipient_id, EVENT, toClientNotification(notification));
+    }
+    return notifications;
+  } catch (error) {
+    console.error("Failed to notify price drop:", error?.message);
+    return null;
+  }
+};
+
+// ---- Moderation / account ----
+
+export const notifyModerationWarning = ({ productTitle, sellerId, adminNote = null }) =>
+  sendDirect({
+    recipientId: sellerId,
+    type: "moderation",
+    title: "Listing Under Review ⚠️",
+    message: adminNote
+      ? `Your listing "${productTitle || "a product"}" has been flagged: ${adminNote}`
+      : `Your listing "${productTitle || "a product"}" has been flagged for moderation review. Please review our guidelines.`,
+    actionUrl: "/productlisted",
+    actionLabel: "Review Guidelines",
+  });
 
 const LISTING_ACTION_COPY = {
   blocked: {
@@ -1173,9 +374,7 @@ const LISTING_ACTION_COPY = {
   },
 };
 
-/**
- * Tell a seller what moderation did to their listing, with the reason.
- */
+/** Tell a seller what moderation did to their listing, with the reason. */
 export const notifyListingModerated = ({ sellerId, productTitle, action, reason = null }) => {
   const copy = LISTING_ACTION_COPY[action];
   if (!copy) return Promise.resolve(null);
@@ -1183,6 +382,7 @@ export const notifyListingModerated = ({ sellerId, productTitle, action, reason 
   const reasonText = reason ? ` Reason: ${String(reason).slice(0, 200)}` : "";
   return notifyUser({
     userId: sellerId,
+    type: "moderation",
     title: copy.title,
     message: copy.body(title) + reasonText,
     actionUrl: "/productlisted",
@@ -1216,4 +416,463 @@ export const notifyReporterOutcome = ({ reporterId, targetModel, targetLabel, ou
     message,
     actionUrl: "/notification",
   });
+};
+
+/** Notify user when their role is updated (e.g., promoted to support). */
+export const notifyRoleAssigned = ({ userId, newRole }) => {
+  const role = String(newRole || "");
+  const roleLabel = role === "support" ? "Support Staff" : role.charAt(0).toUpperCase() + role.slice(1);
+  return sendDirect({
+    recipientId: userId,
+    title: "Staff Role Updated",
+    message: `You have been granted ${roleLabel} permissions on Unideals Admin Portal.`,
+    actionUrl: "/profile",
+    actionLabel: "View Profile",
+  });
+};
+
+// ==================== BROADCAST AUDIENCE ====================
+
+/**
+ * Who a campaign targets: the active-user filter, plus either the socket
+ * room that reaches them or the explicit id list (buyers / sellers).
+ */
+const resolveAudience = async ({ targetAudience = "all", targetCampus = null }) => {
+  const active = { status: USER_STATUS.ACTIVE };
+  if (targetAudience === "all") return { filter: active, room: "broadcast:all" };
+  if (targetAudience === "campus") {
+    if (!targetCampus || !mongoose.Types.ObjectId.isValid(targetCampus)) {
+      throw new AppError("A valid campus must be selected for campus targeting", 400);
+    }
+    return { filter: { ...active, campus_id: targetCampus }, room: `campus:${targetCampus}` };
+  }
+  if (targetAudience === "buyers" || targetAudience === "sellers") {
+    // Buyers = users who opened a conversation; sellers = users with a listing.
+    const ids =
+      targetAudience === "buyers"
+        ? await Conversation.distinct("buyer_id")
+        : await Product.distinct("seller_id");
+    const filter = { ...active, _id: { $in: ids } };
+    return { filter, userIds: await User.distinct("_id", filter) };
+  }
+  throw new AppError("Invalid notification audience", 400);
+};
+
+/** Estimate recipient count based on target audience and campus filters. */
+export const estimateRecipients = async ({ targetAudience = "all", targetCampus = null }) => {
+  const audience = await resolveAudience({ targetAudience, targetCampus });
+  return audience.userIds ? audience.userIds.length : User.countDocuments(audience.filter);
+};
+
+/** Mongo match for the broadcasts one user is eligible to see. */
+const getUserBroadcastQuery = async (user) => {
+  const audiences = [{ target_audience: "all" }];
+  if (user.campus_id) audiences.push({ target_audience: "campus", target_campus: user.campus_id });
+
+  const [isBuyer, isSeller] = await Promise.all([
+    Conversation.exists({ buyer_id: user._id }),
+    Product.exists({ seller_id: user._id }),
+  ]);
+  if (isBuyer) audiences.push({ target_audience: "buyers" });
+  if (isSeller) audiences.push({ target_audience: "sellers" });
+
+  // Only campaigns sent after the user joined. Legacy rows have no sent_at,
+  // so fall back to createdAt for them.
+  const since = new Date(user.createdAt || 0);
+  return {
+    is_broadcast: true,
+    status: "sent",
+    $and: [
+      { $or: audiences },
+      { $or: [{ sent_at: { $gte: since } }, { sent_at: null, createdAt: { $gte: since } }] },
+    ],
+  };
+};
+
+/**
+ * Send a broadcast campaign now: record reach, mark sent, push live.
+ * Throws on failure; callers decide whether that marks the row failed.
+ */
+export const dispatchNotificationDocument = async (notification) => {
+  const audience = await resolveAudience({
+    targetAudience: notification.target_audience,
+    targetCampus: notification.target_campus,
+  });
+  const recipientCount = audience.userIds
+    ? audience.userIds.length
+    : await User.countDocuments(audience.filter);
+  const onlineRooms = audience.room ? [audience.room] : (audience.userIds || []).map((id) => `user:${id}`);
+  const delivered = (await onlineUserIdsIn(onlineRooms)).size;
+
+  const now = new Date();
+  notification.status = "sent";
+  notification.sent_at = now;
+  notification.expires_at = retentionDate(now);
+  notification.failure_reason = null;
+  notification.stats = {
+    total_sent: recipientCount,
+    delivered,
+    clicked: notification.stats?.clicked || 0,
+  };
+  await notification.save();
+
+  const payload = toClientNotification(notification);
+  if (notification.target_audience === "all") emitToAll(EVENT, payload);
+  else if (notification.target_audience === "campus") emitToCampus(notification.target_campus, EVENT, payload);
+  else emitToUsers(audience.userIds, EVENT, payload);
+
+  return notification;
+};
+
+const markFailed = (notification, error) =>
+  Notification.updateOne(
+    { _id: notification._id },
+    { $set: { status: "failed", failure_reason: clip(error?.message || "Unknown error", 300) } },
+  ).catch(() => {});
+
+// action_url is followed by the client on click. Only allow in-app paths
+// ("/deals") or absolute https links — never javascript:, data:, or
+// protocol-relative "//host" URLs.
+const sanitizeActionUrl = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") throw new AppError("Invalid action URL", 400);
+  const v = value.trim().slice(0, 500);
+  if (!v) return null;
+  if (v.startsWith("/") && !v.startsWith("//") && !v.includes("\\")) return v;
+  try {
+    const u = new URL(v);
+    if (u.protocol === "https:") return u.toString();
+  } catch {
+    // fall through
+  }
+  throw new AppError("Action URL must be an in-app path (/...) or an https:// link", 400);
+};
+
+const sanitizeImageUrl = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") throw new AppError("Invalid image URL", 400);
+  const v = value.trim().slice(0, 2048);
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    if (u.protocol === "https:") return u.toString();
+  } catch {
+    // fall through
+  }
+  throw new AppError("Image URL must be an https:// link", 400);
+};
+
+/** Create a campaign from the admin portal (sent now, or scheduled). */
+export const createAdminNotification = async ({
+  title,
+  message,
+  type = "general",
+  target_audience = "all",
+  target_campus = null,
+  image_url = null,
+  action_url = null,
+  action_label = "View Offers",
+  schedule_type = "now",
+  scheduled_at = null,
+  sent_by = null,
+}) => {
+  if (typeof title !== "string" || !title.trim()) throw new AppError("Notification title is required", 400);
+  if (typeof message !== "string" || !message.trim()) throw new AppError("Notification message is required", 400);
+  if (title.trim().length > 100) throw new AppError("Title cannot exceed 100 characters", 400);
+  if (message.trim().length > 500) throw new AppError("Message cannot exceed 500 characters", 400);
+  if (!CAMPAIGN_TYPES.includes(type)) throw new AppError("Invalid notification type", 400);
+  if (!NOTIFICATION_AUDIENCES.includes(target_audience)) throw new AppError("Invalid notification audience", 400);
+
+  const safeActionUrl = sanitizeActionUrl(action_url);
+  const safeImageUrl = sanitizeImageUrl(image_url);
+  const safeActionLabel =
+    typeof action_label === "string" && action_label.trim() ? action_label.trim().slice(0, 40) : "View Offers";
+
+  let campusId = null;
+  if (target_audience === "campus") {
+    if (!target_campus || !mongoose.Types.ObjectId.isValid(target_campus)) {
+      throw new AppError("A valid campus must be selected for campus targeting", 400);
+    }
+    campusId = target_campus;
+  }
+
+  const isScheduled = schedule_type === "scheduled";
+  let scheduledDate = null;
+  if (isScheduled) {
+    scheduledDate = new Date(scheduled_at);
+    if (!scheduled_at || Number.isNaN(scheduledDate.getTime()) || scheduledDate <= new Date()) {
+      throw new AppError("Scheduled notifications require a future date and time", 400);
+    }
+  }
+
+  const notification = await Notification.create({
+    title: title.trim(),
+    message: message.trim(),
+    type,
+    target_audience,
+    target_campus: campusId,
+    image_url: safeImageUrl,
+    action_url: safeActionUrl,
+    action_label: safeActionLabel,
+    schedule_type: isScheduled ? "scheduled" : "now",
+    scheduled_at: scheduledDate,
+    // "sending" (not "draft") so the scheduler's crash recovery can finish
+    // an instant send that died half-way.
+    status: isScheduled ? "scheduled" : "sending",
+    sent_by,
+    is_broadcast: true,
+  });
+
+  if (!isScheduled) {
+    try {
+      await dispatchNotificationDocument(notification);
+    } catch (error) {
+      await markFailed(notification, error);
+      throw error;
+    }
+  }
+  return notification;
+};
+
+/**
+ * Send due scheduled campaigns (called every minute by the job runner).
+ * Each row is claimed atomically (-> "sending") first, so overlapping ticks
+ * or several server instances never send the same campaign twice. Rows left
+ * in "sending" by a crashed process are re-claimed after SENDING_STALE_MS.
+ */
+export const dispatchDueScheduledNotifications = async () => {
+  let count = 0;
+  try {
+    for (let i = 0; i < 100; i++) {
+      const now = new Date();
+      const notif = await Notification.findOneAndUpdate(
+        {
+          is_broadcast: true,
+          $or: [
+            { status: "scheduled", scheduled_at: { $lte: now } },
+            { status: "sending", updatedAt: { $lte: new Date(now.getTime() - SENDING_STALE_MS) } },
+          ],
+        },
+        { $set: { status: "sending" } },
+        { returnDocument: "after", sort: { scheduled_at: 1 } },
+      );
+      if (!notif) break;
+      try {
+        await dispatchNotificationDocument(notif);
+        count += 1;
+      } catch (err) {
+        console.error("Scheduled notification dispatch failed:", err?.message);
+        await markFailed(notif, err);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to dispatch scheduled notifications:", error?.message);
+  }
+  return count;
+};
+
+// ==================== USER FEED + STATE ====================
+
+/** A user's feed: eligible broadcasts + their direct notifications. */
+export const getUserNotificationFeed = async (userId) => {
+  const user = await User.findById(userId).select("campus_id createdAt role").lean();
+  if (!user) throw new AppError("User not found", 404);
+
+  const newestFirst = { sent_at: -1, createdAt: -1 };
+  const [broadcasts, directs] = await Promise.all([
+    getUserBroadcastQuery(user).then((q) => Notification.find(q).sort(newestFirst).limit(50).lean()),
+    Notification.find({
+      is_broadcast: false,
+      recipient_id: userId,
+      status: "sent",
+      is_dismissed: { $ne: true },
+    })
+      .sort(newestFirst)
+      .limit(50)
+      .lean(),
+  ]);
+
+  const receipts = broadcasts.length
+    ? await NotificationReceipt.find({
+        user_id: userId,
+        notification_id: { $in: broadcasts.map((b) => b._id) },
+      }).lean()
+    : [];
+  const receiptOf = new Map(receipts.map((r) => [String(r.notification_id), r]));
+
+  const notifications = [
+    ...broadcasts
+      .filter((b) => !receiptOf.get(String(b._id))?.is_dismissed)
+      .map((b) => toClientNotification(b, { unread: !receiptOf.get(String(b._id))?.is_read })),
+    ...directs.map((d) => toClientNotification(d, { unread: !d.is_read })),
+  ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  return {
+    notifications,
+    unreadCount: notifications.filter((n) => n.unread).length,
+  };
+};
+
+/** Load a notification the user is allowed to act on, or 404. */
+const loadForUser = async (notificationId, userId) => {
+  if (!mongoose.Types.ObjectId.isValid(notificationId)) throw new AppError("Invalid notification ID", 400);
+  const notification = await Notification.findById(notificationId).lean();
+  if (!notification) throw new AppError("Notification not found", 404);
+
+  if (!notification.is_broadcast) {
+    if (String(notification.recipient_id) !== String(userId)) throw new AppError("Notification not found", 404);
+    return notification;
+  }
+  const user = await User.findById(userId).select("_id campus_id createdAt").lean();
+  const eligible =
+    user && (await Notification.exists({ _id: notificationId, ...(await getUserBroadcastQuery(user)) }));
+  if (!eligible) throw new AppError("Notification not found", 404);
+  return notification;
+};
+
+const upsertReceipt = (notificationId, userId, set) =>
+  NotificationReceipt.updateOne(
+    { notification_id: notificationId, user_id: userId },
+    { $set: set },
+    { upsert: true },
+  );
+
+export const markNotificationRead = async (notificationId, userId) => {
+  const notification = await loadForUser(notificationId, userId);
+  const set = { is_read: true, read_at: new Date() };
+  if (notification.is_broadcast) await upsertReceipt(notificationId, userId, set);
+  else await Notification.updateOne({ _id: notificationId }, { $set: set });
+  return { ok: true };
+};
+
+export const markAllNotificationsRead = async (userId) => {
+  const readAt = new Date();
+  await Notification.updateMany(
+    { recipient_id: userId, is_broadcast: false, status: "sent", is_read: false },
+    { $set: { is_read: true, read_at: readAt } },
+  );
+
+  const user = await User.findById(userId).select("_id campus_id createdAt").lean();
+  if (user) {
+    const broadcastIds = await Notification.find(await getUserBroadcastQuery(user)).distinct("_id");
+    if (broadcastIds.length) {
+      await NotificationReceipt.bulkWrite(
+        broadcastIds.map((id) => ({
+          updateOne: {
+            filter: { notification_id: id, user_id: userId },
+            update: { $set: { is_read: true, read_at: readAt } },
+            upsert: true,
+          },
+        })),
+        { ordered: false },
+      );
+    }
+  }
+  return { ok: true };
+};
+
+/** Hide a notification from this user's feed (and mark it read). */
+export const dismissNotification = async (notificationId, userId) => {
+  const notification = await loadForUser(notificationId, userId);
+  const set = { is_dismissed: true, is_read: true, read_at: new Date() };
+  if (notification.is_broadcast) await upsertReceipt(notificationId, userId, set);
+  else await Notification.updateOne({ _id: notificationId }, { $set: set });
+  return { ok: true };
+};
+
+/**
+ * Record a click. stats.clicked counts unique clickers, so click-through
+ * can't exceed 100% when someone opens the same notification twice.
+ */
+export const trackNotificationClick = async (notificationId, userId) => {
+  const notification = await loadForUser(notificationId, userId);
+  const now = new Date();
+  let firstClick = false;
+
+  if (notification.is_broadcast) {
+    try {
+      const before = await NotificationReceipt.findOneAndUpdate(
+        { notification_id: notificationId, user_id: userId },
+        { $set: { is_clicked: true, clicked_at: now }, $setOnInsert: { is_read: false, read_at: null } },
+        { upsert: true, returnDocument: "before" },
+      ).lean();
+      firstClick = !before?.is_clicked;
+    } catch (error) {
+      if (error?.code !== 11000) throw error; // concurrent first click: the other request counted it
+    }
+  } else {
+    const result = await Notification.updateOne({ _id: notificationId, clicked_at: null }, { $set: { clicked_at: now } });
+    firstClick = result.modifiedCount === 1;
+  }
+
+  if (firstClick) await Notification.updateOne({ _id: notificationId }, { $inc: { "stats.clicked": 1 } });
+};
+
+// ==================== ADMIN ====================
+
+// campuses: null (everything) or the campus ids a limited staff member covers.
+const campusAudience = (campuses) => (campuses ? { target_audience: "campus", target_campus: { $in: campuses } } : {});
+
+export const getAdminNotificationStats = async ({ campuses = null } = {}) => {
+  const [totals, activeUsers] = await Promise.all([
+    Notification.aggregate([
+      { $match: { is_broadcast: true, status: "sent", ...campusAudience(campuses) } },
+      {
+        $group: {
+          _id: null,
+          totalSent: { $sum: "$stats.total_sent" },
+          delivered: { $sum: "$stats.delivered" },
+          clicked: { $sum: "$stats.clicked" },
+        },
+      },
+    ]),
+    getActiveUserCount(),
+  ]);
+
+  const { totalSent = 0, delivered = 0, clicked = 0 } = totals[0] || {};
+  const pct = (n) => (totalSent > 0 ? Math.round((n / totalSent) * 100) : 0);
+  return {
+    totalSent,
+    delivered,
+    deliveredPercent: pct(delivered),
+    clicked,
+    clickedPercent: pct(clicked),
+    activeUsers,
+  };
+};
+
+export const getAdminNotificationHistory = async ({ page = 1, limit = 20, campuses = null }) => {
+  page = Math.min(Math.max(Number.parseInt(page, 10) || 1, 1), 1000);
+  limit = Math.min(Math.max(Number.parseInt(limit, 10) || 20, 1), 100);
+  const filter = { is_broadcast: true, status: "sent", ...campusAudience(campuses) };
+  const [items, total] = await Promise.all([
+    Notification.find(filter)
+      .populate("target_campus", "name code")
+      .populate("sent_by", "name email")
+      .sort({ sent_at: -1, createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    Notification.countDocuments(filter),
+  ]);
+  return { items, total, page, totalPages: Math.ceil(total / limit) };
+};
+
+export const getAdminScheduledNotifications = ({ campuses = null } = {}) =>
+  Notification.find({ status: "scheduled", ...campusAudience(campuses) })
+    .populate("target_campus", "name code")
+    .populate("sent_by", "name email")
+    .sort({ scheduled_at: 1 })
+    .lean();
+
+export const cancelScheduledNotification = async (notificationId, { campuses = null } = {}) => {
+  if (!mongoose.Types.ObjectId.isValid(notificationId)) throw new AppError("Invalid notification ID", 400);
+  const notif = await Notification.findOneAndUpdate(
+    { _id: notificationId, status: "scheduled", ...campusAudience(campuses) },
+    // Cancelled rows age out like sent ones instead of living forever.
+    { $set: { status: "cancelled", expires_at: retentionDate() } },
+    { returnDocument: "after" },
+  );
+  if (!notif) throw new AppError("Scheduled notification not found", 404);
+  return notif;
 };

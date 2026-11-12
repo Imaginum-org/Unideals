@@ -16,7 +16,10 @@ import { emitToConversation, emitToUser } from "../utils/socket.js";
 import {
   notifyNewOffer,
   notifyOfferAccepted,
+  notifyOfferDeclined,
+  notifyDealConfirmed,
   notifyPickupScheduled,
+  notifyPaymentConfirmed,
   notifyDealCompleted,
   notifyDealCancelled,
 } from "./notification.service.js";
@@ -299,6 +302,15 @@ export const respondOffer = async ({ conversationId, userId, messageId, action }
       text: `Offer of ${inr(entry.amount)} passed on. Shoot another if you're still keen.`,
       deal,
     });
+    // Tell the offerer, who may not be in the chat — fire-and-forget
+    const responder = await User.findById(userId).select("name").lean();
+    notifyOfferDeclined({
+      conversationId: conversation._id,
+      responderName: responder?.name,
+      productTitle: conversation.product_snapshot?.title,
+      amount: entry.amount,
+      recipientId: entry.offered_by,
+    }).catch(() => {});
   }
 
   const fresh = await Deal.findById(deal._id);
@@ -387,6 +399,15 @@ export const confirmDeal = async ({ conversationId, userId, amount }) => {
     text: `Deal locked at ${inr(amt)}. It's reserved for you.`,
     deal,
   });
+  // Notify the buyer the item is reserved for them — fire-and-forget
+  const sellerUser = await User.findById(userId).select("name").lean();
+  notifyDealConfirmed({
+    conversationId: conversation._id,
+    sellerName: sellerUser?.name,
+    productTitle: conversation.product_snapshot?.title,
+    amount: amt,
+    buyerId: conversation.buyer_id,
+  }).catch(() => {});
   const fresh = await Deal.findById(deal._id);
   broadcastDeal(conversation, fresh.toObject());
   return fresh;
@@ -467,6 +488,12 @@ export const confirmPayment = async ({ conversationId, userId }) => {
     text: "Seller confirmed the payment. Almost yours.",
     deal,
   });
+  // Prompt the buyer to close the deal — fire-and-forget
+  notifyPaymentConfirmed({
+    conversationId: conversation._id,
+    productTitle: conversation.product_snapshot?.title,
+    buyerId: conversation.buyer_id,
+  }).catch(() => {});
   const fresh = await Deal.findById(deal._id);
   broadcastDeal(conversation, fresh.toObject());
   return fresh;

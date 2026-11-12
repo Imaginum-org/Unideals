@@ -6,6 +6,7 @@ import {
   ArrowUp,
   Camera,
   ChevronUp,
+  History,
   ImagePlus,
   IndianRupee,
   Mic,
@@ -19,7 +20,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import axiosInstance from "../../../services/axiosInstance.js";
+import { getAssistantChat, rateAssistantReply, sendAssistantMessage } from "../api/assistantApi.js";
 import Wordmark from "../../../components/ui/Wordmark.jsx";
 import { LOGO_PATHS, LOGO_VIEWBOX } from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
@@ -29,6 +30,8 @@ import ListingDraftCard from "./ListingDraftCard.jsx";
 import ChecklistCard from "./ChecklistCard.jsx";
 import BudgetBundleCard from "./BudgetBundleCard.jsx";
 import SafetyTipCard from "./SafetyTipCard.jsx";
+import AssistantMessageActions from "./AssistantMessageActions.jsx";
+import AssistantHistoryPanel from "./AssistantHistoryPanel.jsx";
 
 const quickActions = [
   { icon: Search, title: "Find a deal", hint: "Affordable electronics", prompt: "Find affordable electronics" },
@@ -63,6 +66,50 @@ const loadStoredMessages = () => {
   }
   return [initialMessage];
 };
+
+// The saved chat this tab is continuing, tied to the account that owns it.
+const CONVERSATION_KEY = "unideals-assistant-conversation";
+
+const loadStoredConversation = () => {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(CONVERSATION_KEY) || "null");
+    if (stored?.id && stored?.userId) return stored;
+  } catch {
+    // Storage unavailable or corrupt.
+  }
+  return null;
+};
+
+const saveConversation = (conversation) => {
+  try {
+    if (conversation) sessionStorage.setItem(CONVERSATION_KEY, JSON.stringify(conversation));
+    else sessionStorage.removeItem(CONVERSATION_KEY);
+  } catch {
+    // Persistence is a nicety only.
+  }
+};
+
+// One reply from the API, in the widget's message shape.
+const toAssistantMessage = (data, id = nextId()) => ({
+  id,
+  serverId: data.messageId || data.serverId || undefined,
+  feedback: data.feedback || null,
+  text: data.reply || data.text || "Sorry, I didn't catch that. Could you rephrase?",
+  sender: "assistant",
+  intent: data.intent,
+  category: data.category,
+  products: data.productCards?.length ? data.productCards : data.products || [],
+  searchQuery: data.searchQuery || "",
+  suggestions: data.suggestions || [],
+  estimate: data.estimate || null,
+  comparison: data.comparison || null,
+  draft: data.draft || null,
+  checklist: data.checklist || null,
+  bundle: data.bundle || null,
+  safetyTips: data.safetyTips || null,
+  route: data.route || null,
+  routeLabel: data.routeLabel || null,
+});
 
 const saveMessages = (messages) => {
   try {
@@ -292,6 +339,7 @@ const FloatingAssistant = () => {
   const prefersReducedMotion = useReducedMotion();
   const { userDetails } = useUser();
   const firstName = userDetails?.name?.trim().split(/\s+/)[0] || "";
+  const userId = userDetails?._id || null;
 
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -303,6 +351,11 @@ const FloatingAssistant = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [messages, setMessages] = useState(loadStoredMessages);
+  const [conversation, setConversation] = useState(loadStoredConversation);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [streamingId, setStreamingId] = useState(null);
+  // Only continue a saved chat that belongs to whoever is signed in now.
+  const conversationId = userId && conversation?.userId === userId ? conversation.id : null;
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const uploadInputRef = useRef(null);
@@ -333,6 +386,10 @@ const FloatingAssistant = () => {
   useEffect(() => {
     saveMessages(messages);
   }, [messages]);
+
+  useEffect(() => {
+    saveConversation(conversation);
+  }, [conversation]);
 
   useEffect(() => {
     if (isPanelVisible) {
@@ -412,44 +469,53 @@ const FloatingAssistant = () => {
     setInput("");
     setIsTyping(true);
 
-    try {
-      const { data } = await axiosInstance.post("/api/chat/assistant", {
-        message: messageText,
-        history,
-        attachments: attachments.map((attachment) => {
-          const payload = { ...attachment };
-          delete payload.preview;
-          return payload;
-        }),
+    const replyId = nextId();
+    const payload = {
+      message: messageText,
+      history,
+      conversationId: conversationId || undefined,
+      attachments: attachments.map((attachment) => {
+        const item = { ...attachment };
+        delete item.preview;
+        return item;
+      }),
+    };
+    // Streamed text shows up in the reply bubble as it's written.
+    const onText = (textSoFar) => {
+      setStreamingId(replyId);
+      setMessages((prev) => {
+        const index = prev.findIndex((item) => item.id === replyId);
+        if (index === -1) return [...prev, { id: replyId, text: textSoFar, sender: "assistant", isStreaming: true }];
+        const next = prev.slice();
+        next[index] = { ...next[index], text: textSoFar };
+        return next;
       });
+    };
 
-      const assistantData = data?.data || {};
+    try {
+      let data;
+      try {
+        data = await sendAssistantMessage(payload, { onText });
+      } catch (error) {
+        // The saved chat expired or was deleted elsewhere: start a new one.
+        if (error.response?.status !== 404 || !payload.conversationId) throw error;
+        setConversation(null);
+        data = await sendAssistantMessage({ ...payload, conversationId: undefined }, { onText });
+      }
+      if (data.conversationId && userId) setConversation({ id: data.conversationId, userId });
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: nextId(),
-          text: assistantData.reply || "Sorry, I didn't catch that. Could you rephrase?",
-          sender: "assistant",
-          intent: assistantData.intent,
-          category: assistantData.category,
-          products: assistantData.productCards?.length ? assistantData.productCards : assistantData.products || [],
-          searchQuery: assistantData.searchQuery || "",
-          suggestions: assistantData.suggestions || [],
-          estimate: assistantData.estimate || null,
-          comparison: assistantData.comparison || null,
-          draft: assistantData.draft || null,
-          checklist: assistantData.checklist || null,
-          bundle: assistantData.bundle || null,
-          safetyTips: assistantData.safetyTips || null,
-          route: assistantData.route || null,
-          routeLabel: assistantData.routeLabel || null,
-        },
-      ]);
+      setMessages((prev) => {
+        const final = toAssistantMessage(data, replyId);
+        const index = prev.findIndex((item) => item.id === replyId);
+        if (index === -1) return [...prev, final];
+        const next = prev.slice();
+        next[index] = final;
+        return next;
+      });
     } catch (error) {
       const status = error.response?.status;
       setMessages((prev) => [
-        ...prev,
+        ...prev.filter((item) => item.id !== replyId),
         {
           id: nextId(),
           text:
@@ -463,8 +529,41 @@ const FloatingAssistant = () => {
       ]);
     } finally {
       setIsTyping(false);
+      setStreamingId(null);
     }
-  }, [isTyping, messages]);
+  }, [isTyping, messages, conversationId, userId]);
+
+  const rateReply = useCallback(async (message, value) => {
+    if (!conversationId || !message.serverId) return;
+    const previous = message.feedback || null;
+    const setFeedback = (feedback) =>
+      setMessages((prev) => prev.map((item) => (item.id === message.id ? { ...item, feedback } : item)));
+    setFeedback(value);
+    try {
+      await rateAssistantReply(conversationId, message.serverId, value);
+    } catch {
+      setFeedback(previous);
+    }
+  }, [conversationId]);
+
+  const openSavedChat = useCallback(async (id) => {
+    try {
+      const chat = await getAssistantChat(id);
+      setMessages([
+        initialMessage,
+        ...chat.messages.map((item) =>
+          item.sender === "assistant"
+            ? toAssistantMessage(item, item.id)
+            : { id: item.id, text: item.text, sender: "user", hadMedia: item.hadMedia },
+        ),
+      ]);
+      setConversation({ id: chat.id, userId });
+      setHistoryOpen(false);
+    } catch {
+      setHistoryOpen(false);
+      pushAssistantNote("I couldn't open that chat. It may have expired.");
+    }
+  }, [pushAssistantNote, userId]);
 
   const retryMessage = (message) => {
     if (!message.retryText || isTyping) return;
@@ -707,6 +806,8 @@ const FloatingAssistant = () => {
 
   const resetChat = () => {
     setMessages([initialMessage]);
+    setConversation(null);
+    setHistoryOpen(false);
     setInput("");
     setMediaPreview(null);
     setCameraMenuOpen(false);
@@ -771,6 +872,17 @@ const FloatingAssistant = () => {
               </div>
 
               <div className="flex shrink-0 items-center">
+                {userId && (
+                  <button
+                    type="button"
+                    onClick={() => setHistoryOpen(true)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                    aria-label="Recent chats"
+                    title="Recent chats"
+                  >
+                    <History className="h-4 w-4" />
+                  </button>
+                )}
                 {hasConversation && (
                   <button
                     type="button"
@@ -880,6 +992,15 @@ const FloatingAssistant = () => {
                             </Link>
                           )}
 
+                          {!message.isError && !message.isStreaming && message.text && (
+                            <AssistantMessageActions
+                              text={message.text}
+                              feedback={message.feedback}
+                              canRate={Boolean(conversationId && message.serverId)}
+                              onRate={(value) => rateReply(message, value)}
+                            />
+                          )}
+
                           {showSuggestions ? (
                             <div className="mt-2.5 flex flex-wrap gap-1.5">
                               {message.suggestions.slice(0, 4).map((suggestion) => (
@@ -901,7 +1022,7 @@ const FloatingAssistant = () => {
                 );
               })}
 
-              {isTyping && <TypingIndicator />}
+              {isTyping && !streamingId && <TypingIndicator />}
               <div ref={messagesEndRef} />
             </div>
 
@@ -997,6 +1118,17 @@ const FloatingAssistant = () => {
                 AI can make mistakes. Always inspect items before you pay.
               </p>
             </div>
+
+            {historyOpen && userId && (
+              <AssistantHistoryPanel
+                activeId={conversationId}
+                onOpen={openSavedChat}
+                onClose={() => setHistoryOpen(false)}
+                onDeleted={(ids) => {
+                  if (conversationId && ids.includes(conversationId)) setConversation(null);
+                }}
+              />
+            )}
 
             {cameraOpen && (
               <div role="dialog" aria-modal="true" aria-label="Take a picture" className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">

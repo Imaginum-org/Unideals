@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Bell, BellOff, Check, CheckCheck, Megaphone, MessageSquare, Package, ShieldAlert, Tag, X } from "lucide-react";
+import { ArrowUpRight, BellOff, Check, CheckCheck, X } from "lucide-react";
 import { useNotification } from "../../../context/NotificationContext.jsx";
+import { formatNotificationTime, getNotificationMeta } from "../utils/notificationMeta.js";
 import {
   AccountLayout,
   CARD,
@@ -13,27 +14,9 @@ import {
 } from "../../user/components/account/AccountKit.jsx";
 import { cn } from "../../../utils/cn.js";
 
-// Icon + tone by notification type.
-const getNotificationTypeMeta = (type = "") => {
-  const norm = String(type).toUpperCase();
-  if (norm.includes("OFFER") || norm.includes("PROMOTION") || norm.includes("PROMO"))
-    return { Icon: Tag, tone: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300", label: "Offer" };
-  if (norm.includes("WISHLIST") || norm.includes("PRICE"))
-    return { Icon: Tag, tone: "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-300", label: "Price alert" };
-  if (norm.includes("MESSAGE"))
-    return { Icon: MessageSquare, tone: "bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300", label: "Message" };
-  if (norm.includes("ORDER"))
-    return { Icon: Package, tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300", label: "Order" };
-  if (norm.includes("ANNOUNCE"))
-    return { Icon: Megaphone, tone: "bg-[var(--accent-soft)] text-[var(--accent-text)]", label: "Announcement" };
-  if (norm.includes("MODERAT") || norm.includes("REVIEW") || norm.includes("FLAG"))
-    return { Icon: ShieldAlert, tone: "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300", label: "Moderation" };
-  return { Icon: Bell, tone: "bg-neutral-100 text-slate-600 dark:bg-white/5 dark:text-zinc-300", label: "Update" };
-};
-
 export default function Notification() {
   const navigate = useNavigate();
-  const { notifications, unreadCount, loading, error, markRead, markAllRead, trackClick, dismiss, fetchNotifications } =
+  const { notifications, unreadCount, loading, error, markRead, markAllRead, openNotification, dismiss, fetchNotifications } =
     useNotification();
   const [filter, setFilter] = useState("all");
 
@@ -42,11 +25,7 @@ export default function Notification() {
     [filter, notifications],
   );
 
-  const openNotification = async (notification) => {
-    await trackClick(notification.id);
-    await markRead(notification.id);
-    navigate(notification.actionPath || notification.action_url || "/deals");
-  };
+  const open = (notification) => openNotification(notification, navigate);
 
   return (
     <AccountLayout
@@ -98,12 +77,12 @@ export default function Notification() {
           )}
           <ul className={cn(CARD, FLUSH_ON_PHONE, "divide-y divide-neutral-100 overflow-hidden dark:divide-neutral-800")}>
             {visible.map((n) => {
-              const meta = getNotificationTypeMeta(n.type);
+              const meta = getNotificationMeta(n);
               const Icon = meta.Icon;
-              const banner = n.imageUrl || n.image_url;
+              const banner = n.imageUrl;
               return (
                 <li
-                  key={n.id || n._id}
+                  key={n.id}
                   className={cn("group relative flex gap-3 px-4 py-4 transition-colors sm:px-5", n.unread ? "bg-[var(--accent-soft)]/40" : "hover:bg-neutral-50/70 dark:hover:bg-white/[0.02]")}
                 >
                   <span className="relative mt-0.5 shrink-0">
@@ -116,15 +95,17 @@ export default function Notification() {
                   </span>
 
                   <div className="min-w-0 flex-1">
-                    <button type="button" onClick={() => openNotification(n)} className="block w-full pr-8 text-left">
+                    <button type="button" onClick={() => open(n)} className="block w-full pr-8 text-left">
                       <span className="flex items-baseline justify-between gap-3">
                         <span className={cn("min-w-0 truncate text-[14.5px] text-slate-900 dark:text-white", n.unread ? "font-semibold" : "font-medium")}>
                           {n.title}
                         </span>
-                        <span className="shrink-0 text-[12px] text-slate-400 dark:text-zinc-500">{n.time}</span>
+                        <span className="shrink-0 text-[12px] text-slate-400 dark:text-zinc-500">
+                          {formatNotificationTime(n.createdAt)}
+                        </span>
                       </span>
                       <span className="mt-0.5 line-clamp-2 block text-[13px] leading-relaxed text-slate-600 dark:text-zinc-300">
-                        {n.message || n.description}
+                        {n.description}
                       </span>
                     </button>
 
@@ -135,13 +116,16 @@ export default function Notification() {
                     )}
 
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                      <span className="text-[11.5px] font-medium text-slate-400 dark:text-zinc-500">{meta.label}</span>
+                      <span className="text-[11.5px] font-medium text-slate-400 dark:text-zinc-500">
+                        {meta.label}
+                        {n.count > 1 && ` · ${n.count}`}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => openNotification(n)}
+                        onClick={() => open(n)}
                         className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-[var(--accent-text)] hover:underline"
                       >
-                        {n.actionLabel || n.action_label || "View"}
+                        {n.actionLabel}
                         <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
                       {n.unread && (
