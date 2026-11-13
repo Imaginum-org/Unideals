@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -32,6 +32,8 @@ import BudgetBundleCard from "./BudgetBundleCard.jsx";
 import SafetyTipCard from "./SafetyTipCard.jsx";
 import AssistantMessageActions from "./AssistantMessageActions.jsx";
 import AssistantHistoryPanel from "./AssistantHistoryPanel.jsx";
+import { AssistantThemePicker, AssistantWallpaper } from "./AssistantThemes.jsx";
+import { useAssistantTheme } from "../utils/assistantThemes.js";
 
 const quickActions = [
   { icon: Search, title: "Find a deal", hint: "Affordable electronics", prompt: "Find affordable electronics" },
@@ -363,11 +365,70 @@ const ThinkingDots = () => (
   </span>
 );
 
+// Cloud geometry. The cloud is a union of circles over a body rect, drawn
+// twice: first with a stroke (only its outer edge stays visible), then
+// filled on top, so it gets one clean rim. Width follows the longest line.
+// Geometry is in viewBox units; CLOUD_SCALE shrinks it on screen.
+const CLOUD_H = 90;
+const CLOUD_MIN_W = 176;
+const CLOUD_SCALE = 0.8;
+const cloudShapes = (w) => {
+  const bigR = Math.min(29, 25 + (w - CLOUD_MIN_W) * 0.04);
+  return {
+    rect: { x: 30, y: 38, width: w - 60, height: 44 },
+    circles: [
+      // top puffs: small, big, medium
+      { cx: w * 0.29, cy: 43, r: 19 },
+      { cx: w * 0.5, cy: 35, r: bigR },
+      { cx: w * 0.72, cy: 42, r: 21 },
+      // round ends
+      { cx: 30, cy: 60, r: 24 },
+      { cx: w - 30, cy: 61, r: 23 },
+      // gently scalloped base
+      { cx: w * 0.3, cy: 70, r: 18 },
+      { cx: w * 0.5, cy: 72, r: 18 },
+      { cx: w * 0.7, cy: 70, r: 18 },
+    ],
+  };
+};
+
+const CloudShapes = ({ shapes, ...props }) => (
+  <g {...props}>
+    <rect {...shapes.rect} />
+    {shapes.circles.map((c) => (
+      <circle key={`${c.cx}-${c.cy}`} {...c} />
+    ))}
+  </g>
+);
+
+const SPARKLE_PATH = "M5 0c.5 2.6 1.6 3.7 4.2 4.2C6.6 4.7 5.5 5.8 5 8.4 4.5 5.8 3.4 4.7.8 4.2 3.4 3.7 4.5 2.6 5 0z";
+
 const ThoughtCloud = ({ lines, reducedMotion, onOpen, onDismiss }) => {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState(reducedMotion ? "shown" : "thinking");
   const [chars, setChars] = useState(0);
+  const [textWidth, setTextWidth] = useState(140);
+  const sizerRef = useRef(null);
+  const uid = useId().replace(/:/g, "");
   const linesKey = lines.join("|");
+
+  // Size the cloud to the longest line once, so it doesn't grow while typing.
+  useLayoutEffect(() => {
+    const el = sizerRef.current;
+    if (!el) return undefined;
+    const measure = () => setTextWidth(Math.ceil(el.getBoundingClientRect().width));
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(el); // re-measure once the web font loads
+    return () => observer?.disconnect();
+  }, [linesKey]);
+
+  // On-screen size; the shapes are drawn at 1/CLOUD_SCALE of it.
+  const width = Math.round(Math.max(CLOUD_MIN_W * CLOUD_SCALE, textWidth + 58));
+  const height = Math.round(CLOUD_H * CLOUD_SCALE);
+  const viewW = width / CLOUD_SCALE;
+  const shapes = cloudShapes(viewW);
+  const bigPuff = shapes.circles[1];
   const isLast = index >= lines.length - 1;
   const line = lines[Math.min(index, lines.length - 1)] || "";
 
@@ -399,28 +460,74 @@ const ThoughtCloud = ({ lines, reducedMotion, onOpen, onDismiss }) => {
 
   const text = phase === "shown" || reducedMotion ? line : line.slice(0, chars);
 
+  // Shared paint: a soft top-to-bottom gradient and a hairline rim.
+  const fill = `url(#${uid}-fill)`;
+  const rim = "[stroke:rgba(74,77,254,0.16)] dark:[stroke:rgba(255,255,255,0.09)]";
+  const shadow =
+    "[filter:drop-shadow(0_12px_20px_rgba(74,77,254,0.2))_drop-shadow(0_2px_3px_rgba(15,23,42,0.07))] dark:[filter:drop-shadow(0_12px_22px_rgba(0,0,0,0.45))]";
+
   return (
     <motion.div
-      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.85 }}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.8 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.9 }}
-      transition={{ type: "spring", stiffness: 300, damping: 24 }}
-      style={{ transformOrigin: "bottom right" }}
-      className="group/cloud absolute bottom-full right-1 mb-5 [filter:drop-shadow(0_10px_22px_rgba(74,77,254,0.22))_drop-shadow(0_1px_2px_rgba(15,23,42,0.08))]"
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.85 }}
+      transition={{ type: "spring", stiffness: 280, damping: 22 }}
+      style={{ transformOrigin: "bottom right", width }}
+      className="group/cloud absolute bottom-full right-0 mb-6"
     >
+      {/* invisible: every line stacked in one cell, so its width is the longest */}
+      <span
+        ref={sizerRef}
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute left-0 top-0 inline-grid whitespace-nowrap text-[12.5px] font-semibold tracking-tight"
+      >
+        {lines.map((l) => (
+          <span key={l} className="[grid-area:1/1]">
+            {l}
+          </span>
+        ))}
+      </span>
+
       <motion.div
         animate={reducedMotion ? undefined : { y: [0, -3, 0] }}
-        transition={reducedMotion ? undefined : { duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        transition={reducedMotion ? undefined : { duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+        whileHover={reducedMotion ? undefined : { scale: 1.03 }}
+        style={{ transformOrigin: "bottom right" }}
         className="relative"
       >
-        {/* cloud puffs: same fill as the body, so the shadow wraps one shape */}
-        <span aria-hidden="true" className="absolute -top-3 left-4 h-8 w-8 rounded-full bg-white dark:bg-[#272B35]" />
-        <span aria-hidden="true" className="absolute -top-[18px] left-[42%] h-10 w-10 rounded-full bg-white dark:bg-[#272B35]" />
-        <span aria-hidden="true" className="absolute -top-2.5 right-5 h-7 w-7 rounded-full bg-white dark:bg-[#272B35]" />
+        <svg
+          width={width}
+          height={height}
+          viewBox={`0 0 ${viewW} ${CLOUD_H}`}
+          aria-hidden="true"
+          className={`block overflow-visible ${shadow}`}
+        >
+          <defs>
+            <linearGradient id={`${uid}-fill`} x1="0" y1="0" x2="0" y2={CLOUD_H} gradientUnits="userSpaceOnUse">
+              <stop offset="0" className="[stop-color:#FFFFFF] dark:[stop-color:#30344A]" />
+              <stop offset="1" className="[stop-color:#F1F2FF] dark:[stop-color:#23262F]" />
+            </linearGradient>
+            <linearGradient id={`${uid}-spark`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#6366F1" />
+              <stop offset="1" stopColor="#0EA5E9" />
+            </linearGradient>
+          </defs>
+          <CloudShapes shapes={shapes} fill="none" strokeWidth="2" className={rim} />
+          <CloudShapes shapes={shapes} fill={fill} />
+          {/* a little sparkle riding on the cloud */}
+          <path
+            d={SPARKLE_PATH}
+            fill={`url(#${uid}-spark)`}
+            transform={`translate(${bigPuff.cx + bigPuff.r * 0.72} ${bigPuff.cy - bigPuff.r - 2})`}
+            style={reducedMotion ? undefined : { animation: "ai-twinkle 1.8s ease-in-out infinite alternate" }}
+          />
+        </svg>
+
         <button
           type="button"
           onClick={onOpen}
-          className="relative flex min-h-[40px] min-w-[150px] items-center justify-center gap-2 whitespace-nowrap rounded-full bg-white px-5 py-2.5 text-left text-[13.5px] font-semibold tracking-tight text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4A4DFE]/50 dark:bg-[#272B35] dark:text-white"
+          style={{ top: 36 * CLOUD_SCALE, height: (CLOUD_H - 40) * CLOUD_SCALE }}
+          className="absolute inset-x-5 flex items-center justify-center whitespace-nowrap rounded-full text-[12.5px] font-semibold tracking-tight text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4A4DFE]/50 dark:text-white"
           aria-label={`${line} Open Unideals AI`}
         >
           {phase === "thinking" ? (
@@ -428,7 +535,7 @@ const ThoughtCloud = ({ lines, reducedMotion, onOpen, onDismiss }) => {
           ) : (
             <span aria-live="polite">
               {text}
-              {phase === "typing" && <span className="ml-0.5 inline-block h-[14px] w-[2px] translate-y-[2px] animate-pulse bg-[#4A4DFE]" />}
+              {phase === "typing" && <span className="ml-0.5 inline-block h-[13px] w-[2px] translate-y-[2px] animate-pulse rounded-full bg-[#4A4DFE]" />}
             </span>
           )}
         </button>
@@ -439,14 +546,30 @@ const ThoughtCloud = ({ lines, reducedMotion, onOpen, onDismiss }) => {
             onDismiss();
           }}
           aria-label="Hide this tip"
-          className="absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white opacity-100 shadow transition hover:bg-slate-900 sm:opacity-0 sm:group-hover/cloud:opacity-100 dark:bg-zinc-200 dark:text-zinc-900"
+          style={{ left: 2, top: 24 }}
+          className="absolute flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white opacity-100 shadow-md ring-2 ring-white transition hover:bg-slate-900 sm:opacity-0 sm:group-hover/cloud:opacity-100 dark:bg-zinc-200 dark:text-zinc-900 dark:ring-[#23262F]"
         >
           <X className="h-3 w-3" />
         </button>
       </motion.div>
-      {/* the trail of small bubbles leading down to the launcher */}
-      <span aria-hidden="true" className="absolute -bottom-3 right-5 h-3.5 w-3.5 rounded-full bg-white dark:bg-[#272B35]" />
-      <span aria-hidden="true" className="absolute -bottom-[22px] right-2.5 h-2 w-2 rounded-full bg-white dark:bg-[#272B35]" />
+
+      {/* the trail of little puffs leading down to the launcher */}
+      <svg
+        width="34"
+        height="26"
+        viewBox="0 0 34 26"
+        aria-hidden="true"
+        className={`absolute -bottom-[22px] right-4 overflow-visible ${shadow}`}
+      >
+        <g className={rim} strokeWidth="1.6" fill="none">
+          <circle cx="15" cy="6" r="5.5" />
+          <circle cx="25" cy="17.5" r="3.2" />
+        </g>
+        <g className="fill-[#F4F5FF] dark:fill-[#272A34]">
+          <circle cx="15" cy="6" r="5.5" />
+          <circle cx="25" cy="17.5" r="3.2" />
+        </g>
+      </svg>
     </motion.div>
   );
 };
@@ -470,6 +593,8 @@ const FloatingAssistant = () => {
   const [messages, setMessages] = useState(loadStoredMessages);
   const [conversation, setConversation] = useState(loadStoredConversation);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [chatTheme, setChatTheme] = useAssistantTheme();
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [streamingId, setStreamingId] = useState(null);
   // Only continue a saved chat that belongs to whoever is signed in now.
   const conversationId = userId && conversation?.userId === userId ? conversation.id : null;
@@ -529,16 +654,25 @@ const FloatingAssistant = () => {
     setIsMinimized(false);
   }, [location.pathname]);
 
-  // Esc closes the panel (or the camera overlay first).
+  // Esc closes the panel (or the camera overlay / theme menu first).
   useEffect(() => {
     if (!isPanelVisible) return undefined;
     const onKeyDown = (event) => {
       if (event.key !== "Escape") return;
       if (cameraStreamRef.current) return;
+      if (themeMenuOpen) {
+        setThemeMenuOpen(false);
+        return;
+      }
       setIsMinimized(true);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isPanelVisible, themeMenuOpen]);
+
+  // The theme menu never outlives the panel.
+  useEffect(() => {
+    if (!isPanelVisible) setThemeMenuOpen(false);
   }, [isPanelVisible]);
 
   // Idle attention cue: every few seconds the launcher's logo mark briefly
@@ -1025,6 +1159,13 @@ const FloatingAssistant = () => {
               </div>
 
               <div className="flex shrink-0 items-center">
+                <AssistantThemePicker
+                  theme={chatTheme}
+                  onChange={setChatTheme}
+                  open={themeMenuOpen}
+                  onOpenChange={setThemeMenuOpen}
+                  reducedMotion={prefersReducedMotion}
+                />
                 {userId && (
                   <button
                     type="button"
@@ -1068,11 +1209,13 @@ const FloatingAssistant = () => {
               </div>
             </header>
 
-            {/* Messages */}
+            {/* Messages, over the chosen theme's wallpaper (which stays put while they scroll) */}
+            <div className="relative flex min-h-0 flex-1 flex-col">
+            <AssistantWallpaper theme={chatTheme} />
             <div
               aria-live="polite"
               aria-relevant="additions text"
-              className="no-scrollbar relative flex-1 space-y-4 overflow-y-auto bg-[radial-gradient(120%_60%_at_50%_0%,rgba(99,102,241,.07),transparent_60%)] px-4 py-4 dark:bg-[radial-gradient(120%_60%_at_50%_0%,rgba(99,102,241,.12),transparent_60%)]"
+              className="no-scrollbar relative flex-1 space-y-4 overflow-y-auto px-4 py-4"
             >
               {messages.map((message, index) => {
                 if (message.isWelcome) {
@@ -1177,6 +1320,7 @@ const FloatingAssistant = () => {
 
               {isTyping && !streamingId && <TypingIndicator />}
               <div ref={messagesEndRef} />
+            </div>
             </div>
 
             {/* Composer */}
