@@ -1,4 +1,5 @@
 import * as notificationService from "../services/notification.service.js";
+import { registerDeviceToken, unregisterDeviceToken } from "../services/push.service.js";
 import { forwardServiceError } from "../utils/response.js";
 import { isCampusInScope } from "../services/campusScope.service.js";
 
@@ -82,6 +83,32 @@ export const dismissNotification = async (req, res, next) => {
       message: "Notification dismissed",
       data: result,
     });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// POST /api/notifications/devices  { token, platform: "web" | "android" | "ios" }
+// Called on every visit / app start: registers or refreshes this device.
+export const registerDevice = async (req, res, next) => {
+  try {
+    await registerDeviceToken({
+      userId: req.userId,
+      token: req.body?.token,
+      platform: req.body?.platform,
+      userAgent: req.get("user-agent"),
+    });
+    return res.status(200).json({ success: true, message: "Device registered for push" });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// DELETE /api/notifications/devices  { token }  — call before logout.
+export const unregisterDevice = async (req, res, next) => {
+  try {
+    await unregisterDeviceToken({ userId: req.userId, token: req.body?.token });
+    return res.status(200).json({ success: true, message: "Device unregistered" });
   } catch (error) {
     forwardServiceError(error, next);
   }

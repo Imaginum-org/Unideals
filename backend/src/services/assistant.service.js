@@ -1699,17 +1699,15 @@ const answerWithGemini = async ({ message, safeHistory, user, attachments, deadl
     }
 
     const text = response.text || "";
-    let parsed;
-    try {
-      let cleanText = text;
-      if (text.includes("```json")) {
-        cleanText = text.split("```json")[1].split("```")[0];
-      }
-      parsed = JSON.parse(cleanText);
-    } catch {
+    // The JSON object may come fenced, bare, or after a sentence of prose
+    // (seen with Groq's models); take the object wherever it is.
+    let parsed = parseJsonResponse(text);
+    if (!parsed || typeof parsed.reply !== "string") {
       const cleanReply = text
         .replace(/```json\s*/g, "").replace(/```/g, "")
-        .replace(/^\s*[{\[].*[}\]]\s*$/s, "")
+        .replace(/\{[\s\S]*\}\s*$/, "")
+        // ...or a JSON object cut off mid-way (output limit reached).
+        .replace(/\{\s*"reply"[\s\S]*$/, "")
         .trim();
       parsed = {
         reply: cleanReply || "I understood your question but had trouble formatting my response. Could you rephrase that?",

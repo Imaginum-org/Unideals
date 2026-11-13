@@ -1,4 +1,5 @@
 import axios from "../../../services/axiosInstance";
+import { disablePushForLogout } from "../../../services/push.js";
 
 const AUTH_BASE_PATH = "/api/auth";
 
@@ -22,6 +23,9 @@ export const loginWithGoogleOneTap = (data) => {
 };
 
 export const logoutUser = async () => {
+  // Detach this browser from push first, while the session cookie still
+  // authenticates the request. Never blocks or fails the logout.
+  await disablePushForLogout();
   // Backend contract is POST-only (GET would be a logout-CSRF vector).
   return axios.post(`${AUTH_BASE_PATH}/logoutUser`);
 };

@@ -23,6 +23,10 @@ Object.assign(process.env, {
   GEMINI_MODEL: "mock-primary",
   GEMINI_FALLBACK_MODELS: "mock-fallback",
   GEMINI_TIMEOUT_MS: "1500",
+  // Groq stays off (and never reaches the real API) unless a test turns it on;
+  // its HTTP calls are mocked below.
+  GROQ_API_KEY: "",
+  GROQ_MODELS: "mock-groq-big,mock-groq-small",
   // This file sends far more than a student would in a minute.
   ASSISTANT_RATE_LIMIT_PER_MINUTE: "1000",
 });
@@ -59,10 +63,14 @@ const hang = (params) =>
     params.config?.abortSignal?.addEventListener("abort", () => reject(new Error("aborted")));
   });
 
+// What Gemini returns for an expired or invalid API key.
+const badKeyError = () => Object.assign(new Error("API key not valid. Please pass a valid API key. API_KEY_INVALID"), { status: 400 });
+
 ai.models.generateContent = (params) => {
   geminiCalls.push(params);
   if (geminiMode === "hang") return hang(params);
   if (geminiMode === "down") return Promise.reject(Object.assign(new Error("overloaded"), { status: 503 }));
+  if (geminiMode === "badkey") return Promise.reject(badKeyError());
   if (isWriter(params)) {
     const text = writerText(params);
     return Promise.resolve({ text, candidates: [{ content: { parts: [{ text }] } }] });
@@ -76,6 +84,7 @@ ai.models.generateContentStream = async (params) => {
   geminiCalls.push({ ...params, streamed: true });
   if (geminiMode === "hang") await hang(params);
   if (geminiMode === "down") throw Object.assign(new Error("overloaded"), { status: 503 });
+  if (geminiMode === "badkey") throw badKeyError();
   const text = writerText(params);
   // Small pieces, so the chips marker arrives split across chunks.
   const pieces = text.match(/[\s\S]{1,5}/g);
@@ -83,6 +92,34 @@ ai.models.generateContentStream = async (params) => {
     for (const piece of pieces) yield { text: piece };
   })();
 };
+
+// ── Groq mock (OpenAI-compatible HTTP API) ──
+//   "ok"         normal replies (the writer gets text + chips, the tool path JSON)
+//   "down"       every call is a 503
+//   "ratelimit"  the first model called is rate limited; the others answer
+let groqMode = "ok";
+const groqCalls = [];
+const realFetch = globalThis.fetch;
+const groqJson = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+globalThis.fetch = async (url, init = {}) => {
+  if (!String(url).startsWith("https://api.groq.com/")) return realFetch(url, init);
+  const body = JSON.parse(init.body);
+  groqCalls.push(body);
+  if (groqMode === "down") return groqJson(503, { error: { message: "Service unavailable" } });
+  if (groqMode === "ratelimit" && body.model === groqCalls[0].model) {
+    return groqJson(429, { error: { message: `Rate limit reached for model \`${body.model}\` on tokens per minute (TPM). Please try again in 30s.`, code: "rate_limit_exceeded" } });
+  }
+  const writer = String(body.messages[0]?.content || "").includes("@@CHIPS@@");
+  const content = writer
+    ? "Groq here! Found it for you.\n@@CHIPS@@\nCheaper ones\nIs it negotiable?"
+    : JSON.stringify({ reply: "Groq answer: inspect before you pay.", intent: "advice", suggestions: ["More tips"] });
+  if (body.stream) {
+    const sse = content.match(/[\s\S]{1,6}/g).map((piece) => `data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n\n`).join("") + "data: [DONE]\n\n";
+    return new Response(sse, { status: 200, headers: { "content-type": "text/event-stream" } });
+  }
+  return groqJson(200, { choices: [{ message: { role: "assistant", content } }] });
+};
+const { resetAIProviderState } = await import(B + "src/services/assistant.gemini.js");
 
 let passed = 0;
 let failed = 0;
@@ -252,6 +289,89 @@ await test("when Gemini is down the student still gets the app's answer", async 
   assert.equal(r.body.data.intent, "product_search");
   assert.ok(r.body.data.reply);
 });
+
+// ── Groq failsafe ──
+
+const withGroq = async (fn) => {
+  process.env.GROQ_API_KEY = "test-groq-key";
+  resetAIProviderState();
+  groqCalls.length = 0;
+  try {
+    await fn();
+  } finally {
+    process.env.GROQ_API_KEY = "";
+    geminiMode = "echo";
+    groqMode = "ok";
+    resetAIProviderState();
+  }
+};
+
+await test("Groq: when Gemini is down, Groq writes the reply (JSON, streaming and the tool path)", () =>
+  withGroq(async () => {
+    geminiMode = "down";
+    const r = await ask(bharat, { message: "hero cycle" });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data.aiPowered, true);
+    assert.match(r.body.data.model, /^groq:/);
+    assert.match(r.body.data.reply, /^Groq here!/);
+    assert.deepEqual(r.body.data.suggestions, ["Cheaper ones", "Is it negotiable?"]);
+    assert.equal(r.body.data.products[0].title, "Hero cycle", "cards still come from the search");
+
+    const s = await askStream(null, { message: "study lamp" });
+    const streamed = s.events.filter((e) => e.event === "delta").map((e) => e.data.text).join("");
+    assert.equal(streamed.trim(), "Groq here! Found it for you.", "streamed from Groq, chips marker held back");
+    assert.match(s.events.at(-1).data.data.model, /^groq:/);
+
+    const t = await ask(null, { message: "Is Unideals a good idea for my roommate too?" });
+    assert.match(t.body.data.reply, /Groq answer/);
+    const toolCall = groqCalls.find((c) => c.tools);
+    assert.ok(toolCall, "the tool-calling path reached Groq with its tools");
+    assert.equal(toolCall.tools[0].function.parameters.type, "object", "Gemini schema types converted to JSON Schema");
+  }));
+
+await test("Groq: an expired Gemini key switches to Groq, and Gemini is skipped after that", () =>
+  withGroq(async () => {
+    geminiMode = "badkey";
+    const first = await ask(bharat, { message: "lamp for my desk" });
+    assert.match(first.body.data.model, /^groq:/);
+    const geminiCallsBefore = geminiCalls.length;
+    const second = await ask(asha, { message: "cycle for campus" });
+    assert.match(second.body.data.model, /^groq:/);
+    assert.equal(geminiCalls.length, geminiCallsBefore, "a bad key pauses Gemini instead of failing on every message");
+  }));
+
+await test("Groq: a rate-limited model hands over to the next Groq model", () =>
+  withGroq(async () => {
+    geminiMode = "down";
+    groqMode = "ratelimit";
+    const r = await ask(bharat, { message: "a desk lamp please" });
+    const limited = groqCalls[0].model;
+    assert.match(r.body.data.model, /^groq:/);
+    assert.notEqual(r.body.data.model, `groq:${limited}`, "answered by the other Groq model");
+    const callsBefore = groqCalls.length;
+    await ask(asha, { message: "any cycle around" });
+    assert.ok(groqCalls.slice(callsBefore).every((c) => c.model !== limited), "the limited model is skipped until its retry time");
+  }));
+
+await test("Groq: with Gemini and Groq both down, the student still gets the app's answer", () =>
+  withGroq(async () => {
+    geminiMode = "down";
+    groqMode = "down";
+    const r = await ask(bharat, { message: "study lamp for hostel" });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data.intent, "product_search");
+    assert.equal(r.body.data.aiPowered, false);
+    assert.ok(r.body.data.products.length);
+  }));
+
+await test("Groq: photos and voice notes are never sent to Groq", () =>
+  withGroq(async () => {
+    geminiMode = "down";
+    const r = await ask(null, { message: "what is this?", attachments: [{ mimeType: "image/jpeg", data: "data:image/jpeg;base64,/9j/4AAQ" }] });
+    assert.equal(r.status, 200);
+    // Groq may reword the "couldn't read that photo" message, but never sees the photo.
+    assert.ok(groqCalls.every((c) => !JSON.stringify(c).includes("/9j/4AAQ")), "the image never reaches Groq");
+  }));
 
 await test("unrelated questions go to Gemini instead of a fixed refusal; manipulation attempts don't", async () => {
   geminiCalls.length = 0;

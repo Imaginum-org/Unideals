@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, BellOff, Check, CheckCheck, X } from "lucide-react";
+import { ArrowUpRight, BellOff, BellRing, Check, CheckCheck, X } from "lucide-react";
 import { useNotification } from "../../../context/NotificationContext.jsx";
 import { formatNotificationTime, getNotificationMeta } from "../utils/notificationMeta.js";
 import {
@@ -16,9 +16,27 @@ import { cn } from "../../../utils/cn.js";
 
 export default function Notification() {
   const navigate = useNavigate();
-  const { notifications, unreadCount, loading, error, markRead, markAllRead, openNotification, dismiss, fetchNotifications } =
-    useNotification();
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    error,
+    markRead,
+    markAllRead,
+    openNotification,
+    dismiss,
+    fetchNotifications,
+    pushPermission,
+    turnOnPush,
+  } = useNotification();
   const [filter, setFilter] = useState("all");
+  const [enablingPush, setEnablingPush] = useState(false);
+
+  const handleTurnOnPush = async () => {
+    setEnablingPush(true);
+    await turnOnPush();
+    setEnablingPush(false);
+  };
 
   const visible = useMemo(
     () => (filter === "unread" ? notifications.filter((n) => n.unread) : notifications),
@@ -39,6 +57,26 @@ export default function Notification() {
         </button>
       }
     >
+      {pushPermission === "default" && (
+        <div className={cn(CARD, "mb-4 flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5")}>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-text)]">
+            <BellRing className="h-[18px] w-[18px]" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold text-slate-900 dark:text-white">Get alerts when Unideals is closed</p>
+            <p className="text-[12.5px] text-slate-500 dark:text-zinc-400">New offers, messages and deal updates on this device.</p>
+          </div>
+          <button type="button" onClick={handleTurnOnPush} disabled={enablingPush} className={btnSecondary}>
+            {enablingPush ? "Turning on…" : "Turn on"}
+          </button>
+        </div>
+      )}
+      {pushPermission === "denied" && (
+        <p className="mb-4 rounded-lg bg-neutral-100 px-3.5 py-2.5 text-[12.5px] text-slate-600 dark:bg-white/5 dark:text-zinc-300">
+          Notifications are blocked for this site. To get alerts when Unideals is closed, allow them in your browser&apos;s site settings.
+        </p>
+      )}
+
       <TabBar
         className="mb-4"
         ariaLabel="Filter notifications"

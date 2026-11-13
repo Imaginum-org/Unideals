@@ -219,6 +219,40 @@ await test("legacy rows without sent_at still show in the feed", async () => {
   assert.ok((await feed(Bu)).notifications.some((x) => x.id === String(insertedId)));
 });
 
+console.log("\nPush device tokens");
+const push = await import(B + "src/services/push.service.js");
+const { default: DeviceToken } = await import(B + "src/models/DeviceToken.model.js");
+await DeviceToken.init();
+const tok = (i) => `fcm-token-${String(i).padStart(30, "0")}`;
+
+await test("push is off without PUSH_ENABLED, and sending is a silent no-op", async () => {
+  assert.equal(push.isPushEnabled(), false);
+  assert.equal(await push.pushToUsers([Bu], { id: "x", title: "t", message: "m" }), null);
+});
+
+await test("a token belongs to whoever registered it last", async () => {
+  await push.registerDeviceToken({ userId: Bu, token: tok(1), platform: "web" });
+  await push.registerDeviceToken({ userId: S, token: tok(1), platform: "web" });
+  const rows = await DeviceToken.find({ token: tok(1) }).lean();
+  assert.equal(rows.length, 1);
+  assert.equal(String(rows[0].user_id), S);
+});
+
+await test("only the owner can unregister a token", async () => {
+  await push.unregisterDeviceToken({ userId: Bu, token: tok(1) });
+  assert.equal(await DeviceToken.countDocuments({ token: tok(1) }), 1);
+  await push.unregisterDeviceToken({ userId: S, token: tok(1) });
+  assert.equal(await DeviceToken.countDocuments({ token: tok(1) }), 0);
+});
+
+await test("bad input is rejected and each user keeps at most 10 devices", async () => {
+  await assert.rejects(push.registerDeviceToken({ userId: Bu, token: "short", platform: "web" }), /Invalid push token/);
+  await assert.rejects(push.registerDeviceToken({ userId: Bu, token: tok(2), platform: "desktop" }), /Invalid platform/);
+  for (let i = 10; i < 22; i++) await push.registerDeviceToken({ userId: Bu, token: tok(i), platform: "android" });
+  assert.equal(await DeviceToken.countDocuments({ user_id: buyer._id }), 10);
+  assert.equal(await DeviceToken.countDocuments({ token: tok(21) }), 1, "newest kept");
+});
+
 await mongoose.disconnect();
 await mongod.stop();
 console.log(`\n${passed} passed, ${failed} failed`);

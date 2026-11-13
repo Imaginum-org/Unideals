@@ -29,6 +29,7 @@
     "browser-image-compression": "^2.0.2",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "firebase": "^12.19.0",
     "framer-motion": "^12.40.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.475.0",

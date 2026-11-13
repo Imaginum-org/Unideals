@@ -8,6 +8,7 @@ import Deal from "../models/deal.model.js";
 import Review from "../models/Review.model.js";
 import Report from "../models/Report.model.js";
 import Notification, { NotificationReceipt } from "../models/Notification.model.js";
+import DeviceToken from "../models/DeviceToken.model.js";
 import Payment from "../models/Payment.model.js";
 import Subscription from "../models/Subscription.model.js";
 import Boost from "../models/Boost.model.js";
@@ -124,6 +125,7 @@ export const deleteUserPermanently = async ({ userId, actor, confirmEmail, reaso
     PickupSpot.deleteMany({ user: uid }),
     StaffAccess.deleteMany({ user_id: uid }),
     AssistantConversation.deleteMany({ user_id: uid }),
+    DeviceToken.deleteMany({ user_id: uid }), // keep last: `removed` reads results by index
   ]);
   const count = (i) => results[i]?.deletedCount || 0;
   const removed = {

@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { notificationApi } from "../features/notification/api/notificationApi.js";
 import {
   followNotificationTarget,
@@ -15,6 +16,7 @@ import {
 import { useUser } from "./useUserContext.jsx";
 import { toast } from "../components/ui/toast.js";
 import { acquireSocket, releaseSocket } from "../services/realtime.js";
+import { enablePush, getPushPermission, syncPush } from "../services/push.js";
 
 const NotificationContext = createContext(null);
 const MAX_ITEMS = 100;
@@ -49,6 +51,7 @@ export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pushPermission, setPushPermission] = useState(getPushPermission);
   const mountedRef = useRef(true);
   const listRef = useRef(notifications);
   listRef.current = notifications;
@@ -85,6 +88,9 @@ export function NotificationProvider({ children }) {
 
     setLoading(true);
     fetchNotifications();
+    // Already allowed on an earlier visit: refresh this browser's push token
+    // (tokens rotate) and make sure it's linked to the account now logged in.
+    syncPush();
 
     // Live items arrive via "notification:new"; a full re-sync is only needed
     // after a real gap (reconnect, tab coming back), and never twice in 30s —
@@ -196,6 +202,45 @@ export function NotificationProvider({ children }) {
     [markRead, trackClick],
   );
 
+  // Must run from a click: browsers ignore permission prompts that aren't.
+  const turnOnPush = useCallback(async () => {
+    try {
+      const result = await enablePush();
+      setPushPermission(result);
+      if (result === "granted") toast.success("Notifications turned on for this browser.");
+      else if (result === "denied") toast.error("Notifications are blocked. Allow them in your browser's site settings.");
+      return result;
+    } catch (pushError) {
+      console.error("Failed to turn on push:", pushError);
+      toast.error("Couldn't turn on notifications. Please try again.");
+      setPushPermission(getPushPermission());
+      return "error";
+    }
+  }, []);
+
+  // A system notification was clicked: /push-sw.js opened the page with
+  // ?from_push=<id>. Record the click, mark it read, and drop the param.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (userLoading || !isLoggedIn) return;
+    const params = new URLSearchParams(location.search);
+    const id = params.get("from_push");
+    if (id === null) return;
+    params.delete("from_push");
+    const search = params.toString();
+    navigate(
+      { pathname: location.pathname, search: search ? `?${search}` : "", hash: location.hash },
+      { replace: true, state: location.state },
+    );
+    if (!/^[a-f\d]{24}$/i.test(id)) return;
+    trackClick(id);
+    notificationApi
+      .markRead(id)
+      .then(fetchNotifications)
+      .catch(() => {}); // already read, dismissed or expired: nothing to fix
+  }, [location, isLoggedIn, userLoading, navigate, trackClick, fetchNotifications]);
+
   const unreadCount = useMemo(() => notifications.filter((n) => n.unread).length, [notifications]);
 
   const value = useMemo(
@@ -210,8 +255,10 @@ export function NotificationProvider({ children }) {
       dismiss,
       openNotification,
       fetchNotifications,
+      pushPermission,
+      turnOnPush,
     }),
-    [notifications, unreadCount, loading, error, markRead, markAllRead, trackClick, dismiss, openNotification, fetchNotifications],
+    [notifications, unreadCount, loading, error, markRead, markAllRead, trackClick, dismiss, openNotification, fetchNotifications, pushPermission, turnOnPush],
   );
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;

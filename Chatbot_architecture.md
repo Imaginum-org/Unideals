@@ -269,13 +269,22 @@ It never includes a phone number, email, address or anyone else's details.
 
 ## 6. The Gemini layer
 
-`assistant.gemini.js`.
+`assistant.gemini.js` (routing, timeouts, health) and `assistant.groq.js` (the Groq adapter).
+
+**Providers: Gemini first, Groq as the failsafe**
+- Every AI call walks one chain of models: the Gemini models, then the Groq models (`groq:<model>`). A failure hands over to the next model within the turn's time budget, so an expired Gemini key, a used-up quota or an overload means Groq answers instead.
+- Groq is reached over its OpenAI-compatible HTTP API with plain `fetch` (no SDK). `assistant.groq.js` translates Gemini-style requests (contents, system prompt, function tools, JSON mode) to OpenAI messages and back, so no caller changes.
+- **Photos and voice notes stay on Gemini.** Groq is text only here; with Gemini down, media gets the "type the product name instead" reply.
+- Groq's models are reasoning models: they're sent `reasoning_effort: "low"` with 512 extra tokens, and a note that a final JSON answer goes in the message text (gpt-oss otherwise tries to "call a tool named JSON"). An invalid tool call (`tool_use_failed`) is retried once as a plain answer.
+- `node scripts/check-ai-providers.mjs` pings every model in the chain and lists the chat models your Groq key can use.
 
 **Models**
 - **Tool-calling path**:
   - primary `GEMINI_MODEL` (default `gemini-flash-latest`);
-  - then `GEMINI_FALLBACK_MODELS` (default `gemini-flash-lite-latest`).
-- **Reply writer**: the fast model first, then the primary. Override with `GEMINI_COMPOSE_MODELS`.
+  - then `GEMINI_FALLBACK_MODELS` (default `gemini-flash-lite-latest`);
+  - then `GROQ_MODELS` in order (default `openai/gpt-oss-120b`, `openai/gpt-oss-20b`).
+- **Reply writer**: the fast Gemini model first, then the primary, then Groq **smallest first** (rewrites are the high-volume call, and each Groq model has its own per-minute token limit, so this spreads the load). Override the Gemini part with `GEMINI_COMPOSE_MODELS`.
+- In November 2026 the free Groq key offered `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b` and `allam-2-7b` (no Llama chat models). `gpt-oss-120b` was limited to 8,000 tokens a minute; a tool-calling turn uses about 2,000.
 - In November 2026 the `-lite-latest` alias resolved to `gemini-3.5-flash-lite`.
 - `thinkingBudget: 0` is **rejected** (400) by that model, so no thinking settings are sent.
 
@@ -284,11 +293,13 @@ It never includes a phone number, email, address or anyone else's details.
 - **Per turn**: 20 s across everything: tool rounds, model fallbacks and the writer.
 - **Writer**: its first words must arrive within 8 s. Once text is flowing, it may continue until the turn's deadline (`streamGeminiWithFallback`, two clocks). A failure part-way through still ends with the `done` event carrying the draft.
 
-**Errors** (`noteFailure`)
-- **429 / `RESOURCE_EXHAUSTED`**: a 60 s circuit breaker turns on.
-- **400 / 401 / 403**: stop trying.
-- **Timeout, 500 or 503**: that model is parked for 2 minutes.
+**Errors** (`noteFailure`). None of them stops the chain: a problem with one provider is exactly when the other should answer.
+- **Bad, expired or revoked key** (401, 403, or Gemini's 400 `API_KEY_INVALID`): that whole **provider** is paused for 10 minutes.
+- **429 / `RESOURCE_EXHAUSTED`**: quotas are per model, so only that **model** is skipped: for the provider's own "try again in…" time (2–60 s), or 15 minutes when a daily quota is used up.
+- **Timeout, 500, 502 or 503**: that model is parked for 2 minutes (still tried if nothing else is left).
 - **404**: that model is parked for 30 minutes.
+- **Anything else** (e.g. a 400 one model didn't like): the next model is tried.
+- `isAIAvailable()` (exported as `isGeminiAvailable` too, for older callers) is true while any model in the chain can be called; when it's false, the app's own wording is used without waiting.
 
 **Tool-calling path** (`answerWithGemini`)
 - `temperature: 0.6`, `maxOutputTokens: 1024`.
@@ -462,6 +473,7 @@ Plan prices must **not** be copied into the knowledge base. Live prices come fro
   - the message, the recent history, and any photo or audio;
   - the student context (first name, campus, plan, own listings, counts);
   - the listings found.
+- **Sent to Groq** (only when Gemini can't answer and `GROQ_API_KEY` is set): the same text as above, **never photos or audio**. The Privacy Policy's "Who we share it with" needs Groq added before this goes live.
 - **Never sent**: phone numbers, emails, or other users' details.
 - **Stored by Unideals**: signed-in chats only, masked, for 90 days.
 - The Privacy Policy (`frontend/src/features/legal/content/legalContent.js`) covers this under "What we collect", "How we use it", "Who we share it with", "How long we keep it" and "Deleting your account".
@@ -487,7 +499,9 @@ Both need a signed-in user and are limited to 10 requests a minute. **Neither is
 | `GEMINI_MODEL` | `gemini-flash-latest` | Primary model for the tool-calling path |
 | `GEMINI_FALLBACK_MODELS` | `gemini-flash-lite-latest` | Comma-separated models tried in order |
 | `GEMINI_COMPOSE_MODELS` | fallbacks, then the primary | Models for the reply writer, fastest first |
-| `GEMINI_TIMEOUT_MS` | `30000` | Per-call timeout, capped at 9 s by the service |
+| `GEMINI_TIMEOUT_MS` | `30000` | Per-call timeout, capped at 9 s by the service (applies to Groq calls too) |
+| `GROQ_API_KEY` | none | Turns on Groq as the failsafe provider. Without it, the chain is Gemini only |
+| `GROQ_MODELS` | `openai/gpt-oss-120b,openai/gpt-oss-20b` | Groq models tried in order after Gemini. Check what your key offers with `node scripts/check-ai-providers.mjs` |
 | `ASSISTANT_RATE_LIMIT_PER_MINUTE` | `30` | Assistant messages per account (guests: per IP) per minute |
 
 ---
@@ -558,7 +572,8 @@ Both need a signed-in user and are limited to 10 requests a minute. **Neither is
 
 | Command (from `backend/`) | What it covers |
 | --- | --- |
-| `node tests/assistant.integration.test.mjs` | 23 HTTP tests with Gemini mocked. **Phase 0**: small talk, trending, 400s, no cross-user cache leak, abort on a hung model. **Phase 1**: the writer rewrites with cards unchanged, the context is passed without contact details, an invented price is rejected, the draft is used when Gemini is down, the off-topic and injection handling, chips and language helpers, streaming (signed in and guest), the expired-login 401. **Phase 2**: saving with masking, guests never stored, server-side history beats client history, 404 for other people's chats, list and reopen, feedback, delete one and all, the 90-day TTL index, masking cases |
+| `node scripts/check-ai-providers.mjs` | Live: pings every Gemini and Groq model in the chain with the real keys, and lists the chat models the Groq key can use |
+| `node tests/assistant.integration.test.mjs` | 29 HTTP tests with Gemini and Groq mocked (the real Groq key is blanked, so tests never call it). **Groq failsafe**: Groq writes the reply when Gemini is down (JSON, streaming, tool path with converted schemas), an expired Gemini key pauses Gemini, a rate-limited Groq model hands over to the next, both down still gives the app's answer, photos never reach Groq. The rest: **Phase 0**: small talk, trending, 400s, no cross-user cache leak, abort on a hung model. **Phase 1**: the writer rewrites with cards unchanged, the context is passed without contact details, an invented price is rejected, the draft is used when Gemini is down, the off-topic and injection handling, chips and language helpers, streaming (signed in and guest), the expired-login 401. **Phase 2**: saving with masking, guests never stored, server-side history beats client history, 404 for other people's chats, list and reopen, feedback, delete one and all, the 90-day TTL index, masking cases |
 | `node tests/userDeletion.integration.test.mjs` | Also checks that account deletion removes the student's AI chats and leaves others' alone |
 | `node scripts/test-policy-knowledge.mjs` | 30 knowledge base matching cases, 18 policy tool topics, the scope guard and live pricing |
 | `node scripts/smoke-assistant.mjs` | Product-search smoke test; needs a MongoDB with data |

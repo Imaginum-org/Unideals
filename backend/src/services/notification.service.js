@@ -29,6 +29,7 @@ import {
   onlineUserIdsIn,
 } from "../utils/socket.js";
 import { AppError } from "../utils/appError.js";
+import { pushToUserFilter, pushToUsers } from "./push.service.js";
 
 const EVENT = "notification:new";
 const SENDING_STALE_MS = 10 * 60 * 1000; // a "sending" row older than this crashed mid-dispatch
@@ -131,7 +132,9 @@ const sendDirect = async (input) => {
   if (!input?.recipientId) return null;
   try {
     const notification = await Notification.create(directDoc(input));
-    emitToUser(input.recipientId, EVENT, toClientNotification(notification));
+    const payload = toClientNotification(notification);
+    emitToUser(input.recipientId, EVENT, payload);
+    pushToUsers([input.recipientId], { ...payload, tag: input.groupKey }); // best-effort, never throws
     return notification;
   } catch (error) {
     console.error(`Failed to send "${input.type || "general"}" notification:`, error?.message);
@@ -178,7 +181,10 @@ export const notifyNewMessage = async ({ conversationId, senderId, receiverId, s
     if (grouped) {
       grouped.title = clip(`${grouped.group_count} new messages from ${name}`, 100);
       await Notification.updateOne({ _id: grouped._id }, { $set: { title: grouped.title } });
-      emitToUser(receiverId, EVENT, toClientNotification(grouped));
+      const payload = toClientNotification(grouped);
+      emitToUser(receiverId, EVENT, payload);
+      // Same tag as the first alert, so the OS replaces it instead of stacking.
+      pushToUsers([receiverId], { ...payload, tag: groupKey });
       return grouped;
     }
 
@@ -329,6 +335,10 @@ export const notifyPriceDrop = async ({ productId, productTitle, oldPrice, newPr
     );
     for (const notification of notifications) {
       emitToUser(notification.recipient_id, EVENT, toClientNotification(notification));
+    }
+    if (notifications.length) {
+      // Same text for everyone, so one multicast instead of a call per user.
+      pushToUsers(recipients, { ...toClientNotification(notifications[0]), id: "", tag: groupKey });
     }
     return notifications;
   } catch (error) {
@@ -520,6 +530,8 @@ export const dispatchNotificationDocument = async (notification) => {
   if (notification.target_audience === "all") emitToAll(EVENT, payload);
   else if (notification.target_audience === "campus") emitToCampus(notification.target_campus, EVENT, payload);
   else emitToUsers(audience.userIds, EVENT, payload);
+  // System push to the same audience, in the background (can be thousands of devices).
+  pushToUserFilter(audience.filter, { ...payload, tag: `campaign:${payload.id}` });
 
   return notification;
 };
