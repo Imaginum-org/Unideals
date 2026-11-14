@@ -25,7 +25,15 @@ export default function Deals() {
     setError(false);
     try {
       const res = await getBoostedProducts({ campus_slug: campusSlug, limit: 48, ...(girls ? { audience: "girls_only" } : {}) });
-      const list = (res.data?.data || []).filter((p) => (girls ? p.isGirlsOnly === true : true));
+      // Guard against a cached response: only listed items whose boost is still live.
+      const now = Date.now();
+      const list = (res.data?.data || []).filter(
+        (p) =>
+          (girls ? p.isGirlsOnly === true : true) &&
+          (p.status ?? "listed") === "listed" &&
+          p.boost_expires_at &&
+          new Date(p.boost_expires_at).getTime() > now,
+      );
       // Ending soonest first: that's what makes them "limited time".
       list.sort((a, b) => new Date(a.boost_expires_at) - new Date(b.boost_expires_at));
       setItems(list);
@@ -48,7 +56,7 @@ export default function Deals() {
   return (
     <div className="min-h-[100dvh] bg-[#F7F8FA] pb-24 font-figtree text-slate-900 dark:bg-[#131313] dark:text-white">
       <Seo title="Limited time deals | Unideals" />
-      <div className="mx-auto w-full max-w-[1380px] px-5 pt-5 sm:px-[4.5vw] lg:pt-8 2xl:px-0">
+      <div className="mx-auto w-full max-w-[calc(var(--page-max)+9vw)] px-5 pt-5 sm:px-[4.5vw] lg:pt-8 2xl:max-w-[var(--page-max)] 2xl:px-0">
         <BrowseHeader
           breadcrumbs={[{ label: "Home", to: "/" }, { label: "Limited time deals" }]}
           title="Limited time deals"

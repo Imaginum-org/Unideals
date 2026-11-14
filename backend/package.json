@@ -22,7 +22,9 @@
     "test:assistant": "node tests/assistant.integration.test.mjs",
     "test:campus-scope": "node tests/campusScope.integration.test.mjs",
     "test:notifications": "node tests/notifications.integration.test.mjs",
-    "test:user-deletion": "node tests/userDeletion.integration.test.mjs"
+    "test:user-deletion": "node tests/userDeletion.integration.test.mjs",
+    "test:boosted": "node tests/boosted.integration.test.mjs",
+    "test:labs": "node tests/labs.integration.test.mjs"
   },
   "keywords": [
     "nodejs",

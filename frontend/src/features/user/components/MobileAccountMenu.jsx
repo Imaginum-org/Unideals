@@ -13,6 +13,7 @@ import {
   Settings,
   ShoppingBag,
   Trophy,
+  PlayCircle,
 } from "lucide-react";
 import { useUser, clearAccountScopedStorage } from "../../../context/useUserContext.jsx";
 import { useNotification } from "../../../context/NotificationContext.jsx";
@@ -46,6 +47,7 @@ const GROUPS = [
   {
     title: "Support",
     items: [
+      { to: "/guides", label: "Video guides", icon: PlayCircle },
       { to: "/faq", label: "FAQ", icon: CircleHelp },
       { to: "/contact", label: "Help & support", icon: LifeBuoy },
       { to: "/termscondition", label: "Terms & privacy", icon: FileText },

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, BadgePercent, Building2, CheckCircle2, IndianRupee, MapPin, Plus, ShieldCheck, Sparkles, Wallet } from "lucide-react";
 import Select from "../../../components/ui/Select.jsx";
 import PriceInsights from "../components/PriceInsights.jsx";
+import { useLabs } from "../../../services/labs.js";
 import { toast } from "../../../components/ui/toast.js";
 import axios from "../../../services/axiosInstance";
 import useProductListing from "../hooks/useProductListing";
@@ -146,7 +147,12 @@ const PricingStep = () => {
   const discount = original > selling && selling > 0 ? Math.round(((original - selling) / original) * 100) : 0;
   const onlyDigits = (v) => v.replace(/[^0-9]/g, "").slice(0, 8);
   const suggested = suggestPrice(formData);
-  const showSuggestion = suggested && Number(formData.sellingPrice) !== suggested;
+  // One suggestion per seller: Pro / Pro+ get the market-based card below
+  // (with this rule-of-thumb only as its labelled fallback); Free sellers
+  // get the rule-of-thumb chip, labelled as a typical estimate.
+  const { has: hasLab } = useLabs();
+  const smartPricing = hasLab("price_insights");
+  const showSuggestion = !smartPricing && suggested && Number(formData.sellingPrice) !== suggested;
 
   const priceInput = (field, id, placeholder) => (
     <div className="relative">
@@ -194,7 +200,7 @@ const PricingStep = () => {
                   className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-soft-strong)]"
                 >
                   <Sparkles className="h-3 w-3" aria-hidden="true" />
-                  Use suggested ₹{suggested.toLocaleString("en-IN")}
+                  Typical resale: use ₹{suggested.toLocaleString("en-IN")}
                 </button>
               )}
             </Field>
@@ -222,6 +228,9 @@ const PricingStep = () => {
             <PriceInsights
               category={formData.category}
               condition={formData.condition}
+              originalPrice={formData.originalPrice}
+              estimate={suggested}
+              currentPrice={formData.sellingPrice}
               onUsePrice={(value) => updateField("sellingPrice", String(value))}
             />
           </div>
@@ -341,8 +350,22 @@ const PricingStep = () => {
               type="checkbox"
               checked={formData.termsAccepted}
               onChange={(e) => handleTermsChange(e.target.checked)}
-              className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer rounded accent-[var(--accent)]"
+              className="peer sr-only"
             />
+            {/* Custom box: white by default (the native one renders dark),
+                brand colour + tick when checked, focus ring for keyboards. */}
+            <span
+              aria-hidden="true"
+              className={`mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent-ring)] peer-focus-visible:ring-offset-1 ${
+                formData.termsAccepted
+                  ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                  : `bg-white text-transparent dark:bg-white/10 ${errors.termsAccepted ? "border-red-400" : "border-slate-300 hover:border-slate-400 dark:border-white/25"}`
+              }`}
+            >
+              <svg viewBox="0 0 12 12" className="h-3 w-3">
+                <path d="M2.5 6.2 5 8.6 9.5 3.6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
             <span className="text-[13.5px] leading-relaxed text-slate-600 dark:text-zinc-300">
               I agree to the{" "}
               <button

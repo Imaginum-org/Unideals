@@ -192,16 +192,30 @@ const useCompact = () => {
   return compact;
 };
 
-export default function GirlsEntryPill({ tab, onChange }) {
+// Session-only memory of a manual collapse. Lives in module scope, so it
+// survives in-app navigation (Explore, categories stay collapsed) but resets
+// on a full refresh. Home passes resetOnMount, so landing on Home always
+// opens the panel again.
+let userCollapsed = false;
+
+export default function GirlsEntryPill({ tab, onChange, resetOnMount = false }) {
   const { girlsMode, setGirlsMode } = useGirlsMode();
   const { userDetails, isLoggedIn } = useUser();
   // Start collapsed when Girl Mode is already on (no open-then-close slide
   // on every page load); otherwise open so the feature is discoverable.
   // Phones start collapsed too: the open panel would cover most of a small
   // screen; the edge handle alone stays discoverable.
-  const [expanded, setExpanded] = useState(
-    () => tab !== "girls" && (typeof window === "undefined" || window.innerWidth >= 640),
-  );
+  const [expanded, setExpandedState] = useState(() => {
+    if (resetOnMount) userCollapsed = false;
+    return !userCollapsed && tab !== "girls" && (typeof window === "undefined" || window.innerWidth >= 640);
+  });
+  // User-driven open/close also updates the session memory.
+  const setExpanded = (next) =>
+    setExpandedState((prev) => {
+      const value = typeof next === "function" ? next(prev) : next;
+      userCollapsed = !value;
+      return value;
+    });
   const handleRef = useRef(null);
   const rootRef = useRef(null);
   const compact = useCompact();
@@ -220,7 +234,7 @@ export default function GirlsEntryPill({ tab, onChange }) {
 
   // Girl Mode ON → auto-collapse so only the handle remains visible.
   useEffect(() => {
-    if (isOn) setExpanded(false);
+    if (isOn) setExpandedState(false);
   }, [isOn]);
 
   // Escape collapses the open panel (focus returns to the handle).

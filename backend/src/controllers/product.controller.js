@@ -3,6 +3,8 @@ import { resolveRequestCampus } from "../services/campus.service.js";
 import { deleteImageSafely } from "../utils/imagekit.js";
 import { forwardServiceError } from "../utils/response.js";
 import Product from "../models/Product.model.js";
+import User from "../models/User.model.js";
+import Deal from "../models/deal.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
 import { computeAndAwardBadges } from "../services/badgeService.js";
 import { getAuthCookieOptions } from "../services/auth.service.js";
@@ -28,6 +30,19 @@ export const createProduct = async (req, res) => {
     const user = req.user;
     const data = req.body;
 
+    // "First listing" = this account has never had a listing live before.
+    // Read before creating (the save hook stamps first_listed_at), and fall
+    // back to history for accounts not yet backfilled. Counting *current*
+    // listings re-celebrated sellers whose first item had already sold.
+    const before = await User.findById(user._id).select("first_listed_at").lean();
+    let hadListed = Boolean(before?.first_listed_at);
+    if (!hadListed) {
+      hadListed = Boolean(
+        (await Product.exists({ seller_id: user._id, status: { $ne: PRODUCT_STATUS.DRAFT } })) ||
+          (await Deal.exists({ "sale.seller_id": user._id })),
+      );
+    }
+
     const product = await productService.createProduct(data, user);
 
     let gamification = null;
@@ -37,13 +52,7 @@ export const createProduct = async (req, res) => {
       console.error("Error updating gamification on createProduct:", gamifyErr);
     }
 
-    const productCount = await Product.countDocuments({
-      seller_id: user._id,
-      status: PRODUCT_STATUS.LISTED,
-      is_deleted: false,
-    });
-
-    const isFirstListing = productCount === 1;
+    const isFirstListing = product?.status === PRODUCT_STATUS.LISTED && !hadListed;
 
     return res.status(201).json({
       success: true,
@@ -188,7 +197,9 @@ export const getBoostedProducts = async (req, res, next) => {
     const products = await productService.getBoostedProducts(campus._id, req.user?.gender ?? null, req.user?.role ?? null, req.query?.audience ?? null, req.query?.limit);
 
     // Same content per campus URL for every viewer — edge-cacheable.
-    res.set("Cache-Control", "public, max-age=60, s-maxage=300");
+    // Revalidate every time (ETag → cheap 304s): a sold, unlisted or expired
+    // boost must leave the rail now, not after a browser/CDN cache window.
+    res.set("Cache-Control", "public, no-cache");
     return res.status(200).json({
       success: true,
       message: "Boosted products fetched successfully",

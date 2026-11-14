@@ -1,6 +1,8 @@
 import bcrypt from "bcrypt";
 import userModel from "../models/User.model.js";
-import { USER_STATUS } from "../config/constants.js";
+import { PRODUCT_STATUS, USER_STATUS } from "../config/constants.js";
+import Product from "../models/Product.model.js";
+import Deal from "../models/deal.model.js";
 import { deleteImageSafely, getFileOwnership } from "../utils/imagekit.js";
 import { safeErrorMessage } from "../utils/response.js";
 import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges } from "../services/badgeService.js";
@@ -47,6 +49,21 @@ export const getUserProfile = async (req, res) => {
         success: false,
         error: true,
       });
+    }
+
+    // Older accounts: derive "first listed" once from their history
+    // (deleted/sold listings included), then it's stored for good.
+    if (!user.first_listed_at) {
+      const first = await Product.findOne({ seller_id: userId, status: { $ne: PRODUCT_STATUS.DRAFT } })
+        .sort({ createdAt: 1 })
+        .select("createdAt")
+        .lean();
+      const sale = first ? null : await Deal.findOne({ "sale.seller_id": userId }).select("completed_at").lean();
+      const at = first?.createdAt || sale?.completed_at || null;
+      if (at) {
+        user.first_listed_at = at;
+        userModel.updateOne({ _id: userId, first_listed_at: null }, { $set: { first_listed_at: at } }).catch(() => {});
+      }
     }
 
     if (user.gamification) {

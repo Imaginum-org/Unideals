@@ -27,6 +27,7 @@ import {
 import AnimatedOfferPrice from "../../payment/components/AnimatedOfferPrice.jsx";
 import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
+import BoostAddons from "../../payment/components/BoostAddons.jsx";
 
 const PLAN_TIER = {
   free: "base_user",
@@ -566,7 +567,7 @@ const PricingModel = () => {
               </div>
 
               {/* Comparison table */}
-              <table className="relative z-20 w-full table-fixed overflow-hidden rounded-xl bg-[#F7F8FA] text-left shadow-[0_24px_60px_-24px_rgba(15,23,42,0.22)] dark:bg-[#1A1D20] dark:shadow-none">
+              <table className="relative z-20 w-full table-fixed overflow-hidden rounded-xl bg-white text-left shadow-[0_1px_3px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80 dark:bg-[#1A1D20] dark:shadow-none dark:ring-white/10">
                 <colgroup>
                   <col className="w-[32%]" />
                   <col className="w-[22%]" />
@@ -576,7 +577,7 @@ const PricingModel = () => {
 
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-white/10">
-                    <th className="sticky left-0 z-10 bg-[#F7F8FA] dark:bg-[#1A1D20] px-7 py-6 text-sm font-semibold text-slate-900 dark:text-white font-figtree">
+                    <th className="sticky left-0 z-10 bg-white dark:bg-[#1A1D20] px-7 py-6 text-sm font-semibold text-slate-900 dark:text-white font-figtree">
                       Features
                     </th>
                     <th className="px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-figtree">
@@ -601,7 +602,7 @@ const PricingModel = () => {
                       className="border-b border-slate-100 last:border-0 dark:border-white/10 transition-colors hover:bg-[#EEF2FF]/70 dark:hover:bg-white/5"
                     >
                       <td
-                        className={`sticky left-0 z-10 bg-[#F7F8FA] dark:bg-[#1A1D20] px-7 py-6 text-sm font-medium leading-5 font-figtree ${
+                        className={`sticky left-0 z-10 bg-white dark:bg-[#1A1D20] px-7 py-6 text-sm font-medium leading-5 font-figtree ${
                           row.featureHighlight
                             ? "text-[#3300ff]"
                             : "text-slate-700 dark:text-[#D7D7D7]"
@@ -653,105 +654,10 @@ const PricingModel = () => {
               </table>
             </div>
 
-            {/* Comparison table */}
-            <table className="relative z-20 w-full table-fixed overflow-hidden rounded-xl bg-white text-left shadow-xl shadow-slate-200 dark:bg-[#1A1D20] dark:shadow-none">
-              <colgroup>
-                <col className="w-[32%]" />
-                <col className="w-[22%]" />
-                <col className="w-[20%]" />
-                <col className="w-[26%]" />
-              </colgroup>
-
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-white/10">
-                  <th className="px-7 py-6 text-sm font-semibold text-slate-900 dark:text-white font-poppins">
-                    Features
-                  </th>
-                  <th className="px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
-                    Free
-                  </th>
-                  <th className="border-x-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] px-7 py-6 text-center text-sm font-semibold text-[#3300ff] font-poppins">
-                    Pro
-                  </th>
-                  <th className="px-7 py-6 text-center text-sm font-semibold text-orange-500 font-poppins">
-                    Pro Plus
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {comparisonRows.map((row, index) => {
-                  const isLastRow = index === comparisonRows.length - 1;
-
-                  return (
-                    <tr
-                      key={row.feature}
-                      className="border-b border-slate-100 last:border-0 dark:border-white/10"
-                    >
-                      <td
-                        className={`px-7 py-6 text-sm font-medium leading-5 font-poppins ${
-                          row.featureHighlight
-                            ? "text-[#3300ff]"
-                            : "text-slate-700 dark:text-[#D7D7D7]"
-                        }`}
-                      >
-                        {row.feature}
-                      </td>
-
-                      <td className="px-7 py-6 text-center text-sm">
-                        {renderComparisonValue(row.free, "free", row)}
-                      </td>
-
-                      <td
-                        className={`border-x-4 border-[#b8b0ff] bg-[#3300ff]/[0.08] px-7 py-6 text-center text-sm font-semibold ${
-                          isLastRow ? "rounded-b-2xl border-b-4" : ""
-                        }`}
-                      >
-                        {renderComparisonValue(row.pro, "pro", row)}
-                      </td>
-
-                      <td className="px-7 py-6 text-center text-sm font-semibold">
-                        {renderComparisonValue(row.proPlus, "proPlus", row)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           </div>
 
-            {/* One-time add-ons (part of the plan doc, all users) */}
-            <div className="mx-auto mt-10 max-w-3xl">
-              <p className="text-center text-[15px] font-bold text-slate-900 dark:text-white font-figtree">
-                Just need one quick boost?
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {[
-                  { days: "3-Day Boost", price: "₹29", blurb: "Quick push for the weekend rush." },
-                  { days: "7-Day Boost", price: "₹49", blurb: "Top of the feed all week. Big W." },
-                ].map((a) => (
-                  <div
-                    key={a.days}
-                    className="flex items-center gap-3.5 rounded-2xl border border-[#3300ff]/20 bg-white px-5 py-4 shadow-[0_16px_40px_-20px_rgba(51,0,255,0.25)] dark:bg-[#1A1D20]"
-                  >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#3300ff]/10 text-[#3300ff] dark:text-[#8FA2FF]">
-                      <Zap size={18} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-bold text-slate-900 dark:text-white font-figtree">
-                        {a.days} <span className="text-[#3300ff] dark:text-[#8FA2FF]">{a.price}</span>
-                      </span>
-                      <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400 font-figtree">
-                        {a.blurb}
-                      </span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-3 text-center text-xs font-medium text-slate-400 dark:text-[#848484] font-figtree">
-                One-time buys, no subscription needed. Works on Free too.
-              </p>
-            </div>
+            {/* One-time boost add-ons: pick a listing and pay right here */}
+            <BoostAddons />
 
             {/* Assurance row: gateway, lifetime, refunds */}
             <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2.5 text-xs font-medium text-slate-500 dark:text-[#848484] font-figtree">

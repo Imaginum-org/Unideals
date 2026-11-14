@@ -163,10 +163,36 @@ const dealSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+
+    // What sold, captured at completion. The listing itself is soft-deleted
+    // on completion and hard-deleted ~15 days later, so this is the durable
+    // record that price insights and the demand meter learn from.
+    sale: {
+      type: new mongoose.Schema(
+        {
+          campus_id: { type: mongoose.Schema.Types.ObjectId, ref: "Campus" },
+          category: { type: String },
+          condition: { type: String },
+          original_price: { type: Number }, // what the seller paid new (MRP)
+          sold_price: { type: Number }, // agreed price the deal closed at
+          seller_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
   },
   {
     timestamps: true,
   },
+);
+
+/**
+ * Market data: completed sales per campus + category, newest first.
+ */
+dealSchema.index(
+  { "sale.campus_id": 1, "sale.category": 1, completed_at: -1 },
+  { partialFilterExpression: { status: "completed" } },
 );
 
 /**

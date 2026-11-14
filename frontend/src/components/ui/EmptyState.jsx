@@ -158,7 +158,7 @@ const ActionButton = ({ action, primary }) => {
   if (!action?.label) return null;
   const Icon = action.icon;
   const className = cn(
-    "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1A1D20]",
+    "inline-flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1A1D20]",
     primary
       ? "es-primary bg-[#3838EC] text-white shadow-[0_8px_20px_-8px_rgba(56,56,236,0.65)] hover:-translate-y-px hover:bg-[#2F2FD9] focus-visible:ring-[#3838EC]/50"
       : "es-secondary border border-neutral-200 bg-white text-slate-700 hover:border-[#3838EC]/40 hover:text-[#3838EC] focus-visible:ring-[#3838EC]/40 dark:border-neutral-700 dark:bg-transparent dark:text-zinc-200 dark:hover:border-[#6D6DF5] dark:hover:text-white",

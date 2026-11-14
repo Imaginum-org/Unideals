@@ -177,7 +177,7 @@ const ExplorePage = () => {
     <div className="min-h-[100dvh] bg-[#F7F8FA] pb-24 font-figtree text-slate-900 dark:bg-[#131313] dark:text-white">
       <GirlsEntryPill tab={audienceTab} onChange={setAudienceTab} />
 
-      <div className="mx-auto w-full max-w-[1380px] px-5 pt-5 sm:px-[4.5vw] lg:pt-8 2xl:px-0">
+      <div className="mx-auto w-full max-w-[calc(var(--page-max)+9vw)] px-5 pt-5 sm:px-[4.5vw] lg:pt-8 2xl:max-w-[var(--page-max)] 2xl:px-0">
         <BrowseHeader
           breadcrumbs={[{ label: "Home", to: "/" }, { label: "Explore" }]}
           title="All listings"

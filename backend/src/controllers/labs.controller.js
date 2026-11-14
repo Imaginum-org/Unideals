@@ -7,7 +7,7 @@ export const getMyLabs = (req, res) => {
   return res.status(200).json({ success: true, data: labsForUser(req.user) });
 };
 
-// GET /api/product/price-insights?category=&condition=
+// GET /api/product/price-insights?category=&condition=&originalPrice=
 // Labs: "price_insights" (Pro & Pro+); demand only with "demand_meter" (Pro+).
 export const priceInsights = async (req, res, next) => {
   try {
@@ -19,10 +19,14 @@ export const priceInsights = async (req, res, next) => {
       });
     }
     const campusId = req.user?.campus_id?._id || req.user?.campus_id;
+    const original = Number.parseInt(String(req.query.originalPrice || ""), 10);
     const data = await getPriceInsights({
       campusId,
+      userId: req.user?._id,
       category: String(req.query.category || ""),
       condition: String(req.query.condition || ""),
+      // The seller's own "price when new": the suggestion is for THIS item.
+      originalPrice: Number.isFinite(original) && original > 0 && original <= 10_000_000 ? original : null,
       includeDemand: hasLabsFeature(req.user, "demand_meter"),
     });
     return res.status(200).json({ success: true, data });

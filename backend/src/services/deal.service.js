@@ -512,6 +512,23 @@ export const confirmItemReceived = async ({ conversationId, userId }) => {
   deal.item_received = { is_confirmed: true, confirmed_at: new Date() };
   deal.status = DEAL_STATUS.COMPLETED;
   deal.completed_at = new Date();
+  // Durable sale record for price insights / demand meter (the listing is
+  // soft-deleted below and hard-deleted later). Best-effort: a missing
+  // listing never blocks completing the deal.
+  const soldItem = await Product.findById(conversation.product_id)
+    .select("campus_id category condition original_price seller_id")
+    .lean()
+    .catch(() => null);
+  if (soldItem) {
+    deal.sale = {
+      campus_id: soldItem.campus_id,
+      category: soldItem.category,
+      condition: soldItem.condition,
+      original_price: Number(soldItem.original_price) || undefined,
+      sold_price: Number(deal.current_price) || undefined,
+      seller_id: soldItem.seller_id,
+    };
+  }
   await deal.save();
 
   // Sold = gone: soft-delete so no other user can get confused by a dead

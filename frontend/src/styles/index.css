@@ -658,6 +658,14 @@
 .girls-mode .es-secondary .bg-\[\#3838EC\]\/10 { background-color: rgba(236, 72, 153, 0.12) !important; }
 .girls-mode .es-secondary .text-\[\#3838EC\] { color: #db2777 !important; }
 
+/* ── Page width ─────────────────────────────────────────────────────────
+   One max content width for navbar, pages and footer, so they always line
+   up. 1380px up to 1919px wide; big monitors get more room (fewer empty
+   gutters) and grids add columns at the matching wide/ultra breakpoints. */
+:root { --page-max: 1380px; }
+@media (min-width: 1920px) { :root { --page-max: 1680px; } }
+@media (min-width: 2400px) { :root { --page-max: 1920px; } }
+
 /* ── Accent tokens (browse UI, sliders, chips). One place decides the accent:
    brand blue by default, pink in Girl Mode, lighter text tones in dark. ── */
 :root {
@@ -732,6 +740,36 @@
   }
   html[data-app-screen] .site-header {
     display: none;
+  }
+}
+/* Account pages (sidebar app shell): the floating, centred navbar pill
+   would sit unrelated to the full-height sidebar below it. Dock it instead:
+   full width, flush to the top, hairline bottom border, logo inset matching
+   the sidebar, so bar + sidebar read as one frame (Linear/Vercel-style).
+   Set by AccountLayout via html[data-app-shell]. Phones are unchanged. */
+@media (min-width: 640px) {
+  html[data-app-shell] {
+    --header-h: calc(4rem + 1px);
+  }
+  html[data-app-shell] .site-header {
+    padding: 0;
+    background-color: rgb(255 255 255 / 0.92);
+    border-bottom: 1px solid rgb(229 231 235 / 0.9);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+  html.dark[data-app-shell] .site-header {
+    background-color: rgb(22 24 27 / 0.92);
+    border-bottom-color: rgb(38 38 38);
+  }
+  html[data-app-shell] .site-header-bar {
+    max-width: none;
+    border-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
   }
 }
 /* Phones/tablets with an open thread: the conversation owns the screen,

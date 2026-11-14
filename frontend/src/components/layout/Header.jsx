@@ -1284,7 +1284,7 @@ const Header = () => {
     dark:bg-[#16181B]/90
     sm:border-0
     sm:bg-transparent
-    sm:px-6
+    sm:px-[4.5vw]
     sm:pt-3
     sm:backdrop-blur-none
     sm:dark:bg-transparent
@@ -1295,7 +1295,7 @@ const Header = () => {
     ${showHeader ? "translate-y-0" : "-translate-y-full"}
   `}
       >
-        <div className="mx-auto flex h-14 w-full max-w-[1380px] min-w-0 items-center justify-between px-5 sm:h-16 sm:rounded-2xl sm:border sm:border-[#ECEEF3] sm:bg-[#F7F8FA] sm:px-5 sm:shadow-[0_10px_36px_-16px_rgba(23,27,80,0.22)] sm:dark:border-neutral-800 sm:dark:bg-[#1A1D20] sm:dark:shadow-[0_10px_36px_-16px_rgba(0,0,0,0.7)]">
+        <div className="site-header-bar mx-auto flex h-14 w-full max-w-[var(--page-max)] min-w-0 items-center justify-between px-5 sm:h-16 sm:rounded-2xl sm:border sm:border-[#ECEEF3] sm:bg-[#F7F8FA] sm:px-5 sm:shadow-[0_10px_36px_-16px_rgba(23,27,80,0.22)] sm:dark:border-neutral-800 sm:dark:bg-[#1A1D20] sm:dark:shadow-[0_10px_36px_-16px_rgba(0,0,0,0.7)]">
           {/* Mobile app bar (< sm): brand + campus on the left, alerts on the
               right. Search gets its own full-width field below on browsing
               screens; account + chats live in the bottom tab bar. */}

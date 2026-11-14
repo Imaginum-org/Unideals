@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Check, CheckCircle2, Eye, MapPin, Pencil, Rocket, Save } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 import axios from "../../../services/axiosInstance";
+import { invalidateRequests } from "../../../services/requestCache.js";
 import { uploadImage, deleteImage } from "../../../utils/imageUpload.js";
-import { compressImage } from "../utils/imageCompression";
 import useProductListing from "../hooks/useProductListing";
 import { saveDraftProduct, updateProduct, getUserProducts } from "../api/productApi.js";
 import { getBilling } from "../../payment/api/paymentApi.js";
@@ -30,7 +30,7 @@ const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const PreviewStep = () => {
   const navigate = useNavigate();
   const { campus } = useCampus();
-  const { updateUserDetails } = useUser();
+  const { updateUserDetails, userDetails } = useUser();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [publishStage, setPublishStage] = useState("");
   const [limitInfo, setLimitInfo] = useState(null);
@@ -122,17 +122,18 @@ const PreviewStep = () => {
   };
 
   /**
-   * Compress + upload only the NEW photos (already-stored ones are reused
-   * by URL, never re-uploaded). All-or-nothing: on any failure the
-   * successful uploads are deleted again and null is returned.
+   * Upload only the NEW photos (already-stored ones are reused by URL,
+   * never re-uploaded). uploadImage() compresses each photo exactly once
+   * (≤0.8 MB, ≤1600px) before sending it; compressing here as well used to
+   * re-encode every photo twice (extra quality loss, slower publish).
+   * All-or-nothing: on any failure the successful uploads are deleted again
+   * and null is returned.
    */
   const uploadNewImages = async () => {
     const files = formData.images || [];
     if (files.length === 0) return [];
-    setPublishStage("Preparing photos…");
-    const compressed = await Promise.all(files.map((file) => compressImage(file)));
-    setPublishStage("Uploading photos…");
-    const results = await Promise.allSettled(compressed.map((file) => uploadImage(file)));
+    setPublishStage("Optimising and uploading photos…");
+    const results = await Promise.allSettled(files.map((file) => uploadImage(file)));
     const uploads = results.filter((r) => r.status === "fulfilled").map((r) => r.value);
     const failed = results.length - uploads.length;
     if (failed > 0) {
@@ -227,6 +228,8 @@ const PreviewStep = () => {
       const uploads = await uploadNewImages();
       if (uploads === null) return;
       setPublishStage(publish ? "Publishing listing…" : "Saving changes…");
+      // Publishing a saved draft can be someone's first listing too.
+      const firstEver = publish && !userDetails?.first_listed_at;
       const response = await updateProduct(editProductId, {
         ...buildPayload(buildOrderedImages(uploads)),
         ...(publish ? { status: "listed" } : {}),
@@ -234,8 +237,19 @@ const PreviewStep = () => {
       finishLocal();
       if (publish) {
         if (response?.data?.gamification) updateUserDetails({ gamification: response.data.gamification });
+        if (firstEver) updateUserDetails({ first_listed_at: new Date().toISOString() });
+        const saved = response?.data?.data || {};
+        const cover = saved.images?.[0];
         resetForm();
-        navigate("/", { state: { listingCreated: true, isFirstListing: false } });
+        navigate("/", {
+          state: {
+            listingCreated: true,
+            isFirstListing: firstEver,
+            listing: saved._id
+              ? { _id: saved._id, slug: saved.slug, title: saved.title, selling_price: saved.selling_price, image: typeof cover === "string" ? cover : cover?.url }
+              : null,
+          },
+        });
       } else {
         toast.success("Listing updated");
         navigate("/productlisted");
@@ -261,10 +275,26 @@ const PreviewStep = () => {
       const response = await axios.post("/api/product", buildPayload(buildOrderedImages(uploads)));
       const isFirstListing = Boolean(response?.data?.isFirstListing);
       if (response?.data?.gamification) updateUserDetails({ gamification: response.data.gamification });
+      // Tick "List your first item" everywhere right away.
+      if (isFirstListing) updateUserDetails({ first_listed_at: new Date().toISOString() });
+      // Feeds, My listings and the profile must show the new listing now,
+      // not after the request cache expires.
+      invalidateRequests("/api/product");
+      const created = response?.data?.data || {};
+      const cover = created.images?.[0];
+      const listing = created._id
+        ? {
+            _id: created._id,
+            slug: created.slug,
+            title: created.title,
+            selling_price: created.selling_price,
+            image: typeof cover === "string" ? cover : cover?.url,
+          }
+        : null;
       finishLocal();
       resetForm();
       setSelectedImageIndex(0);
-      navigate("/", { state: { listingCreated: true, isFirstListing } });
+      navigate("/", { state: { listingCreated: true, isFirstListing, listing } });
     } catch (error) {
       showError(error, "Something went wrong");
     } finally {

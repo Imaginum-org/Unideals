@@ -372,7 +372,9 @@ ${tierStyles.cardShadow}
                   </span>
                   <span className="truncate">Boosted</span>
                 </span>
-                {endsIn && (
+                {/* Countdown is seller-only: buyers see "Boosted", only the
+                    listing's owner sees when their boost ends. */}
+                {endsIn && isOwnListing && (
                   <span
                     className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold tabular-nums sm:px-2 sm:py-1 sm:text-[10px] ${boostAccentStyles.tintBg} ${boostAccentStyles.tintText}`}
                   >

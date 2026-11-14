@@ -26,7 +26,6 @@ const productSvc = await import(B + "src/services/product.service.js");
 const boostSvc = await import(B + "src/services/boost.service.js");
 const convSvc = await import(B + "src/services/conversation.service.js");
 const reportSvc = await import(B + "src/services/report.service.js");
-const labsSvc = await import(B + "src/services/labs.service.js");
 const labs = await import(B + "src/config/labs.js");
 const plans = await import(B + "src/config/subscriptionPlans.js");
 const perks = await import(B + "src/utils/planPerks.js");
@@ -308,28 +307,7 @@ await test("Free: no Labs; Pro: price insights only; Pro+: everything", () => {
   assert.deepEqual(has("pro"), [true, false]);
   assert.deepEqual(has("pro_plus"), [true, true]);
 });
-await test("Price insights: percentiles + suggested price; demand only when asked", async () => {
-  await Product.deleteMany({});
-  const sl = await mkUser("base_user");
-  for (const price of [300, 400, 500, 600, 700, 800]) await mkProduct(sl, { title: `Calc ${price}`, selling_price: price });
-  await mkProduct(sl, { title: "Sold calc", selling_price: 550, status: "sold" });
-  const noDemand = await labsSvc.getPriceInsights({ campusId: campus._id, category: "electronics", condition: "like_new", includeDemand: false });
-  assert.equal(noDemand.price.samples, 7);
-  assert.equal(noDemand.price.median, 550);
-  assert.equal(noDemand.price.suggested, 550);
-  assert.equal(noDemand.demand, undefined);
-  const withDemand = await labsSvc.getPriceInsights({ campusId: campus._id, category: "electronics", condition: "like_new", includeDemand: true });
-  assert.equal(withDemand.demand.activeListings, 6);
-  assert.equal(withDemand.demand.soldLast30, 1);
-  assert.ok(["low", "moderate", "high"].includes(withDemand.demand.level));
-});
-await test("Price insights falls back to category when the condition is too rare", async () => {
-  const r = await labsSvc.getPriceInsights({ campusId: campus._id, category: "electronics", condition: "brand_new", includeDemand: false });
-  assert.equal(r.scope, "category");
-});
-await test("Price insights rejects an invalid category", async () => {
-  await assert.rejects(labsSvc.getPriceInsights({ campusId: campus._id, category: "weapons", includeDemand: false }), /valid category/);
-});
+// Price-insight maths and the demand meter: tests/labs.integration.test.mjs.
 
 console.log("\nRegressions found while testing");
 await test("Duplicate user report is now blocked (unique partial index exists)", async () => {

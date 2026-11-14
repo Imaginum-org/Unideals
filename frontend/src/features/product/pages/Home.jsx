@@ -6,6 +6,7 @@ import { getBoostedProducts, getProducts } from "../api/productApi";
 import { IoIosArrowForward } from "react-icons/io";
 import { motion, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Zap } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 // Celebration (and its canvas-confetti dep) loads only when shown.
 // Below-the-fold feature bento: split out of the initial Home chunk.
@@ -19,11 +20,11 @@ import { CATEGORY_ITEMS } from "../constants/categories";
 import { GIRLS_MODE_CATEGORY_ORDER } from "../constants/productOptions.js";
 import { FiArrowRight } from "react-icons/fi";
 import { useUser } from "../../../context/useUserContext.jsx";
-import { ikCard } from "../../../utils/imageTransform.js";
-import { productPath } from "../../../utils/productPath.js";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { useGirlsMode } from "../../../context/GirlsModeContext.jsx";
 import GirlsEntryPill from "../../../components/ui/GirlsEntryPill.jsx";
+import HomeHero from "../components/home/HomeHero.jsx";
+import CampusJourney from "../components/home/CampusJourney.jsx";
 import { CampusEmptyState } from "../../../components/ui/EmptyStates.jsx";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { loginWithGoogleOneTap } from "../../auth/api/authApi.js";
@@ -36,36 +37,13 @@ const GOOGLE_ID_SCRIPT_ID = "google-identity-services-script";
 const HOME_PAGE_SIZE = 8;
 const HOME_MAX_PAGES = 2;
 
-// Word-by-word masked rise for the hero headline — cinematic entrance
-// fit for a marketplace launch, runs once on mount.
-const RevealWords = ({ text, delay = 0, reduceMotion }) => (
-  <span aria-label={text}>
-    {text.split(" ").map((word, i) => (
-      <span
-        key={`${word}-${i}`}
-        className="inline-block overflow-hidden pb-[0.1em] -mb-[0.1em] align-bottom"
-      >
-        <motion.span
-          className="inline-block will-change-transform"
-          initial={reduceMotion ? { opacity: 0 } : { y: "115%", opacity: 0 }}
-          animate={{ y: "0%", opacity: 1 }}
-          transition={
-            reduceMotion
-              ? { duration: 0.2, delay }
-              : {
-                  duration: 0.75,
-                  ease: [0.22, 1, 0.36, 1],
-                  delay: delay + i * 0.07,
-                }
-          }
-        >
-          {word}
-          {i < text.split(" ").length - 1 ? " " : ""}
-        </motion.span>
-      </span>
-    ))}
-  </span>
-);
+// Deals rail: phones swipe through all; md+ shows one full grid row
+// (3 / 4 / 5 on 1920px+ "wide" / 6 on 2400px+ "ultra" screens).
+const RAIL_VISIBILITY = {
+  3: "md:hidden lg:flex",
+  4: "md:hidden wide:flex",
+  5: "md:hidden ultra:flex",
+};
 
 const Home = () => {
   const location = useLocation();
@@ -110,20 +88,11 @@ const Home = () => {
   const [boostedProducts, setBoostedProducts] = useState([]);
   const [page, setPage] = useState(1);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [newListing, setNewListing] = useState(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
 
-  // Hero: search box + four real listings with photos (boosted first).
-  const [heroQuery, setHeroQuery] = useState("");
-  const heroPicks = useMemo(() => {
-    const seen = new Set();
-    const imgOf = (p) => (typeof p?.images?.[0] === "string" ? p.images[0] : p?.images?.[0]?.url);
-    return [...boostedProducts, ...products]
-      .filter((p) => p?._id && imgOf(p) && !seen.has(p._id) && seen.add(p._id))
-      .slice(0, 4)
-      .map((p) => ({ _id: p._id, title: p.title, price: p.selling_price, image: ikCard(imgOf(p)), raw: p }));
-  }, [boostedProducts, products]);
   const [error, setError] = useState(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -222,6 +191,7 @@ const Home = () => {
     if (!listingCreated) return;
 
     if (isFirstListing) {
+      setNewListing(location.state?.listing || null);
       setShowCelebration(true);
     } else {
       toast.success("Listing published successfully");
@@ -399,9 +369,16 @@ const Home = () => {
           campus_slug: campusSlug,
           ...(audienceTab === "girls" ? { audience: "girls_only" } : {}),
         });
-        const items = res.data?.data || [];
-        // Client-side guard (server already filters): girls feed shows
-        // ONLY girls-only boosted.
+        // Client-side guards (server already filters; responses can be up to
+        // 45s old from the request cache): only listed products whose boost
+        // window is still open, and girls feed shows ONLY girls-only boosted.
+        const now = Date.now();
+        const items = (res.data?.data || []).filter(
+          (p) =>
+            (p.status ?? "listed") === "listed" &&
+            p.boost_expires_at &&
+            new Date(p.boost_expires_at).getTime() > now,
+        );
         setBoostedProducts(
           audienceTab === "girls" ? items.filter((p) => p.isGirlsOnly === true) : items,
         );
@@ -466,104 +443,17 @@ const Home = () => {
   return (
     <motion.div className="w-full bg-[#F7F8FA] dark:bg-[#131313] relative">
       <div className="w-full px-5 sm:px-[4.5vw]">
-      <div className="flex flex-col w-full max-w-[1380px] mx-auto">
+      <div className="flex flex-col w-full max-w-[var(--page-max)] mx-auto">
         {/* Girls Corner edge menu — fixed to the right edge, girls + admins only */}
-        <GirlsEntryPill tab={audienceTab} onChange={handleAudienceTab} />
-        {/* Hero (marketplace pattern): flat brand colour, big confident type,
-            search as the primary action, and real listings from this campus
-            in a staggered photo grid. No gradients, glows or mock UI. */}
-        <section className="brand-surface mx-auto mb-3 mt-3 w-full overflow-hidden rounded-xl text-white sm:mt-4 md:rounded-2xl">
-          <div className="grid items-center gap-10 px-6 py-10 sm:px-10 sm:py-12 lg:min-h-[480px] lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:px-14 lg:py-14">
-            <div className="font-figtree">
-              <h1 className="text-[34px] font-bold leading-[1.02] tracking-[-0.035em] sm:text-[46px] lg:text-[56px]">
-                <RevealWords text="Buy and sell" reduceMotion={reduceMotion} />
-                <br />
-                <RevealWords text="on campus." delay={0.15} reduceMotion={reduceMotion} />
-              </h1>
-              <motion.p
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-                className="mt-4 max-w-md text-[15px] leading-relaxed text-white/85 sm:text-[17px]"
-              >
-                Textbooks, gadgets, cycles and more from verified students near you.
-              </motion.p>
-
-              <motion.form
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const q = heroQuery.trim();
-                  navigate(q ? `/search?q=${encodeURIComponent(q)}` : "/explore");
-                }}
-                className="mt-7 flex max-w-lg items-center gap-2 rounded-2xl bg-white p-1.5 shadow-[0_12px_32px_-12px_rgba(2,6,23,0.45)]"
-                role="search"
-              >
-                <svg viewBox="0 0 20 20" className="ml-3 h-5 w-5 shrink-0 text-slate-400" aria-hidden="true">
-                  <circle cx="9" cy="9" r="6" fill="none" stroke="currentColor" strokeWidth="2" />
-                  <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                <input
-                  type="search"
-                  value={heroQuery}
-                  onChange={(e) => setHeroQuery(e.target.value)}
-                  placeholder="What are you looking for?"
-                  aria-label="Search listings"
-                  enterKeyHint="search"
-                  className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
-                />
-                <button
-                  type="submit"
-                  className="h-11 shrink-0 rounded-xl bg-slate-900 px-5 text-[14px] font-semibold text-white transition-colors hover:bg-slate-800"
-                >
-                  Search
-                </button>
-              </motion.form>
-
-              <p className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[14px] text-white/80">
-                <span>
-                  Have something to sell?{" "}
-                  <Link to="/upload" className="font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">
-                    List it free
-                  </Link>
-                </span>
-              </p>
-            </div>
-
-            {/* Real listings, staggered photo grid (lg+) */}
-            {heroPicks.length >= 4 && (
-              <div className="hidden w-full max-w-[400px] grid-cols-2 gap-3 justify-self-end lg:grid" aria-label="Listed on your campus">
-                {heroPicks.map((p, i) => (
-                  <div key={p._id} className={i % 2 === 1 ? "translate-y-6" : "-translate-y-3"}>
-                  <motion.div
-                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.2 + i * 0.08 }}
-                  >
-                    <Link
-                      to={productPath(p.raw)}
-                      className="group relative block aspect-square overflow-hidden rounded-2xl bg-white/10"
-                    >
-                      <img src={p.image} alt={p.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
-                      <span className="absolute bottom-2.5 left-2.5 rounded-lg bg-white px-2 py-1 text-[13px] font-bold text-slate-900 shadow-sm">
-                        ₹{Number(p.price || 0).toLocaleString("en-IN")}
-                      </span>
-                    </Link>
-                  </motion.div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
+        <GirlsEntryPill tab={audienceTab} onChange={handleAudienceTab} resetOnMount />
+        {/* Hero: light SaaS banner with Sell / Browse CTAs and a 3D listing stack. */}
+        <HomeHero reduceMotion={reduceMotion} />
         </div>
       </div>
 
       <div className="w-full min-h-screen bg-[#F7F8FA] flex flex-col items-center px-5 sm:px-[4.5vw] pb-24 lg:pb-0 dark:bg-[#131313]">
         {/* Category section */}
-        <div id="categories" className="flex w-full max-w-[1380px] mx-auto flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-8 mt-4 scroll-mt-20">
+        <div id="categories" className="flex w-full max-w-[var(--page-max)] mx-auto flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-8 mt-4 scroll-mt-20">
           <div>
             <h2 className="font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white">
               Shop by Category
@@ -687,25 +577,35 @@ const Home = () => {
 
         {boostedProducts.length > 0 && (
           <section
-            className="mx-auto mt-6 w-full max-w-[1380px] rounded-2xl border border-[var(--accent-soft-strong)] bg-gradient-to-b from-[var(--accent-soft)] via-[var(--accent-soft)] to-transparent p-4 sm:p-5 lg:mt-12 lg:p-6"
+            className="mx-auto mt-8 w-full max-w-[var(--page-max)] lg:mt-12"
             aria-labelledby="deals-heading"
           >
+            {/* Highlight lives in the heading (time-sensitive marker), not a
+                tinted box around the cards. */}
             <div className="flex items-end justify-between gap-3">
-              <div className="min-w-0">
-                <h2
-                  id="deals-heading"
-                  className="flex items-center gap-2 font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white"
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-white shadow-[0_6px_14px_-6px_rgba(245,158,11,0.7)] md:h-10 md:w-10"
                 >
-                  Limited time deals
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[11.5px] font-semibold tracking-normal text-[var(--accent-text)] ring-1 ring-[var(--accent-soft-strong)] dark:bg-white/5">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" aria-hidden="true" />
-                    {boostedProducts.length} live
-                  </span>
-                </h2>
-                <p className="mt-0.5 truncate font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
-                  <span className="sm:hidden">Boosted listings, ending soon</span>
-                  <span className="hidden sm:inline">Boosted by sellers on your campus. Gone when the timer runs out.</span>
-                </p>
+                  <Zap className="h-[18px] w-[18px] md:h-5 md:w-5" fill="currentColor" strokeWidth={1.5} />
+                </span>
+                <div className="min-w-0">
+                  <h2
+                    id="deals-heading"
+                    className="whitespace-nowrap font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white"
+                  >
+                    Limited time deals
+                  </h2>
+                  <p className="mt-0.5 truncate font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
+                    <span className="font-medium text-slate-700 dark:text-zinc-300">
+                      {boostedProducts.length} {boostedProducts.length === 1 ? "deal" : "deals"}
+                    </span>
+                    <span aria-hidden="true"> · </span>
+                    <span className="sm:hidden">ending soon</span>
+                    <span className="hidden sm:inline">boosted by sellers on your campus, gone when the timer runs out</span>
+                  </p>
+                </div>
               </div>
               <Link
                 to={audienceTab === "girls" ? "/deals?tab=girls" : "/deals"}
@@ -717,11 +617,11 @@ const Home = () => {
             </div>
 
             {/* Phones: swipeable rail; md+: same grid as Trending */}
-            <div className="no-scrollbar -mx-4 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-1 sm:-mx-5 sm:scroll-px-5 sm:px-5 md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:grid-cols-4 xl:gap-5">
-              {boostedProducts.slice(0, 4).map((product, i) => (
+            <div className="no-scrollbar -mx-5 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-1 sm:-mx-[4.5vw] sm:scroll-px-[4.5vw] sm:px-[4.5vw] md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:grid-cols-4 xl:gap-5 wide:grid-cols-5 ultra:grid-cols-6">
+              {boostedProducts.slice(0, 6).map((product, i) => (
                 <div
                   key={product._id}
-                  className={`flex w-[min(46vw,220px)] shrink-0 snap-start md:w-auto ${i === 3 ? "md:hidden lg:flex" : ""}`}
+                  className={`flex w-[min(46vw,220px)] shrink-0 snap-start md:w-auto ${RAIL_VISIBILITY[i] || ""}`}
                 >
                   <ProductCard product={product} showBoostBar boostAccent={i % 2 === 0 ? "purple" : "orange"} />
                 </div>
@@ -731,15 +631,15 @@ const Home = () => {
         )}
 
         {/* Products section */}
-        <div className="w-full max-w-[1380px] mx-auto lg:mt-12 mt-6 flex flex-col gap-4 lg:mb-6">
+        <div className="w-full max-w-[var(--page-max)] mx-auto lg:mt-12 mt-6 flex flex-col gap-4 lg:mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-figtree text-lg font-semibold tracking-tight text-slate-900 md:text-2xl dark:text-white">
                 Trending Items
               </h2>
               <p className="mt-0.5 truncate font-figtree text-[13px] text-slate-500 md:text-sm dark:text-zinc-400">
-                <span className="sm:hidden">Hot on your campus right now 🔥</span>
-                <span className="hidden sm:inline">What students on your campus are checking out right now 🔥</span>
+                <span className="sm:hidden">Hot on your campus right now</span>
+                <span className="hidden sm:inline">What students on your campus are checking out right now</span>
               </p>
             </div>
           </div>
@@ -753,6 +653,8 @@ const Home = () => {
       md:grid-cols-3
       lg:grid-cols-4
       2xl:grid-cols-4
+      wide:grid-cols-5
+      ultra:grid-cols-6
       gap-2
       sm:gap-3
       md:gap-4
@@ -828,10 +730,15 @@ const Home = () => {
         </div>
 
         {/* Feature bento — below the product feed */}
-        <div className="w-full max-w-[1380px] mx-auto mt-10 lg:mt-14 mb-10 lg:mb-14">
+        <div className="w-full max-w-[var(--page-max)] mx-auto mt-10 lg:mt-14">
           <Suspense fallback={<div className="min-h-[40vh]" aria-hidden="true" />}>
             <LazyPromoBento />
           </Suspense>
+        </div>
+
+        {/* Closing section: an item's journey across campus (on the page bg) */}
+        <div className="w-full max-w-[var(--page-max)] mx-auto mt-10 lg:mt-16 mb-10 lg:mb-16">
+          <CampusJourney reduceMotion={reduceMotion} />
         </div>
       </div>
 
@@ -839,7 +746,7 @@ const Home = () => {
 
       {showCelebration && (
         <Suspense fallback={null}>
-          <LazyCelebration onClose={() => setShowCelebration(false)} />
+          <LazyCelebration listing={newListing} onClose={() => setShowCelebration(false)} />
         </Suspense>
       )}
     </motion.div>

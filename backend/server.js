@@ -6,6 +6,19 @@ if (!process.env.SECRET_KEY_ACCESS_TOKEN || !process.env.SECRET_KEY_REFRESH_TOKE
   process.exit(1);
 }
 
+// Services the live site can't work without. Modules load them lazily (so
+// tests and scripts run without credentials); this is where a misconfigured
+// production deploy fails fast instead of breaking at the first sign-up.
+const REQUIRED_IN_PRODUCTION = ["MONGO_URL", "FRONTEND_URL", "RESEND_API_KEY"];
+const missingEnv = REQUIRED_IN_PRODUCTION.filter((name) => !String(process.env[name] || "").trim());
+if (missingEnv.length) {
+  if (process.env.NODE_ENV === "production") {
+    console.error(`Missing required environment variables: ${missingEnv.join(", ")}`);
+    process.exit(1);
+  }
+  console.warn(`[env] Not set (features using them will fail): ${missingEnv.join(", ")}`);
+}
+
 import http from "http";
 import app from "./src/app.js";
 import { connectDB } from "./src/config/db.js";

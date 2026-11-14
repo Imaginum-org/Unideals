@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { RotateCcw, TriangleAlert } from "lucide-react";
 import Profile_left_part from "../Profile_left_part.jsx";
 import Seo from "../../../../components/Seo.jsx";
@@ -17,6 +18,20 @@ export const CARD =
 export const FLUSH_ON_PHONE = "max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none";
 
 const WIDTHS = { md: "max-w-3xl", lg: "max-w-4xl", xl: "max-w-5xl", full: "max-w-6xl" };
+/** Docks the site navbar while an account page is mounted (index.css,
+ *  html[data-app-shell]). Counted so overlapping page transitions are safe. */
+let appShellCount = 0;
+const useAppShell = () => {
+  useEffect(() => {
+    const root = document.documentElement;
+    appShellCount += 1;
+    root.setAttribute("data-app-shell", "");
+    return () => {
+      appShellCount = Math.max(0, appShellCount - 1);
+      if (!appShellCount) root.removeAttribute("data-app-shell");
+    };
+  }, []);
+};
 
 /**
  * <AccountLayout title description actions width seoTitle>…</AccountLayout>
@@ -43,6 +58,7 @@ export function AccountLayout({
 }) {
   useAppScreen(!root);
   const barTitle = mobileTitle || title;
+  useAppShell();
   return (
     <>
       {seoTitle && <Seo title={seoTitle} robots="noindex,nofollow" />}
@@ -54,7 +70,10 @@ export function AccountLayout({
           {/* `relative` keeps absolutely positioned descendants (e.g. sr-only labels)
               inside the scroll pane; otherwise they stretch the document and the
               whole page scrolls instead of just this column. */}
-          <main className="relative min-w-0 flex-1 md:h-full md:overflow-y-auto">
+          {/* scrollbar-gutter: the pane always reserves its scrollbar track, so
+              switching tabs (short loading skeleton → long page) never
+              shifts the content sideways. */}
+          <main className="relative min-w-0 flex-1 md:h-full md:overflow-y-auto md:[scrollbar-gutter:stable]">
             {!root && barTitle && <MobileAppBar title={barTitle} backTo={backTo} action={mobileAction} />}
             <div className={cn("mx-auto w-full px-4 pb-12 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8", WIDTHS[width] || WIDTHS.lg)}>
               {!bare && (title || actions) && (
@@ -214,8 +233,8 @@ export function ListSkeleton({ rows = 4, className }) {
 
 /** Primary / secondary button classes shared across tabs. */
 export const btnPrimary =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-[13.5px] font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[var(--accent)] px-4 text-[13.5px] font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] disabled:cursor-not-allowed disabled:opacity-60";
 export const btnSecondary =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3.5 text-[13.5px] font-semibold text-slate-700 transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-200 dark:hover:bg-white/5";
+  "inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-neutral-200 bg-white px-3.5 text-[13.5px] font-semibold text-slate-700 transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-200 dark:hover:bg-white/5";
 export const btnDanger =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3.5 text-[13.5px] font-semibold text-red-600 transition-colors hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-red-400 dark:hover:bg-red-950/20";
+  "inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-neutral-200 bg-white px-3.5 text-[13.5px] font-semibold text-red-600 transition-colors hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-red-400 dark:hover:bg-red-950/20";

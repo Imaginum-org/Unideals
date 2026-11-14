@@ -2,6 +2,7 @@ import mongoose, { Schema } from "mongoose";
 import slugify from "slugify";
 import { nanoid } from "nanoid";
 import { normalizeMultiline } from "../utils/text.js";
+import { BOOSTED_RAIL_FIELDS, clearBoostedCache, updateTouchesBoostedRail } from "../utils/boostedCache.js";
 
 import {
   PRODUCT_STATUS,
@@ -406,6 +407,46 @@ productSchema.pre("save", async function () {
     throw error;
   }
 });
+
+// Keep the Home "Boosted" rail truthful: any write that can change whether a
+// listing belongs there (sold, unlisted, deleted, boost started/ended…) clears
+// its cache. View-count bumps and other edits don't, so caching still works.
+productSchema.pre("save", function () {
+  this.$locals.touchesBoostedRail =
+    this.isNew || BOOSTED_RAIL_FIELDS.some((f) => this.isModified(f));
+});
+productSchema.post("save", function () {
+  if (this.$locals.touchesBoostedRail) clearBoostedCache();
+});
+
+// Onboarding: remember the first time this seller had a listing go live
+// (new listing, or a draft published). One conditional update, only when
+// the status actually becomes "listed".
+productSchema.pre("save", function () {
+  this.$locals.becameListed =
+    this.status === PRODUCT_STATUS.LISTED && (this.isNew || this.isModified("status"));
+});
+productSchema.post("save", function () {
+  if (!this.$locals.becameListed || !this.seller_id) return;
+  const User = mongoose.models.User;
+  if (!User) return;
+  User.updateOne(
+    { _id: this.seller_id, first_listed_at: null },
+    { $set: { first_listed_at: this.createdAt || new Date() } },
+  ).catch(() => {});
+});
+productSchema.post(
+  ["findOneAndUpdate", "updateOne", "updateMany", "findOneAndReplace", "replaceOne"],
+  { document: false, query: true },
+  function () {
+    if (updateTouchesBoostedRail(this.getUpdate())) clearBoostedCache();
+  },
+);
+productSchema.post(["deleteOne", "deleteMany", "findOneAndDelete"], { document: false, query: true }, () =>
+  clearBoostedCache(),
+);
+productSchema.post("deleteOne", { document: true, query: false }, () => clearBoostedCache());
+productSchema.post("bulkWrite", () => clearBoostedCache());
 
 // Increment views
 productSchema.statics.getProductAndIncrementViews = function (productId) {

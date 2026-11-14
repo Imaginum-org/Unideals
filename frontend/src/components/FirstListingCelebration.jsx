@@ -1,176 +1,188 @@
-import { useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { HiXMark, HiArrowRight, HiCheckBadge } from "react-icons/hi2";
+import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, X } from "lucide-react";
+import { useCampus } from "../context/CampusContext.jsx";
+import { productPath } from "../utils/productPath.js";
+import { ikCard } from "../utils/imageTransform.js";
 
-const FirstListingCelebration = ({ onClose }) => {
+/*
+ * First-listing celebration (shown once, on Home, after a new seller's first
+ * listing goes live). Shows their actual listing, the Freshers' Drop badge
+ * they just unlocked, and two clear next steps. Confetti in the brand colour
+ * (pink in Girl Mode), skipped for reduced motion. Never auto-closes: ✕,
+ * Escape, backdrop click or either button.
+ */
+
+const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+
+const readAccent = () => {
+  if (typeof window === "undefined") return "#3838ec";
+  const v = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  return v || "#3838ec";
+};
+
+export default function FirstListingCelebration({ listing = null, onClose }) {
+  const reduceMotion = useReducedMotion();
+  const { campus } = useCampus();
+  const closeRef = useRef(null);
+  const campusName = campus?.name || campus?.short_name || "your campus";
+  const href = listing?._id ? productPath(listing) : null;
+
+  // Escape to close, lock page scroll, focus the close button.
   useEffect(() => {
-    let cancelled = false;
-    const duration = 3000;
-    const end = Date.now() + duration;
-
-    // canvas-confetti loads on demand — never in the initial bundle.
-    const fire = (opts) =>
-      import("canvas-confetti").then((m) => {
-        if (!cancelled) m.default(opts);
-      });
-
-    const frame = () => {
-      fire({
-        particleCount: 2,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0 },
-        colors: ["#3838EC", "#8B8BFF", "#1F1F8F"],
-      });
-
-      fire({
-        particleCount: 2,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1 },
-        colors: ["#3838EC", "#8B8BFF", "#1F1F8F"],
-      });
-
-      if (Date.now() < end) {
-        requestAnimationFrame(frame);
-      }
-    };
-
-    fire({
-      particleCount: 180,
-      spread: 120,
-      startVelocity: 35,
-      origin: { y: 0.6 },
-      colors: ["#3838EC", "#8B8BFF", "#1F1F8F"],
-    });
-
-    frame();
-
-    const timer = setTimeout(() => {
-      onClose?.();
-    }, 6000);
-
+    const onKey = (e) => e.key === "Escape" && onClose?.();
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
     return () => {
-      cancelled = true;
-      clearTimeout(timer);
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
     };
   }, [onClose]);
 
-  return (
+  // One celebratory burst + short side streams, in the brand colour.
+  useEffect(() => {
+    if (reduceMotion) return undefined;
+    let cancelled = false;
+    const accent = readAccent();
+    const colors = [accent, "#ffffff", "#FBBF24", "#34D399"];
+    import("canvas-confetti").then(({ default: confetti }) => {
+      if (cancelled) return;
+      confetti({ particleCount: 110, spread: 75, startVelocity: 38, origin: { y: 0.55 }, colors, scalar: 0.9, zIndex: 100000 });
+      const end = Date.now() + 1200;
+      const stream = () => {
+        if (cancelled) return;
+        confetti({ particleCount: 2, angle: 60, spread: 50, origin: { x: 0, y: 0.7 }, colors, zIndex: 100000 });
+        confetti({ particleCount: 2, angle: 120, spread: 50, origin: { x: 1, y: 0.7 }, colors, zIndex: 100000 });
+        if (Date.now() < end) requestAnimationFrame(stream);
+      };
+      stream();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reduceMotion]);
+
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="first-listing-heading"
-        className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/55 backdrop-blur-sm px-4"
+        className="fixed inset-0 z-[99999] flex items-end justify-center bg-slate-950/50 px-0 backdrop-blur-[2px] sm:items-center sm:px-4"
+        onClick={onClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 28 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 12 }}
-          transition={{ type: "spring", stiffness: 220, damping: 22 }}
-          className="relative w-full max-w-[420px] overflow-hidden rounded-2xl bg-[#F7F8FA] shadow-[0_30px_80px_-16px_rgba(56,56,236,0.28)] border border-slate-900/[0.06]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="first-listing-title"
+          onClick={(e) => e.stopPropagation()}
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 12 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="relative w-full max-w-[400px] overflow-hidden rounded-t-2xl border border-neutral-200/80 bg-white shadow-[0_30px_80px_-20px_rgba(15,23,42,0.45)] sm:rounded-2xl dark:border-neutral-800 dark:bg-[#1A1D20]"
         >
-          {/* Top accent bar */}
-          <div className="h-[3px] w-full bg-[#3838EC]" />
-
-          {/* Header row: brand mark + close */}
-          <div className="flex items-center justify-between px-6 pt-5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#3838EC] text-[13px] font-bold text-white">
-              U
-            </div>
+          {/* Listing preview on a soft brand wash */}
+          <div className="relative bg-[var(--accent-soft)] px-5 pb-5 pt-12">
             <button
+              ref={closeRef}
+              type="button"
               onClick={onClose}
               aria-label="Close"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-white/70 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
             >
-              <HiXMark size={18} />
+              <X className="h-[18px] w-[18px]" />
             </button>
-          </div>
 
-          {/* Top: celebration content */}
-          <div className="px-8 pb-8 pt-4 text-center">
             <motion.div
-              initial={{ opacity: 0, scale: 0.4, rotate: -20 }}
-              animate={{ opacity: 1, scale: 1, rotate: -8 }}
-              transition={{
-                delay: 0.15,
-                type: "spring",
-                stiffness: 320,
-                damping: 14,
-              }}
-              className="mx-auto mb-6 inline-flex items-center gap-1.5 rounded-md border-[3px] border-double border-[#3838EC] px-4 py-1.5 font-mono text-xs font-bold uppercase tracking-[0.15em] text-[#3838EC]"
+              initial={reduceMotion ? false : { opacity: 0, y: 14, rotate: -3 }}
+              animate={{ opacity: 1, y: 0, rotate: -2 }}
+              transition={{ delay: 0.15, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="mx-auto w-[210px] overflow-hidden rounded-xl border border-white bg-white shadow-[0_18px_36px_-16px_rgba(15,23,42,0.45)] dark:border-white/10 dark:bg-[#1f2226]"
             >
-              <HiCheckBadge size={16} />
-              Listed
+              <div className="relative aspect-[4/3] bg-neutral-100 dark:bg-white/5">
+                {listing?.image ? (
+                  <img src={ikCard(listing.image)} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="grid h-full w-full place-items-center">
+                    <img src="/fav.svg" alt="" className="h-12 w-12 rounded-xl" />
+                  </div>
+                )}
+                <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-sm">
+                  <span className="relative flex h-1.5 w-1.5">
+                    {!reduceMotion && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />}
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                  Live
+                </span>
+              </div>
+              {listing?.title && (
+                <div className="px-3 py-2.5">
+                  <p className="truncate text-[13px] font-medium text-slate-900 dark:text-white">{listing.title}</p>
+                  {listing.selling_price != null && (
+                    <p className="text-[13px] font-semibold text-slate-900 dark:text-white">{inr(listing.selling_price)}</p>
+                  )}
+                </div>
+              )}
             </motion.div>
+          </div>
 
-            <h2
-              id="first-listing-heading"
-              className="text-[28px] font-bold leading-tight tracking-tight text-slate-900"
-            >
-              You&apos;re live.
+          {/* Message */}
+          <div className="px-6 pb-6 pt-5">
+            <p className="text-[12.5px] font-medium text-[var(--accent-text)]">First listing, done</p>
+            <h2 id="first-listing-title" className="mt-1 font-figtree text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white">
+              You&apos;re officially a seller.
             </h2>
-
-            <p className="mx-auto mt-3 max-w-[300px] text-[15px] leading-relaxed text-slate-500">
-              Your first listing just went up on{" "}
-              <span className="font-semibold text-[#3838EC]">Unideals</span>.
-              Students can now find it, view it, and reach out.
+            <p className="mt-1.5 text-[14px] leading-relaxed text-slate-600 dark:text-zinc-400">
+              It&apos;s live on {campusName}. Now we wait for the &ldquo;is this still available?&rdquo; texts.
             </p>
-          </div>
 
-          {/* Perforated tear line */}
-          <div className="relative border-t-2 border-dashed border-slate-200">
-            <div className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-slate-100 shadow-[inset_0_1px_3px_rgba(15,23,42,0.12)]" />
-            <div className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-slate-100 shadow-[inset_0_1px_3px_rgba(15,23,42,0.12)]" />
-          </div>
-
-          {/* Receipt stub */}
-          <div className="space-y-2.5 bg-[#F7F8FA]/70 px-8 py-5 font-mono text-[13px] tabular-nums">
-            <div className="flex items-baseline justify-between">
-              <span className="text-[11px] uppercase tracking-wide text-slate-400">
-                Status
+            {/* Badge just unlocked (first_listing: Freshers' Drop, +30 XP) */}
+            <div className="mt-4 flex items-center gap-3 rounded-xl border border-amber-200/70 bg-amber-50/70 px-3.5 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/20">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-[18px] shadow-sm ring-1 ring-amber-100 dark:bg-white/10 dark:ring-amber-900/50" aria-hidden="true">
+                📦
               </span>
-              <span className="inline-flex items-center gap-1.5 font-semibold text-[#3838EC]">
-                <motion.span
-                  animate={{ opacity: [1, 0.4, 1] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
-                  className="h-1.5 w-1.5 rounded-full bg-[#3838EC]"
-                />
-                Live
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-semibold text-slate-900 dark:text-white">Freshers&apos; Drop unlocked</span>
+                <span className="block text-[12.5px] text-slate-500 dark:text-zinc-400">+30 XP added to your profile</span>
               </span>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[11px] uppercase tracking-wide text-slate-400">
-                Visible to
-              </span>
-              <span className="font-semibold text-slate-700">All students</span>
-            </div>
-          </div>
 
-          {/* CTA */}
-          <div className="px-8 pb-8 pt-6">
-            <motion.button
-              whileHover={{ scale: 1.015 }}
-              whileTap={{ scale: 0.985 }}
-              onClick={onClose}
-              className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-lg bg-[#3838EC] py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_20px_-6px_rgba(56,56,236,0.55)] transition-colors hover:bg-[#2F2FCB]"
-            >
-              <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[#F7F8FA]/25" />
-              Continue exploring
-              <HiArrowRight size={16} />
-            </motion.button>
-            <p className="mt-3 text-center text-xs text-slate-400">
-              Closes automatically in a few seconds
-            </p>
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-neutral-200 bg-white text-[14px] font-medium text-slate-900 transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] dark:border-neutral-700 dark:bg-transparent dark:text-white dark:hover:bg-white/5"
+              >
+                Keep browsing
+              </button>
+              {href ? (
+                <Link
+                  to={href}
+                  onClick={onClose}
+                  className="group inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[var(--accent)] text-[14px] font-medium text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1A1D20]"
+                >
+                  View listing
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </Link>
+              ) : (
+                <Link
+                  to="/productlisted"
+                  onClick={onClose}
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-[var(--accent)] text-[14px] font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
+                >
+                  My listings
+                </Link>
+              )}
+            </div>
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
-};
-
-export default FirstListingCelebration;
+}

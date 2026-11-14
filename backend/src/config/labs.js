@@ -29,7 +29,7 @@ export const LABS_FEATURES = Object.freeze([
     key: "demand_meter",
     name: "Demand meter",
     description:
-      "See how hot a category is on your campus right now (supply, views and recent sales) before you price it.",
+      "See how hot a category is on your campus right now (live supply, recent sales and buyer chats) before you price it.",
     minTier: USER_TIER.PRO_PLUS,
   },
 ]);

@@ -91,7 +91,7 @@ const Footer = () => {
   return (
     <div className="w-full bg-[#F7F8FA] px-5 pb-4 pt-8 sm:px-[4.5vw] sm:pb-6 sm:pt-12 dark:bg-[#131313]">
       <footer
-        className="brand-surface mx-auto w-full max-w-[1380px] overflow-hidden rounded-xl font-figtree text-white shadow-[0_10px_30px_-12px_rgba(15,23,42,0.35)] md:rounded-2xl"
+        className="brand-surface mx-auto w-full max-w-[var(--page-max)] overflow-hidden rounded-xl font-figtree text-white shadow-[0_10px_30px_-12px_rgba(15,23,42,0.35)] md:rounded-2xl"
       >
 
         <div className="relative px-5 pt-8 sm:px-8 sm:pt-10 lg:px-12">

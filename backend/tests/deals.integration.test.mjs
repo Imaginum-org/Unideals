@@ -115,6 +115,49 @@ await test("completed deals are final", async () => {
   await deals.confirmItemReceived({ conversationId: id, userId: Bu });
   await assert.rejects(() => deals.revertDealStage({ conversationId: id, userId: S }), /can't be undone/i);
 });
+await test("a completed deal records what sold, at what price (for price insights)", async () => {
+  const { id } = await mkThread();
+  await deals.confirmDeal({ conversationId: id, userId: S, amount: 800 });
+  await deals.schedulePickup({ conversationId: id, userId: S, date: tomorrow, location: "Library" });
+  await deals.confirmPayment({ conversationId: id, userId: S });
+  await deals.confirmItemReceived({ conversationId: id, userId: Bu });
+  const d = await Deal.findOne({ conversation_id: id }).lean();
+  assert.equal(d.sale.category, "electronics");
+  assert.equal(d.sale.condition, "like_new");
+  assert.equal(d.sale.original_price, 1500);
+  assert.equal(d.sale.sold_price, 800);
+  assert.equal(String(d.sale.campus_id), String(campus._id));
+  assert.equal(String(d.sale.seller_id), S);
+});
+await test("a first listing that sells (and is later purged) still counts as 'listed your first item'", async () => {
+  const fresh = await mkUser();
+  assert.equal((await User.findById(fresh._id).lean()).first_listed_at ?? null, null);
+  const product = await Product.create({
+    seller_id: fresh._id, campus_id: campus._id, title: "First ever", description: "Works perfectly, barely used.",
+    category: "electronics", condition: "like_new", selling_price: 900, original_price: 1500,
+    images: [{ url: "https://ik.imagekit.io/x/a.jpg", fileId: "f" }], status: "listed", payment_preference: "both",
+    pickup_address_snapshot: { address_line: "Gate", city: "V" },
+  });
+  // Stamped by the save hook (fire-and-forget): give it a tick.
+  await new Promise((r) => setTimeout(r, 100));
+  const stamped = (await User.findById(fresh._id).lean()).first_listed_at;
+  assert.ok(stamped, "first_listed_at set when the listing went live");
+  // The listing sells and the cleanup job later hard-deletes it.
+  await Product.deleteOne({ _id: product._id });
+  const { computeAndAwardBadges } = await import(B + "src/services/badgeService.js");
+  await computeAndAwardBadges(fresh._id);
+  const after = await User.findById(fresh._id).lean();
+  assert.ok(after.first_listed_at, "never cleared");
+  assert.ok((after.gamification?.badges || []).some((b) => b.badge_id === "first_listing"), "first-listing badge kept");
+});
+await test("a draft alone doesn't count as listing your first item", async () => {
+  const fresh = await mkUser();
+  await Product.create({
+    seller_id: fresh._id, campus_id: campus._id, title: "Just a draft", category: "electronics", status: "draft",
+  });
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal((await User.findById(fresh._id).lean()).first_listed_at ?? null, null);
+});
 await test("two simultaneous undos never skip two stages", async () => {
   const { id } = await mkThread();
   await deals.confirmDeal({ conversationId: id, userId: S, amount: 800 });

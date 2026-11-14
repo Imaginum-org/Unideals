@@ -13,7 +13,7 @@ import {
   FolderIcon,
 } from "@animateicons/react/lucide";
 import { Settings01Icon } from "@animateicons/react/huge";
-import { ArrowUpRight, CircleHelp, Crown, PanelLeftClose, PanelLeftOpen, Sparkles, Trophy } from "lucide-react";
+import { ArrowUpRight, CircleHelp, Crown, PanelLeftClose, PanelLeftOpen, PlayCircle, Sparkles, Trophy } from "lucide-react";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
@@ -320,6 +320,7 @@ function Profile_left_part() {
     {
       title: "Support",
       items: [
+        { path: "/guides", label: "Video guides", icon: PlayCircle },
         { path: "/faq", label: "FAQ", icon: CircleHelp },
         { path: "/contact", label: "Help & support", icon: ContactIcon },
         { path: "/termscondition", label: "Terms & privacy", icon: FolderIcon },

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BadgeCheck, CalendarDays, Check, MapPin, Pencil, Plus } from "lucide-react";
+import { ArrowRight, BadgeCheck, CalendarDays, Check, ChevronRight, FilePen, Handshake, MapPin, MessageCircle, Pencil, PlayCircle, Plus } from "lucide-react";
 import MobileAccountMenu from "../components/MobileAccountMenu.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import AchievementTracker from "../components/overview/AchievementTracker.jsx";
@@ -145,7 +145,13 @@ function ProfileOverview() {
     { done: Boolean(userDetails?.is_email_verified), label: "Verify your email", to: "/settings" },
     { done: Boolean(campusName), label: "Set your campus", to: "/settings" },
     { done: hasAvatar, label: "Add a profile photo", to: "/settings" },
-    { done: userProducts.length > 0, label: "List your first item", to: "/upload" },
+    // Ever had a listing live (durable: a first listing that sold or was
+    // deleted still counts). Drafts alone don't.
+    {
+      done: Boolean(userDetails?.first_listed_at) || userProducts.some((p) => (p.status || "").toLowerCase() !== "draft"),
+      label: "List your first item",
+      to: "/upload",
+    },
   ];
   const doneCount = checklist.filter((c) => c.done).length;
   const showChecklist = !productsLoading && userDetails && doneCount < checklist.length;
@@ -156,7 +162,8 @@ function ProfileOverview() {
   const todo = [
     yourTurn > 0 && {
       key: "deals",
-      tone: "bg-amber-500",
+      icon: Handshake,
+      tone: "bg-amber-50 text-amber-600 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/60",
       title: `${count(yourTurn, "deal needs", "deals need")} your next step`,
       hint: "Set a pickup or confirm payment",
       to: "/myorders",
@@ -164,7 +171,8 @@ function ProfileOverview() {
     },
     chatUnread > 0 && {
       key: "chats",
-      tone: "bg-[var(--accent)]",
+      icon: MessageCircle,
+      tone: "bg-[var(--accent-soft)] text-[var(--accent-text)] ring-[var(--accent-soft-strong)]",
       title: `${count(chatUnread > 99 ? "99+" : chatUnread, "unread chat", "unread chats")}`,
       hint: "Buyers reply faster when you do",
       to: "/chat",
@@ -172,7 +180,8 @@ function ProfileOverview() {
     },
     listing.drafts > 0 && {
       key: "drafts",
-      tone: "bg-slate-400",
+      icon: FilePen,
+      tone: "bg-neutral-100 text-slate-500 ring-neutral-200 dark:bg-white/5 dark:text-zinc-400 dark:ring-white/10",
       title: `${count(listing.drafts, "draft", "drafts")} not live yet`,
       hint: "Finish listing to start getting views",
       to: "/productlisted",
@@ -214,7 +223,18 @@ function ProfileOverview() {
         {/* ── Profile header ── */}
         <section className={cn(CARD, FLUSH_ON_PHONE, "overflow-hidden max-sm:-mt-4")}>
           <div className="brand-surface h-28 overflow-hidden sm:h-36" aria-hidden="true">
-            <p className="pointer-events-none absolute -bottom-[0.18em] right-3 select-none bg-gradient-to-b from-white/35 to-white/5 bg-clip-text text-[clamp(3.6rem,12vw,7.5rem)] font-extrabold leading-none tracking-[-0.04em] text-transparent sm:right-6">
+            {/* Light from the top-right: one wide, soft radial wash (no visible
+                shapes or edges), a faint diagonal sheen, and a 1px highlight on
+                the top edge. The wordmark is lit from the same corner. */}
+            <span
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(90% 130% at 100% 0%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0) 62%), linear-gradient(115deg, rgba(255,255,255,0) 42%, rgba(255,255,255,0.07) 58%, rgba(255,255,255,0) 74%)",
+              }}
+            />
+            <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-white/0 via-white/25 to-white/50" />
+            <p className="pointer-events-none absolute -bottom-[0.18em] right-3 select-none bg-gradient-to-bl from-white/70 via-white/25 to-white/[0.06] bg-clip-text text-[clamp(3.6rem,12vw,7.5rem)] font-extrabold leading-none tracking-[-0.04em] text-transparent sm:right-6">
               unideals
             </p>
           </div>
@@ -306,27 +326,38 @@ function ProfileOverview() {
 
         {/* ── Needs your attention: one small card per pending action ── */}
         {todo.length > 0 && (
-          <section aria-label="Needs your attention" className={cn("grid gap-3", todo.length === 1 ? "" : todo.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3")}>
-            {todo.map((t) => (
-              <Link
-                key={t.key}
-                to={t.to}
-                className={cn(CARD, "group flex items-center gap-3 px-4 py-3.5 transition-all hover:-translate-y-px hover:border-[var(--accent-ring)] hover:shadow-[0_6px_18px_-10px_rgba(15,23,42,0.25)]")}
-              >
-                <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
-                  <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", t.tone)} />
-                  <span className={cn("relative inline-flex h-2 w-2 rounded-full", t.tone)} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13.5px] font-semibold text-slate-900 dark:text-white">{t.title}</span>
-                  <span className="block truncate text-[12px] text-slate-500 dark:text-zinc-400">{t.hint}</span>
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-1 text-[12.5px] font-semibold text-[var(--accent-text)]">
-                  {t.cta}
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-                </span>
-              </Link>
-            ))}
+          <section aria-labelledby="todo-heading" className={cn(CARD, FLUSH_ON_PHONE, "overflow-hidden")}>
+            <div className="flex items-center justify-between gap-3 px-4 pb-1 pt-3.5 sm:px-5">
+              <h2 id="todo-heading" className="text-[13.5px] font-semibold text-slate-900 dark:text-white">
+                Needs your attention
+              </h2>
+              <span className="text-[12.5px] tabular-nums text-slate-400 dark:text-zinc-500">{todo.length}</span>
+            </div>
+            <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {todo.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <li key={t.key}>
+                    <Link
+                      to={t.to}
+                      className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50 focus-visible:bg-neutral-50 focus-visible:outline-none sm:px-5 dark:hover:bg-white/[0.03] dark:focus-visible:bg-white/[0.03]"
+                    >
+                      <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg ring-1 ring-inset", t.tone)} aria-hidden="true">
+                        <Icon className="h-[17px] w-[17px]" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13.5px] font-medium text-slate-900 dark:text-white">{t.title}</span>
+                        <span className="block truncate text-[12.5px] text-slate-500 dark:text-zinc-400">{t.hint}</span>
+                      </span>
+                      <span className="inline-flex shrink-0 items-center gap-0.5 text-[12.5px] font-medium text-slate-500 transition-colors group-hover:text-slate-900 dark:text-zinc-400 dark:group-hover:text-white">
+                        <span className="hidden sm:inline">{t.cta}</span>
+                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         )}
 
@@ -403,12 +434,13 @@ function ProfileOverview() {
                 ))}
               </div>
             ) : recent.length === 0 ? (
-              <div className={cn(CARD, "flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:justify-between")}>
-                <div>
+              <div className={cn(CARD, "flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5")}>
+                <div className="min-w-0 flex-1">
                   <p className="text-[14.5px] font-semibold text-slate-900 dark:text-white">Nothing listed yet</p>
-                  <p className="text-[13px] text-slate-500 dark:text-zinc-400">Books, gadgets, cycles: list in two minutes and earn the Freshers&apos; Drop badge.</p>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-zinc-400">Books, gadgets, cycles: list in two minutes and earn the Freshers&apos; Drop badge.</p>
                 </div>
-                <Link to="/upload" className={btnPrimary}>
+                {/* Never shrinks or wraps; full-width, thumb-sized on phones. */}
+                <Link to="/upload" className={cn(btnPrimary.replace("h-9 ", ""), "h-11 w-full shrink-0 whitespace-nowrap sm:h-9 sm:w-auto")}>
                   <Plus className="h-4 w-4" aria-hidden="true" /> List an item
                 </Link>
               </div>
@@ -466,6 +498,15 @@ function ProfileOverview() {
           </section>
           </div>
         </div>
+
+        {/* Quiet pointer to the video walkthroughs */}
+        <Link
+          to="/guides"
+          className="mx-auto inline-flex items-center gap-1.5 py-1 text-[12.5px] text-slate-400 transition-colors hover:text-[var(--accent-text)] dark:text-zinc-500"
+        >
+          <PlayCircle className="h-3.5 w-3.5" aria-hidden="true" />
+          New here? Short video guides show how everything works
+        </Link>
       </div>
     </AccountLayout>
   );

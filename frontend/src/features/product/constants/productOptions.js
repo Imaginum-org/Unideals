@@ -133,15 +133,23 @@ export const GIRLS_MODE_CATEGORY_ORDER = Object.freeze([
 ]);
 
 // Sort any category option list girls-first by the curated order.
-// Options outside the order (e.g. lab_equipment in upload) sink to the end.
+// Options outside the order (e.g. lab_equipment in upload) come next, and
+// "Others" is always the very last option.
 export const orderCategoriesForGirls = (options) =>
   [...options].sort((a, b) => {
-    const ia = GIRLS_MODE_CATEGORY_ORDER.indexOf(a.value);
-    const ib = GIRLS_MODE_CATEGORY_ORDER.indexOf(b.value);
-    const ra = ia === -1 ? Number.MAX_SAFE_INTEGER : ia;
-    const rb = ib === -1 ? Number.MAX_SAFE_INTEGER : ib;
-    return ra - rb;
+    const rank = (v) => {
+      if (v === "others") return Number.MAX_SAFE_INTEGER;
+      const i = GIRLS_MODE_CATEGORY_ORDER.indexOf(v);
+      return i === -1 ? Number.MAX_SAFE_INTEGER - 1 : i;
+    };
+    return rank(a.value) - rank(b.value);
   });
+
+/** Any category list with "Others" moved to the end (order otherwise kept). */
+export const othersLast = (options) => [
+  ...options.filter((o) => o.value !== "others"),
+  ...options.filter((o) => o.value === "others"),
+];
 
 export const PRODUCT_CONDITION_OPTIONS = [
   { value: "brand_new", label: "Brand New" },

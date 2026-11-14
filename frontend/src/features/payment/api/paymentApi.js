@@ -1,4 +1,5 @@
 import axios from "../../../services/axiosInstance";
+import { invalidateRequests } from "../../../services/requestCache.js";
 
 const BILLING_BASE_PATH = "/api/payments";
 
@@ -8,8 +9,13 @@ export const createPaymentOrder = (data) => {
 };
 
 // POST /api/payments/verify { razorpay_order_id, razorpay_payment_id, razorpay_signature }
+// A verified boost add-on changes product data (Boosted rail, listing
+// badges), so drop cached product reads right after a successful verify.
 export const verifyPayment = (data) => {
-  return axios.post(`${BILLING_BASE_PATH}/verify`, data);
+  return axios.post(`${BILLING_BASE_PATH}/verify`, data).then((res) => {
+    invalidateRequests("/api/product");
+    return res;
+  });
 };
 
 // GET /api/payments/me — tier, plan, usage, payment history

@@ -8,7 +8,6 @@ import {
   CalendarDays,
   ChevronDown,
   Check,
-  CircleCheck,
   Clock3,
   Copy,
   Eye,
@@ -20,7 +19,9 @@ import {
   Info,
   Layers,
   LayoutList,
+  Mail,
   MapPin,
+  MoreHorizontal,
   MessageSquareText,
   Package,
   Palette,
@@ -31,6 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { FaTelegram, FaWhatsapp } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 import { getProductById, getProducts, recordProductView } from "../api/productApi";
 import ProductCard from "../components/ProductCard.jsx";
 import ProductGallery from "../components/ProductGallery.jsx";
@@ -109,7 +111,7 @@ const PLAN_LABEL = { pro: "Pro", pro_plus: "Pro+" };
 const PAYMENT_LABEL = { cash: "Cash", upi: "UPI", both: "Cash or UPI" };
 
 const SAFETY_TIPS = [
-  "Meet at a busy, public spot on campus, ideally in daylight.",
+  "Meet at a busy campus spot, ideally in daylight.",
   "Check the item properly before you pay.",
   "Pay at pickup by cash or UPI. Never pay in advance.",
   "Keep the conversation in Unideals chat.",
@@ -123,12 +125,26 @@ const CARD =
 // (native shopping-app pattern) instead of floating cards with margins.
 const FLUSH_ON_PHONE = "max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none";
 
-function Section({ title, icon: Icon, action, className, children }) {
+/* Soft tints: a hint of colour per section so the details column isn't monochrome. */
+const TINTS = {
+  indigo: "bg-indigo-50 text-indigo-600 ring-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-300 dark:ring-indigo-900/60",
+  violet: "bg-violet-50 text-violet-600 ring-violet-100 dark:bg-violet-950/50 dark:text-violet-300 dark:ring-violet-900/60",
+  emerald: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-900/60",
+  sky: "bg-sky-50 text-sky-600 ring-sky-100 dark:bg-sky-950/50 dark:text-sky-300 dark:ring-sky-900/60",
+  rose: "bg-rose-50 text-rose-500 ring-rose-100 dark:bg-rose-950/50 dark:text-rose-300 dark:ring-rose-900/60",
+};
+
+/* A titled block inside the shared details card. Spacing + type do the work; no borders. */
+function Section({ title, icon: Icon, tone = "indigo", action, className, children }) {
   return (
-    <section className={cn(CARD, FLUSH_ON_PHONE, "p-4 sm:p-6", className)}>
-      <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
-        <h2 className="flex items-center gap-2 text-[16px] font-semibold tracking-tight text-slate-900 sm:text-[17px] dark:text-white">
-          {Icon && <Icon className="h-[18px] w-[18px] text-[var(--accent-text)]" aria-hidden="true" />}
+    <section className={cn("px-4 py-5 sm:px-6 sm:py-6", className)}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-slate-900 sm:text-[17px] dark:text-white">
+          {Icon && (
+            <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg ring-1 ring-inset", TINTS[tone])} aria-hidden="true">
+              <Icon className="h-4 w-4" />
+            </span>
+          )}
           {title}
         </h2>
         {action}
@@ -138,18 +154,20 @@ function Section({ title, icon: Icon, action, className, children }) {
   );
 }
 
-function Chip({ tone = "neutral", className, children, ...rest }) {
+function Chip({ tone = "neutral", size = "md", className, children, ...rest }) {
+  // Quiet, compact tags (Linear/Stripe style): neutral surface, colour used sparingly.
   const tones = {
-    neutral: "bg-neutral-100 text-slate-600 ring-neutral-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-white/10",
-    accent: "bg-[var(--accent-soft)] text-[var(--accent-text)] ring-[var(--accent-soft-strong)]",
-    success: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900",
-    warning: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900",
-    pink: "bg-pink-50 text-pink-700 ring-pink-200 dark:bg-pink-950/40 dark:text-pink-200 dark:ring-pink-900",
+    neutral: "bg-white text-slate-700 ring-neutral-200 dark:bg-white/[0.04] dark:text-zinc-300 dark:ring-white/10",
+    accent: "bg-[var(--accent-soft)] text-[var(--accent-text)] ring-transparent",
+    success: "bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/60",
+    warning: "bg-amber-50 text-amber-800 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/60",
+    pink: "bg-pink-50 text-pink-700 ring-pink-100 dark:bg-pink-950/40 dark:text-pink-200 dark:ring-pink-900/60",
   };
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold capitalize ring-1 ring-inset",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md font-medium ring-1 ring-inset",
+        size === "sm" ? "h-5 px-1.5 text-[10.5px]" : "h-6 px-2 text-[12px] capitalize",
         tones[tone],
         className,
       )}
@@ -160,22 +178,32 @@ function Chip({ tone = "neutral", className, children, ...rest }) {
   );
 }
 
-function Notice({ tone = "warning", icon: Icon = Info, children }) {
-  const tones = {
-    warning: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200",
-    pink: "border-pink-200 bg-pink-50 text-pink-800 dark:border-pink-900/60 dark:bg-pink-950/30 dark:text-pink-200",
-    accent: "border-[var(--accent-soft-strong)] bg-[var(--accent-soft)] text-slate-700 dark:text-zinc-200",
+/* Status callout: neutral surface, a tinted icon tile carries the tone,
+   bold title + muted explanation. */
+function Notice({ tone = "warning", icon: Icon = Info, title, children }) {
+  const tiles = {
+    warning: "bg-amber-50 text-amber-600 ring-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-900/60",
+    neutral: "bg-neutral-100 text-slate-500 ring-neutral-200 dark:bg-white/5 dark:text-zinc-400 dark:ring-white/10",
+    pink: "bg-pink-50 text-pink-600 ring-pink-100 dark:bg-pink-950/50 dark:text-pink-300 dark:ring-pink-900/60",
   };
   return (
-    <div className={cn("flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-[13px] font-medium leading-relaxed", tones[tone])}>
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <div className="min-w-0">{children}</div>
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-white/[0.02]"
+    >
+      <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg ring-1 ring-inset", tiles[tone])} aria-hidden="true">
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 pt-px">
+        {title && <p className="text-[13px] font-semibold leading-5 text-slate-900 dark:text-white">{title}</p>}
+        <p className="text-[12.5px] leading-5 text-slate-500 dark:text-zinc-400">{children}</p>
+      </div>
     </div>
   );
 }
 
 const iconBtn =
-  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-[13px] font-semibold text-slate-600 transition-colors hover:border-[var(--accent-ring)] hover:text-[var(--accent-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-300";
+  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 text-[13px] font-medium text-slate-600 transition-colors hover:border-[var(--accent-ring)] hover:text-[var(--accent-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-300";
 
 /* Escape-to-close + body scroll lock for the page's dialogs. */
 function useDialog(open, onClose) {
@@ -577,7 +605,7 @@ const ProductDescription = () => {
         transition={{ duration: 0.3, ease: "easeOut" }}
         className="min-h-screen w-full bg-[#F7F9FD] pb-[calc(6rem+env(safe-area-inset-bottom))] font-figtree dark:bg-[#131313] sm:pb-0"
       >
-        <div className="mx-auto w-full max-w-[1380px] px-4 sm:px-8 sm:pt-4 md:px-11 lg:px-14 2xl:px-0">
+        <div className="mx-auto w-full max-w-[calc(var(--page-max)+9vw)] px-4 sm:px-[4.5vw] sm:pt-4 2xl:max-w-[var(--page-max)] 2xl:px-0">
           {/* Breadcrumbs (sm+; phones open straight onto the photo) */}
           <div className="hidden sm:block">
           <Breadcrumbs
@@ -604,57 +632,61 @@ const ProductDescription = () => {
                 />
               </div>
 
-              <DescriptionSection text={product?.description} className="max-lg:order-4" />
+              {/* Details: one calm surface, sections split by hairlines (no nested boxes). */}
+              <div className={cn(CARD, FLUSH_ON_PHONE, "divide-y divide-neutral-200/80 max-lg:order-4 dark:divide-neutral-800")}>
+                <DescriptionSection text={product?.description} />
 
-              {specs.length > 0 && (
-                <Section title="Specifications" icon={LayoutList} className="max-lg:order-5">
-                  <dl className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
-                    {specs.map(({ icon: Icon, label, value }) => (
-                      <div
-                        key={label}
-                        className="flex items-center justify-between gap-4 border-b border-neutral-100 py-3 last:border-0 sm:[&:nth-last-child(2):nth-child(odd)]:border-0 dark:border-neutral-800"
-                      >
-                        <dt className="flex items-center gap-2.5 text-[13.5px] text-slate-500 dark:text-zinc-400">
-                          <Icon className="h-4 w-4 shrink-0 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
-                          {label}
-                        </dt>
-                        <dd className="min-w-0 truncate text-right text-[13.5px] font-semibold text-slate-900 dark:text-zinc-100" title={value}>
-                          {value}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </Section>
-              )}
-
-              <Section title="Pickup & safety" icon={ShieldCheck} className="max-lg:order-6">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <InfoTile icon={Building2} label="Campus" value={product?.campus_id?.name || campus?.name || "Campus marketplace"} />
-                  <InfoTile
-                    icon={MapPin}
-                    label="Meetup spot"
-                    value={pickup.address_line || "Shared in chat"}
-                    sub={[pickup.city, pickup.state].filter(Boolean).join(", ")}
-                  />
-                </div>
-                {pickup.additional_info && (
-                  <p className="mt-3 rounded-xl bg-neutral-50 px-3.5 py-3 text-[13px] leading-relaxed text-slate-600 dark:bg-white/[0.03] dark:text-zinc-300">
-                    <span className="font-semibold text-slate-800 dark:text-zinc-100">Seller note: </span>
-                    {pickup.additional_info}
-                  </p>
+                {specs.length > 0 && (
+                  <Section title="Specifications" icon={LayoutList} tone="violet">
+                    <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 sm:gap-x-8">
+                      {specs.map(({ label, value }) => (
+                        <div key={label} className="min-w-0">
+                          <dt className="text-[12.5px] text-slate-500 dark:text-zinc-400">{label}</dt>
+                          <dd
+                            className="mt-1 truncate text-[14.5px] font-medium text-slate-900 first-letter:uppercase dark:text-zinc-100"
+                            title={String(value)}
+                          >
+                            {value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </Section>
                 )}
-                <div className="mt-4 rounded-xl border border-[var(--accent-soft-strong)] bg-[var(--accent-soft)] p-4">
-                  <p className="text-[13.5px] font-semibold text-[var(--accent-text)]">Safe campus exchange</p>
-                  <ul className="mt-2.5 grid gap-2 sm:grid-cols-2">
-                    {SAFETY_TIPS.map((tip) => (
-                      <li key={tip} className="flex items-start gap-2 text-[13px] leading-relaxed text-slate-600 dark:text-zinc-300">
-                        <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Section>
+
+                <Section title="Pickup & safety" icon={MapPin} tone="emerald">
+                  <div className="grid gap-5 sm:grid-cols-2 sm:gap-8">
+                    <InfoTile icon={Building2} tone="sky" label="Campus" value={product?.campus_id?.name || campus?.name || "Campus marketplace"} />
+                    <InfoTile
+                      icon={MapPin}
+                      tone="rose"
+                      label="Meetup spot"
+                      value={pickup.address_line || "Shared in chat"}
+                      sub={[pickup.city, pickup.state].filter(Boolean).join(", ")}
+                    />
+                  </div>
+                  {pickup.additional_info && (
+                    <p className="mt-5 break-words text-[14px] leading-relaxed text-slate-600 dark:text-zinc-300">
+                      <span className="font-medium text-slate-900 dark:text-zinc-100">Seller note: </span>
+                      {pickup.additional_info}
+                    </p>
+                  )}
+                  <div className="mt-6 rounded-xl bg-emerald-50/60 p-4 sm:p-5 dark:bg-emerald-950/20">
+                    <p className="flex items-center gap-2 text-[13.5px] font-semibold text-slate-900 dark:text-white">
+                      <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                      Safe campus exchange
+                    </p>
+                    <ul className="mt-3 grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+                      {SAFETY_TIPS.map((tip) => (
+                        <li key={tip} className="flex items-start gap-2.5 text-[13.5px] leading-5 text-slate-600 dark:text-zinc-300">
+                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" strokeWidth={2.25} aria-hidden="true" />
+                          {tip}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </Section>
+              </div>
             </div>
 
             {/* ── Summary column (sticky on desktop) ── */}
@@ -669,7 +701,7 @@ const ProductDescription = () => {
                     </Link>
                   )}
                   {conditionLabel && !isSpecHidden(product?.category, "condition") && <Chip>{conditionLabel}</Chip>}
-                  <Chip tone={reservedByOther ? "warning" : isAvailable ? "success" : "neutral"}>
+                  <Chip>
                     <span
                       className={cn(
                         "h-1.5 w-1.5 rounded-full",
@@ -714,7 +746,12 @@ const ProductDescription = () => {
                         {inr(original)}
                       </span>
                     )}
-                    {savePct > 0 && <Chip tone="success" className="mb-0.5">{savePct}% off</Chip>}
+                    {savePct > 0 && (
+                      // Styled like the header's Sell button: solid fill, white text.
+                      <span className="mb-0.5 inline-flex h-7 items-center whitespace-nowrap rounded-lg bg-emerald-700 px-2.5 text-[13px] font-medium text-white dark:bg-emerald-600">
+                        Save {savePct}%
+                      </span>
+                    )}
                   </div>
                   <p className="mt-2 text-[12.5px] text-slate-500 dark:text-zinc-400">
                     {hasDiscount && <>You save {inr(original - selling)} · </>}
@@ -726,14 +763,18 @@ const ProductDescription = () => {
                 {/* Status notices */}
                 <div className="mt-4 space-y-2 empty:hidden">
                   {!isAvailable && (
-                    <Notice icon={Info}>This listing is {availabilityLabel.toLowerCase()} and no longer accepting buyers.</Notice>
+                    <Notice tone="neutral" icon={Package} title={`${availabilityLabel}`}>
+                      This listing isn&apos;t accepting buyers anymore.
+                    </Notice>
                   )}
                   {reservedByOther && (
-                    <Notice icon={Info}>Reserved for another buyer. It may become available again if the deal falls through.</Notice>
+                    <Notice tone="warning" icon={Hourglass} title="Reserved for another buyer">
+                      If their deal falls through, it&apos;ll be available again.
+                    </Notice>
                   )}
                   {girlsBlocked && (
-                    <Notice tone="pink" icon={Info}>
-                      Girls-only listing. Only girls can chat with this seller.
+                    <Notice tone="pink" icon={ShieldCheck} title="Girls-only listing">
+                      Only girls can chat with this seller.
                       {!isLoggedIn && " Log in to continue."}
                     </Notice>
                   )}
@@ -833,7 +874,7 @@ const ProductDescription = () => {
             {isOwner ? (
               <Link
                 to={`/upload/${product._id}`}
-                className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-[15px] font-semibold text-white active:scale-[0.98]"
+                className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-[15px] font-medium text-white active:scale-[0.98]"
               >
                 <Pencil className="h-[18px] w-[18px]" aria-hidden="true" />
                 Edit listing
@@ -888,7 +929,7 @@ export default ProductDescription;
 /* ── Building blocks ── */
 
 function PrimaryCta({ isAvailable, reservedByOther, girlsBlocked, chatHref, className }) {
-  const base = "inline-flex items-center justify-center gap-2 rounded-lg px-4 text-[15px] font-semibold";
+  const base = "inline-flex items-center justify-center gap-2 rounded-lg px-4 text-[15px] font-medium";
   if (reservedByOther || girlsBlocked || !isAvailable) {
     const label = reservedByOther ? "Reserved" : girlsBlocked ? "Girls only" : "No longer available";
     return (
@@ -918,7 +959,7 @@ function PrimaryCta({ isAvailable, reservedByOther, girlsBlocked, chatHref, clas
 // One shape for the secondary actions (Save, Report listing) so they sit
 // side by side as an identical pair; only colour/state differs.
 const SECONDARY_BTN =
-  "inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border px-3 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] disabled:opacity-60";
+  "inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border px-3 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] disabled:opacity-60";
 const SECONDARY_IDLE =
   "border-neutral-200 bg-white text-slate-600 dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-300";
 
@@ -975,10 +1016,17 @@ function OwnerActions({ productId }) {
   };
   return (
     <div className="flex flex-col gap-2.5">
-      <Notice tone="accent" icon={Info}>This is your listing. Buyers see a Chat button here.</Notice>
+      <p className="flex items-center gap-2 text-[12.5px] text-slate-500 dark:text-zinc-400">
+        <BadgeCheck className="h-4 w-4 shrink-0 text-[var(--accent-text)]" aria-hidden="true" />
+        <span>
+          <span className="font-semibold text-slate-800 dark:text-zinc-200">Your listing</span>
+          <span aria-hidden="true"> · </span>
+          buyers see a Chat button here
+        </span>
+      </p>
       <Link
         to={`/upload/${productId}`}
-        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-[15px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-[14.5px] font-medium text-white shadow-sm transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1A1D20]"
       >
         <Pencil className="h-[18px] w-[18px]" aria-hidden="true" />
         Edit listing
@@ -1009,18 +1057,31 @@ function SellerCard({ seller, stats, isOwner, onReport, className }) {
   const activeListings = stats?.active_listings;
 
   const ratingCount = Number(seller?.rating?.count) || 0;
+  // One quiet stats strip: value on top, label below.
   const facts = [
-    { label: "Buyer rating", value: ratingCount ? `★ ${Number(seller.rating.avg).toFixed(1)} (${ratingCount})` : "New seller" },
-    memberSince && { label: "Member since", value: memberSince },
-    Number.isFinite(activeListings) && { label: "Active listings", value: activeListings },
+    { label: ratingCount ? `Rating (${ratingCount})` : "Rating", value: ratingCount ? `★ ${Number(seller.rating.avg).toFixed(1)}` : "New" },
+    Number.isFinite(activeListings) && { label: activeListings === 1 ? "Listing" : "Listings", value: activeListings },
     level && { label: rank || "Level", value: `Lvl ${level}` },
   ].filter(Boolean);
+  const cols = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" }[facts.length];
 
   return (
     <section className={cn(CARD, FLUSH_ON_PHONE, "p-4 sm:p-6", className)} aria-label="Seller">
-      <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-        {isOwner ? "You" : "Seller"}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[13px] font-semibold text-slate-900 dark:text-white">{isOwner ? "Your seller profile" : "About the seller"}</h2>
+        {!isOwner && onReport && (
+          <button
+            type="button"
+            onClick={onReport}
+            aria-label="Report seller"
+            className="-mr-2 inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] dark:text-zinc-400 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+          >
+            <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+            Report
+          </button>
+        )}
+      </div>
+
       <div className="mt-3 flex items-center gap-3">
         <AvatarComponent
           name={seller?.name || "Seller"}
@@ -1033,54 +1094,51 @@ function SellerCard({ seller, stats, isOwner, onReport, className }) {
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">
             <p className="truncate text-[15px] font-semibold text-slate-900 dark:text-white">{seller?.name || "Campus seller"}</p>
-            {plan && <Chip tone="accent" className="px-2 py-0.5 text-[10.5px] normal-case">{plan}</Chip>}
+            {plan && <Chip tone="accent" size="sm">{plan}</Chip>}
           </div>
-          {seller?.is_email_verified ? (
-            <p className="mt-0.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-emerald-600 dark:text-emerald-400">
-              <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              Verified email
-            </p>
-          ) : (
-            <p className="mt-0.5 text-[12.5px] text-slate-500 dark:text-zinc-400">Campus member</p>
-          )}
+          <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12.5px] text-slate-500 dark:text-zinc-400">
+            {seller?.is_email_verified ? (
+              <span className="inline-flex items-center gap-1 font-medium text-slate-700 dark:text-zinc-300">
+                <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                Verified
+              </span>
+            ) : (
+              <span>Campus member</span>
+            )}
+            {memberSince && (
+              <>
+                <span aria-hidden="true" className="text-slate-300 dark:text-zinc-600">·</span>
+                <span className="whitespace-nowrap">Joined {memberSince}</span>
+              </>
+            )}
+          </p>
         </div>
       </div>
 
       {facts.length > 0 && (
-        <dl className={cn("mt-4 grid gap-2", facts.length === 3 ? "grid-cols-3" : facts.length === 2 || facts.length === 4 ? "grid-cols-2" : "grid-cols-1")}>
+        <dl className={cn("mt-5 grid gap-4 border-t border-neutral-200/80 pt-4 dark:border-neutral-800", cols)}>
           {facts.map((f) => (
-            <div key={f.label} className="min-w-0 rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-white/[0.03]">
-              <dt className="truncate text-[11px] font-medium text-slate-500 dark:text-zinc-400">{f.label}</dt>
-              <dd className="mt-0.5 truncate text-[14px] font-semibold tabular-nums text-slate-900 dark:text-white">{f.value}</dd>
+            <div key={f.label} className="flex min-w-0 flex-col-reverse">
+              <dt className="mt-0.5 max-w-full truncate text-[11.5px] text-slate-500 dark:text-zinc-400">{f.label}</dt>
+              <dd className="max-w-full truncate text-[15px] font-semibold tabular-nums text-slate-900 dark:text-white">{f.value}</dd>
             </div>
           ))}
         </dl>
-      )}
-
-      {!isOwner && onReport && (
-        <button
-          type="button"
-          onClick={onReport}
-          className="mt-4 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500 transition-colors hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400"
-        >
-          <Flag className="h-3.5 w-3.5" aria-hidden="true" />
-          Report seller
-        </button>
       )}
     </section>
   );
 }
 
-function InfoTile({ icon: Icon, label, value, sub }) {
+function InfoTile({ icon: Icon, tone = "sky", label, value, sub }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-neutral-100 p-3.5 dark:border-neutral-800">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-text)]">
-        <Icon className="h-5 w-5" aria-hidden="true" />
+    <div className="flex min-w-0 items-start gap-3">
+      <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg ring-1 ring-inset", TINTS[tone])} aria-hidden="true">
+        <Icon className="h-[18px] w-[18px]" />
       </span>
       <div className="min-w-0">
-        <p className="text-[12px] font-medium text-slate-500 dark:text-zinc-400">{label}</p>
-        <p className="mt-0.5 break-words text-[14px] font-semibold text-slate-900 dark:text-white">{value}</p>
-        {sub && <p className="mt-0.5 break-words text-[12.5px] text-slate-500 dark:text-zinc-400">{sub}</p>}
+        <p className="text-[12.5px] text-slate-500 dark:text-zinc-400">{label}</p>
+        <p className="mt-0.5 break-words text-[14.5px] font-medium text-slate-900 first-letter:uppercase dark:text-white">{value}</p>
+        {sub && <p className="mt-0.5 break-words text-[13px] text-slate-500 first-letter:uppercase dark:text-zinc-400">{sub}</p>}
       </div>
     </div>
   );
@@ -1124,7 +1182,7 @@ function DescriptionSection({ text, className }) {
 
   return (
     <div ref={sectionRef} className={cn("scroll-mt-[calc(var(--header-h,4.75rem)+1rem)]", className)}>
-    <Section title="About this item" icon={Info}>
+    <Section title="About this item" icon={Info} tone="indigo">
       {body ? (
         <>
           <div className="relative">
@@ -1174,7 +1232,7 @@ function ProductPageSkeleton() {
   const bar = "browse-shimmer rounded-full bg-neutral-100 dark:bg-white/5";
   return (
     <div className="min-h-screen bg-[#F7F9FD] font-figtree dark:bg-[#131313]" aria-busy="true" aria-label="Loading listing">
-      <div className="mx-auto w-full max-w-[1380px] px-4 pt-4 sm:px-8 md:px-11 lg:px-14 2xl:px-0">
+      <div className="mx-auto w-full max-w-[calc(var(--page-max)+9vw)] px-4 pt-4 sm:px-[4.5vw] 2xl:max-w-[var(--page-max)] 2xl:px-0">
         <div className={cn(bar, "h-3.5 w-56")} />
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:gap-8">
           <div className="flex flex-col gap-5">
@@ -1223,15 +1281,17 @@ function ProductPageSkeleton() {
 function ShareSheet({ open, onClose, product, shareUrl, campusName }) {
   const safeTimeout = useSafeTimeout();
   const [copied, setCopied] = useState(false);
+  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
   useDialog(open, onClose);
 
-  const shareText = `Found this on Unideals${campusName ? ` (${campusName})` : ""}\n\n${product?.title}\n${inr(product?.selling_price)}\n\n${shareUrl}`;
+  const title = product?.title || "Listing on Unideals";
+  const price = inr(product?.selling_price);
+  const shareText = `Found this on Unideals${campusName ? ` (${campusName})` : ""}: ${title}, ${price}`;
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      toast.success("Link copied");
       safeTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Could not copy link");
@@ -1243,82 +1303,161 @@ function ShareSheet({ open, onClose, product, shareUrl, campusName }) {
     onClose();
   };
 
+  const nativeShare = async () => {
+    try {
+      await navigator.share({ title, text: shareText, url: shareUrl });
+      onClose();
+    } catch {
+      /* cancelled */
+    }
+  };
+
+  const targets = [
+    {
+      key: "whatsapp",
+      label: "WhatsApp",
+      icon: <FaWhatsapp className="h-[22px] w-[22px]" />,
+      tone: "bg-[#25D366]/10 text-[#1DA851] dark:bg-[#25D366]/15 dark:text-[#4ADE80]",
+      onClick: () => openExternal(`https://wa.me/?text=${encodeURIComponent(`${shareText}\n${shareUrl}`)}`),
+    },
+    {
+      key: "telegram",
+      label: "Telegram",
+      icon: <FaTelegram className="h-[22px] w-[22px]" />,
+      tone: "bg-[#3390EC]/10 text-[#2A82DA] dark:bg-[#3390EC]/15 dark:text-[#60A5FA]",
+      onClick: () =>
+        openExternal(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`),
+    },
+    {
+      key: "x",
+      label: "X",
+      icon: <FaXTwitter className="h-[19px] w-[19px]" />,
+      tone: "bg-neutral-100 text-slate-900 dark:bg-white/10 dark:text-white",
+      onClick: () =>
+        openExternal(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`),
+    },
+    {
+      key: "email",
+      label: "Email",
+      icon: <Mail className="h-[20px] w-[20px]" />,
+      tone: "bg-neutral-100 text-slate-700 dark:bg-white/10 dark:text-zinc-200",
+      onClick: () => {
+        window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(`${shareText}\n\n${shareUrl}`)}`;
+        onClose();
+      },
+    },
+    ...(canNativeShare
+      ? [
+          {
+            key: "more",
+            label: "More",
+            icon: <MoreHorizontal className="h-[20px] w-[20px]" />,
+            tone: "bg-neutral-100 text-slate-700 dark:bg-white/10 dark:text-zinc-200",
+            onClick: nativeShare,
+          },
+        ]
+      : []),
+  ];
+
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[999] flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label="Share listing">
+        <div className="fixed inset-0 z-[999] flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-labelledby="share-sheet-title">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
           />
           <motion.div
-            initial={{ y: 40, opacity: 0 }}
+            initial={{ y: 24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 40, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            className="relative w-full rounded-t-3xl border border-neutral-200 bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:p-6 md:mx-4 md:w-[460px] md:rounded-3xl dark:border-neutral-800 dark:bg-[#1A1D20]"
+            exit={{ y: 24, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="relative w-full overflow-hidden rounded-t-2xl border border-neutral-200/80 bg-white shadow-[0_24px_64px_-16px_rgba(15,23,42,0.4)] md:mx-4 md:w-[440px] md:rounded-2xl dark:border-neutral-800 dark:bg-[#1A1D20]"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-[17px] font-semibold text-slate-900 dark:text-white">Share listing</h3>
-                <p className="mt-0.5 text-[13px] text-slate-500 dark:text-zinc-400">Send it to friends or your hostel group.</p>
-              </div>
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 border-b border-neutral-200/80 px-5 py-4 dark:border-neutral-800">
+              <h3 id="share-sheet-title" className="text-[15px] font-semibold text-slate-900 dark:text-white">
+                Share listing
+              </h3>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-neutral-100 dark:text-zinc-400 dark:hover:bg-white/5"
+                className="-mr-1.5 grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-neutral-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white"
               >
                 <X className="h-[18px] w-[18px]" />
               </button>
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-white/[0.03]">
-              <img
-                src={product?.images?.[0]?.url ? ikThumb(product.images[0].url) : FALLBACK_IMAGE}
-                alt=""
-                className="h-14 w-14 shrink-0 rounded-xl object-cover"
-              />
-              <div className="min-w-0">
-                <p className="truncate text-[14px] font-semibold text-slate-900 dark:text-white">{product?.title}</p>
-                <p className="text-[14px] font-bold text-[var(--accent-text)]">{inr(product?.selling_price)}</p>
+            <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
+              {/* What's being shared */}
+              <div className="flex items-center gap-3">
+                <img
+                  src={product?.images?.[0]?.url ? ikThumb(product.images[0].url) : FALLBACK_IMAGE}
+                  alt=""
+                  className="h-12 w-12 shrink-0 rounded-lg object-cover ring-1 ring-black/5 dark:ring-white/10"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-medium text-slate-900 dark:text-white">{title}</p>
+                  <p className="truncate text-[13px] text-slate-500 dark:text-zinc-400">
+                    <span className="font-semibold text-slate-900 dark:text-white">{price}</span>
+                    {campusName ? <> · {campusName}</> : null}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => openExternal(`https://wa.me/?text=${encodeURIComponent(shareText)}`)}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#25D366] text-[14px] font-semibold text-white transition hover:brightness-105"
-              >
-                <FaWhatsapp className="h-5 w-5" /> WhatsApp
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  openExternal(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(product?.title || "")}`)
-                }
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#3390EC] text-[14px] font-semibold text-white transition hover:brightness-105"
-              >
-                <FaTelegram className="h-5 w-5" /> Telegram
-              </button>
-            </div>
+              {/* Link + copy (primary action) */}
+              <label htmlFor="share-link" className="mt-5 block text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">
+                Listing link
+              </label>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  id="share-link"
+                  readOnly
+                  value={shareUrl}
+                  onFocus={(e) => e.target.select()}
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-neutral-200 bg-neutral-50 px-3 text-[13px] text-slate-700 outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)] dark:border-neutral-700 dark:bg-white/[0.03] dark:text-zinc-300"
+                />
+                <button
+                  type="button"
+                  onClick={copy}
+                  className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1A1D20] ${
+                    copied ? "bg-emerald-600" : "bg-[var(--accent)] hover:bg-[var(--accent-hover)]"
+                  }`}
+                  aria-live="polite"
+                >
+                  {copied ? <Check className="h-4 w-4" strokeWidth={2.5} /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+              </div>
 
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-neutral-200 bg-white p-1.5 pl-3 dark:border-neutral-700 dark:bg-[#131313]">
-              <span className="min-w-0 flex-1 truncate text-[13px] text-slate-500 dark:text-zinc-400">{shareUrl}</span>
-              <button
-                type="button"
-                onClick={copy}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
-              >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? "Copied" : "Copy"}
-              </button>
+              {/* Share targets */}
+              <p className="mt-5 text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">Share to</p>
+              <div className="mt-2.5 flex flex-wrap gap-x-2 gap-y-3">
+                {targets.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={t.onClick}
+                    className="group flex w-[64px] flex-col items-center gap-1.5 rounded-xl py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]"
+                  >
+                    <span className={`grid h-12 w-12 place-items-center rounded-full transition-transform group-hover:-translate-y-0.5 ${t.tone}`}>
+                      {t.icon}
+                    </span>
+                    <span className="text-[12px] text-slate-600 dark:text-zinc-300">{t.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-4 border-t border-neutral-200/80 pt-3.5 text-[12px] text-slate-500 dark:border-neutral-800 dark:text-zinc-400">
+                {product?.isGirlsOnly
+                  ? "Girls-only listing: only girls on this campus can open it."
+                  : "Anyone on your campus with this link can view the listing."}
+              </p>
             </div>
-            <p className="mt-3 text-center text-[12px] text-slate-400 dark:text-zinc-500">Anyone on your campus with this link can view the listing.</p>
           </motion.div>
         </div>
       )}

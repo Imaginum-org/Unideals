@@ -125,6 +125,15 @@ const userSchema = new Schema(
       default: false,
     },
 
+    // First time any of their listings went live. Never cleared: a first
+    // listing that later sells (deals soft-delete it) or is deleted still
+    // counts for onboarding ("List your first item") and the first-listing
+    // badge. Backfilled on profile fetch for older accounts.
+    first_listed_at: {
+      type: Date,
+      default: null,
+    },
+
     verifyTokenEmail: {
       type: String,
       select: false,

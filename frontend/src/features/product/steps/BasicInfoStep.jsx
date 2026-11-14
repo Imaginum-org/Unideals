@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Lock, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ChevronDown, FileText, Lock, SlidersHorizontal, Sparkles } from "lucide-react";
 import useProductListing from "../hooks/useProductListing";
 import {
   PRODUCT_CATEGORY_OPTIONS,
@@ -7,6 +7,7 @@ import {
   PRODUCT_USAGE_OPTIONS,
   GIRLS_ONLY_CATEGORIES,
   orderCategoriesForGirls,
+  othersLast,
 } from "../constants/productOptions";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { normalizeMultiline } from "../../../utils/text.js";
@@ -28,10 +29,8 @@ import {
   fixedValue,
   guessFromTitle,
   isFieldOff,
-  purchaseDateShortcuts,
   rulesFor,
 } from "../utils/listingSmarts.js";
-import { cn } from "../../../utils/cn.js";
 
 const TITLE_MAX = 120;
 const DESC_MAX = 1000;
@@ -49,9 +48,8 @@ const BasicInfoStep = () => {
   const girlsEligible = isLoggedIn && (userDetails?.gender === "female" || userDetails?.role === "admin");
   const categoryOptions = girlsEligible
     ? orderCategoriesForGirls(PRODUCT_CATEGORY_OPTIONS)
-    : PRODUCT_CATEGORY_OPTIONS.filter((o) => !o.girlsOnly);
+    : othersLast(PRODUCT_CATEGORY_OPTIONS.filter((o) => !o.girlsOnly));
   const allowedCategories = useMemo(() => categoryOptions.map((o) => o.value), [categoryOptions]);
-  const selectedCategory = PRODUCT_CATEGORY_OPTIONS.find((o) => o.value === formData.category);
   const isGirlsCategory = GIRLS_ONLY_CATEGORIES.includes(formData.category);
   const rules = rulesFor(formData.category);
   const colourOff = isFieldOff(formData.category, "color");
@@ -116,7 +114,12 @@ const BasicInfoStep = () => {
   const usageLabel = PRODUCT_USAGE_OPTIONS.find((o) => o.value === formData.usageDuration)?.label || "";
   const descLength = normalizeMultiline(formData.description || "").length;
   const canDraftDescription = Boolean(String(formData.title || "").trim().length >= 3 && formData.condition);
-  const shortcuts = useMemo(() => purchaseDateShortcuts(), []);
+  // Brand / colour are optional: tucked behind a link unless already filled.
+  const hasExtras = Boolean(String(formData.brand || "").trim() || String(formData.color || "").trim());
+  const [showExtras, setShowExtras] = useState(hasExtras);
+  useEffect(() => {
+    if (hasExtras) setShowExtras(true);
+  }, [hasExtras]);
 
   const writeDescription = () => {
     const text = draftDescription(formData, usageLabel);
@@ -125,7 +128,7 @@ const BasicInfoStep = () => {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
-      <FormSection icon={FileText} title="About the item" description="Start with the title. We'll fill in what we can from it.">
+      <FormSection icon={FileText} title="About the item">
         <div className="flex flex-col gap-5">
           <Field
             label="Title"
@@ -156,7 +159,6 @@ const BasicInfoStep = () => {
             required
             field="category"
             error={errors.category}
-            hint={selectedCategory?.description || "Pick the closest match so buyers can find it."}
             counter={<AutoTag show={auto.category} label="From title" />}
           >
             <Select
@@ -186,7 +188,7 @@ const BasicInfoStep = () => {
             <div className="relative">
               <textarea
                 id="listing-description"
-                rows={6}
+                rows={4}
                 maxLength={DESC_MAX}
                 value={formData.description}
                 onChange={(e) => setManual("description", e.target.value)}
@@ -197,7 +199,7 @@ const BasicInfoStep = () => {
                   if (clean !== e.target.value) updateField("description", clean);
                 }}
                 placeholder="e.g. Bought in Aug 2024, used for one semester. Comes with the original cover and manual. Small scratch on the back."
-                className={`${inputClass(errors.description)} min-h-[150px] resize-y py-3 pb-12 leading-relaxed`}
+                className={`${inputClass(errors.description)} min-h-[120px] resize-y py-3 pb-12 leading-relaxed`}
               />
               {!String(formData.description || "").trim() && (
                 <button
@@ -219,7 +221,7 @@ const BasicInfoStep = () => {
         </div>
       </FormSection>
 
-      <FormSection icon={SlidersHorizontal} title="Specifications" description="These are linked, so impossible combinations are ruled out for you.">
+      <FormSection icon={SlidersHorizontal} title="Specifications">
         <div className="flex flex-col gap-5">
           <Field
             label="Condition"
@@ -230,6 +232,7 @@ const BasicInfoStep = () => {
             counter={fixedCondition ? <LockedTag /> : null}
           >
             <ChoiceChips
+              compact
               ariaLabel="Condition"
               options={PRODUCT_CONDITION_OPTIONS}
               value={formData.condition}
@@ -256,23 +259,6 @@ const BasicInfoStep = () => {
                 onChange={(e) => setManual("purchaseDate", e.target.value)}
                 className={`${inputClass(errors.purchaseDate)} h-11 [color-scheme:light] dark:[color-scheme:dark]`}
               />
-              <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Quick purchase dates">
-                {shortcuts.map((s) => (
-                  <button
-                    key={s.label}
-                    type="button"
-                    onClick={() => setManual("purchaseDate", s.value)}
-                    className={cn(
-                      "h-7 rounded-full border px-2.5 text-[12px] font-medium transition-colors",
-                      formData.purchaseDate === s.value
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-text)]"
-                        : "border-neutral-200 text-slate-600 hover:border-[var(--accent-ring)] dark:border-neutral-700 dark:text-zinc-300",
-                    )}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
             </Field>
 
             <Field
@@ -280,15 +266,7 @@ const BasicInfoStep = () => {
               required
               field="usageDuration"
               error={errors.usageDuration}
-              hint={
-                fixedUsage
-                  ? rules.usage?.why
-                  : formData.condition === "brand_new"
-                    ? "Brand New means unused."
-                    : formData.purchaseDate
-                      ? "Matched to your purchase date. Lower it if you used it for less."
-                      : "Pick a purchase date and this fills in."
-              }
+              hint={fixedUsage ? rules.usage?.why : undefined}
               counter={fixedUsage ? <LockedTag /> : <AutoTag show={auto.usageDuration} />}
             >
               <Select
@@ -302,6 +280,21 @@ const BasicInfoStep = () => {
               />
             </Field>
 
+          </div>
+
+          {!showExtras ? (
+            <button
+              type="button"
+              onClick={() => setShowExtras(true)}
+              className="inline-flex w-fit items-center gap-1.5 text-[13.5px] font-medium text-[var(--accent-text)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]"
+              aria-expanded="false"
+            >
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              {colourOff ? "Add brand / model" : "Add brand and colour"}
+              <span className="font-normal text-slate-400 dark:text-zinc-500">(optional)</span>
+            </button>
+          ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Field
               label="Brand / model"
               htmlFor="listing-brand"
@@ -320,12 +313,12 @@ const BasicInfoStep = () => {
               />
             </Field>
 
+            {!colourOff && (
             <Field
               label="Colour"
               htmlFor="listing-color"
-              optional={!colourOff}
+              optional
               error={errors.color}
-              hint={colourOff ? `Not needed for ${selectedCategory?.label || "this category"}.` : undefined}
               counter={<AutoTag show={auto.color && !colourOff} label="From title" />}
             >
               <input
@@ -339,7 +332,9 @@ const BasicInfoStep = () => {
                 className={`${inputClass(errors.color)} h-11 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-slate-400 dark:disabled:bg-white/5`}
               />
             </Field>
+            )}
           </div>
+          )}
         </div>
       </FormSection>
 

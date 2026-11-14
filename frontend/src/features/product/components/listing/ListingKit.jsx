@@ -86,12 +86,12 @@ export function Counter({ value, max }) {
 }
 
 /** Single-choice chips (radio group) for short option lists. */
-export function ChoiceChips({ options, value, onChange, ariaLabel, invalid, columns, disabled }) {
+export function ChoiceChips({ options, value, onChange, ariaLabel, invalid, columns, disabled, compact = false }) {
   return (
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={cn("grid gap-2", columns || "grid-cols-2 sm:grid-cols-3")}
+      className={cn(compact ? "flex flex-wrap gap-2" : cn("grid gap-2", columns || "grid-cols-2 sm:grid-cols-3"))}
     >
       {options.map((opt) => {
         const active = value === opt.value;
@@ -104,7 +104,9 @@ export function ChoiceChips({ options, value, onChange, ariaLabel, invalid, colu
             disabled={disabled}
             onClick={() => !disabled && onChange(opt.value)}
             className={cn(
-              "flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-center text-[13.5px] font-semibold leading-tight transition-colors",
+              compact
+                ? "inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full border px-4 text-[13px] font-medium transition-colors"
+                : "flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-center text-[13.5px] font-semibold leading-tight transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] disabled:cursor-not-allowed",
               disabled && !active && "opacity-40",
               active

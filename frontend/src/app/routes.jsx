@@ -88,6 +88,7 @@ const Wishlist = page(() => import("../features/user/pages/Wishlist.jsx"));
 const Myorders = page(() => import("../features/user/pages/Myorders.jsx"));
 const ContactUs = page(() => import("../features/user/pages/ContactUs.jsx"));
 const FAQ = page(() => import("../features/help/pages/FAQ.jsx"));
+const VideoGuides = page(() => import("../features/help/pages/VideoGuides.jsx"));
 const Termscondition = page(() => import("../features/user/pages/Termscondition.jsx"));
 const PrivacyPolicy = page(() => import("../features/legal/pages/PrivacyPolicy.jsx"));
 const Chat = page(() => import("../features/chat/pages/Chat.jsx"));
@@ -122,6 +123,7 @@ const PREFETCH_TABLE = [
   ["/signup", Signup],
   ["/contact", ContactUs],
   ["/faq", FAQ],
+  ["/guides", VideoGuides],
 ];
 
 /** Start downloading the JS for the page at `pathname` (no-op if cached). */
@@ -190,6 +192,7 @@ export default function AppRoutes() {
             />
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/achievements" element={<Achievements />} />
+            <Route path="/guides" element={<VideoGuides />} />
             <Route path="/badge" element={<Navigate to="/achievements" replace />} />
             <Route path="/myorders" element={<Myorders />} />
             <Route path="/chat" element={<Chat />} />

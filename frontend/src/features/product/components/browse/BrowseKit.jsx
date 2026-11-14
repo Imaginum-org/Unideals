@@ -27,7 +27,7 @@ import Select from "../../../../components/ui/Select.jsx";
  */
 
 // One grid for every browse page (Explore, Category, Search).
-export const BROWSE_GRID = "grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:gap-5 2xl:grid-cols-4";
+export const BROWSE_GRID = "grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:gap-5 2xl:grid-cols-4 wide:grid-cols-5 ultra:grid-cols-6";
 
 export const SORT_OPTIONS = [
   { value: "recommended", label: "Recommended" },

@@ -4,6 +4,7 @@ import ProductView from "../models/ProductView.model.js";
 import { HOT_DEAL } from "../config/hotDeals.js";
 import crypto from "crypto";
 import { createTtlCache, keyOf } from "../utils/ttlCache.js";
+import { boostedCache } from "../utils/boostedCache.js";
 import { FEED_RANK_WEIGHT, SEARCH_RANK_WEIGHT, TRENDING_RANK_WEIGHT, sellerRank } from "../utils/planPerks.js";
 
 // Aggregate results that don't need to be real-time: total counts and price
@@ -466,10 +467,12 @@ export const getBoostedProducts = async (campusId, viewerGender = null, viewerRo
   }
 
   // Boosted rail renders on every Home view: share one query per campus +
-  // audience for 30s. The key omits `now` on purpose (it changes every ms);
-  // the same filter is re-evaluated on each refresh.
+  // audience for 30s. The key omits `now` on purpose (it changes every ms).
+  // The Product model clears this cache whenever a listing is sold, unlisted,
+  // deleted or its boost changes (utils/boostedCache.js), and every read below
+  // re-checks the boost window, so a boost never outlives its duration.
   const cacheKey = `boosted:${max}:${keyOf({ ...filter, boost_expires_at: null })}`;
-  return feedMetaCache.memo(cacheKey, 30 * 1000, () =>
+  const rows = await boostedCache.memo(cacheKey, 30 * 1000, () =>
     Product.find(filter)
       .sort({ boost_expires_at: -1 })
       .limit(max)
@@ -478,6 +481,13 @@ export const getBoostedProducts = async (campusId, viewerGender = null, viewerRo
       )
       .populate("seller_id", "name avatar subscription role rating")
       .lean(),
+  );
+  const nowMs = Date.now();
+  return rows.filter(
+    (p) =>
+      p.status === PRODUCT_STATUS.LISTED &&
+      p.boost_expires_at &&
+      new Date(p.boost_expires_at).getTime() > nowMs,
   );
 };
 

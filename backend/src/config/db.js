@@ -2,11 +2,13 @@
 // right now basic set up - will update when going to production and add more options for connection like retryWrites
 import mongoose from "mongoose";
 
-if (!process.env.MONGO_URL) {
-  throw new Error("MONGO_URL not found in .env file");
-}
-
+// Checked when connecting, not at import, so importing this module (via
+// app.js) never crashes tests or scripts; server.js validates env first.
 export const connectDB = async () => {
+  if (!process.env.MONGO_URL) {
+    console.error("MongoDB connection failed: MONGO_URL is not set");
+    process.exit(1);
+  }
   try {
     await mongoose.connect(process.env.MONGO_URL, {
       serverSelectionTimeoutMS: 15000, // 15s timeout for Atlas cluster discovery & DNS lookup

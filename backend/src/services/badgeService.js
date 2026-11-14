@@ -64,7 +64,7 @@ const CATEGORY_MAP = {
 
 const firstStep = (value, target) => [Math.max(0, Number(value) || 0), target];
 const BADGE_PROGRESS = {
-  first_listing:    (c) => firstStep(c.totalListings, 1),
+  first_listing:    (c) => firstStep(c.hasListed ? Math.max(c.totalListings, 1) : c.totalListings, 1),
   power_seller:     (c) => firstStep(c.productsSold, 5),
   category_ace:     (c) => firstStep(c.maxCategoryCount, 3),
   first_buy:        (c) => firstStep(c.totalBuys, 1),
@@ -89,7 +89,7 @@ const TIER_RANK = { bronze: 1, silver: 2, gold: 3, special: 0 };
 
 const BADGE_DEFINITIONS = {
   // Seller
-  first_listing:    (c) => c.totalListings >= 1 ? { tier: "special", xp: 30 } : null,
+  first_listing:    (c) => c.hasListed ? { tier: "special", xp: 30 } : null,
   power_seller:     (c) => c.productsSold >= 50 ? { tier: "gold", xp: 200 }
                          : c.productsSold >= 20 ? { tier: "silver", xp: 100 }
                          : c.productsSold >= 5  ? { tier: "bronze", xp: 50 }
@@ -166,7 +166,7 @@ async function getLiveWishlistCount(wishlist) {
 
 async function buildContext(userId) {
   const user = await User.findById(userId).select(
-    "is_email_verified avatar mobile createdAt wishlist gamification gender rating"
+    "is_email_verified avatar mobile createdAt wishlist gamification gender rating first_listed_at"
   );
   if (!user) throw new Error("User not found");
 
@@ -256,6 +256,8 @@ async function buildContext(userId) {
     // GET /api/wishlist, which filters is_deleted:false).
     wishlistCount: await getLiveWishlistCount(user.wishlist),
     totalListings: allListings.length,
+    // Durable: a first listing that sold/was deleted still counts.
+    hasListed: Boolean(user.first_listed_at) || allListings.length > 0,
     productsSold: sold.length,
     // Needs 3+ ratings so a single 5-star review cannot award it.
     avgRating: user.rating?.count >= 3 ? user.rating.avg : null,
