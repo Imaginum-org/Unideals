@@ -95,10 +95,12 @@ export const unregisterDeviceToken = async ({ userId, token }) => {
  *    closed. `tag` makes a newer alert replace the older one (chat grouping).
  * FCM data values must all be strings.
  */
-const buildMessage = ({ id, kind, title, message, actionPath, tag }) => {
+const buildMessage = ({ id, kind, title, message, actionPath, tag, imageUrl }) => {
   const safeTitle = clip(title, 100) || "Unideals";
   const body = clip(message, 240);
   const collapse = clip(tag || `n:${id}`, 100);
+  // Already validated as https:// when the campaign was created.
+  const image = typeof imageUrl === "string" && imageUrl.startsWith("https://") ? imageUrl : "";
   return {
     data: {
       notificationId: String(id || ""),
@@ -107,11 +109,18 @@ const buildMessage = ({ id, kind, title, message, actionPath, tag }) => {
       body,
       path: actionPath || "/notification",
       tag: collapse,
+      ...(image && { image }),
     },
     android: {
       priority: "high",
       collapseKey: collapse,
-      notification: { title: safeTitle, body, tag: collapse, channelId: "default" },
+      notification: {
+        title: safeTitle,
+        body,
+        tag: collapse,
+        channelId: "default",
+        ...(image && { imageUrl: image }),
+      },
     },
     webpush: { headers: { Urgency: "high", TTL: String(24 * 60 * 60) } },
   };

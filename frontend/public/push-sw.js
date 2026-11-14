@@ -34,6 +34,9 @@ self.addEventListener("push", (event) => {
       await self.registration.showNotification(data.title || "Unideals", {
         body: data.body || "",
         icon: "/push-icon.png", // PNG: Chrome/Edge don't render SVG notification icons
+        // Large banner image (campaigns). Chromium on Windows/Android/ChromeOS shows it;
+        // Firefox, Safari and macOS Chrome ignore it and show text only.
+        image: data.image || undefined,
         // No `badge`: Android masks it to a white silhouette, and a full-bleed
         // square logo becomes a plain white block. The browser default is cleaner.
         tag: data.tag || undefined, // same tag replaces the older alert (grouped chats)
