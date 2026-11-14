@@ -28,7 +28,7 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       # mongodb-memory-server downloads a MongoDB binary on first use; cache it.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
