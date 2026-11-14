@@ -1,0 +1,39 @@
+# Repo-wide ignores. backend/ and frontend/ have their own, more detailed lists.
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Environment / secrets (only the *.sample files are committed)
+.env
+.env.*
+!.env.sample
+!.env.example
+*.pem
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+
+# Logs and scratch output
+logs/
+*.log
+npm-debug.log*
+tmp/
+temp/
+output/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Local tooling
+.claude/settings.local.json

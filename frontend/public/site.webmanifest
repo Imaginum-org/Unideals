@@ -1,9 +1,14 @@
 {
-    "name": "Unideals",
-    "short_name": "Unideals",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#ffffff",
-    "icons": []
+  "name": "Unideals",
+  "short_name": "Unideals",
+  "description": "Buy and sell within your campus community.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#534ff2",
+  "icons": [
+    { "src": "/push-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/fav.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
 }

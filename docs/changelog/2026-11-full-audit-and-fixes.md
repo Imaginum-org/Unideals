@@ -1,7 +1,7 @@
 # Unideals — Fixes Log 02
 
 **Date:** 2026-11-08
-**Scope:** Full audit of `backend/` (Express 5 + Mongoose + Socket.IO) and `frontend/` (React 18 + Vite) after the earlier pass in `fix.md`. This pass looked for issues that one missed: authorization gaps, data leaks, race conditions, broken features, and performance.
+**Scope:** Full audit of `backend/` (Express 5 + Mongoose + Socket.IO) and `frontend/` (React 18 + Vite) after the earlier pass in `docs/changelog/2026-09-security-hardening-and-bug-fixes.md`. This pass looked for issues that one missed: authorization gaps, data leaks, race conditions, broken features, and performance.
 **Verification:**
 - Backend: `node --check` passes on every source file. `src/app.js`, the jobs, sockets and notification service all import cleanly. The CSRF fix and HTML escaping were unit-checked with a script.
 - Frontend: `npm run build` passes and `eslint` reports no new warnings on changed files.
@@ -563,7 +563,7 @@ The bare "No products listed yet on this campus." line with two loose buttons is
 ## Price check (answered)
 - The configured prices **are correct** and consistent everywhere:
   - Backend (`config/subscriptionPlans.js`): Pro 9900 paise, Pro+ 19900 paise, plus boosts of 2900 / 4900 (`config/boostAddons.js`).
-  - These match the pricing page, the comparison table and `Subscription_plan.md` (Founder Pro ₹99 / Pro+ ₹199 lifetime; boosts ₹29 / ₹49).
+  - These match the pricing page, the comparison table and `docs/features/subscriptions-and-monetization.md` (Founder Pro ₹99 / Pro+ ₹199 lifetime; boosts ₹29 / ₹49).
 
 ## Backend: Girls Founder offer (server-enforced)
 - **`backend/src/config/subscriptionPlans.js`:**
@@ -972,7 +972,7 @@ Every page was captured at full length on a phone in light and dark (plus tablet
 
 ### Bugs found by the tests
 - **Duplicate reports were never blocked.** The `Report` unique partial index used `$ne: null`, which MongoDB rejects, so the index was never created. It now uses `reporter_id: { $type: "objectId" }`. Production will build it on the next start; if duplicates already exist, the build fails until they are removed.
-- **Redundant index.** The `notifications.scheduled_at` partial index from the optimisation pass duplicated an existing field index, so Mongoose skipped it. Removed, and `optimisation.md` corrected.
+- **Redundant index.** The `notifications.scheduled_at` partial index from the optimisation pass duplicated an existing field index, so Mongoose skipped it. Removed, and `docs/architecture/performance-optimisations.md` corrected.
 
 ### Tests: `backend/tests/plans.integration.test.mjs` (`npm run test:plans`)
 - Runs against a real in-memory MongoDB (`mongodb-memory-server` dev dependency) using the backend's own models, services and pipelines.

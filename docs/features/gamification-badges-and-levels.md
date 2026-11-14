@@ -2,7 +2,7 @@
 
 > **Status**: Planning Phase
 > **Last Updated**: September 2026
-> **Related Files**: [`Subscription_plan.md`](./Subscription_plan.md)
+> **Related Files**: [`subscriptions-and-monetization.md`](./subscriptions-and-monetization.md)
 
 This document is the single source of truth for the gamification system.
 Update this file whenever badge rules or implementation details change.

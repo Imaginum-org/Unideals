@@ -226,9 +226,9 @@
 
 ## Preserved (intentionally unchanged to avoid breakage)
 
-### Razorpay Integration (Pro ₹99 / Pro+ ₹199 Founder lifetime, per Subscription_plan.md)
+### Razorpay Integration (Pro ₹99 / Pro+ ₹199 Founder lifetime, per docs/features/subscriptions-and-monetization.md)
 
-Spec: `Subscription_plan.md` (Founder: Pro ₹99, Pro+ ₹199, lifetime; Free 10 / Pro 25 / Pro+ unlimited listings; wishlist 25/100/unlimited; boosts 0/2/5). The earlier `add payment gateway v1` commit had only shipped the plan catalog + enums + empty stubs — the gateway below is the full implementation.
+Spec: `docs/features/subscriptions-and-monetization.md` (Founder: Pro ₹99, Pro+ ₹199, lifetime; Free 10 / Pro 25 / Pro+ unlimited listings; wishlist 25/100/unlimited; boosts 0/2/5). The earlier `add payment gateway v1` commit had only shipped the plan catalog + enums + empty stubs — the gateway below is the full implementation.
 
 **Backend (`/api/payments`)**
 - `src/utils/razorpay.js` (new) — lazy SDK singleton (missing env fails only on payment use, never at boot); `npm i razorpay@2.9.8`.

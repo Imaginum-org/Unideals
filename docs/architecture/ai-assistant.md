@@ -345,7 +345,7 @@ Every product query runs through `visibleListingFilter`: listed, non-deleted lis
 
 ## 7. Knowledge base
 
-There are two hand-written sources. **The PDF in `output/pdf/` is not used by the code**: it is an old design export and is out of date.
+There are two hand-written sources. **An old PDF export of the knowledge base used to live in `output/pdf/`; it was out of date, never used by the code, and has been removed.**
 
 ### 7.1 `services/assistant.knowledge.js` (the one users mostly see)
 

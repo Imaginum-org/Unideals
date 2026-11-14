@@ -17,7 +17,7 @@
 <p>
   <img src="https://img.shields.io/badge/License-ISC-blue?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/Status-Active-success?style=flat-square" alt="Status" />
-  <img src="https://img.shields.io/badge/Node-%3E%3D18.0.0-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node version" />
+  <img src="https://img.shields.io/badge/Node-22.x-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node version" />
 </p>
 
 </div>
@@ -34,6 +34,7 @@
 - [Frontend Routes](#frontend-routes)
 - [Configuration](#configuration)
 - [Getting Started](#getting-started)
+- [Documentation](#documentation)
 - [Security](#security)
 - [License](#license)
 
@@ -158,8 +159,9 @@ Unideals/
 │   │   └── utils/                  Tokens, ImageKit, Razorpay, email templates
 │   └── server.js
 │
-├── Subscription_plan.md           Plan pricing and monetization spec
-├── fix.md                         Security and feature fix log
+├── docs/                          Architecture, feature specs, changelogs, runbooks (see docs/README.md)
+├── .github/                       CI workflow, Dependabot, issue/PR templates, contributing & security policy
+├── LICENSE
 └── README.md
 ```
 
@@ -392,7 +394,7 @@ Legacy redirects: `/profileoverview` → `/profile`, `/setting` → `/settings`.
 
 ## Configuration
 
-Both services are configured via environment variables. Copy `.env.sample` to `.env` in each directory and populate the values before running the app. **Never commit `.env` files.**
+Both services are configured via environment variables. Copy `.env.sample` to `.env` in each directory and populate the values before running the app. **Never commit `.env` files.** Each `.env.sample` is the complete, annotated list (required vs optional, defaults, and tuning knobs such as `HOT_*`, `USER_CACHE_TTL_MS` and `ASSISTANT_RATE_LIMIT_PER_MINUTE`); the tables below cover the main ones.
 
 **Backend (`backend/.env`)**
 
@@ -426,7 +428,7 @@ Both services are configured via environment variables. Copy `.env.sample` to `.
 
 ## Getting Started
 
-**Prerequisites:** Node.js ≥ 18, npm ≥ 9, a MongoDB instance, and accounts for ImageKit, Resend, Google Cloud Console, EmailJS, and Razorpay (Test Mode is enough for local setup).
+**Prerequisites:** Node.js 22 (see `.nvmrc`), npm ≥ 10, a MongoDB instance, and accounts for ImageKit, Resend, Google Cloud Console, EmailJS, and Razorpay (Test Mode is enough for local setup).
 
 ```bash
 # 1. Clone
@@ -451,7 +453,22 @@ Verify the API is running at `http://localhost:5000/health`.
 
 **Testing payments locally:** keep Razorpay in Test Mode, use the test keys in both `.env` files, and point a webhook at your machine with a tunnel (e.g. `ngrok http 5000` → webhook URL `https://<tunnel>/api/payments/webhook` with `payment.captured` + `payment.failed` events). Pay with test card `4111 1111 1111 1111` (any future expiry/CVV) or test UPI `success@razorpay` / `failure@razorpay`. No real money moves in Test Mode.
 
-**Plan reference:** `Subscription_plan.md` in the repo root is the source of truth for plan prices, limits, and boost rules. Switch Founder → semester billing later by setting `ACTIVE_SUBSCRIPTION_TYPE = semester` in `backend/src/config/subscriptionPlans.js`.
+**Running tests:** `cd backend && npm test` runs every integration suite against an in-memory MongoDB (no `.env` needed). `cd frontend && npm run lint && npm run build` checks the client. CI runs the same steps on every push and pull request (`.github/workflows/ci.yml`).
+
+**Plan reference:** [`docs/features/subscriptions-and-monetization.md`](docs/features/subscriptions-and-monetization.md) is the source of truth for plan prices, limits, and boost rules. Switch Founder → semester billing later by setting `ACTIVE_SUBSCRIPTION_TYPE = semester` in `backend/src/config/subscriptionPlans.js`.
+
+---
+
+## Documentation
+
+All project docs live in [`docs/`](docs/README.md):
+
+| Area | Docs |
+|---|---|
+| Architecture | [AI assistant](docs/architecture/ai-assistant.md) · [Notifications & push](docs/architecture/notifications.md) · [Performance optimisations](docs/architecture/performance-optimisations.md) |
+| Feature specs | [Subscriptions & monetization](docs/features/subscriptions-and-monetization.md) · [Gamification](docs/features/gamification-badges-and-levels.md) · [Girls Corner](docs/features/girls-corner.md) |
+| Operations | [Deployment & launch checklist](docs/operations/deployment-and-launch-checklist.md) |
+| History | [Changelogs / fix logs](docs/changelog/) |
 
 ---
 
@@ -475,7 +492,7 @@ Verify the API is running at `http://localhost:5000/health`.
 
 ## License
 
-Distributed under the **ISC License**. See `package.json` in `backend/` and `frontend/`.
+Distributed under the **ISC License**. See [`LICENSE`](LICENSE).
 
 <div align="center">
 

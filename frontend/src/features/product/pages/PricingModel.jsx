@@ -159,7 +159,7 @@ const PricingModel = () => {
     return { text: "Upgrade Now", disabled: false };
   };
 
-  // Pricing cards data — mirrors Subscription_plan.md (Founder phase).
+  // Pricing cards data — mirrors docs/features/subscriptions-and-monetization.md (Founder phase).
   const plans = [
     {
       id: "free",
@@ -210,7 +210,7 @@ const PricingModel = () => {
     },
   ];
 
-  // Detailed comparison table data — mirrors Subscription_plan.md.
+  // Detailed comparison table data — mirrors docs/features/subscriptions-and-monetization.md.
   // Every row carries a one-line student-friendly blurb, revealed by the
   // arrow. All rows start collapsed.
   const comparisonRows = [

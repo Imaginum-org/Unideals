@@ -1,0 +1,21 @@
+# Normalise line endings: LF in the repo, native on checkout for text files.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+
+# Lockfiles: don't show huge diffs in reviews
+package-lock.json -diff linguist-generated=true

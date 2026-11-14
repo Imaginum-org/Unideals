@@ -4,7 +4,7 @@ import {
   getSubscriptionPlan,
 } from "./subscriptionPlans.js";
 
-// Single source of truth: Subscription_plan.md via subscriptionPlans.js.
+// Single source of truth: docs/features/subscriptions-and-monetization.md via subscriptionPlans.js.
 // Free 0 credits, Pro 2 x 3 days, Pro+ 5 x 7 days. maxActiveBoosts is an
 // anti-spam cap (not in the spec) limiting simultaneous live boosts.
 const durationHoursFor = (tier) => {

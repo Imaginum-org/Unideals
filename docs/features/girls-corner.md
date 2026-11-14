@@ -1,6 +1,6 @@
 # Girl Corner 🌸 — Ultimate Feature Spec (Unideals)
 
-> **File:** `/Girl_Corner_feature.md` | **Version:** 1.0 FINAL | **Status:** Approved for build
+> **File:** `docs/features/girls-corner.md` | **Version:** 1.0 FINAL | **Status:** Approved for build
 > **Stack:** Frontend React 18 + Vite 6 (`frontend/`) | Backend Express 5 + Mongoose 9 (`backend/`)
 > **Scope:** MVP Phase-1 only. Phase-2/3 explicitly at bottom.
 

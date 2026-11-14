@@ -1,0 +1,22 @@
+# Public marketplace pages are crawlable; account, auth and transactional
+# pages are not useful in search results.
+User-agent: *
+Allow: /
+Disallow: /chat
+Disallow: /profile
+Disallow: /profileoverview
+Disallow: /setting
+Disallow: /settings
+Disallow: /wishlist
+Disallow: /myorders
+Disallow: /notification
+Disallow: /upload
+Disallow: /productlisted
+Disallow: /subscription
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /checkEmail
+Disallow: /search
