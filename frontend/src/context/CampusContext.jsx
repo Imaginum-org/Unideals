@@ -37,6 +37,13 @@ const readGuestSlug = () => {
  * `req.user.campus_id`, the slug param below is only used for guests.
  */
 export const CampusProvider = ({ children }) => {
+  const [hadSessionAtBoot] = useState(() => {
+    try {
+      return localStorage.getItem("isAuthenticated") === "true";
+    } catch {
+      return false;
+    }
+  });
   const { userDetails, isLoggedIn, loading: userLoading, updateUserDetails } =
     useUser();
   const [campuses, setCampuses] = useState([]);
@@ -129,7 +136,14 @@ export const CampusProvider = ({ children }) => {
   // Gate is logged-in-only: guests browse the default campus freely.
   const needsGate = !userLoading && isLoggedIn && !profileCampus;
 
-  const campusSlug = campus?.slug || null;
+  // Guests don't need the campus directory to start loading listings: the
+  // API takes the slug directly. Using it right away removes one full round
+  // trip before the first feed request (the directory still loads and
+  // validates the slug; a stale pick falls back to the default above).
+  // Only when this browser has no saved session, so a signed-in user's feed
+  // is never first requested for the wrong campus.
+  const likelyGuest = !isLoggedIn && !userDetails && !hadSessionAtBoot;
+  const campusSlug = campus?.slug || (likelyGuest ? guestSlug || DEFAULT_CAMPUS_SLUG : null);
 
   // True when a guest is on the implicit flagship (never picked).
   const isDefaultCampus = !isLoggedIn && !guestSlug;

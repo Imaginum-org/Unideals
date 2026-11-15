@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Category from "../../../features/product/components/Category.jsx";
 import ProductCard from "../../../features/product/components/ProductCard.jsx";
 import { getBoostedProducts, getProducts } from "../api/productApi";
+import { readSnapshot, writeSnapshot } from "../../../services/snapshotCache.js";
 import { IoIosArrowForward } from "react-icons/io";
 import { motion, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -103,6 +104,8 @@ const Home = () => {
   const hasMoreRef = useRef(true);
   // Guards late responses after a campus switch (no mixed-campus lists).
   const fetchCampusRef = useRef(null);
+  // True while the feed shows a last-seen snapshot awaiting fresh page 1.
+  const showingSnapshotRef = useRef(false);
   const canSeeGirlsRef = useRef(canSeeGirls);
   useEffect(() => { canSeeGirlsRef.current = canSeeGirls; }, [canSeeGirls]);
 
@@ -280,7 +283,9 @@ const Home = () => {
       fetchingRef.current = true;
       fetchCampusRef.current = campusSlug;
 
-      setLoading(true);
+      // Refreshing behind a last-seen snapshot: no skeletons, the snapshot
+      // is swapped for fresh data when it arrives.
+      if (!(pageNumber === 1 && showingSnapshotRef.current)) setLoading(true);
 
       const res = await getProducts({
         page: pageNumber,
@@ -296,12 +301,22 @@ const Home = () => {
       const pagination = res.data?.pagination || {};
 
       setProducts((prev) => {
+        // Page 1 is the source of truth: it replaces any snapshot.
+        if (pageNumber === 1) return newProducts;
+
         const existing = new Set(prev.map((p) => p._id));
 
         const filtered = newProducts.filter((p) => !existing.has(p._id));
 
         return [...prev, ...filtered];
       });
+      if (pageNumber === 1) {
+        showingSnapshotRef.current = false;
+        // Public campus feed only; Girls Corner never touches device storage.
+        if (audienceTab !== "girls") {
+          writeSnapshot(`home-feed:${campusSlug}`, { items: newProducts, totalPages: pagination.totalPages || 1 });
+        }
+      }
 
       setHasMore(
         pageNumber < HOME_MAX_PAGES &&
@@ -310,7 +325,8 @@ const Home = () => {
 
       setPage(pageNumber);
     } catch {
-      setError("Failed to load products");
+      // Behind a snapshot, keep showing it rather than an error state.
+      if (!(pageNumber === 1 && showingSnapshotRef.current)) setError("Failed to load products");
     } finally {
       fetchingRef.current = false;
       setLoading(false);
@@ -350,8 +366,18 @@ const Home = () => {
   }, [fetchProducts]);
 
   // Campus switch starts a clean feed — never append across campuses.
+  // A last-seen snapshot of this campus's feed (if any) paints instantly;
+  // the page-1 request already in flight replaces it.
   useEffect(() => {
-    setProducts([]);
+    const snap = campusSlug && audienceTab !== "girls" ? readSnapshot(`home-feed:${campusSlug}`) : null;
+    if (snap?.items?.length) {
+      showingSnapshotRef.current = true;
+      setProducts(snap.items);
+      setInitialLoading(false);
+    } else {
+      showingSnapshotRef.current = false;
+      setProducts([]);
+    }
     setPage(1);
     setHasMore(true);
     hasMoreRef.current = true;
@@ -365,6 +391,11 @@ const Home = () => {
         setBoostedProducts([]);
         return;
       }
+      const notExpired = (p) => p.boost_expires_at && new Date(p.boost_expires_at).getTime() > Date.now();
+      const snapKey = audienceTab === "girls" ? null : `home-boosted:${campusSlug}`;
+      // Paint the last-seen rail (minus anything whose boost has ended).
+      const snap = snapKey ? readSnapshot(snapKey) : null;
+      if (Array.isArray(snap)) setBoostedProducts(snap.filter(notExpired));
       try {
         const res = await getBoostedProducts({
           campus_slug: campusSlug,
@@ -383,6 +414,7 @@ const Home = () => {
         setBoostedProducts(
           audienceTab === "girls" ? items.filter((p) => p.isGirlsOnly === true) : items,
         );
+        if (snapKey) writeSnapshot(snapKey, items);
       } catch (err) {
         console.error("Failed to load boosted products", err);
       }

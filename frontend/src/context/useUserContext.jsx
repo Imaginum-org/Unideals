@@ -44,7 +44,7 @@ export const clearAccountScopedStorage = () => {
       localStorage.removeItem(k),
     );
     Object.keys(localStorage)
-      .filter((k) => k.startsWith("unideals-offer-hint:"))
+      .filter((k) => k.startsWith("unideals-offer-hint:") || k.startsWith("unideals:snap:"))
       .forEach((k) => localStorage.removeItem(k));
     sessionStorage.removeItem("contactLastSent");
     sessionStorage.removeItem("unideals-assistant-chat");
