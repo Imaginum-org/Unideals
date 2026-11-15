@@ -130,6 +130,13 @@ messageSchema.index({
 });
 
 /**
+ * Thread pages: getMessages filters by conversation and pages on _id
+ * (newest first, `before` cursor). Without this index every fetch sorted
+ * the whole conversation in memory.
+ */
+messageSchema.index({ conversation_id: 1, _id: -1 });
+
+/**
  * Fast unread lookup
  */
 messageSchema.index({

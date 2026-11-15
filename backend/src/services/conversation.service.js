@@ -121,8 +121,8 @@ const assertParticipant = (conversation, userId) => {
 
 export const getConversationById = async (conversationId, userId = null) => {
   const conversation = await Conversation.findById(conversationId)
-    .populate("buyer_id", "name avatar subscription role")
-    .populate("seller_id", "name avatar subscription role")
+    .populate("buyer_id", "name avatar subscription role is_college_verified")
+    .populate("seller_id", "name avatar subscription role is_college_verified")
     .populate(
       "product_id",
       "title selling_price images status is_negotiable pickup_address_snapshot seller_id",
@@ -207,30 +207,22 @@ export const getUserConversations = async ({
     and.push({ $or: or });
   }
 
-  let rows = await Conversation.find(and.length ? { $and: and } : {})
-    .populate("buyer_id", "name avatar subscription role")
-    .populate("seller_id", "name avatar subscription role")
-    .populate(
-      "product_id",
-      "title selling_price images status is_negotiable pickup_address_snapshot seller_id",
-    )
+  // Opened-but-untouched threads stay invisible: a conversation only earns
+  // its list slot with the first message (every send path stamps
+  // last_message, so empty preview ⟺ zero activity). Filtered in Mongo so
+  // empty threads are never fetched at all.
+  and.push({ last_message: { $nin: [null, ""] } });
+
+  // People are needed for every row (Pro ranking + name search); products
+  // and deals only for the page actually returned (see below).
+  let rows = await Conversation.find({ $and: and })
+    .select("buyer_id seller_id product_id product_snapshot last_message last_message_type last_activity_at unread_count createdAt updatedAt")
+    .populate("buyer_id", "name avatar subscription role is_college_verified")
+    .populate("seller_id", "name avatar subscription role is_college_verified")
     .sort({ last_activity_at: -1 })
     .limit(200)
     .lean();
-
-  // Opened-but-untouched threads stay invisible: a conversation only earns
-  // its list slot with the first message (every send path stamps
-  // last_message, so empty preview ⟺ zero activity, guaranteed).
   rows = rows.filter((r) => String(r.last_message || "").trim() !== "");
-
-  // Attach deal status in one query (scalable: avoids N+1 per row populate).
-  const ids = rows.map((r) => r._id);
-  const deals = ids.length
-    ? await Deal.find({ conversation_id: { $in: ids } })
-        .select("conversation_id status current_price updatedAt")
-        .lean()
-    : [];
-  const dealByConv = new Map(deals.map((d) => [String(d.conversation_id), d]));
 
   if (q) {
     // Title/preview already matched in Mongo; only names can slip through,
@@ -241,7 +233,7 @@ export const getUserConversations = async ({
         String(r.buyer_id?._id || r.buyer_id) === me
           ? r.seller_id
           : r.buyer_id;
-      const title = r.product_snapshot?.title || r.product_id?.title || "";
+      const title = r.product_snapshot?.title || "";
       const otherName = other?.name || "";
       return (
         title.toLowerCase().includes(needle) ||
@@ -266,6 +258,24 @@ export const getUserConversations = async ({
   const total = rows.length;
   const pageRows = rows.slice((pg - 1) * lim, (pg - 1) * lim + lim);
 
+  // Listings + deal status for this page only, in two batched queries (was:
+  // a product populate and a deal lookup for up to 200 rows per request).
+  const pageProductIds = [...new Set(pageRows.map((r) => r.product_id && String(r.product_id)).filter(Boolean))];
+  const pageIds = pageRows.map((r) => r._id);
+  const [pageProducts, deals] = await Promise.all([
+    pageProductIds.length
+      ? Product.find({ _id: { $in: pageProductIds } }, { images: { $slice: 1 } })
+          .select("title selling_price images status is_negotiable pickup_address_snapshot seller_id")
+          .lean()
+      : [],
+    pageIds.length
+      ? Deal.find({ conversation_id: { $in: pageIds } }).select("conversation_id status current_price updatedAt").lean()
+      : [],
+  ]);
+  const productById = new Map(pageProducts.map((p) => [String(p._id), p]));
+  for (const r of pageRows) r.product_id = (r.product_id && productById.get(String(r.product_id))) || null;
+  const dealByConv = new Map(deals.map((d) => [String(d.conversation_id), d]));
+
   const data = pageRows.map((r) => {
     const isBuyer = String(r.buyer_id?._id || r.buyer_id) === me;
     const other = isBuyer ? r.seller_id : r.buyer_id;
@@ -283,6 +293,7 @@ export const getUserConversations = async ({
             avatar: other.avatar,
             subscription: other.subscription || "base_user",
             role: other.role || "user",
+            is_college_verified: Boolean(other.is_college_verified),
           }
         : null,
       product: r.product_id

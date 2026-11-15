@@ -29,6 +29,7 @@ import orderRouter from "./routes/order.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import reviewRouter from "./routes/review.routes.js";
 import { verifyOrigin } from "./middlewares/csrf.middleware.js";
+import { buildListingsSitemap } from "./services/sitemap.service.js";
 import { requestMetrics } from "./middlewares/requestMetrics.middleware.js";
 
 // import errorMiddleware from "./middlewares/error.middleware.js";
@@ -232,6 +233,20 @@ app.get("/health", (req, res) => {
 
 // Gzip JSON + thumbs metadata (threshold keeps tiny auth payloads fast).
 app.use(compression({ threshold: 1024 }));
+
+// Live-listings sitemap (proxied to unideals.in/sitemap-listings.xml by the
+// frontend host). Cached in memory for an hour; CDN/crawlers cache too.
+app.get("/sitemap-listings.xml", async (req, res) => {
+  try {
+    const xml = await buildListingsSitemap();
+    res.set("Content-Type", "application/xml; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=3600");
+    res.set("X-Robots-Tag", "noindex");
+    return res.status(200).send(xml);
+  } catch {
+    return res.status(503).type("text/plain").send("Sitemap temporarily unavailable");
+  }
+});
 
 // Routes
 app.use(verifyOrigin);

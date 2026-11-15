@@ -3,6 +3,7 @@ import * as accessService from "../services/access.service.js";
 import * as auditLogService from "../services/auditLog.service.js";
 import * as userDeletionService from "../services/userDeletion.service.js";
 import { safeErrorMessage } from "../utils/response.js";
+import { getIdCardForReview } from "../services/genderRequest.service.js";
 
 const sendSuccess = (res, message, payload, statusCode = 200) =>
   res.status(statusCode).json({
@@ -96,6 +97,7 @@ export const reviewGenderChangeRequest = async (req, res) => {
     const user = await adminUserService.reviewGenderChangeRequest(
       req.params.id,
       req.body?.action,
+      req.body?.note,
     );
     auditLogService
       .logAdminAction({
@@ -104,7 +106,7 @@ export const reviewGenderChangeRequest = async (req, res) => {
         targetType: "user",
         targetId: user.id || user._id,
         targetSnapshot: { gender: user.gender },
-        metadata: { action: req.body?.action },
+        metadata: { action: req.body?.action, note: typeof req.body?.note === "string" ? req.body.note.slice(0, 300) : null },
       })
       .catch(() => {});
     return sendSuccess(res, "Gender change request reviewed", { data: user });
@@ -127,6 +129,37 @@ export const deleteUser = async (req, res) => {
       reason: req.body?.reason,
     });
     return sendSuccess(res, "Account and all linked data deleted", { data: result });
+  } catch (error) {
+    return sendFailure(res, error, error?.statusCode || 400);
+  }
+};
+
+// The college ID photo for a pending request. Streamed straight from the
+// database, never cached, and every view is audit-logged.
+export const getGenderRequestIdCard = async (req, res) => {
+  try {
+    const card = await getIdCardForReview(req.params.id);
+    auditLogService
+      .logAdminAction({
+        actor: req.user,
+        action: "user.gender_id_view",
+        targetType: "user",
+        targetId: req.params.id,
+      })
+      .catch(() => {});
+    res.set({
+      "Content-Type": card.mimetype,
+      "Content-Length": String(card.size),
+      "Cache-Control": "no-store, private, max-age=0",
+      Pragma: "no-cache",
+      "Content-Disposition": "inline",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'",
+      "Cross-Origin-Resource-Policy": "same-site",
+    });
+    // lean() returns BSON Binary; its .buffer is the image bytes.
+    const bytes = Buffer.isBuffer(card.data) ? card.data : Buffer.from(card.data.buffer);
+    return res.status(200).send(bytes);
   } catch (error) {
     return sendFailure(res, error, error?.statusCode || 400);
   }

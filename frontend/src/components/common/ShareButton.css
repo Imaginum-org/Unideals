@@ -1,49 +1,66 @@
+/*
+ * "Share Unideals" pill with an animated gradient border.
+ *
+ * The ring is a conic gradient whose *angle* is animated (registered
+ * custom property), so colour travels around the pill at an even speed on
+ * every edge, whatever the button's width. (Rotating a square gradient
+ * behind a wide pill made the long edges race and the ends crawl.)
+ * A blurred copy underneath gives a soft glow that is not clipped.
+ * Browsers without @property show a static gradient ring.
+ */
+
+@property --share-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+
 .share-btn-wrapper {
   position: relative;
   display: inline-flex;
   border-radius: 999px;
   padding: 1.5px;
   isolation: isolate;
-  overflow: hidden;
-}
-
-.share-btn-wrapper::before {
-  content: "";
-  position: absolute;
-  inset: -100%;
   background: conic-gradient(
-    from 0deg,
-    #4285f4 0deg,
-    #9b72cb 90deg,
-    #d96570 180deg,
-    #f2a93b 270deg,
-    #4285f4 360deg
+    from var(--share-angle),
+    #4285f4,
+    #9b72cb,
+    #d96570,
+    #f2a93b,
+    #4285f4
   );
-  animation: share-btn-rotate 3.5s linear infinite;
-  will-change: transform;
+  animation: share-btn-spin 4s linear infinite;
 }
 
+/* Soft glow: same ring, blurred, behind the button. */
 .share-btn-wrapper::after {
   content: "";
   position: absolute;
-  inset: -100%;
-  background: conic-gradient(
-    from 0deg,
-    #4285f4 0deg,
-    #9b72cb 90deg,
-    #d96570 180deg,
-    #f2a93b 270deg,
-    #4285f4 360deg
-  );
-  animation: share-btn-rotate 3.5s linear infinite;
-  filter: blur(6px);
-  opacity: 0.55;
+  inset: 1px;
   z-index: -1;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--share-angle),
+    #4285f4,
+    #9b72cb,
+    #d96570,
+    #f2a93b,
+    #4285f4
+  );
+  filter: blur(7px);
+  opacity: 0.35;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
 }
 
-@keyframes share-btn-rotate {
+.share-btn-wrapper:hover::after,
+.share-btn-wrapper:focus-within::after {
+  opacity: 0.6;
+}
+
+@keyframes share-btn-spin {
   to {
-    transform: rotate(360deg);
+    --share-angle: 360deg;
   }
 }
 
@@ -57,19 +74,21 @@
   border: none;
   border-radius: 999px;
   background: #ffffff;
-  color: #3c4043;
+  color: #334155;
   font-size: 14px;
   font-weight: 500;
   font-family: inherit;
   line-height: 1;
   cursor: pointer;
   transition:
-    background 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
     transform 0.15s ease;
 }
 
 .share-btn:hover {
-  background: #f8f9fb;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 .share-btn:active {
@@ -78,18 +97,19 @@
 
 .share-btn:focus-visible {
   outline: 2px solid #4285f4;
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 .share-btn-icon {
   display: inline-flex;
-  color: #000;
+  color: currentColor;
 }
 
+/* Footer size */
 .footer-share-btn .share-btn {
   gap: 6px;
   padding: 8px 14px;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .footer-share-btn .share-btn-icon svg {
@@ -97,24 +117,23 @@
   height: 15px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .share-btn-wrapper::before,
-  .share-btn-wrapper::after {
-    animation: none;
-  }
+/* Follows the site's theme toggle (html.dark), not the OS setting. */
+:is(.dark) .share-btn {
+  background: #1f2226;
+  color: #e4e4e7;
 }
 
-@media (prefers-color-scheme: dark) {
-  .share-btn {
-    background: #fff;
-    color: #000;
-  }
+:is(.dark) .share-btn:hover {
+  background: #26292e;
+  color: #ffffff;
+}
 
-  .share-btn:hover {
-    background: #fff;
-  }
+:is(.dark) .share-btn-wrapper::after {
+  opacity: 0.45;
+}
 
-  .share-btn-icon {
-    color: #000;
+@media (prefers-reduced-motion: reduce) {
+  .share-btn-wrapper {
+    animation: none;
   }
 }

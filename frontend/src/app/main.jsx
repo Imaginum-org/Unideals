@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import ScrollToTop from "../components/layout/ScrollToTop.jsx";
 import "../services/authInterceptor.js";
 import "../styles/index.css";
 import App from "./App.jsx";
@@ -29,6 +30,7 @@ try {
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
+    <ScrollToTop />
     <ThemeProvider>
       <GirlsModeProvider>
         <UserProvider>

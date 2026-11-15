@@ -828,7 +828,7 @@ Available conditions: ${Object.values(PRODUCT_CONDITION_LABELS || {}).join(", ")
 
 Facts and honesty:
 - Unideals rules, policies, prices, plan details, timelines and procedures come ONLY from the Knowledge Base Context, the student context or tool results. Never guess them.
-- If a policy or procedure question isn't covered, say honestly that you're not sure about that one, and that the team can confirm at hi@unideals.in or /contact. One sentence, no drama.
+- If a policy or procedure question isn't covered, say honestly that you're not sure about that one, and that the team can confirm at unideals.support@gmail.com or /contact. One sentence, no drama.
 - General buying and selling know-how (what specs matter, what to inspect, how to negotiate politely, what's a reasonable condition for the price) can come from common knowledge, as long as you don't present it as an Unideals rule.
 - If something is clearly unrelated to students buying, selling or using the marketplace (homework, coding, news, politics), don't answer it: in one warm line say it's not your thing and offer something nearby you can help with.
 - Never share personal details or contact info of other users. Always suggest meeting in a public campus spot and inspecting before paying.
@@ -1130,7 +1130,7 @@ const fallbackLocalSearch = async (message) => {
 
     if (isPolicyQuestion && !knowledgeMatch) {
       return {
-        reply: "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but don't worry, our team is continuously expanding my knowledge and I'll soon be able to answer it fully!\n\nIn the meantime, here's what you can do:\n📧 Email us directly at **hi@unideals.in** — our team will reply within 24-48 hours.\n🎫 Submit a support ticket at **/contact** and a campus team member will assist you.\n📚 Browse our Terms & Conditions at **/termscondition** or Privacy Policy at **/privacy-policy**.\n\nThanks for your patience — we're always improving! 🙌",
+        reply: "That's a great question! 🤔 I don't have the exact answer to this specific query in my knowledge base just yet — but don't worry, our team is continuously expanding my knowledge and I'll soon be able to answer it fully!\n\nIn the meantime, here's what you can do:\n📧 Email us directly at **unideals.support@gmail.com** — our team will reply within 24-48 hours.\n🎫 Submit a support ticket at **/contact** and a campus team member will assist you.\n📚 Browse our Terms & Conditions at **/termscondition** or Privacy Policy at **/privacy-policy**.\n\nThanks for your patience — we're always improving! 🙌",
         intent: "policy",
         route: "/contact",
         suggestions: [

@@ -8,7 +8,9 @@ import {
   escapeRegex,
   toPositiveInt,
 } from "../utils/adminQuery.js";
-import { notifyRoleAssigned } from "./notification.service.js";
+import { notifyRoleAssigned, notifyUser } from "./notification.service.js";
+import GenderIdCard from "../models/GenderIdCard.model.js";
+import { deleteIdCard } from "./genderRequest.service.js";
 import { campusMatch, withCampusScope } from "./campusScope.service.js";
 
 const { ObjectId } = mongoose.Types;
@@ -326,6 +328,10 @@ export const getGenderChangeRequests = async (query = {}, scope = null) => {
       .limit(limit)
       .lean(),
   ]);
+  // Which requests still have their ID photo (it expires after 30 days).
+  const withCard = data.length
+    ? new Set((await GenderIdCard.find({ user_id: { $in: data.map((u) => u._id) } }).select("user_id").lean()).map((c) => String(c.user_id)))
+    : new Set();
   return {
     data: data.map((u) => ({
       id: String(u._id),
@@ -335,12 +341,21 @@ export const getGenderChangeRequests = async (query = {}, scope = null) => {
       genderSource: u.genderSource,
       requestedGender: u.genderChangeRequest?.requestedGender || null,
       requestedAt: u.genderChangeRequest?.requestedAt || null,
+      hasIdCard: withCard.has(String(u._id)),
+      idCardUrl: withCard.has(String(u._id)) ? `/api/admin/gender-requests/${u._id}/id-card` : null,
     })),
     pagination: buildPagination(total, page, limit),
   };
 };
 
-export const reviewGenderChangeRequest = async (userId, action) => {
+const GENDER_LABEL = { male: "Male", female: "Female", other: "Other" };
+
+/**
+ * Approve or reject. Either way the ID photo is deleted right after the
+ * decision is saved, and the user is told the outcome. `note` (optional)
+ * is shown to the user on a rejection.
+ */
+export const reviewGenderChangeRequest = async (userId, action, note = null) => {
   if (!ObjectId.isValid(userId)) throw new Error("Invalid user id");
   const act = String(action || "").toLowerCase();
   if (!["approve", "reject"].includes(act)) throw new Error("Invalid action");
@@ -349,10 +364,21 @@ export const reviewGenderChangeRequest = async (userId, action) => {
   if (!user.genderChangeRequest || user.genderChangeRequest.status !== "pending") {
     throw new Error("No pending gender change request");
   }
+  const reviewNote = typeof note === "string" && note.trim() ? note.trim().slice(0, 300) : null;
   if (act === "reject") {
     user.genderChangeRequest.status = "rejected";
     user.genderChangeRequest.reviewedAt = new Date();
+    user.genderChangeRequest.reviewNote = reviewNote;
     await user.save();
+    await deleteIdCard(user._id);
+    notifyUser({
+      userId: user._id,
+      type: "moderation",
+      title: "Gender change not approved",
+      message: `We couldn't approve your request.${reviewNote ? ` Reason: ${reviewNote}` : ""} Your ID photo has been deleted. You can send a new request from Settings.`,
+      actionUrl: "/settings",
+      actionLabel: "Open Settings",
+    }).catch(() => {});
     return user.toObject();
   }
   // Approve: set gender as admin, stamp source, auto-unlist girls-only if
@@ -364,7 +390,17 @@ export const reviewGenderChangeRequest = async (userId, action) => {
   user.genderUpdatedAt = new Date();
   user.genderChangeRequest.status = "approved";
   user.genderChangeRequest.reviewedAt = new Date();
+  user.genderChangeRequest.reviewNote = null;
   await user.save();
+  await deleteIdCard(user._id);
+  notifyUser({
+    userId: user._id,
+    type: "moderation",
+    title: "Gender change approved",
+    message: `Your gender is now set to ${GENDER_LABEL[next] || next}. Your ID photo has been deleted.`,
+    actionUrl: "/settings",
+    actionLabel: "Open Settings",
+  }).catch(() => {});
   if (leavingFemale) {
     try {
       await Product.updateMany(

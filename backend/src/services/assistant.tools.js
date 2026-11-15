@@ -632,7 +632,7 @@ export const toolHandlers = {
           "If item doesn't match the listing: do NOT pay — walk away.",
           "Report fraudulent sellers via the in-app report/flag button.",
           "For serious fraud (theft, criminal scam): contact campus security or local police first.",
-          "Email hi@unideals.in with full evidence for platform action against the seller.",
+          "Email unideals.support@gmail.com with full evidence for platform action against the seller.",
           "Unideals can suspend/ban fraudulent sellers but cannot recover funds.",
         ]
       },
@@ -685,7 +685,7 @@ export const toolHandlers = {
           "2nd violation: Temporary suspension (7-30 days depending on severity).",
           "3rd violation or any serious offense: Permanent account ban.",
           "Permanently banned users cannot create new accounts.",
-          "Appeals: email hi@unideals.in with evidence.",
+          "Appeals: email unideals.support@gmail.com with evidence.",
           "Banned accounts forfeit subscription benefits — no refunds.",
         ],
         sectionRef: TERMS_AND_CONDITIONS.sections.find(s => s.id === "moderation_penalties"),
@@ -703,7 +703,7 @@ export const toolHandlers = {
           "Google OAuth users: no separate password — sign in with Google account.",
           "Email verification required for full access (listing, chat, wishlist, etc.).",
           "If verification email not received: check spam or request resend from login page.",
-          "Account hacking/unauthorized access: contact hi@unideals.in immediately.",
+          "Account hacking/unauthorized access: contact unideals.support@gmail.com immediately.",
           "Password change: Settings → Security (only for email-based accounts).",
           "Google users manage passwords via Google account settings.",
         ]

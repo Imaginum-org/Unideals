@@ -19,9 +19,9 @@ import {
 } from "lucide-react";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { AccountLayout, CARD, FLUSH_ON_PHONE, PageHeader } from "../../user/components/account/AccountKit.jsx";
-import Seo from "../../../components/Seo.jsx";
 import { FAQ_CATEGORIES, FAQ_COUNT } from "../faqData.js";
 import { cn } from "../../../utils/cn.js";
+import PageSeo from "../../../components/seo/PageSeo.jsx";
 
 const ICONS = {
   rocket: Rocket,
@@ -216,7 +216,7 @@ export default function FAQ() {
   }
   return (
     <>
-      <Seo title="FAQ | Unideals" description="Answers to common questions about buying and selling on Unideals." />
+      <PageSeo path="/faq" />
       <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#F7F9FD] font-figtree dark:bg-[#131313]">
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:py-8">
           <PageHeader title="Frequently asked questions" description={`${FAQ_COUNT} answers about buying, selling and staying safe on Unideals.`} />

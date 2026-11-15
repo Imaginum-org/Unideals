@@ -24,7 +24,7 @@ const sendEmail = async ({ sendTo, subject, html }) => {
     const { data, error } = await getClient().emails.send({
       from: "Unideals <onboarding@unideals.in>", // MUST be your verified domain
       // Resend SDK v6 uses camelCase replyTo; reply_to was silently ignored.
-      replyTo: "imaginum.org@gmail.com",
+      replyTo: "unideals.support@gmail.com",
       to: sendTo,
       subject: subject,
       html: html,

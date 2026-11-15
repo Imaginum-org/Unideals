@@ -30,8 +30,10 @@ const getMonthWindow = (date = new Date()) => {
   return { start, end };
 };
 
+// No global expireStaleBoosts() here: it ran two collection-wide updateMany
+// scans on every quota read. Counts below filter on expires_at, and the
+// expire-boosts job (every 10 min) tidies statuses in the background.
 export const getBoostSummary = async (user) => {
-  await expireStaleBoosts();
 
   const rules = getBoostPlanRules(user.subscription);
   const { start, end } = getMonthWindow();
@@ -93,8 +95,9 @@ export const expireStaleBoosts = async () => {
   };
 };
 
+// Expiry is checked per listing below (boost_expires_at > now), so the
+// global expireStaleBoosts() sweep is left to the background job.
 export const createBoost = async ({ productId, user }) => {
-  await expireStaleBoosts();
 
   const product = await Product.findOne({
     _id: productId,

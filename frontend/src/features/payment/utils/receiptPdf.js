@@ -186,7 +186,7 @@ export async function downloadReceiptPdf({ payment, customer = {}, validity }) {
   doc.setTextColor(...MUTED);
   doc.text("This is a computer-generated receipt and does not need a signature.", M, H - 72);
   doc.text("Payments are processed securely by Razorpay. Unideals never sees your card or UPI details.", M, H - 58);
-  doc.text("Questions about this payment? Write to hi@unideals.in", M, H - 44);
+  doc.text("Questions about this payment? Write to unideals.support@gmail.com", M, H - 44);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...BRAND);
   doc.text("unideals", W - M, H - 44, { align: "right" });

@@ -140,23 +140,29 @@ export const expireDueSubscriptions = async () => {
     .select("_id user_id")
     .lean();
 
-  let expired = 0;
-  for (const sub of due) {
-    try {
-      await Subscription.updateOne(
-        { _id: sub._id, status: SUBSCRIPTION_STATUS.ACTIVE },
-        { $set: { status: SUBSCRIPTION_STATUS.EXPIRED } },
-      );
-      await User.updateOne(
-        { _id: sub.user_id, role: { $ne: "admin" }, subscription: { $ne: USER_TIER.BASE_USER } },
-        { $set: { subscription: USER_TIER.BASE_USER } },
-      );
-      expired += 1;
-    } catch {
-      // best-effort per row; job continues
-    }
+  if (!due.length) return { checked: 0, expired: 0 };
+
+  // Two bulk writes instead of two round trips per expiring user (a semester
+  // boundary expires many plans in the same night). The status guard keeps
+  // it idempotent if a renewal landed between the read and the write.
+  const subIds = due.map((s) => s._id);
+  const userIds = [...new Set(due.map((s) => String(s.user_id)))];
+  const res = await Subscription.updateMany(
+    { _id: { $in: subIds }, status: SUBSCRIPTION_STATUS.ACTIVE, expires_at: { $lte: now } },
+    { $set: { status: SUBSCRIPTION_STATUS.EXPIRED } },
+  );
+  // Never downgrade someone who renewed in the meantime.
+  const renewed = new Set(
+    (await Subscription.find({ user_id: { $in: userIds }, status: SUBSCRIPTION_STATUS.ACTIVE }).distinct("user_id")).map(String),
+  );
+  const toDowngrade = userIds.filter((id) => !renewed.has(id));
+  if (toDowngrade.length) {
+    await User.updateMany(
+      { _id: { $in: toDowngrade }, role: { $ne: "admin" }, subscription: { $ne: USER_TIER.BASE_USER } },
+      { $set: { subscription: USER_TIER.BASE_USER } },
+    );
   }
-  return { checked: due.length, expired };
+  return { checked: due.length, expired: res?.modifiedCount || 0 };
 };
 
 export const isSubscriptionActive = (subscription) =>

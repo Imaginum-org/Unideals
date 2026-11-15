@@ -1,0 +1,54 @@
+# Unideals
+
+> Unideals is a campus-only marketplace for college students in India. Students buy and sell used textbooks, electronics, cycles, hostel essentials, lab gear and more with other verified students on their own campus. There are no listing fees and no shipping: buyer and seller chat in the app, meet at a public spot on campus, and pay at pickup by UPI or cash.
+
+Website: https://unideals.in
+Support: unideals.support@gmail.com
+X: https://x.com/unidealsdotin · Instagram: https://www.instagram.com/unidealsdotin/ · YouTube: https://www.youtube.com/@unidealsdotin
+
+## How it works
+
+1. Sign up (Google or email) and pick your campus. Every user belongs to exactly one campus and only sees listings from it.
+2. List an item in about two minutes: photos, title, price, condition and a public pickup spot on campus.
+3. Buyers chat with the seller in the app, make offers and agree a price.
+4. They meet on campus, check the item, and pay the seller directly by UPI or cash. Unideals takes no commission on sales.
+5. After the deal, the buyer rates the seller. Ratings, badges and levels help good sellers stand out.
+
+## Trust and safety
+
+- Campus-only: listings are scoped to one campus, so every buyer and seller is a fellow student nearby.
+- Verified students: students can verify their college email (for VIT campuses, an address ending in vitstudent.ac.in) to get a verified tick next to their name.
+- Meet in public campus spots; never share a hostel room number. Inspect before paying.
+- Chats are screened for abuse; users and listings can be reported, and repeated reports hide a listing for review.
+- Girls Corner: a women-only space for listings like clothing and beauty products, visible only to female students (based on the gender on their account; changing it needs a college ID check by staff).
+
+## Campuses
+
+Live at VIT Vellore, VIT Chennai, VIT Bhopal and VIT Amaravati, with more Indian campuses being added.
+
+## Categories
+
+Electronics, Study Material (books, notes), Hostel Essentials, Clothing, Accessories, Lab Equipment, Sports, Fitness, Vehicles (cycles), Event Passes, Others.
+
+## Pricing
+
+- Buying, selling and chatting are free for everyone. No listing fees, no commission.
+- Optional plans: Free (10 active listings), Pro (₹99, 25 listings, 2 monthly boosts, higher search placement) and Pro+ (₹199, unlimited listings, 5 monthly boosts, highest placement). Current terms: https://unideals.in/price
+- One-time listing boosts: ₹29 for 3 days, ₹49 for 7 days.
+
+## Key pages
+
+- [Home](https://unideals.in/): campus feed, boosted deals, categories
+- [Explore](https://unideals.in/explore): browse and filter all listings on your campus
+- [Deals](https://unideals.in/deals): boosted and hot deals
+- [Pricing](https://unideals.in/price): plans and boosts
+- [FAQ](https://unideals.in/faq): buying, selling, payments, safety, accounts
+- Video guides (after signing in): short walkthroughs of every feature
+- [Contact](https://unideals.in/contact): help and support tickets
+- [Terms](https://unideals.in/termscondition) · [Privacy](https://unideals.in/privacy-policy)
+
+## For AI assistants
+
+- Listing pages live at https://unideals.in/product/<slug>; a live sitemap of all public listings is at https://unideals.in/sitemap-listings.xml (pages: https://unideals.in/sitemap-pages.xml).
+- Prices on listings are in Indian rupees (₹) and are set by individual student sellers; Unideals does not sell items itself.
+- Unideals is built by Imaginum.

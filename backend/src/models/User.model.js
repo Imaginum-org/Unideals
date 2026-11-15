@@ -59,10 +59,12 @@ const userSchema = new Schema(
       default: null,
     },
 
-    // Girls Corner 🌸 — self-declared once, then locked (admin approval to change).
+    // Girls Corner 🌸 — set once (from the Google account when it shares one,
+    // otherwise self-declared), then locked: changes need an ID-card request
+    // approved by staff.
     genderSource: {
       type: String,
-      enum: ["self", "admin"],
+      enum: ["self", "google", "admin"],
       default: "self",
     },
     genderUpdatedAt: {
@@ -80,7 +82,7 @@ const userSchema = new Schema(
       },
       status: {
         type: String,
-        enum: ["pending", "approved", "rejected"],
+        enum: ["pending", "approved", "rejected", "cancelled"],
         default: null,
       },
       requestedAt: {
@@ -91,15 +93,23 @@ const userSchema = new Schema(
         type: Date,
         default: null,
       },
+      // Shown to the user when a request is rejected (e.g. "ID photo unreadable").
+      reviewNote: {
+        type: String,
+        trim: true,
+        maxlength: 300,
+        default: null,
+      },
     },
 
     // Campus marketplace: every user belongs to exactly one campus.
     // Null only for legacy accounts until they pass the onboarding gate.
+    // Indexed via { campus_id, gamification.total_xp } (prefix serves
+    // campus-only lookups too).
     campus_id: {
       type: Schema.Types.ObjectId,
       ref: "Campus",
       default: null,
-      index: true,
     },
 
     subscription: {
@@ -123,6 +133,38 @@ const userSchema = new Schema(
     is_email_verified: {
       type: Boolean,
       default: false,
+    },
+
+    // College email verification (verified tick). People sign in with a personal
+    // Gmail; in Settings they can prove they're a student by confirming a
+    // college address with an emailed OTP. Only the boolean is public, and
+    // the address itself is never shown to anyone else.
+    is_college_verified: {
+      type: Boolean,
+      default: false,
+    },
+    college_email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      maxlength: 254,
+      default: null,
+    },
+    college_verified_at: {
+      type: Date,
+      default: null,
+    },
+    // Pending OTP: sha256 hash only, expires in 10 minutes, 5 tries max.
+    college_email_otp: {
+      type: {
+        email: { type: String, default: null },
+        hash: { type: String, default: null },
+        expires_at: { type: Date, default: null },
+        sent_at: { type: Date, default: null },
+        attempts: { type: Number, default: 0 },
+      },
+      select: false,
+      default: null,
     },
 
     // First time any of their listings went live. Never cleared: a first
@@ -360,6 +402,14 @@ const userSchema = new Schema(
 );
 
 userSchema.index({ status: 1 });
+// Campus leaderboard: top XP on one campus, sorted by the index.
+userSchema.index({ campus_id: 1, "gamification.total_xp": -1 });
+
+// One verified account per college address.
+userSchema.index(
+  { college_email: 1 },
+  { unique: true, partialFilterExpression: { is_college_verified: true } },
+);
 
 userSchema.index(
   { createdAt: 1 },

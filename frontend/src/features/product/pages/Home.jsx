@@ -28,6 +28,7 @@ import CampusJourney from "../components/home/CampusJourney.jsx";
 import { CampusEmptyState } from "../../../components/ui/EmptyStates.jsx";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { loginWithGoogleOneTap } from "../../auth/api/authApi.js";
+import PageSeo from "../../../components/seo/PageSeo.jsx";
 
 const HOME_GOOGLE_LOGIN_TRIGGER_KEY = "homeGoogleLoginTriggered";
 const GOOGLE_ID_SCRIPT_ID = "google-identity-services-script";
@@ -442,6 +443,7 @@ const Home = () => {
 
   return (
     <motion.div className="w-full bg-[#F7F8FA] dark:bg-[#131313] relative">
+      <PageSeo path="/" />
       <div className="w-full px-5 sm:px-[4.5vw]">
       <div className="flex flex-col w-full max-w-[var(--page-max)] mx-auto">
         {/* Girls Corner edge menu — fixed to the right edge, girls + admins only */}

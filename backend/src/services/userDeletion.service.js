@@ -18,6 +18,7 @@ import PhotoHandoff from "../models/PhotoHandoff.model.js";
 import PickupSpot from "../models/PickupSpot.model.js";
 import StaffAccess from "../models/StaffAccess.model.js";
 import AssistantConversation from "../models/AssistantConversation.model.js";
+import GenderIdCard from "../models/GenderIdCard.model.js";
 import Campus from "../models/Campus.model.js";
 import { USER_ROLES } from "../config/constants.js";
 import { deleteImageSafely } from "../utils/imagekit.js";
@@ -40,7 +41,8 @@ const idsOf = (rows) => rows.map((row) => row._id);
  * they were part of with its messages, deals and reviews; reports they filed
  * or that name them; their notifications, payments, subscriptions, badge
  * history, chat cooldowns, phone-upload sessions, pickup spots and custom
- * staff access; their Unideals AI chats; their avatar.
+ * staff access; their Unideals AI chats; any gender-request ID photo;
+ * their avatar.
  *
  * Kept: the audit log (staff actions stay accountable, including this one)
  * and broadcast notifications they sent as staff.
@@ -125,6 +127,7 @@ export const deleteUserPermanently = async ({ userId, actor, confirmEmail, reaso
     PickupSpot.deleteMany({ user: uid }),
     StaffAccess.deleteMany({ user_id: uid }),
     AssistantConversation.deleteMany({ user_id: uid }),
+    GenderIdCard.deleteMany({ user_id: uid }),
     DeviceToken.deleteMany({ user_id: uid }), // keep last: `removed` reads results by index
   ]);
   const count = (i) => results[i]?.deletedCount || 0;

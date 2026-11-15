@@ -1,3 +1,4 @@
+import { loadAuthUser } from "../utils/userCache.js";
 import mongoose from "mongoose";
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
@@ -263,7 +264,8 @@ export const sendTextMessage = async ({ conversationId, senderId, text, replyTo 
 
   // Best-effort in-app message notification
   try {
-    const sender = await User.findById(senderId).select("name").lean();
+    // The sender was just authenticated, so this is a cache hit, not a query.
+    const sender = await loadAuthUser(User, senderId);
     notifyNewMessage({
       conversationId: conversation._id,
       senderId,
@@ -317,7 +319,8 @@ export const getMessages = async ({ conversationId, userId, limit = 50, before =
 
   // Reciprocal receipts: with read receipts off, the reader still needs
   // correct local state, but peer READs render as DELIVERED in their view.
-  const me = await User.findById(userId).select("chat_settings").lean();
+  // Cached auth user (this request already loaded it): no extra query.
+  const me = await loadAuthUser(User, userId);
   if (me?.chat_settings && me.chat_settings.read_receipts === false) {
     const myId = String(userId);
     ordered = ordered.map((m) =>

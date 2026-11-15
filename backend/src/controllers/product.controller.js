@@ -6,7 +6,7 @@ import Product from "../models/Product.model.js";
 import User from "../models/User.model.js";
 import Deal from "../models/deal.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
-import { computeAndAwardBadges } from "../services/badgeService.js";
+import { computeAndAwardBadges, scheduleBadgeRecompute } from "../services/badgeService.js";
 import { getAuthCookieOptions } from "../services/auth.service.js";
 import crypto from "crypto";
 
@@ -330,9 +330,8 @@ export const deleteProduct = async (req, res, next) => {
 
     const product = await productService.deleteProduct(productId, userId);
 
-    computeAndAwardBadges(userId).catch((err) =>
-      console.error("Error updating gamification on deleteProduct:", err),
-    );
+    // Coalesced: bursts of edits trigger one recompute (badgeService).
+    scheduleBadgeRecompute(userId);
 
     return res.status(200).json({
       success: true,
@@ -351,9 +350,8 @@ export const unlistProduct = async (req, res, next) => {
 
     const product = await productService.unlistProduct(productId, userId);
 
-    computeAndAwardBadges(userId).catch((err) =>
-      console.error("Error updating gamification on unlistProduct:", err),
-    );
+    // Coalesced: bursts of edits trigger one recompute (badgeService).
+    scheduleBadgeRecompute(userId);
 
     return res.status(200).json({
       success: true,
@@ -372,9 +370,8 @@ export const relistProduct = async (req, res, next) => {
 
     const product = await productService.relistProduct(productId, userId);
 
-    computeAndAwardBadges(userId).catch((err) =>
-      console.error("Error updating gamification on relistProduct:", err),
-    );
+    // Coalesced: bursts of edits trigger one recompute (badgeService).
+    scheduleBadgeRecompute(userId);
 
     return res.status(200).json({
       success: true,
@@ -414,9 +411,8 @@ export const updateProduct = async (req, res, next) => {
       req.body,
     );
 
-    computeAndAwardBadges(req.userId).catch((err) =>
-      console.error("Error updating gamification on updateProduct:", err),
-    );
+    // Coalesced: bursts of edits trigger one recompute (badgeService).
+    scheduleBadgeRecompute(req.userId);
 
     return res.status(200).json({
       success: true,
@@ -433,9 +429,8 @@ export const markProductSold = async (req, res, next) => {
   try {
     const product = await productService.markProductSold(req.params.id, req.userId);
 
-    computeAndAwardBadges(req.userId).catch((err) =>
-      console.error("Error updating gamification on markProductSold:", err),
-    );
+    // Coalesced: bursts of edits trigger one recompute (badgeService).
+    scheduleBadgeRecompute(req.userId);
 
     return res.status(200).json({
       success: true,

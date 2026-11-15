@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Ban,
+  Bell,
   Check,
   Clock,
   Cookie,
@@ -28,6 +29,8 @@ import {
   Settings,
   Share2,
   Shield,
+  Sparkles,
+  Star,
   Store,
   Tag,
   Trash2,
@@ -42,6 +45,7 @@ const ICONS = {
   flag: Flag, flower: Flower2, gavel: Gavel, grad: GraduationCap, handshake: Handshake, image: ImageIcon,
   info: Info, lock: Lock, mail: Mail, chat: MessageCircle, phone: Phone, refresh: RefreshCw, scale: Scale,
   settings: Settings, share: Share2, shield: Shield, store: Store, tag: Tag, trash: Trash2, trophy: Trophy, user: User,
+  bell: Bell, sparkles: Sparkles, star: Star,
 };
 
 const TABS = [

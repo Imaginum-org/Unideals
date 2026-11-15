@@ -1,28 +1,24 @@
 import Product from "../models/Product.model.js";
+import User from "../models/User.model.js";
+
+const LIVE_GIRLS = { isGirlsOnly: true, status: "listed", is_deleted: false };
 
 /**
  * Nightly: auto-unlist girls-only listings whose seller is no longer female.
- * Covers admin gender corrections (edge #10). Idempotent, batched.
+ * Covers admin gender corrections (edge #10). Idempotent.
+ *
+ * Works on distinct sellers, not listings: one distinct + one user lookup
+ * + one updateMany, instead of pulling every live girls-only listing into
+ * memory each night.
  */
 export const autoUnlistInvalidGirlsListings = async () => {
-  const stale = await Product.find(
-    { isGirlsOnly: true, status: "listed", is_deleted: false },
-    { _id: 1, seller_id: 1 },
-  ).lean();
-  if (!stale.length) return { checked: 0, unlisted: 0 };
-  const { default: User } = await import("../models/User.model.js");
-  const sellerIds = [...new Set(stale.map((p) => String(p.seller_id)))];
-  const sellers = await User.find({ _id: { $in: sellerIds } })
-    .select("_id gender")
-    .lean();
-  const bad = new Set(
-    sellers.filter((u) => u.gender !== "female").map((u) => String(u._id)),
-  );
-  const ids = stale.filter((p) => bad.has(String(p.seller_id))).map((p) => p._id);
-  if (!ids.length) return { checked: stale.length, unlisted: 0 };
+  const sellerIds = await Product.distinct("seller_id", LIVE_GIRLS);
+  if (!sellerIds.length) return { checked: 0, unlisted: 0 };
+  const ineligible = await User.find({ _id: { $in: sellerIds }, gender: { $ne: "female" } }).distinct("_id");
+  if (!ineligible.length) return { checked: sellerIds.length, unlisted: 0 };
   const r = await Product.updateMany(
-    { _id: { $in: ids } },
+    { ...LIVE_GIRLS, seller_id: { $in: ineligible } },
     { $set: { status: "unlisted", is_boosted: false } },
   );
-  return { checked: stale.length, unlisted: r?.modifiedCount || 0 };
+  return { checked: sellerIds.length, unlisted: r?.modifiedCount || 0 };
 };

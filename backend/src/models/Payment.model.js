@@ -91,6 +91,8 @@ const paymentSchema = new Schema(
 
 paymentSchema.index({ user_id: 1, status: 1, createdAt: -1 });
 paymentSchema.index({ user_id: 1, plan: 1, status: 1 });
+// Nightly "expire abandoned payments": { status: "created", createdAt < cutoff }.
+paymentSchema.index({ status: 1, createdAt: 1 });
 
 const Payment = mongoose.model("Payment", paymentSchema);
 

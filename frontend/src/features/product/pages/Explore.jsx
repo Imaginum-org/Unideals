@@ -24,6 +24,7 @@ import { useUser } from "../../../context/useUserContext.jsx";
 import { useGirlsMode } from "../../../context/GirlsModeContext.jsx";
 import GirlsEntryPill from "../../../components/ui/GirlsEntryPill.jsx";
 import { CampusEmptyState, FiltersEmptyState } from "../../../components/ui/EmptyStates.jsx";
+import PageSeo from "../../../components/seo/PageSeo.jsx";
 
 const PAGE_SIZE = 12;
 
@@ -176,6 +177,7 @@ const ExplorePage = () => {
   return (
     <div className="min-h-[100dvh] bg-[#F7F8FA] pb-24 font-figtree text-slate-900 dark:bg-[#131313] dark:text-white">
       <GirlsEntryPill tab={audienceTab} onChange={setAudienceTab} />
+      <PageSeo path="/explore" />
 
       <div className="mx-auto w-full max-w-[calc(var(--page-max)+9vw)] px-5 pt-5 sm:px-[4.5vw] lg:pt-8 2xl:max-w-[var(--page-max)] 2xl:px-0">
         <BrowseHeader

@@ -41,8 +41,8 @@ export const getUserOrders = async ({
   }
 
   let rows = await Conversation.find(and.length ? { $and: and } : {})
-    .populate("buyer_id", "name avatar subscription role")
-    .populate("seller_id", "name avatar subscription role")
+    .populate("buyer_id", "name avatar subscription role is_college_verified")
+    .populate("seller_id", "name avatar subscription role is_college_verified")
     .populate("product_id", "title selling_price images status slug")
     .sort({ last_activity_at: -1 })
     .limit(300)

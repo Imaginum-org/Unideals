@@ -580,7 +580,7 @@ function Subscription() {
             <p className="flex items-center gap-1.5 border-t border-neutral-100 px-4 py-3 text-[12.5px] text-slate-500 sm:px-5 dark:border-neutral-800 dark:text-zinc-400">
               <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
               Need to downgrade?{" "}
-              <a href="mailto:hi@unideals.in?subject=Downgrade%20request" className="font-semibold text-[var(--accent-text)] hover:underline">
+              <a href="mailto:unideals.support@gmail.com?subject=Downgrade%20request" className="font-semibold text-[var(--accent-text)] hover:underline">
                 Contact support
               </a>
             </p>

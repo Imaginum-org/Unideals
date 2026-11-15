@@ -843,3 +843,81 @@ html[data-chat-thread] .tabbar-spacer {
 @media print {
   .brand-surface { background: none !important; }
 }
+
+@keyframes tickTip {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Campus line art (home "From one hostel room to another" + profile
+   banner). Shared by components/campus/CampusArt.jsx users; scoped to
+   .cj-root. Lines draw in once the root gets .is-drawn. */
+.cj-root { --cj-line: #cbd5e1; --cj-fill: #ffffff; --cj-window: #e2e8f0; }
+:is(.dark) .cj-root { --cj-line: #3f444c; --cj-fill: #1a1d20; --cj-window: #2a2e34; }
+.cj-line { fill: none; stroke: var(--cj-line); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s cubic-bezier(.65,0,.35,1), stroke .5s; }
+.cj-fill { fill: var(--cj-fill); fill-opacity: 0; transition: fill-opacity .8s ease .9s, stroke-dashoffset 1.4s cubic-bezier(.65,0,.35,1), stroke .5s; }
+.cj-window { fill: var(--cj-window); opacity: 0; transition: opacity .6s ease 1.1s, fill .5s; }
+.cj-tree { fill: none; }
+.cj-ground { stroke-width: 1.2; }
+.cj-stub { stroke: var(--cj-line); stroke-width: 1.4; stroke-dasharray: 2 5; fill: none; opacity: 0; transition: opacity .6s ease 1.2s; }
+.cj-rail { fill: none; stroke: var(--cj-line); stroke-width: 2; stroke-dasharray: 3 8; stroke-linecap: round; opacity: 0; transition: opacity .6s ease 1s; }
+.cj-walked { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; }
+.cj-stop { fill: var(--cj-fill); stroke: var(--cj-line); stroke-width: 2; opacity: 0; transition: opacity .6s ease 1.1s, fill .4s, stroke .4s; }
+.cj-stop.is-on { fill: var(--accent); stroke: var(--accent); }
+.cj-name { color: #64748b; opacity: 0; transition: opacity .6s ease 1.1s, color .4s; }
+:is(.dark) .cj-name { color: #a1a1aa; }
+.cj-name.is-active { color: var(--accent-text); font-weight: 600; }
+.cj-caption { opacity: 0; transform: translateY(6px); transition: opacity .3s ease, transform .35s cubic-bezier(.22,1,.36,1); }
+.cj-caption.is-in { opacity: 1; transform: none; animation: cj-in .4s cubic-bezier(.22,1,.36,1); }
+@keyframes cj-in { from { opacity: 0; transform: translateY(6px); } }
+.is-drawn .cj-line { stroke-dashoffset: 0; }
+.is-drawn .cj-fill { fill-opacity: 1; }
+.is-drawn .cj-window, .is-drawn .cj-stub, .is-drawn .cj-rail, .is-drawn .cj-stop, .is-drawn .cj-name { opacity: 1; }
+.cj-building.is-active .cj-line { stroke: var(--accent); }
+.cj-building.is-active .cj-window { fill: var(--accent-soft-strong); }
+@media (prefers-reduced-motion: reduce) {
+  .cj-line, .cj-fill, .cj-window, .cj-stub, .cj-rail, .cj-stop, .cj-name, .cj-caption { transition: none; animation: none; }
+}
+
+/* Profile banner variant: buildings are drawn at 0.54 scale inside a short
+   strip, so lines are thickened to stay crisp; labels only from sm up. */
+.cj-banner .cj-line { stroke-width: 2.8; }
+.cj-banner .cj-ground { stroke-width: 1.2; }
+.cj-banner .cj-rail { stroke-width: 1.8; stroke-dasharray: 2.5 7; }
+.cj-banner .cj-walked { stroke-width: 2.4; }
+.cj-banner .cj-stub { stroke-width: 1.2; }
+.cj-label { fill: #64748b; font-size: 12px; font-weight: 500; letter-spacing: 0.01em; opacity: 0; transition: opacity .6s ease 1.1s, fill .4s; }
+:is(.dark) .cj-label { fill: #a1a1aa; }
+.cj-label.is-active { fill: var(--accent-text); font-weight: 600; }
+.is-drawn .cj-label { opacity: 1; }
+.cj-token { transition: opacity .3s ease; }
+.cj-token-chip { fill: var(--cj-fill); stroke: var(--accent); stroke-width: 1.5; filter: drop-shadow(0 4px 8px var(--accent-ring)); }
+.cj-token-icon { color: var(--accent); }
+@media (max-width: 639.98px) {
+  .cj-banner .cj-label { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cj-label, .cj-token { transition: none; }
+}
+
+/* Home "How it works" journey: numbered stops, active pulse, route glow,
+   dotted backdrop. */
+.cj-stop-num { fill: #94a3b8; font-weight: 700; opacity: 0; transition: opacity .6s ease 1.1s, fill .3s; pointer-events: none; }
+:is(.dark) .cj-stop-num { fill: #71717a; }
+.cj-stop-num.is-on { fill: #fff; }
+.is-drawn .cj-stop-num { opacity: 1; }
+.cj-pulse { fill: var(--accent); opacity: .3; transform-box: fill-box; transform-origin: center; animation: cj-pulse 1.8s cubic-bezier(.22,1,.36,1) infinite; }
+@keyframes cj-pulse { from { transform: scale(1); opacity: .32; } to { transform: scale(2.6); opacity: 0; } }
+.cj-root .cj-walked { filter: drop-shadow(0 0 5px var(--accent-ring)); }
+.cj-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(100, 116, 139, 0.2) 1px, transparent 0);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 40%, #000 25%, transparent 80%);
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 40%, #000 25%, transparent 80%);
+}
+:is(.dark) .cj-grid { background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.07) 1px, transparent 0); }
+@media (prefers-reduced-motion: reduce) {
+  .cj-pulse { display: none; }
+  .cj-stop-num { transition: none; }
+}

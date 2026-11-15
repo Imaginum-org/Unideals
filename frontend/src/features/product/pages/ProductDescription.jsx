@@ -45,10 +45,13 @@ import {
   PRODUCT_USAGE_OPTIONS,
 } from "../constants/productOptions.js";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
+import VerifiedTick from "../../../components/common/VerifiedTick.jsx";
 import EmptyState from "../../../components/ui/EmptyState.jsx";
 import LimitModal from "../../../components/ui/LimitModal.jsx";
 import ReportUserModal from "../../chat/components/ReportUserModal.jsx";
 import Seo from "../../../components/Seo.jsx";
+import { canonicalFor } from "../../../components/seo/routeSeo.js";
+import { productJsonLd } from "../../../components/seo/productJsonLd.js";
 import { toast } from "../../../components/ui/toast.js";
 import { useWishlist } from "../../../context/WishlistContext";
 import { useCampus } from "../../../context/CampusContext.jsx";
@@ -592,11 +595,17 @@ const ProductDescription = () => {
   return (
     <>
       <Seo
-        title={product?.title ? `${product.title} | Unideals` : "Product | Unideals"}
+        title={
+          product?.title
+            ? `${product.title}${product.selling_price != null ? ` for ₹${Number(product.selling_price).toLocaleString("en-IN")}` : ""} | Unideals`
+            : "Product | Unideals"
+        }
         description={product?.description ? String(product.description).replace(/\s+/g, " ").trim().slice(0, 160) : "View this campus listing on Unideals."}
         robots={product?.isGirlsOnly ? "noindex,nofollow" : "index,follow"}
-        canonical={product?._id && !product?.isGirlsOnly ? `${window.location.origin}${productPath(product)}` : undefined}
+        canonical={product?._id && !product?.isGirlsOnly ? canonicalFor(productPath(product)) : undefined}
         image={product?.images?.[0]?.url || undefined}
+        type="product"
+        jsonLd={product?._id && !product?.isGirlsOnly ? productJsonLd(product, canonicalFor(productPath(product))) : undefined}
       />
 
       <motion.main
@@ -1094,17 +1103,11 @@ function SellerCard({ seller, stats, isOwner, onReport, className }) {
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">
             <p className="truncate text-[15px] font-semibold text-slate-900 dark:text-white">{seller?.name || "Campus seller"}</p>
+            <VerifiedTick verified={Boolean(seller?.is_college_verified)} size="md" />
             {plan && <Chip tone="accent" size="sm">{plan}</Chip>}
           </div>
           <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12.5px] text-slate-500 dark:text-zinc-400">
-            {seller?.is_email_verified ? (
-              <span className="inline-flex items-center gap-1 font-medium text-slate-700 dark:text-zinc-300">
-                <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
-                Verified
-              </span>
-            ) : (
-              <span>Campus member</span>
-            )}
+            <span>Campus member</span>
             {memberSince && (
               <>
                 <span aria-hidden="true" className="text-slate-300 dark:text-zinc-600">·</span>

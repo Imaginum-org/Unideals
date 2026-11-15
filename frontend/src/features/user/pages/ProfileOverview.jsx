@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BadgeCheck, CalendarDays, Check, ChevronRight, FilePen, Handshake, MapPin, MessageCircle, Pencil, PlayCircle, Plus } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, ChevronRight, FilePen, Handshake, MapPin, MessageCircle, Pencil, PlayCircle, Plus } from "lucide-react";
 import MobileAccountMenu from "../components/MobileAccountMenu.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import AchievementTracker from "../components/overview/AchievementTracker.jsx";
@@ -14,6 +14,10 @@ import { productPath } from "../../../utils/productPath.js";
 import { useChatUnread } from "../../../services/chatUnread.js";
 import { AccountLayout, CARD, FLUSH_ON_PHONE, btnPrimary, btnSecondary } from "../components/account/AccountKit.jsx";
 import { cn } from "../../../utils/cn.js";
+import VerifiedTick, { TickIcon } from "../../../components/common/VerifiedTick.jsx";
+import CollegeVerifyPrompt from "../components/overview/CollegeVerifyPrompt.jsx";
+import CampusBanner from "../components/overview/CampusBanner.jsx";
+import { ratingWeather } from "../components/overview/ratingWeather.js";
 
 const PLAN_LABEL = { pro: "Pro", pro_plus: "Pro+" };
 const inr = (n) => (n == null || n === "" ? "" : `₹${Number(n).toLocaleString("en-IN")}`);
@@ -159,6 +163,9 @@ function ProfileOverview() {
   // Things waiting on you, most urgent first. Hidden when empty.
   const yourTurn = insights?.deals?.yourTurn || 0;
   const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  // Unverified, and their campus supports it (VIT today; more colleges later).
+  const canVerifyCollege =
+    Boolean(userDetails?._id) && userDetails.is_college_verified === false && userDetails.college_verification_available === true;
   const todo = [
     yourTurn > 0 && {
       key: "deals",
@@ -187,9 +194,21 @@ function ProfileOverview() {
       to: "/productlisted",
       cta: "Finish",
     },
+    canVerifyCollege && {
+      key: "college",
+      icon: ({ className }) => <TickIcon verified={false} className={className} />,
+      tone: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50",
+      title: "Get your verified tick",
+      hint: "Buyers trust verified students more, so you sell faster",
+      to: "/settings?tab=verification",
+      cta: "Verify",
+    },
   ].filter(Boolean);
 
   const ratingCount = ratings?.count || 0;
+  // Jenkins-style build weather for the buyer rating: clear sun when buyers
+  // are happy, clouds rolling in as it drops.
+  const weather = !numbersLoading && ratingCount ? ratingWeather(ratings.avg) : null;
   const statCells = [
     {
       label: "Active listings",
@@ -219,25 +238,11 @@ function ProfileOverview() {
 
   return (
     <AccountLayout seoTitle="Profile | Unideals" width="xl" bare root>
+      {canVerifyCollege && <CollegeVerifyPrompt userId={userDetails._id} />}
       <div className="flex flex-col gap-4 sm:gap-5">
         {/* ── Profile header ── */}
         <section className={cn(CARD, FLUSH_ON_PHONE, "overflow-hidden max-sm:-mt-4")}>
-          <div className="brand-surface h-28 overflow-hidden sm:h-36" aria-hidden="true">
-            {/* Light from the top-right: one wide, soft radial wash (no visible
-                shapes or edges), a faint diagonal sheen, and a 1px highlight on
-                the top edge. The wordmark is lit from the same corner. */}
-            <span
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(90% 130% at 100% 0%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0) 62%), linear-gradient(115deg, rgba(255,255,255,0) 42%, rgba(255,255,255,0.07) 58%, rgba(255,255,255,0) 74%)",
-              }}
-            />
-            <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-white/0 via-white/25 to-white/50" />
-            <p className="pointer-events-none absolute -bottom-[0.18em] right-3 select-none bg-gradient-to-bl from-white/70 via-white/25 to-white/[0.06] bg-clip-text text-[clamp(3.6rem,12vw,7.5rem)] font-extrabold leading-none tracking-[-0.04em] text-transparent sm:right-6">
-              unideals
-            </p>
-          </div>
+          <CampusBanner />
 
           <div className="flex flex-col gap-4 px-4 pb-4 sm:flex-row sm:items-end sm:justify-between sm:px-6 sm:pb-5">
             <div className="flex min-w-0 items-end gap-4">
@@ -256,13 +261,22 @@ function ProfileOverview() {
               </div>
               <div className="min-w-0 pt-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="truncate text-[20px] font-semibold tracking-tight text-slate-900 sm:text-[24px] dark:text-white">{userDetails?.name || "User"}</h1>
-                  {userDetails?.is_email_verified && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11.5px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                      <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                      Verified
-                    </span>
-                  )}
+                  <h1 className="flex min-w-0 items-center gap-1.5 text-[20px] font-semibold tracking-tight text-slate-900 sm:text-[24px] dark:text-white">
+                    <span className="truncate">{userDetails?.name || "User"}</span>
+                    {(userDetails?.is_college_verified || canVerifyCollege) && (
+                      <VerifiedTick
+                        verified={Boolean(userDetails.is_college_verified)}
+                        showUnverified
+                        size="lg"
+                        title={userDetails.is_college_verified ? "You're a verified student" : undefined}
+                        description={
+                          userDetails.is_college_verified
+                            ? "Everyone sees this verified tick next to your name. It tells buyers you confirmed your college email."
+                            : undefined
+                        }
+                      />
+                    )}
+                  </h1>
                   {plan && <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[11.5px] font-bold text-white dark:bg-white dark:text-slate-900">{plan}</span>}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-500 dark:text-zinc-400">
@@ -298,8 +312,20 @@ function ProfileOverview() {
           {/* Buyer rating */}
           <div className="flex flex-col gap-2 border-t border-neutral-100 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6 sm:px-6 dark:border-neutral-800">
             <div className="flex shrink-0 items-center gap-3">
-              <span className="text-[26px] font-semibold leading-none tabular-nums text-slate-900 dark:text-white">
-                {numbersLoading ? "—" : ratingCount ? Number(ratings.avg).toFixed(1) : "–"}
+              <span className="inline-flex items-center gap-2">
+                <span className="text-[26px] font-semibold leading-none tabular-nums text-slate-900 dark:text-white">
+                  {numbersLoading ? "—" : ratingCount ? Number(ratings.avg).toFixed(1) : "–"}
+                </span>
+                {weather && (
+                  <span
+                    role="img"
+                    aria-label={weather.label}
+                    title={`${weather.label}: ${weather.hint}`}
+                    className="grid h-8 w-8 place-items-center rounded-full bg-neutral-50 text-[17px] leading-none ring-1 ring-inset ring-neutral-200/80 dark:bg-white/[0.04] dark:ring-white/10"
+                  >
+                    {weather.emoji}
+                  </span>
+                )}
               </span>
               <div>
                 <StarRow value={ratingCount ? ratings.avg : 0} size="h-4 w-4" />
@@ -318,7 +344,7 @@ function ProfileOverview() {
               </figure>
             ) : (
               <p className="min-w-0 flex-1 text-[12.5px] text-slate-500 sm:border-l sm:border-slate-200 sm:pl-6 dark:text-zinc-400 dark:sm:border-neutral-700">
-                {ratingCount ? "Keep deals smooth to keep your rating high." : "Buyers rate you after a completed deal. Good ratings help you sell faster."}
+                {weather ? weather.hint : "Buyers rate you after a completed deal. Good ratings help you sell faster."}
               </p>
             )}
           </div>

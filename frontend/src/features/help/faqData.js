@@ -251,7 +251,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: "Can I change my gender on my profile?",
-        a: "Gender is set once during sign-up. To change it, open Settings → Profile → Gender and request approval. Our team reviews it.",
+        a: "Gender is set once during sign-up (from your Google account if it shares one, otherwise you choose). To change it, open Settings → Profile → Gender, pick the new gender and add a photo of your college ID card. Our team reviews it, and the photo is deleted as soon as the request is decided or cancelled. You can cancel the request any time before that.",
       },
       {
         q: "How do I log out of all devices?",

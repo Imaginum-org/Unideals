@@ -39,3 +39,33 @@ export const updateTouchesBoostedRail = (update) => {
   }
   return BOOSTED_RAIL_FIELDS.some((f) => keys.has(f));
 };
+
+// ── Feed page cache (product.service.getAllProducts, non-search pages) ──
+// The ranked feed scores every live listing on a campus per request, and
+// Home / Explore / infinite scroll hit the same few pages constantly. A
+// short TTL serves those repeats from memory. Any listing write except a
+// view-count bump clears it, so new / edited / sold listings show at once
+// on this instance (other instances within the TTL).
+export const feedPageCache = createTtlCache({ max: 500 });
+export const clearFeedCache = () => feedPageCache.clear();
+
+// Fields that never change what a feed card shows or where it ranks enough
+// to matter within the TTL (views_count still nudges "recommended" scores,
+// but bumping it on every view would make the cache useless).
+const FEED_NEUTRAL_FIELDS = new Set(["views_count", "hot_until", "updatedAt"]);
+
+/** True when a Mongo update touches anything a feed card depends on. */
+export const updateTouchesFeed = (update) => {
+  if (!update) return false;
+  if (Array.isArray(update)) return true;
+  for (const [k, v] of Object.entries(update)) {
+    if (k.startsWith("$")) {
+      if (v && typeof v === "object") {
+        for (const f of Object.keys(v)) if (!FEED_NEUTRAL_FIELDS.has(f.split(".")[0])) return true;
+      }
+    } else if (!FEED_NEUTRAL_FIELDS.has(k.split(".")[0])) {
+      return true;
+    }
+  }
+  return false;
+};

@@ -2,7 +2,13 @@ import mongoose, { Schema } from "mongoose";
 import slugify from "slugify";
 import { nanoid } from "nanoid";
 import { normalizeMultiline } from "../utils/text.js";
-import { BOOSTED_RAIL_FIELDS, clearBoostedCache, updateTouchesBoostedRail } from "../utils/boostedCache.js";
+import {
+  BOOSTED_RAIL_FIELDS,
+  clearBoostedCache,
+  clearFeedCache,
+  updateTouchesBoostedRail,
+  updateTouchesFeed,
+} from "../utils/boostedCache.js";
 
 import {
   PRODUCT_STATUS,
@@ -18,7 +24,6 @@ const productSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
 
     // Campus marketplace: denormalized from the seller at creation so
@@ -28,7 +33,6 @@ const productSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Campus",
       default: null,
-      index: true,
     },
 
     title: {
@@ -39,12 +43,15 @@ const productSchema = new Schema(
       trim: true,
       maxlength: 120,
     },
-    // SEO-friendly URL
+    // SEO-friendly URL. Sparse: listings without a slug yet (e.g. a draft
+    // saved before it has a title) are left out of the unique index;
+    // otherwise every such listing counts as slug:null and the second one
+    // fails with a duplicate-key error.
     slug: {
       type: String,
       unique: true,
+      sparse: true,
       lowercase: true,
-      index: true,
     },
 
     description: {
@@ -65,7 +72,6 @@ const productSchema = new Schema(
       required: function () {
         return this.status !== PRODUCT_STATUS.DRAFT;
       },
-      index: true,
     },
 
     condition: {
@@ -74,7 +80,6 @@ const productSchema = new Schema(
       required: function () {
         return this.status !== PRODUCT_STATUS.DRAFT;
       },
-      index: true,
     },
 
     attributes: {
@@ -151,7 +156,6 @@ const productSchema = new Schema(
         return this.status !== PRODUCT_STATUS.DRAFT;
       },
       min: 0,
-      index: true,
     },
 
     // Stock count for single-seller chat sales. Exposed to buyers;
@@ -235,7 +239,6 @@ const productSchema = new Schema(
       type: String,
       enum: Object.values(PRODUCT_STATUS),
       default: PRODUCT_STATUS.LISTED,
-      index: true,
     },
 
     is_boosted: {
@@ -279,7 +282,6 @@ const productSchema = new Schema(
     is_deleted: {
       type: Boolean,
       default: false,
-      index: true,
     },
 
     // Set when the listing was auto-unlisted for hitting the report
@@ -342,6 +344,8 @@ productSchema.index({
   selling_price: 1,
   createdAt: -1,
 });
+// Seller's listings (My listings, plan caps, badges, orphan sweep). Also
+// serves seller_id-only lookups, so seller_id has no single-field index.
 productSchema.index({
   seller_id: 1,
   createdAt: -1,
@@ -373,12 +377,18 @@ productSchema.index({
 });
 
 productSchema.index({ is_boosted: 1, boost_expires_at: -1, boost_tier: 1 });
+// Trending rail: campus live listings by views, no in-memory sort.
+productSchema.index({ campus_id: 1, status: 1, is_deleted: 1, views_count: -1 });
+// Nightly purge of soft-deleted listings ({ is_deleted, updatedAt < … }).
+productSchema.index({ is_deleted: 1, updatedAt: 1 });
+// Nightly purge of stale drafts + staff filters by status.
+productSchema.index({ status: 1, updatedAt: 1 });
 // Per-campus hot-deal cap check.
 productSchema.index({ campus_id: 1, hot_until: 1 });
-productSchema.index(
-  { seller_id: 1, title: 1, selling_price: 1 },
-  { unique: false },
-);
+// Duplicate-listing check (same seller, title, price). No options: the
+// old explicit { unique: false } made index sync drop + rebuild it for
+// nothing, since the live index has no "unique" key at all.
+productSchema.index({ seller_id: 1, title: 1, selling_price: 1 });
 /*
 For Nearby products and Nearby products
 $near can be accessed
@@ -414,9 +424,12 @@ productSchema.pre("save", async function () {
 productSchema.pre("save", function () {
   this.$locals.touchesBoostedRail =
     this.isNew || BOOSTED_RAIL_FIELDS.some((f) => this.isModified(f));
+  this.$locals.touchesFeed =
+    this.isNew || this.modifiedPaths().some((f) => !["views_count", "hot_until", "updatedAt"].includes(f.split(".")[0]));
 });
 productSchema.post("save", function () {
   if (this.$locals.touchesBoostedRail) clearBoostedCache();
+  if (this.$locals.touchesFeed) clearFeedCache();
 });
 
 // Onboarding: remember the first time this seller had a listing go live
@@ -439,14 +452,18 @@ productSchema.post(
   ["findOneAndUpdate", "updateOne", "updateMany", "findOneAndReplace", "replaceOne"],
   { document: false, query: true },
   function () {
-    if (updateTouchesBoostedRail(this.getUpdate())) clearBoostedCache();
+    const update = this.getUpdate();
+    if (updateTouchesBoostedRail(update)) clearBoostedCache();
+    if (updateTouchesFeed(update)) clearFeedCache();
   },
 );
-productSchema.post(["deleteOne", "deleteMany", "findOneAndDelete"], { document: false, query: true }, () =>
-  clearBoostedCache(),
-);
-productSchema.post("deleteOne", { document: true, query: false }, () => clearBoostedCache());
-productSchema.post("bulkWrite", () => clearBoostedCache());
+const clearListingCaches = () => {
+  clearBoostedCache();
+  clearFeedCache();
+};
+productSchema.post(["deleteOne", "deleteMany", "findOneAndDelete"], { document: false, query: true }, clearListingCaches);
+productSchema.post("deleteOne", { document: true, query: false }, clearListingCaches);
+productSchema.post("bulkWrite", clearListingCaches);
 
 // Increment views
 productSchema.statics.getProductAndIncrementViews = function (productId) {

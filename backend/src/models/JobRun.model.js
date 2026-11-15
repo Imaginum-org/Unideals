@@ -25,6 +25,10 @@ const jobStateSchema = new Schema(
     run_count: { type: Number, default: 0 },
     failure_count: { type: Number, default: 0 },
     consecutive_failures: { type: Number, default: 0 },
+    // Cross-instance lock (see jobRegistry.runJob): only the instance that
+    // holds an unexpired lease runs the job, so N API instances ≠ N runs.
+    lease_owner: { type: String, default: null },
+    lease_until: { type: Date, default: null },
   },
   { timestamps: true, versionKey: false },
 );

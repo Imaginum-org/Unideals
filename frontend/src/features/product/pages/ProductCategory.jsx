@@ -30,6 +30,8 @@ import GirlsEntryPill from "../../../components/ui/GirlsEntryPill.jsx";
 import EmptyState from "../../../components/ui/EmptyState.jsx";
 import { FiltersEmptyState } from "../../../components/ui/EmptyStates.jsx";
 import { Plus, Search } from "lucide-react";
+import PageSeo from "../../../components/seo/PageSeo.jsx";
+import { categorySeo } from "../../../components/seo/routeSeo.js";
 
 const PAGE_SIZE = 12;
 
@@ -238,6 +240,12 @@ const CategoryPage = () => {
 
   return (
     <div className="min-h-[100dvh] bg-[#F7F8FA] pb-24 font-figtree text-slate-900 dark:bg-[#131313] dark:text-white">
+      {/* Girls Corner, boosted and unknown categories stay out of search. */}
+      <PageSeo
+        path={`/category/${categoryName}`}
+        {...categorySeo(PRODUCT_CATEGORY_OPTIONS.find((o) => o.value === categoryValue)?.label || "Items")}
+        noindex={isUnknownCategory || isGirlsOnlyCategory || isBoostedPage}
+      />
       {!isUnknownCategory && <GirlsEntryPill tab={audienceTab} onChange={setAudienceTab} />}
 
       <div className="mx-auto w-full max-w-[calc(var(--page-max)+9vw)] px-5 pt-5 sm:px-[4.5vw] lg:pt-8 2xl:max-w-[var(--page-max)] 2xl:px-0">

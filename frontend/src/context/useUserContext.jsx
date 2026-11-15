@@ -18,7 +18,7 @@ const UserContext = createContext();
 // gender-change requests etc. stay in memory and are refetched each visit.
 const CACHEABLE_FIELDS = [
   "_id", "name", "email", "avatar", "role", "subscription", "gender",
-  "campus_id", "is_email_verified", "createdAt", "college", "campus",
+  "campus_id", "is_email_verified", "is_college_verified", "college_verification_available", "createdAt", "college", "campus",
 ];
 const toCacheable = (user) => {
   if (!user || typeof user !== "object") return user;

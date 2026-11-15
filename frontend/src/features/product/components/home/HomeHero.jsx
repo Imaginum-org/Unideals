@@ -1,16 +1,15 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { FaPlus } from "react-icons/fa6";
-import { ArrowRight, BadgeCheck, Check, MapPin, ShieldCheck, Wallet, Zap } from "lucide-react";
-import CategoryIcon from "../CategoryIcon.jsx";
+import { ArrowRight, BadgeCheck, Bike, GraduationCap, Laptop, ShieldCheck, Wallet } from "lucide-react";
 
 /*
- * Home hero: brand-blue banner (follows --accent, pink in Girl Mode) with
- * subtle white light so it isn't flat. Right side (lg+): the product at
- * work, as clean UI: a "Fresh on your campus" feed card where new listings
- * slide in, flanked by a buyer's chat message and a paid-at-pickup
- * confirmation (list → chat → meet & pay). Category art, no photos.
+ * Home hero: brand banner (follows --accent, pink in Girl Mode) with large
+ * soft curved light shapes. Left: headline, CTAs and trust points. Right
+ * (lg+): a frosted-glass shopping bag with the Unideals "U", an orbit ring
+ * around it and floating glass tiles for what students trade (books/degree,
+ * cycles, laptops). All vector + CSS (no rasters), so it stays sharp at any
+ * size and re-tints with the accent. Gentle float; static for reduced motion.
  * Buttons share the navbar Sell button's exact shape, size, type and hover.
  */
 
@@ -26,136 +25,130 @@ const rise = (reduce, delay = 0) => ({
 const SELL_SHAPE =
   "flex shrink-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--accent)] md:px-4 md:text-base lg:px-5";
 
-// Illustrative feed (category art only). Cycles to feel live.
-const FEED = [
-  { id: 1, cat: "vehicles", title: "Hero Sprint cycle", where: "Hostel B", price: "2,400", boosted: true },
-  { id: 2, cat: "electronics", title: "Casio fx-991EX calculator", where: "Hostel A", price: "650" },
-  { id: 3, cat: "study_material", title: "Engineering Maths, 3rd ed.", where: "Library", price: "220" },
-  { id: 4, cat: "lab_equipment", title: "Lab coat, size M", where: "Hostel C", price: "150" },
-  { id: 5, cat: "hostel_essentials", title: "Rechargeable study lamp", where: "Hostel A", price: "180" },
-  { id: 6, cat: "electronics", title: "boAt Rockerz 450", where: "Hostel D", price: "900" },
-];
-const AGO = ["just now", "3 min ago", "8 min ago"];
+/* Gentle idle float (skipped for reduced motion). */
+const floatY = (reduce, amp, duration, delay = 0) =>
+  reduce ? {} : { animate: { y: [0, -amp, 0] }, transition: { duration, repeat: Infinity, ease: "easeInOut", delay } };
 
-function FeedRow({ item, ago }) {
+/* Frosted-glass tile with a white line icon. */
+function GlassTile({ icon: Icon, size, rotate, className, reduceMotion, enterDelay, floatAmp, floatDur }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-50 ring-1 ring-inset ring-slate-200/70">
-        <CategoryIcon value={item.cat} className="h-7 w-7" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="truncate text-[13.5px] font-semibold text-slate-900">{item.title}</span>
-          {item.boosted && (
-            <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-amber-50 px-1.5 py-px text-[10.5px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200/70">
-              <Zap className="h-2.5 w-2.5" strokeWidth={2.5} />
-              Boosted
-            </span>
-          )}
-        </span>
-        <span className="mt-0.5 flex items-center gap-1 text-[12px] text-slate-500">
-          <MapPin className="h-3 w-3" />
-          {item.where} · {ago}
-        </span>
-      </span>
-      <span className="shrink-0 text-[14px] font-bold tabular-nums text-slate-900">₹{item.price}</span>
-    </div>
+    <motion.div
+      className={`absolute ${className}`}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85, y: 12 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.7, ease: EASE, delay: enterDelay }}
+    >
+      <motion.div {...floatY(reduceMotion, floatAmp, floatDur, enterDelay + 0.6)}>
+        <div
+          className="grid place-items-center rounded-[22%] border border-white/45 bg-gradient-to-br from-white/35 via-white/15 to-white/5 shadow-[0_18px_40px_-14px_rgba(15,10,80,0.55),inset_0_1px_0_rgba(255,255,255,0.6),inset_0_-10px_18px_-10px_rgba(255,255,255,0.35)] backdrop-blur-md"
+          style={{ width: size, height: size, transform: `rotate(${rotate}deg)` }}
+        >
+          <Icon className="h-[46%] w-[46%] text-white drop-shadow-[0_2px_4px_rgba(20,10,90,0.35)]" strokeWidth={1.8} />
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* The glass bag: back wall, handle, front face with the "U", side depth. */
+function GlassBag() {
+  return (
+    <svg viewBox="0 0 300 320" className="h-full w-full overflow-visible" aria-hidden="true">
+      <defs>
+        <linearGradient id="hb-front" x1="0.1" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.7" />
+          <stop offset="0.55" stopColor="#fff" stopOpacity="0.42" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0.28" />
+        </linearGradient>
+        <linearGradient id="hb-side" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.3" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0.1" />
+        </linearGradient>
+        <linearGradient id="hb-handle" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.75" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0.35" />
+        </linearGradient>
+        <linearGradient id="hb-gloss" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id="hb-shadow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#140a55" stopOpacity="0.45" />
+          <stop offset="1" stopColor="#140a55" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* Contact shadow */}
+      <ellipse cx="150" cy="306" rx="128" ry="14" fill="url(#hb-shadow)" />
+
+      <g transform="rotate(-7 150 200)">
+        {/* Top opening (back rim seen behind the front edge) */}
+        <path d="M62 122 L80 112 H250 L232 122 Z" fill="#fff" fillOpacity="0.22" stroke="#fff" strokeOpacity="0.45" strokeWidth="1.2" strokeLinejoin="round" />
+        {/* Handle: thick glass loop with an inner core */}
+        <path d="M104 122 C 104 36, 200 36, 200 122" fill="none" stroke="url(#hb-handle)" strokeWidth="24" strokeLinecap="round" />
+        <path d="M104 122 C 104 36, 200 36, 200 122" fill="none" stroke="#fff" strokeOpacity="0.35" strokeWidth="8" strokeLinecap="round" />
+        {/* Side depth (right) */}
+        <path d="M232 122 L250 112 Q262 112 264 126 L277 258 Q279 282 256 290 L238 296 Q259 293 260 270 L247 136 Q246 122 232 122 Z" fill="url(#hb-side)" stroke="#fff" strokeOpacity="0.35" strokeWidth="1.2" strokeLinejoin="round" />
+        {/* Front face */}
+        <path
+          d="M62 122 H232 Q246 122 247 136 L260 270 Q262 296 236 296 H54 Q28 296 30 270 L46 136 Q48 122 62 122 Z"
+          fill="url(#hb-front)"
+          stroke="#fff"
+          strokeOpacity="0.7"
+          strokeWidth="1.6"
+        />
+        {/* Rim highlight + left gloss */}
+        <path d="M62 123.5 H232" stroke="#fff" strokeOpacity="0.85" strokeWidth="2" strokeLinecap="round" />
+        <path d="M50 140 Q48 200 40 268 Q38 284 56 288 L70 288 Q60 220 66 140 Z" fill="url(#hb-gloss)" />
+        {/* The "U" mark */}
+        <path d="M118 186 V211 Q118 240 145 240 Q172 240 172 211 V186" fill="none" stroke="#fff" strokeWidth="15" strokeLinecap="round" />
+      </g>
+    </svg>
   );
 }
 
 function HeroArt({ reduceMotion }) {
-  const [head, setHead] = useState(0);
-  useEffect(() => {
-    if (reduceMotion) return undefined;
-    const id = setInterval(() => setHead((h) => (h + 1) % FEED.length), 3200);
-    return () => clearInterval(id);
-  }, [reduceMotion]);
-  const rows = [0, 1, 2].map((i) => FEED[(head + FEED.length - i) % FEED.length]);
-
-  const enter = (delay, x = 0) => ({
-    initial: reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, x },
-    animate: { opacity: 1, y: 0, x: 0 },
-    transition: { duration: 0.7, ease: EASE, delay },
-  });
-
   return (
-    <div aria-hidden="true" className="relative mx-auto hidden w-full max-w-[460px] py-6 lg:block" style={{ perspective: "1600px" }}>
-      {/* Feed card */}
-      <motion.div {...enter(0.15)} className="relative mx-auto w-[380px]">
-        <div
-          className="overflow-hidden rounded-2xl bg-white text-slate-900 shadow-[0_30px_60px_-20px_rgba(15,23,42,0.45),0_0_0_1px_rgba(255,255,255,0.5)]"
-          style={{ transform: "rotateY(-7deg) rotateX(3deg)", transformStyle: "preserve-3d" }}
-        >
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <div>
-              <p className="text-[14px] font-semibold tracking-tight">Fresh on your campus</p>
-              <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-slate-500">
-                <span className="relative flex h-1.5 w-1.5">
-                  {!reduceMotion && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />}
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                </span>
-                Updated just now
-              </p>
-            </div>
-          </div>
+    <div aria-hidden="true" className="pointer-events-none relative mx-auto -my-4 hidden h-[400px] w-full max-w-[540px] origin-center scale-[0.92] lg:block">
+      {/* Orbit: back half behind the bag */}
+      <svg viewBox="0 0 540 400" className="absolute inset-0 h-full w-full overflow-visible">
+        <ellipse cx="290" cy="205" rx="250" ry="66" transform="rotate(-14 290 205)" fill="none" stroke="#fff" strokeOpacity="0.28" strokeWidth="3" />
+      </svg>
 
-          <div className="relative h-[204px] overflow-hidden">
-            <AnimatePresence initial={false}>
-              {rows.map((item, i) => (
-                <motion.div
-                  key={item.id}
-                  layout={!reduceMotion}
-                  initial={{ opacity: 0, y: -24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, transition: { duration: 0.25 } }}
-                  transition={{ duration: 0.5, ease: EASE }}
-                  className={i < 2 ? "border-b border-slate-100" : ""}
-                >
-                  <FeedRow item={item} ago={AGO[i]} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-
-          <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[12px]">
-            <span className="inline-flex items-center gap-1 font-medium text-[var(--accent)]">
-              Browse all listings <ArrowRight className="h-3 w-3" />
-            </span>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Buyer's message */}
-      <motion.div {...enter(0.5, 16)} className="absolute -right-4 top-2 z-10">
-        <motion.div {...(reduceMotion ? {} : { animate: { y: [0, -5, 0] }, transition: { duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 } })}>
-          <div className="flex items-start gap-2.5 rounded-2xl rounded-tr-md bg-white/95 px-3 py-2.5 shadow-[0_18px_36px_-16px_rgba(15,23,42,0.5)] ring-1 ring-black/5 backdrop-blur">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white">
-              AK
-            </span>
-            <span className="leading-tight">
-              <span className="block text-[11.5px] font-semibold text-slate-900">
-                Ananya <span className="font-normal text-slate-400">· Hostel B</span>
-              </span>
-              <span className="mt-0.5 block text-[12.5px] text-slate-600">Is the cycle still available?</span>
-            </span>
-          </div>
+      {/* Bag */}
+      <motion.div
+        className="absolute left-[150px] top-[28px] h-[330px] w-[300px]"
+        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.8, ease: EASE, delay: 0.15 }}
+      >
+        <motion.div className="h-full w-full drop-shadow-[0_30px_40px_rgba(20,10,90,0.35)]" {...floatY(reduceMotion, 6, 6, 1)}>
+          <GlassBag />
         </motion.div>
       </motion.div>
 
-      {/* Paid at pickup */}
-      <motion.div {...enter(0.7, -16)} className="absolute -left-4 bottom-2 z-10">
-        <motion.div {...(reduceMotion ? {} : { animate: { y: [0, -6, 0] }, transition: { duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1.6 } })}>
-          <div className="flex items-center gap-2.5 rounded-2xl bg-white/95 px-3 py-2.5 shadow-[0_18px_36px_-16px_rgba(15,23,42,0.5)] ring-1 ring-black/5 backdrop-blur">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
-              <Check className="h-4 w-4" strokeWidth={3} />
-            </span>
-            <span className="leading-tight">
-              <span className="block text-[12.5px] font-semibold text-slate-900">Picked up at Canteen</span>
-              <span className="mt-0.5 block text-[11.5px] text-slate-500">Paid ₹2,400 by UPI</span>
-            </span>
-          </div>
-        </motion.div>
-      </motion.div>
+      {/* Orbit: front arc, over the bag */}
+      <svg viewBox="0 0 540 400" className="absolute inset-0 h-full w-full overflow-visible">
+        <path
+          d="M40 205 A250 66 0 0 0 540 205"
+          transform="rotate(-14 290 205)"
+          fill="none"
+          stroke="#fff"
+          strokeOpacity="0.5"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        {/* Sparkle */}
+        <g stroke="#fff" strokeOpacity="0.85" strokeWidth="3.5" strokeLinecap="round">
+          <path d="M436 6 L432 26" />
+          <path d="M456 14 L444 32" />
+          <path d="M470 34 L452 40" />
+        </g>
+      </svg>
+
+      <GlassTile icon={GraduationCap} size={92} rotate={-8} className="left-[70px] top-[18px]" reduceMotion={reduceMotion} enterDelay={0.35} floatAmp={8} floatDur={5.5} />
+      <GlassTile icon={Bike} size={96} rotate={7} className="left-[54px] top-[222px]" reduceMotion={reduceMotion} enterDelay={0.5} floatAmp={7} floatDur={6.5} />
+      <GlassTile icon={Laptop} size={90} rotate={8} className="right-[-6px] top-[140px]" reduceMotion={reduceMotion} enterDelay={0.65} floatAmp={9} floatDur={6} />
     </div>
   );
 }
@@ -166,20 +159,13 @@ export default function HomeHero({ reduceMotion }) {
       aria-labelledby="home-hero-title"
       className="brand-surface relative mx-auto mb-3 mt-3 w-full overflow-hidden rounded-2xl text-white sm:mt-4"
     >
-      {/* Subtle white light so the blue isn't flat */}
+      {/* Light: large soft curved shapes (top-right dome, bottom-right
+          swell), a gentle diagonal wash and faint rings bottom-left. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0)_45%,rgba(255,255,255,0.06)_100%)]" />
-        <div
-          className="absolute inset-0 opacity-60"
-          style={{
-            backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.22) 1px, transparent 0)",
-            backgroundSize: "24px 24px",
-            maskImage: "radial-gradient(ellipse 60% 70% at 75% 45%, #000 20%, transparent 70%)",
-            WebkitMaskImage: "radial-gradient(ellipse 60% 70% at 75% 45%, #000 20%, transparent 70%)",
-          }}
-        />
-        <div className="absolute -right-32 -top-40 h-[480px] w-[480px] rounded-full bg-white/15 blur-3xl" />
-        <div className="absolute -bottom-48 -left-24 h-[420px] w-[420px] rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0)_40%,rgba(255,255,255,0.05)_100%)]" />
+        <div className="absolute -right-[12%] -top-[55%] h-[150%] w-[62%] rounded-[50%] bg-[radial-gradient(closest-side,rgba(255,255,255,0.16),rgba(255,255,255,0.05)_70%,rgba(255,255,255,0))] ring-1 ring-inset ring-white/10" />
+        <div className="absolute -bottom-[70%] -right-[18%] h-[120%] w-[78%] rounded-[50%] bg-white/[0.07]" />
+        <div className="absolute -bottom-[86%] right-[10%] h-[110%] w-[60%] rounded-[50%] bg-white/[0.05]" />
         <svg className="absolute -bottom-40 -left-40 h-[420px] w-[420px] opacity-[0.12]" viewBox="0 0 420 420">
           {[80, 130, 180, 205].map((r) => (
             <circle key={r} cx="210" cy="210" r={r} fill="none" stroke="#fff" strokeWidth="1" />
@@ -187,7 +173,7 @@ export default function HomeHero({ reduceMotion }) {
         </svg>
       </div>
 
-      <div className="relative grid items-center gap-8 px-5 py-9 sm:px-10 sm:py-12 lg:min-h-[420px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8 lg:px-14 lg:py-10">
+      <div className="relative grid items-center gap-8 px-5 py-8 sm:px-10 sm:py-10 lg:min-h-[380px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8 lg:px-14 lg:py-8">
         {/* Copy */}
         <div className="max-w-xl">
           <motion.h1

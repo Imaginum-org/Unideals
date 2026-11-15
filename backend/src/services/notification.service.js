@@ -9,6 +9,7 @@
 // "notification:new". Offline users pick items up on their next feed fetch.
 // Every notifyX() helper is fire-and-forget: it never throws, so a failed
 // notification can never fail the deal / message / moderation that caused it.
+import { loadAuthUser } from "../utils/userCache.js";
 import mongoose from "mongoose";
 import Notification, {
   NotificationReceipt,
@@ -687,7 +688,8 @@ export const dispatchDueScheduledNotifications = async () => {
 
 /** A user's feed: eligible broadcasts + their direct notifications. */
 export const getUserNotificationFeed = async (userId) => {
-  const user = await User.findById(userId).select("campus_id createdAt role").lean();
+  // Auth already loaded this user: cache hit instead of a query.
+  const user = await loadAuthUser(User, userId);
   if (!user) throw new AppError("User not found", 404);
 
   const newestFirst = { sent_at: -1, createdAt: -1 };

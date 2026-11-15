@@ -9,6 +9,7 @@ Everything beyond the top-level [README](../README.md) lives here. Keep each doc
 | [architecture/ai-assistant.md](architecture/ai-assistant.md) | The "Unideals AI" chatbot: routing pipeline, Gemini/Groq layer, knowledge base, image & voice, history, limits, config, testing |
 | [architecture/notifications.md](architecture/notifications.md) | In-app notifications (MongoDB + Socket.IO), event triggers, API, analytics, FCM system push, deploy migration |
 | [architecture/performance-optimisations.md](architecture/performance-optimisations.md) | Caching and payload work that cut DB calls and made pages feel instant, plus next steps for higher scale |
+| [architecture/seo.md](architecture/seo.md) | SEO and AI-crawler setup: per-page tags, server-rendered listing pages, sitemaps, robots.txt, llms.txt, structured data, social cards |
 | [architecture/ai-assistant-interview-prep.pdf](architecture/ai-assistant-interview-prep.pdf) | Interview-prep notes on the assistant's design |
 
 ## Feature specs: what we build and why
@@ -31,5 +32,6 @@ Everything beyond the top-level [README](../README.md) lives here. Keep each doc
 |---|---|
 | [changelog/2026-09-security-hardening-and-bug-fixes.md](changelog/2026-09-security-hardening-and-bug-fixes.md) | 2026-09-19 full-stack hardening + 2026-10-02 update (Razorpay integration, auth, CORS, sanitisation) |
 | [changelog/2026-11-full-audit-and-fixes.md](changelog/2026-11-full-audit-and-fixes.md) | 2026-11-08 second full audit (authorization gaps, data leaks, races) and the UI/payment updates that followed |
+| [changelog/2026-11-db-and-jobs-optimisation.md](changelog/2026-11-db-and-jobs-optimisation.md) | 2026-11-16 database, query, index and background-job optimisation for multi-instance scale, plus the index-sync deploy steps |
 
 New fix logs go in `changelog/` as `YYYY-MM-<short-topic>.md`.

@@ -1,97 +1,191 @@
 <!doctype html>
-<html lang="en">
-
+<html lang="en-IN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
 
-  <title>Unideals - Buy & Sell Campus Essentials</title>
-  <meta name="description"
-    content="Buy and sell campus essentials with fellow students on Unideals. Find books, electronics, cycles, furniture, hostel items, and more with secure listings and instant chat.">
-  <meta name="keywords" content="campus marketplace,
-college marketplace,
-student marketplace,
-buy and sell,
-college books,
-hostel essentials,
-student deals,
-used electronics,
-campus furniture" />
-  <link rel="canonical" href="https://unideals.in/" />
+  <!-- Primary meta. Each page then sets its own title, description and
+       canonical (src/components/Seo.jsx); /product/<slug> gets them in the
+       server HTML from api/product-meta.js. -->
+  <title>Unideals: Buy &amp; Sell on Campus | Student Marketplace India</title>
+  <meta name="description" content="Buy and sell used textbooks, electronics, cycles and hostel essentials with verified students on your campus. No listing fees, no shipping: meet and pay at pickup." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="application-name" content="Unideals" />
+  <meta name="author" content="Unideals by Imaginum" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="format-detection" content="telephone=no" />
 
-  <meta name="robots" content="index,
-follow,
-max-image-preview:large" />
-  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <!-- Theme + icons -->
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#4a4dfe" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#131313" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="/fav.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
+  <link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <meta name="apple-mobile-web-app-title" content="Unideals" />
 
-  <meta name="theme-color" content="#534ff2" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/fav.svg" />
-
-  <link rel="icon" href="/fav.svg" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/fav.svg" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/fav.svg" />
-
+  <!-- Social cards (WhatsApp, Instagram, LinkedIn, X, Slack, iMessage) -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Unideals" />
-  <meta property="og:title" content="Unideals — Buy & Sell Campus Essentials" />
-  <meta property="og:description"
-    content="Unideals — safe marketplace for students. List items, discover deals, and chat instantly." />
-  <meta property="og:url" content="https://unideals.in/" />
-  <meta property="og:image" content="https://unideals.in/og-image.webp" />
-  <meta property="og:image:alt" content="Unideals — marketplace for students" />
+  <meta property="og:locale" content="en_IN" />
+  <meta property="og:title" content="Unideals: Buy &amp; Sell on Campus" />
+  <meta property="og:description" content="The campus-only marketplace for students. Textbooks, gadgets, cycles and hostel essentials from verified students near you. No fees, no shipping." />
+  <meta property="og:image" content="https://unideals.in/og-image.jpg" />
+  <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta name="msapplication-TileColor" content="#534ff2">
+  <meta property="og:image:alt" content="Unideals: buy and sell on campus, the easy way." />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:creator" content="@unideals" />
-  <meta name="twitter:title" content="Unideals — Buy & Sell Campus Essentials" />
-  <meta name="twitter:description"
-    content="Unideals — safe marketplace for students. List items, discover deals, and chat instantly." />
-    <meta name="referrer" content="strict-origin-when-cross-origin">
-    <meta name="color-scheme" content="light dark">
-  <meta name="twitter:image" content="https://unideals.in/og.png" />
-  <link rel="preconnect" href="https://ik.imagekit.io" crossorigin>
-  <link rel="dns-prefetch" href="//ik.imagekit.io">
-  <link rel="preload" as="image" href="/logo.svg">
-  <link rel="manifest" href="/site.webmanifest" />
+  <meta name="twitter:site" content="@unidealsdotin" />
+  <meta name="twitter:title" content="Unideals: Buy &amp; Sell on Campus" />
+  <meta name="twitter:description" content="The campus-only marketplace for students. No fees, no shipping: meet and pay at pickup." />
+  <meta name="twitter:image" content="https://unideals.in/og-image.jpg" />
+  <meta name="twitter:image:alt" content="Unideals: buy and sell on campus, the easy way." />
+
+  <!-- Connections the first screen needs -->
+  <link rel="preconnect" href="https://api.unideals.in" crossorigin />
+  <link rel="preconnect" href="https://ik.imagekit.io" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
+  <!-- AI assistants: plain-text site summary + sitemaps -->
+  <link rel="alternate" type="text/plain" href="/llms.txt" title="Unideals for AI assistants" />
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+  <!-- Structured data: who we are + the site -->
   <script type="application/ld+json">
   {
- "@context":"https://schema.org",
- "@type":"WebSite",
- "name":"Unideals",
- "url":"https://unideals.in",
- "potentialAction":{
-   "@type":"SearchAction",
-   "target":"https://unideals.in/search?q={search_term_string}",
-   "query-input":"required name=search_term_string"
- }
-}
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://unideals.in/#organization",
+        "name": "Unideals",
+        "url": "https://unideals.in",
+        "logo": { "@type": "ImageObject", "url": "https://unideals.in/icon-512.png", "width": 512, "height": 512 },
+        "email": "unideals.support@gmail.com",
+        "description": "Campus-only marketplace where college students in India buy and sell used items with verified students on their own campus.",
+        "areaServed": { "@type": "Country", "name": "India" },
+        "sameAs": [
+          "https://x.com/unidealsdotin",
+          "https://www.instagram.com/unidealsdotin/",
+          "https://www.youtube.com/@unidealsdotin"
+        ],
+        "contactPoint": { "@type": "ContactPoint", "contactType": "customer support", "email": "unideals.support@gmail.com", "availableLanguage": ["en", "hi"] }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://unideals.in/#website",
+        "name": "Unideals",
+        "alternateName": "Unideals Campus Marketplace",
+        "url": "https://unideals.in",
+        "inLanguage": "en-IN",
+        "publisher": { "@id": "https://unideals.in/#organization" }
+      }
+    ]
+  }
   </script>
+
+  <!-- With JavaScript the app takes over #root; the static summary inside it
+       is for crawlers that don't run JS, so hide it visually (still in the
+       DOM) before first paint. Without JS it renders as a plain page. -->
+  <script>document.documentElement.classList.add("js")</script>
+  <style>
+    .js #seo-shell { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+    #seo-shell { max-width: 880px; margin: 0 auto; padding: 32px 20px 48px; font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1e293b; }
+    #seo-shell h1 { font-size: 2rem; line-height: 1.2; margin: 0.5em 0; color: #0f172a; }
+    #seo-shell h2 { font-size: 1.25rem; margin: 1.6em 0 0.4em; color: #0f172a; }
+    #seo-shell a { color: #3838ec; }
+    #seo-shell nav ul, #seo-shell footer ul { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0; list-style: none; }
+    #seo-shell dt { font-weight: 600; margin-top: 0.8em; }
+    #seo-shell dd { margin: 0.2em 0 0; }
+  </style>
 </head>
 
 <body class="bg-[#F7F8FA] dark:bg-[#131313]">
+  <div id="root">
+    <div id="seo-shell">
+      <header>
+        <a href="/" aria-label="Unideals home"><strong>Unideals</strong></a>
+        <nav aria-label="Main">
+          <ul>
+            <li><a href="/explore">Explore listings</a></li>
+            <li><a href="/deals">Deals</a></li>
+            <li><a href="/price">Pricing</a></li>
+            <li><a href="/faq">FAQ</a></li>
+            <li><a href="/contact">Contact</a></li>
+            <li><a href="/signup">Sign up</a></li>
+          </ul>
+        </nav>
+      </header>
 
-  <div id="root"></div>
+      <main>
+        <h1>Buy and sell on campus, the easy way</h1>
+        <p>Unideals is a campus-only marketplace for college students in India. Buy and sell used textbooks, gadgets, cycles and hostel essentials with verified students on your own campus. There are no listing fees and no shipping: you chat in the app, meet at a public spot on campus and pay the seller at pickup by UPI or cash.</p>
 
-  <noscript>
-    <strong>JavaScript is required to run this app. Please enable JavaScript.</strong>
-  </noscript>
+        <h2>How Unideals works</h2>
+        <ol>
+          <li><strong>Join your campus.</strong> Sign up with Google or email and pick your college. You only see listings from students on your campus.</li>
+          <li><strong>List in two minutes.</strong> Add photos, a price, the condition and a public pickup spot.</li>
+          <li><strong>Chat and agree a price.</strong> Buyers message you in the app and can make offers.</li>
+          <li><strong>Meet and pay at pickup.</strong> Check the item on campus, then pay by UPI or cash. Unideals takes no commission.</li>
+          <li><strong>Rate the deal.</strong> Ratings, badges and levels help reliable sellers stand out.</li>
+        </ol>
+
+        <h2>Popular categories</h2>
+        <ul>
+          <li><a href="/category/study_material">Study material: textbooks and notes</a></li>
+          <li><a href="/category/electronics">Electronics: calculators, laptops, headphones</a></li>
+          <li><a href="/category/hostel_essentials">Hostel essentials: lamps, kettles, buckets</a></li>
+          <li><a href="/category/vehicles">Vehicles: cycles</a></li>
+          <li><a href="/category/lab_equipment">Lab equipment: lab coats, drafters</a></li>
+          <li><a href="/category/sports">Sports</a> and <a href="/category/fitness">fitness gear</a></li>
+          <li><a href="/category/clothing">Clothing</a> and <a href="/category/accessories">accessories</a></li>
+          <li><a href="/category/event_passes">Event passes</a> and <a href="/category/others">more</a></li>
+        </ul>
+
+        <h2>Why students use Unideals</h2>
+        <ul>
+          <li><strong>Campus-only and verified:</strong> every buyer and seller is a student on your campus. Students can verify their college email to get a verified tick.</li>
+          <li><strong>Zero listing fees:</strong> buying, selling and chatting are free. Optional Pro (₹99) and Pro+ (₹199) plans add more listings and boosts.</li>
+          <li><strong>Safe meetups:</strong> meet at public campus spots, inspect before you pay, and report anything suspicious.</li>
+          <li><strong>Girls Corner:</strong> a women-only space for clothing, beauty and personal items.</li>
+        </ul>
+
+        <h2>Campuses</h2>
+        <p>Live at VIT Vellore, VIT Chennai, VIT Bhopal and VIT Amaravati, with more Indian campuses coming.</p>
+
+        <h2>Frequently asked questions</h2>
+        <dl>
+          <dt>Is Unideals free?</dt>
+          <dd>Yes. Listing, buying and chatting are free and there is no commission on sales. Optional plans and one-time boosts help listings reach more buyers.</dd>
+          <dt>How do I pay?</dt>
+          <dd>Directly to the seller when you meet on campus, by UPI or cash, after checking the item.</dd>
+          <dt>Is it safe?</dt>
+          <dd>Everyone belongs to a campus, students can verify their college email, chats are screened for abuse, and users and listings can be reported.</dd>
+          <dt>Can I buy from another college?</dt>
+          <dd>Listings are campus-only, so you trade with students you can actually meet.</dd>
+        </dl>
+        <p><a href="/faq">Read all FAQs</a></p>
+      </main>
+
+      <footer>
+        <ul>
+          <li><a href="/termscondition">Terms</a></li>
+          <li><a href="/privacy-policy">Privacy</a></li>
+          <li><a href="mailto:unideals.support@gmail.com">unideals.support@gmail.com</a></li>
+          <li><a href="https://x.com/unidealsdotin" rel="me noopener">X</a></li>
+          <li><a href="https://www.instagram.com/unidealsdotin/" rel="me noopener">Instagram</a></li>
+          <li><a href="https://www.youtube.com/@unidealsdotin" rel="me noopener">YouTube</a></li>
+        </ul>
+        <p>© Unideals by Imaginum. Made for students in India.</p>
+        <noscript><p>Turn on JavaScript to browse listings, chat with sellers and post your own.</p></noscript>
+      </footer>
+    </div>
+  </div>
 
   <script type="module" src="/src/app/main.jsx"></script>
-
-  <!--
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXX"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-XXXX', { anonymize_ip: true });
-  </script>
-  -->
-
 </body>
-
 </html>

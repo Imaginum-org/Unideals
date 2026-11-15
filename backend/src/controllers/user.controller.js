@@ -5,9 +5,16 @@ import Product from "../models/Product.model.js";
 import Deal from "../models/deal.model.js";
 import { deleteImageSafely, getFileOwnership } from "../utils/imagekit.js";
 import { safeErrorMessage } from "../utils/response.js";
-import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges } from "../services/badgeService.js";
+import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges, scheduleBadgeRecompute } from "../services/badgeService.js";
 import { clearAuthCookies } from "../services/auth.service.js";
 import { getInsights } from "../services/insights.service.js";
+import { campusDomainsFor, getCollegeStatus, sendCollegeOtp, verifyCollegeOtp } from "../services/collegeVerification.service.js";
+import {
+  cancelGenderRequest,
+  deleteIdCard,
+  getGenderRequestStatus,
+  submitGenderRequest,
+} from "../services/genderRequest.service.js";
 
 // The signed-in user's own profile: never ship credentials or internal
 // session/token bookkeeping, and never the precise GPS fix (the client caches
@@ -19,6 +26,7 @@ const SELF_PROFILE_EXCLUDE = [
   "-refresh_token_prev_expires_at",
   "-verifyTokenEmail",
   "-verifyTokenEmailExpiry",
+  "-college_email_otp",
   "-tokenVersion",
   "-reset_password_token",
   "-reset_password_expiry",
@@ -33,6 +41,9 @@ const SELF_PROFILE_EXCLUDE = [
 ].join(" ");
 
 // GET USER PROFILE
+// first_listed_at backfill already attempted for these users (this process).
+const firstListedChecked = new Set();
+
 export const getUserProfile = async (req, res) => {
   try {
     const userId = req.userId;
@@ -40,7 +51,7 @@ export const getUserProfile = async (req, res) => {
     const user = await userModel
       .findById(userId)
       .select(SELF_PROFILE_EXCLUDE)
-      .populate("campus_id", "slug name short_name city state is_active")
+      .populate("campus_id", "slug name short_name city state is_active email_domains")
       .lean();
 
     if (!user) {
@@ -51,9 +62,21 @@ export const getUserProfile = async (req, res) => {
       });
     }
 
+    // Explicit boolean (lean() skips schema defaults on older accounts), so
+    // the client can tell "not verified" from "not loaded yet".
+    user.is_college_verified = Boolean(user.is_college_verified);
+    // Whether this campus supports college email verification yet (VIT
+    // campuses do; other colleges once their student domain is added).
+    user.college_verification_available = campusDomainsFor(user.campus_id).length > 0;
+    if (user.campus_id && typeof user.campus_id === "object") delete user.campus_id.email_domains;
+
     // Older accounts: derive "first listed" once from their history
     // (deleted/sold listings included), then it's stored for good.
-    if (!user.first_listed_at) {
+    // Users who never listed have nothing to stamp, so without a memo this
+    // ran 2 queries on EVERY profile load forever. Check once per process.
+    if (!user.first_listed_at && !firstListedChecked.has(String(userId))) {
+      if (firstListedChecked.size > 50_000) firstListedChecked.clear();
+      firstListedChecked.add(String(userId));
       const first = await Product.findOne({ seller_id: userId, status: { $ne: PRODUCT_STATUS.DRAFT } })
         .sort({ createdAt: 1 })
         .select("createdAt")
@@ -190,9 +213,8 @@ export const updateUserProfile = async (req, res) => {
     }
 
     // Recompute badges/gamification in background if profile fields change
-    computeAndAwardBadges(userId).catch((err) =>
-      console.error("Error updating gamification on updateUserProfile:", err),
-    );
+    // Coalesced: bursts of edits trigger one recompute (badgeService).
+    scheduleBadgeRecompute(userId);
 
     if (updatedUser.gamification) {
       const xp = updatedUser.gamification.total_xp || 0;
@@ -348,9 +370,8 @@ export const updateUserAvatar = async (req, res) => {
       .select(SELF_PROFILE_EXCLUDE)
       .lean();
 
-    computeAndAwardBadges(userId).catch((err) =>
-      console.error("Error updating gamification on updateUserAvatar:", err),
-    );
+    // Coalesced: bursts of edits trigger one recompute (badgeService).
+    scheduleBadgeRecompute(userId);
 
     if (updatedUser?.gamification) {
       const xp = updatedUser.gamification.total_xp || 0;
@@ -525,6 +546,16 @@ export const deleteAccount = async (req, res) => {
     } catch {
       // best-effort only
     }
+    // A pending gender request's ID photo goes with the account.
+    try {
+      await deleteIdCard(userId);
+      await userModel.updateOne(
+        { _id: userId, "genderChangeRequest.status": "pending" },
+        { $set: { "genderChangeRequest.status": "cancelled", "genderChangeRequest.reviewedAt": new Date() } },
+      );
+    } catch {
+      // best-effort only
+    }
     // Unideals AI chats are personal data with no reason to outlive the account.
     try {
       const AssistantConversation = (await import("../models/AssistantConversation.model.js")).default;
@@ -649,89 +680,53 @@ export const updateChatSettings = async (req, res) => {
   }
 };
 
-// REQUEST GENDER CHANGE (needs admin approval — gender is set-once).
-// Rate-limited by route limiter. One pending request per user; re-POST
-// while pending just refreshes the requested value (idempotent).
+// GENDER CHANGE REQUESTS (gender is set-once; changes need staff approval).
+// POST is multipart: `requestedGender` + an `idCard` photo of the college ID.
+// Re-sending while pending replaces the request and the photo.
+const sendGenderError = (res, err, fallback) => {
+  const status = err?.statusCode && err.statusCode < 500 ? err.statusCode : 500;
+  if (status === 500) console.error(fallback, err);
+  return res.status(status).json({ message: safeErrorMessage(err, fallback), success: false, error: true });
+};
+
 export const requestGenderChange = async (req, res) => {
   try {
-    const userId = req.userId;
-    const { requestedGender } = req.body || {};
-    const allowed = ["male", "female", "other"];
-    if (!allowed.includes(requestedGender)) {
-      return res.status(400).json({
-        message: "Invalid gender value",
-        success: false,
-        error: true,
-      });
-    }
-    const current = await userModel
-      .findById(userId)
-      .select("gender genderChangeRequest")
-      .lean();
-    if (!current) {
-      return res.status(404).json({ message: "User not found", success: false, error: true });
-    }
-    if (current.gender === requestedGender) {
-      return res.status(400).json({
-        message: "This is already your gender.",
-        success: false,
-        error: true,
-      });
-    }
-    const updated = await userModel
-      .findByIdAndUpdate(
-        userId,
-        {
-          $set: {
-            genderChangeRequest: {
-              requestedGender,
-              status: "pending",
-              requestedAt: new Date(),
-              reviewedAt: null,
-            },
-          },
-        },
-        { new: true },
-      )
-      .select("gender genderChangeRequest")
-      .lean();
+    const genderChangeRequest = await submitGenderRequest({
+      userId: req.userId,
+      requestedGender: req.body?.requestedGender,
+      file: req.file,
+    });
     return res.status(200).json({
-      message: "Request sent for admin approval.",
+      message: "Request sent. Our team will review your ID and get back to you.",
       success: true,
       error: false,
-      genderChangeRequest: updated?.genderChangeRequest || null,
+      genderChangeRequest,
     });
   } catch (err) {
-    console.error("Error requesting gender change:", err);
-    return res.status(500).json({
-      message: safeErrorMessage(err),
-      success: false,
-      error: true,
+    return sendGenderError(res, err, "Could not send your request");
+  }
+};
+
+export const cancelGenderChange = async (req, res) => {
+  try {
+    const genderChangeRequest = await cancelGenderRequest(req.userId);
+    return res.status(200).json({
+      message: "Request cancelled and your ID photo deleted.",
+      success: true,
+      error: false,
+      genderChangeRequest,
     });
+  } catch (err) {
+    return sendGenderError(res, err, "Could not cancel your request");
   }
 };
 
 export const getGenderChangeStatus = async (req, res) => {
   try {
-    const user = await userModel
-      .findById(req.userId)
-      .select("gender genderChangeRequest")
-      .lean();
-    if (!user) {
-      return res.status(404).json({ message: "User not found", success: false, error: true });
-    }
-    return res.status(200).json({
-      success: true,
-      error: false,
-      gender: user.gender ?? null,
-      genderChangeRequest: user.genderChangeRequest || null,
-    });
+    const status = await getGenderRequestStatus(req.userId);
+    return res.status(200).json({ success: true, error: false, ...status });
   } catch (err) {
-    return res.status(500).json({
-      message: safeErrorMessage(err),
-      success: false,
-      error: true,
-    });
+    return sendGenderError(res, err, "Could not load your request");
   }
 };
 
@@ -742,5 +737,47 @@ export const getMyInsights = async (req, res) => {
     return res.status(200).json({ success: true, data });
   } catch (error) {
     return res.status(500).json({ success: false, message: safeErrorMessage(error, "Could not load insights") });
+  }
+};
+
+// ── College email verification (verified tick) ──
+const sendCollegeError = (res, err, fallback) => {
+  const status = err?.statusCode && err.statusCode < 600 ? err.statusCode : 500;
+  if (status >= 500) console.error(fallback, err?.message || err);
+  // Our own AppErrors (incl. 503 "couldn't send the code") are safe to show;
+  // anything unexpected gets the generic fallback.
+  const message = err?.isOperational ? err.message : safeErrorMessage(err, fallback);
+  return res.status(status).json({ message, success: false, error: true });
+};
+
+// GET /api/user/college-verification
+export const getCollegeVerification = async (req, res) => {
+  try {
+    const data = await getCollegeStatus(req.userId);
+    return res.status(200).json({ success: true, error: false, data });
+  } catch (err) {
+    return sendCollegeError(res, err, "Could not load verification status");
+  }
+};
+
+// POST /api/user/college-verification/send-otp { email }
+export const sendCollegeVerificationOtp = async (req, res) => {
+  try {
+    const data = await sendCollegeOtp(req.userId, req.body?.email);
+    return res.status(200).json({ success: true, error: false, message: `We sent a 6-digit code to ${data.email}.`, data });
+  } catch (err) {
+    return sendCollegeError(res, err, "Could not send the code");
+  }
+};
+
+// POST /api/user/college-verification/verify { code }
+export const verifyCollegeVerificationOtp = async (req, res) => {
+  try {
+    const data = await verifyCollegeOtp(req.userId, req.body?.code);
+    // +50 XP is part of the badge recompute; best-effort.
+    computeAndAwardBadges(req.userId).catch(() => {});
+    return res.status(200).json({ success: true, error: false, message: "College email verified. Your verified tick is live.", data });
+  } catch (err) {
+    return sendCollegeError(res, err, "Could not verify the code");
   }
 };

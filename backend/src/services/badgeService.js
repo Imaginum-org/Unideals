@@ -164,15 +164,17 @@ async function getLiveWishlistCount(wishlist) {
   }
 }
 
-async function buildContext(userId) {
-  const user = await User.findById(userId).select(
-    "is_email_verified avatar mobile createdAt wishlist gamification gender rating first_listed_at"
-  );
+const CONTEXT_USER_FIELDS =
+  "is_email_verified avatar mobile createdAt wishlist gender rating first_listed_at gamification is_college_verified";
+
+async function buildContext(userId, preloadedUser = null) {
+  const user = preloadedUser || (await User.findById(userId).select(CONTEXT_USER_FIELDS).lean());
   if (!user) throw new Error("User not found");
 
-  const products = await Product.find({ seller_id: userId }).select(
-    "status category selling_price createdAt updatedAt"
-  );
+  // Plain objects (lean): this runs after every listing change.
+  const products = await Product.find({ seller_id: userId })
+    .select("status category selling_price createdAt updatedAt")
+    .lean();
 
   const SOLD_STATUSES = ["sold", "delivered", "completed"];
   const sold = products.filter((p) => SOLD_STATUSES.includes((p.status || "").toLowerCase()));
@@ -224,7 +226,9 @@ async function buildContext(userId) {
   // OG rank
   let isOGMember = false;
   try {
-    const rank = await User.countDocuments({ _id: { $lt: userId } });
+    // Only "is the rank under 100?" matters, so stop counting at 100
+    // instead of walking the whole _id index for every late joiner.
+    const rank = await User.countDocuments({ _id: { $lt: userId } }, { limit: 100 });
     isOGMember = rank < 100;
   } catch (_) {}
 
@@ -285,9 +289,10 @@ async function buildContext(userId) {
  * @returns {Promise<object>} Updated gamification data
  */
 export async function computeAndAwardBadges(userId) {
-  const ctx = await buildContext(userId);
-  const user = await User.findById(userId).select("gamification gender");
+  // One user read serves both the context and the existing badge list.
+  const user = await User.findById(userId).select(CONTEXT_USER_FIELDS).lean();
   if (!user) throw new Error("User not found");
+  const ctx = await buildContext(userId, user);
 
   const existing = (user.gamification && user.gamification.badges) || [];
   const existingMap = Object.fromEntries(existing.map((b) => [b.badge_id, b]));
@@ -333,7 +338,10 @@ export async function computeAndAwardBadges(userId) {
   // 3. +30 XP for each completed buy beyond the first (first buy is awarded by first_buy badge)
   const additionalBuyXp = Math.max(0, (ctx.totalBuys || 0) - 1) * 30;
 
-  const totalXp = badgeXp + additionalListingXp + additionalBuyXp;
+  // 4. +50 XP, one time, for a verified college email (blue tick)
+  const collegeXp = user.is_college_verified ? 50 : 0;
+
+  const totalXp = badgeXp + additionalListingXp + additionalBuyXp + collegeXp;
 
   const level = computeLevel(totalXp);
   const rank_title = rankFromLevel(level, user.gender);
@@ -400,4 +408,31 @@ export async function getGamificationData(userId) {
     locked_badges: toLockedView(g.locked_badges || []),
     last_computed_at: g.last_computed_at || null,
   };
+}
+
+// ─── Coalesced background recompute ──────────────────────────────────────
+// Listing edits, unlists, relists, deletes and profile edits each used to
+// fire a full recompute (~9 queries + writes) immediately. Bursts (bulk
+// editing, several listings at once) now collapse into ONE recompute per
+// user, run shortly after the last change. Callers that need the fresh
+// result in their response still await computeAndAwardBadges directly.
+const RECOMPUTE_DELAY_MS = 4000;
+const MAX_PENDING = 10_000;
+const pendingRecompute = new Map(); // userId -> timeout
+
+export function scheduleBadgeRecompute(userId, delayMs = RECOMPUTE_DELAY_MS) {
+  if (!userId) return;
+  const key = String(userId);
+  if (pendingRecompute.has(key)) return; // one already queued: it will see this change too
+  if (pendingRecompute.size >= MAX_PENDING) {
+    // Back-pressure: run now rather than grow without bound.
+    computeAndAwardBadges(key).catch((err) => console.error("Badge recompute failed:", err?.message || err));
+    return;
+  }
+  const t = setTimeout(() => {
+    pendingRecompute.delete(key);
+    computeAndAwardBadges(key).catch((err) => console.error("Badge recompute failed:", err?.message || err));
+  }, delayMs);
+  t.unref?.();
+  pendingRecompute.set(key, t);
 }

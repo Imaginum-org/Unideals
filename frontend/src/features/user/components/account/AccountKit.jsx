@@ -21,7 +21,7 @@ const WIDTHS = { md: "max-w-3xl", lg: "max-w-4xl", xl: "max-w-5xl", full: "max-w
 /** Docks the site navbar while an account page is mounted (index.css,
  *  html[data-app-shell]). Counted so overlapping page transitions are safe. */
 let appShellCount = 0;
-const useAppShell = () => {
+export const useAppShell = () => {
   useEffect(() => {
     const root = document.documentElement;
     appShellCount += 1;

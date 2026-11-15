@@ -20,6 +20,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
+import PageSeo from "../../../components/seo/PageSeo.jsx";
 
 
 function ContactUs() {
@@ -232,7 +233,7 @@ function ContactUs() {
         </button>
       </div>
       <a
-        href="mailto:hi@unideals.in"
+        href="mailto:unideals.support@gmail.com"
         className="inline-flex items-center gap-1.5 self-start text-[12px] font-medium text-slate-500 hover:text-[var(--accent-text)] dark:text-zinc-400"
         title="Submit first, then email screenshots with your ticket ID"
       >
@@ -514,9 +515,9 @@ function ContactUs() {
             <dd className="font-semibold text-slate-900 dark:text-white">9 AM – 9 PM</dd>
           </div>
         </dl>
-        <a href="mailto:hi@unideals.in" className={cn(btnSecondary, "mt-4 w-full")}>
+        <a href="mailto:unideals.support@gmail.com" className={cn(btnSecondary, "mt-4 w-full")}>
           <Mail className="h-4 w-4" aria-hidden="true" />
-          hi@unideals.in
+          unideals.support@gmail.com
         </a>
         <p className="mt-2.5 flex items-start gap-1.5 text-[11.5px] text-slate-500 dark:text-zinc-400">
           <Clock className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -565,6 +566,7 @@ function ContactUs() {
   return (
     <div className="min-h-[calc(100dvh-var(--header-h)-var(--tabbar-h))] w-full bg-[#F7F9FD] font-figtree dark:bg-[#131313]">
       <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-8">{content}</div>
+      <PageSeo path="/contact" />
     </div>
   );
 }

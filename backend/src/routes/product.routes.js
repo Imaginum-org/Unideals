@@ -4,6 +4,7 @@ import { priceInsights } from "../controllers/labs.controller.js";
 import { validate } from "../middlewares/validation.middleware.js";
 import auth, { optionalAuth } from "../middlewares/auth.middleware.js";
 import rateLimit from "express-rate-limit";
+import { getListingSeo } from "../services/sitemap.service.js";
 
 import {
   createProduct,
@@ -84,6 +85,19 @@ router.get("/price-insights", searchLimiter, auth, priceInsights);
 router.get("/user/drafts", auth, getMyDraftProducts);
 
 router.get("/", feedLimiter, optionalAuth, getAllProducts);
+
+// Public SEO facts for one listing (server-rendered meta for crawlers and
+// link previews). Registered before "/:id" so "seo" isn't read as an id.
+router.get("/seo/:ref", detailLimiter, async (req, res) => {
+  try {
+    const data = await getListingSeo(req.params.ref);
+    res.set("Cache-Control", "public, max-age=300");
+    if (!data) return res.status(404).json({ success: false, message: "Not found" });
+    return res.status(200).json({ success: true, data });
+  } catch {
+    return res.status(500).json({ success: false, message: "Could not load listing" });
+  }
+});
 
 router.post(
   "/",

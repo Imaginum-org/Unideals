@@ -14,7 +14,7 @@ const CAMPUSES = [
     short_name: "Vellore",
     city: "Vellore",
     state: "Tamil Nadu",
-    email_domains: ["vit.ac.in"],
+    email_domains: ["vitstudent.ac.in"],
   },
   {
     slug: "vit-chennai",
@@ -22,7 +22,7 @@ const CAMPUSES = [
     short_name: "Chennai",
     city: "Chennai",
     state: "Tamil Nadu",
-    email_domains: ["vit.ac.in"],
+    email_domains: ["vitstudent.ac.in"],
   },
   {
     slug: "vit-bhopal",
@@ -30,7 +30,7 @@ const CAMPUSES = [
     short_name: "Bhopal",
     city: "Sehore",
     state: "Madhya Pradesh",
-    email_domains: ["vitbhopal.ac.in"],
+    email_domains: ["vitstudent.ac.in"],
   },
   {
     slug: "vit-amaravati",
@@ -38,7 +38,7 @@ const CAMPUSES = [
     short_name: "Amaravati",
     city: "Amaravati",
     state: "Andhra Pradesh",
-    email_domains: ["vitap.ac.in"],
+    email_domains: ["vitstudent.ac.in"],
   },
 ];
 

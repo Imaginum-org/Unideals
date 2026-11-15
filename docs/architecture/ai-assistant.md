@@ -310,7 +310,7 @@ It never includes a phone number, email, address or anyone else's details.
 - **Persona**: the shared persona.
 - **Honesty rules**:
   - Unideals rules, prices and procedures come only from the knowledge base, the student context or tools;
-  - an uncovered policy question gets one honest sentence pointing to hi@unideals.in or /contact;
+  - an uncovered policy question gets one honest sentence pointing to unideals.support@gmail.com or /contact;
   - general buying know-how may come from common knowledge, but must not be presented as an Unideals rule;
   - clearly unrelated topics get a warm one-line redirect.
 - **The tool map**: which tool to call for which kind of question.
@@ -519,7 +519,7 @@ Both need a signed-in user and are limited to 10 requests a minute. **Neither is
 | The media error leaked internal text | Errors are logged on the server only |
 | Hung Gemini calls kept running, and a turn could take about 54 s | Calls are aborted, with a 20 s turn budget |
 | Enhance-listing crashed on a missing description | Fixed, inputs validated |
-| The bot gave `support@campusmart.in` and similar | It gives `hi@unideals.in` |
+| The bot gave `support@campusmart.in` and similar | It gives `unideals.support@gmail.com` |
 | Boost prices and credits were hard-coded in the policy tool | Read from the plan config |
 | Rate-limit responses were plain text | JSON |
 

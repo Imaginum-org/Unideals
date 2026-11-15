@@ -30,7 +30,7 @@ import {
 } from "../controllers/adminProfile.controller.js";
 
 // Legacy controllers (still used directly for simple cases)
-import { getUsers, getUserStats, updateUserRole, deleteUser, getGenderChangeRequests, reviewGenderChangeRequest } from "../controllers/admin.user.controller.js";
+import { getUsers, getUserStats, updateUserRole, deleteUser, getGenderChangeRequests, reviewGenderChangeRequest, getGenderRequestIdCard } from "../controllers/admin.user.controller.js";
 import { getProducts } from "../controllers/admin.product.controller.js";
 import {
   getOrders,
@@ -254,6 +254,13 @@ router.get(
   auth,
   requireAccess("genderRequests", "view"),
   getGenderChangeRequests,
+);
+router.get(
+  "/gender-requests/:id/id-card",
+  auth,
+  requireAccess("genderRequests", "view"),
+  requireInScope("user"),
+  getGenderRequestIdCard,
 );
 router.patch(
   "/gender-requests/:id",

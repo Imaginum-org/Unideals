@@ -341,11 +341,29 @@ await test("successful run updates state and history", async () => {
 });
 await test("failure is recorded, not thrown", async () => {
   await registry.runJob("test-fail");
-  await registry.runJob("test-fail");
+  // A retry by staff right after a failure is allowed (manual skips the hold).
+  await registry.runJob("test-fail", { trigger: "manual" });
   const state = await JobState.findOne({ key: "test-fail" }).lean();
   assert.equal(state.last_status, "failed");
   assert.equal(state.consecutive_failures, 2);
   assert.match(state.last_error, /db down/);
+});
+await test("a duplicate scheduled tick (another instance, same minute) is skipped", async () => {
+  registry.defineJob({ key: "test-lease", name: "Lease", schedule: "0 4 * * *", run: async () => ({ done: 1 }) });
+  const first = await registry.runJob("test-lease");
+  assert.equal(first.status, "success");
+  // Same tick arriving again: the post-run lease holds, nothing runs twice.
+  assert.equal(await registry.runJob("test-lease"), null);
+  assert.equal((await JobState.findOne({ key: "test-lease" }).lean()).run_count, 1);
+  // A lease held by a live run elsewhere also blocks staff "Run now".
+  await JobState.updateOne(
+    { key: "test-lease" },
+    { $set: { last_status: "running", lease_owner: "other-host:1:abc", lease_until: new Date(Date.now() + 60_000) } },
+  );
+  await assert.rejects(registry.runJob("test-lease", { trigger: "manual" }), /another server/);
+  // Once that lease expires (crashed instance), the next tick takes over.
+  await JobState.updateOne({ key: "test-lease" }, { $set: { lease_until: new Date(Date.now() - 1000) } });
+  assert.equal((await registry.runJob("test-lease")).status, "success");
 });
 await test("frequent no-op runs update state but skip history", async () => {
   await registry.runJob("test-noop");

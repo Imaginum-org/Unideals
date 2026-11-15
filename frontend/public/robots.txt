@@ -1,5 +1,8 @@
-# Public marketplace pages are crawlable; account, auth and transactional
-# pages are not useful in search results.
+# Unideals: https://unideals.in
+# Public marketplace pages (home, explore, deals, categories, listings,
+# pricing, help, legal) are open to search engines and AI assistants.
+# Account, auth, chat and checkout pages are private or useless in results.
+
 User-agent: *
 Allow: /
 Disallow: /chat
@@ -13,10 +16,57 @@ Disallow: /notification
 Disallow: /upload
 Disallow: /productlisted
 Disallow: /subscription
+Disallow: /achievements
+Disallow: /badge
+Disallow: /guides
 Disallow: /login
 Disallow: /signup
 Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /verify-email
 Disallow: /checkEmail
+Disallow: /p/
 Disallow: /search
+Disallow: /*?*oauth_code=
+Disallow: /*?*token=
+
+# AI search and assistant crawlers: same rules, stated explicitly so
+# answers in ChatGPT, Perplexity, Claude and Gemini can cite Unideals.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: Claude-SearchBot
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot
+User-agent: Applebot-Extended
+User-agent: Bingbot
+Allow: /
+Allow: /llms.txt
+Disallow: /chat
+Disallow: /profile
+Disallow: /profileoverview
+Disallow: /setting
+Disallow: /settings
+Disallow: /wishlist
+Disallow: /myorders
+Disallow: /notification
+Disallow: /upload
+Disallow: /productlisted
+Disallow: /subscription
+Disallow: /achievements
+Disallow: /badge
+Disallow: /guides
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /checkEmail
+Disallow: /p/
+Disallow: /search
+
+Sitemap: https://unideals.in/sitemap.xml

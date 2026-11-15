@@ -4,7 +4,7 @@ import ProductCard from "../components/ProductCard.jsx";
 import { BROWSE_GRID, BrowseError, BrowseHeader, EndOfResults, ProductGridSkeleton } from "../components/browse/BrowseKit.jsx";
 import { getBoostedProducts } from "../api/productApi";
 import { useCampus } from "../../../context/CampusContext.jsx";
-import Seo from "../../../components/Seo.jsx";
+import PageSeo from "../../../components/seo/PageSeo.jsx";
 
 /*
  * Limited time deals: every boosted listing on this campus, soonest to end
@@ -55,7 +55,7 @@ export default function Deals() {
 
   return (
     <div className="min-h-[100dvh] bg-[#F7F8FA] pb-24 font-figtree text-slate-900 dark:bg-[#131313] dark:text-white">
-      <Seo title="Limited time deals | Unideals" />
+      <PageSeo path="/deals" />
       <div className="mx-auto w-full max-w-[calc(var(--page-max)+9vw)] px-5 pt-5 sm:px-[4.5vw] lg:pt-8 2xl:max-w-[var(--page-max)] 2xl:px-0">
         <BrowseHeader
           breadcrumbs={[{ label: "Home", to: "/" }, { label: "Limited time deals" }]}

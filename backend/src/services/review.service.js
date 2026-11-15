@@ -64,7 +64,7 @@ export const getRatingSummary = async (sellerId, { recent = 3 } = {}) => {
     Review.find({ seller_id: id })
       .sort({ createdAt: -1 })
       .limit(Math.min(Math.max(recent, 0), 10))
-      .populate("buyer_id", "name avatar")
+      .populate("buyer_id", "name avatar is_college_verified")
       .select("rating comment product_title createdAt buyer_id")
       .lean(),
   ]);

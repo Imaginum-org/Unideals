@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Crown } from "lucide-react";
 import userdp from "/userdp.webp";
 import { avatarUrl, formatName } from "../utils/display.js";
+import { TickIcon } from "../../../components/common/VerifiedTick.jsx";
 
 export const timeAgo = (iso) => {
   if (!iso) return "";
@@ -101,6 +102,7 @@ const ConversationCard = ({ conv, selected, onClick }) => {
               {buying ? "Buying" : "Selling"}
             </span>
             <span className="font-medium text-slate-700 dark:text-zinc-300">{name}</span>
+            {other?.is_college_verified && <TickIcon className="ml-0.5 inline h-3.5 w-3.5 align-[-2px]" />}
             {pro && <Crown className="mx-0.5 inline h-3 w-3 align-[-1px] text-amber-500" aria-label="Pro member" />}
             {": "}
             {conv?.last_message || "Say hi"}

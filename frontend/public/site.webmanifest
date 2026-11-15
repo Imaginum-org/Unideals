@@ -1,14 +1,20 @@
 {
-  "name": "Unideals",
+  "name": "Unideals: Campus Marketplace",
   "short_name": "Unideals",
-  "description": "Buy and sell within your campus community.",
+  "description": "Buy and sell with verified students on your campus. No fees, no shipping.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#534ff2",
+  "orientation": "portrait",
+  "lang": "en-IN",
+  "categories": ["shopping", "education", "lifestyle"],
+  "background_color": "#F7F8FA",
+  "theme_color": "#4a4dfe",
   "icons": [
-    { "src": "/push-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "/fav.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

@@ -4,7 +4,7 @@ import ProductView from "../models/ProductView.model.js";
 import { HOT_DEAL } from "../config/hotDeals.js";
 import crypto from "crypto";
 import { createTtlCache, keyOf } from "../utils/ttlCache.js";
-import { boostedCache } from "../utils/boostedCache.js";
+import { boostedCache, feedPageCache } from "../utils/boostedCache.js";
 import { FEED_RANK_WEIGHT, SEARCH_RANK_WEIGHT, TRENDING_RANK_WEIGHT, sellerRank } from "../utils/planPerks.js";
 
 // Aggregate results that don't need to be real-time: total counts and price
@@ -13,6 +13,8 @@ import { FEED_RANK_WEIGHT, SEARCH_RANK_WEIGHT, TRENDING_RANK_WEIGHT, sellerRank 
 // A short TTL keeps them fresh enough while cutting those DB calls ~90%.
 const feedMetaCache = createTtlCache({ max: 2000 });
 const COUNT_TTL_MS = 30 * 1000;
+// Feed pages (no search). Cleared on any listing write (Product model hooks).
+const FEED_PAGE_TTL_MS = 15 * 1000;
 const PRICE_META_TTL_MS = 60 * 1000;
 const cachedCount = (pipeline) =>
   feedMetaCache.memo(`count:${keyOf(pipeline)}`, COUNT_TTL_MS, async () => {
@@ -28,7 +30,7 @@ const sellerLookup = {
     localField: "seller_id",
     foreignField: "_id",
     as: "seller",
-    pipeline: [{ $project: { name: 1, avatar: 1, subscription: 1 } }],
+    pipeline: [{ $project: { name: 1, avatar: 1, subscription: 1, is_college_verified: 1 } }],
   },
 };
 import Conversation from "../models/conversation.model.js";
@@ -479,7 +481,7 @@ export const getBoostedProducts = async (campusId, viewerGender = null, viewerRo
       .select(
         "title images selling_price original_price category createdAt is_boosted boost_expires_at boost_tier isGirlsOnly hot_until status slug",
       )
-      .populate("seller_id", "name avatar subscription role rating")
+      .populate("seller_id", "name avatar subscription role rating is_college_verified")
       .lean(),
   );
   const nowMs = Date.now();
@@ -733,8 +735,15 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
     },
   });
 
+  // Feed pages without a text search are identical for everyone with the
+  // same filters (viewer-specific rules are already in baseMatch), so share
+  // them for a few seconds. `now` only shifts recency scores by seconds.
+  const isSearch = typeof search === "string" && search.trim();
+  const loadPage = () => Product.aggregate(pipeline);
   const [products, total, priceMeta] = await Promise.all([
-    Product.aggregate(pipeline),
+    isSearch
+      ? loadPage()
+      : feedPageCache.memo(`feed:${keyOf({ baseMatch, sort: safeSort, skip, limit })}`, FEED_PAGE_TTL_MS, loadPage),
     cachedCount(totalPipeline),
     feedMetaCache.memo(`price:${keyOf(priceMetaPipeline)}`, PRICE_META_TTL_MS, () =>
       Product.aggregate(priceMetaPipeline),
@@ -891,7 +900,7 @@ export const getSingleProduct = async (id, campusId, requesterId = null, clientI
     // member since, verified email, level/rank. Nothing private.
     .populate(
       "seller_id",
-      "name avatar subscription role createdAt is_email_verified gamification.level gamification.rank_title rating",
+      "name avatar subscription role createdAt is_email_verified is_college_verified gamification.level gamification.rank_title rating",
     )
     .populate("campus_id", "slug name short_name")
     .lean();

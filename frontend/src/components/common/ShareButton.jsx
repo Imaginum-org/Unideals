@@ -86,8 +86,6 @@ export default function ShareButton({
 
   return (
     <div className={`share-btn-wrapper ${className}`}>
-      <span className="share-btn-track" aria-hidden="true" />
-      <span className="share-btn-comet" aria-hidden="true" />
       <button
         type="button"
         className="share-btn"

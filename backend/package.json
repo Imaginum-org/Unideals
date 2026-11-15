@@ -10,6 +10,7 @@
     "prod": "NODE_ENV=production node server.js",
     "seed:campuses": "node src/seeds/campuses.seed.js",
     "check": "node scripts/check-syntax.mjs",
+    "indexes": "node scripts/indexes.mjs",
     "test": "node scripts/run-tests.mjs",
     "test:plans": "node tests/plans.integration.test.mjs",
     "test:views": "node tests/views.integration.test.mjs",
@@ -24,7 +25,10 @@
     "test:notifications": "node tests/notifications.integration.test.mjs",
     "test:user-deletion": "node tests/userDeletion.integration.test.mjs",
     "test:boosted": "node tests/boosted.integration.test.mjs",
-    "test:labs": "node tests/labs.integration.test.mjs"
+    "test:labs": "node tests/labs.integration.test.mjs",
+    "test:college": "node tests/collegeVerification.integration.test.mjs",
+    "test:performance": "node tests/performance.integration.test.mjs",
+    "test:seo": "node tests/seo.integration.test.mjs"
   },
   "keywords": [
     "nodejs",

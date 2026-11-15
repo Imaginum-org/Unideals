@@ -10,10 +10,19 @@ export const connectDB = async () => {
     process.exit(1);
   }
   try {
+    // Pool sized per instance (Atlas caps total connections per tier, so
+    // instances × MONGO_MAX_POOL must stay under it). A few warm sockets
+    // avoid connect latency on the first requests after idle; idle extras
+    // are released after a minute.
+    const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
     await mongoose.connect(process.env.MONGO_URL, {
       serverSelectionTimeoutMS: 15000, // 15s timeout for Atlas cluster discovery & DNS lookup
       socketTimeoutMS: 45000,
-      maxPoolSize: 10,
+      maxPoolSize: num(process.env.MONGO_MAX_POOL, 20),
+      minPoolSize: num(process.env.MONGO_MIN_POOL, 2),
+      maxIdleTimeMS: 60000,
+      // Retry a write once on a transient network/failover error.
+      retryWrites: true,
     });
 
     console.log(`MongoDB connected: ${mongoose.connection.host}`);

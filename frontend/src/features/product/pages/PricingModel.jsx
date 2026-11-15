@@ -28,6 +28,7 @@ import AnimatedOfferPrice from "../../payment/components/AnimatedOfferPrice.jsx"
 import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 import BoostAddons from "../../payment/components/BoostAddons.jsx";
+import PageSeo from "../../../components/seo/PageSeo.jsx";
 
 const PLAN_TIER = {
   free: "base_user",
@@ -336,6 +337,7 @@ const PricingModel = () => {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#F7F8FA] py-8 text-slate-900 dark:bg-[#131313]">
+      <PageSeo path="/price" />
       {/* Toasts render via the global Toaster in app/App.jsx. */}
 
       {/* Pricing hero and plan cards */}

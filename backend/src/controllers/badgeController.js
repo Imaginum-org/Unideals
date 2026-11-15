@@ -50,9 +50,10 @@ export const getLeaderboard = async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
 
-    const viewer = await User.findById(req.user._id).select("campus_id").lean();
+    // req.user is the (cached) authenticated user: no extra query needed.
+    const viewerCampus = req.user?.campus_id?._id || req.user?.campus_id || null;
     const match = { "gamification.total_xp": { $gt: 0 } };
-    if (viewer?.campus_id) match.campus_id = viewer.campus_id;
+    if (viewerCampus) match.campus_id = viewerCampus;
 
     const users = await User.find(
       match,

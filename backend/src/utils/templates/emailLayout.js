@@ -189,3 +189,51 @@ export const renderEmail = ({
 </td></tr></table>
 </body></html>`;
 };
+
+/**
+ * One-time-code email (college email verification). Same shell as
+ * renderEmail, with a large spaced-out code in place of the button.
+ * All inputs are pre-escaped; `code` is digits only.
+ */
+export const renderOtpEmail = ({ title, greeting, message, code, expiry, expiryNote, siteUrl, preheader }) => {
+  const year = new Date().getFullYear();
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="color-scheme" content="light only" /><title>${title}</title></head>
+<body style="margin:0;padding:0;background:#F5F6FF;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${preheader}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F6FF;font-family:${FONT};"><tr><td align="center" style="padding:24px 12px;">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;background:#FFFFFF;border:1px solid #E8EAFE;border-radius:14px;overflow:hidden;">
+    ${header("brand")}
+    <tr><td align="center" style="padding:24px 28px 4px;">
+      ${hero(envelopeIllustration)}
+      <h1 style="margin:0;color:#11183D;font-size:22px;line-height:1.25;letter-spacing:-.4px;font-weight:800;">${title}</h1>
+      <div style="width:32px;height:3px;margin:12px auto 14px;background:#C7C9FF;border-radius:3px;font-size:0;line-height:0;">&nbsp;</div>
+      <p style="margin:0 0 6px;color:#253052;font-size:15px;line-height:1.5;">${greeting}</p>
+      <p style="margin:0 auto;max-width:380px;color:#596785;font-size:14px;line-height:1.6;">${message}</p>
+    </td></tr>
+    <tr><td align="center" style="padding:18px 28px 20px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background:#F8F9FF;border:1px solid #E1E5F4;border-radius:12px;"><tr>
+        <td align="center" style="padding:14px 26px;color:#11183D;font-size:30px;line-height:1;font-weight:800;letter-spacing:10px;font-family:'SFMono-Regular',Consolas,'Courier New',monospace;">${code}</td>
+      </tr></table>
+      <p style="margin:10px 0 0;color:#7480A0;font-size:12.5px;line-height:1.5;">Enter this code on the Verification page in Settings.</p>
+    </td></tr>
+    <tr><td style="padding:0 24px 20px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F2F2FF;border-radius:10px;"><tr>
+        <td width="58" valign="middle" style="padding:12px 0 12px 14px;">${clockIcon}</td>
+        <td valign="middle" style="padding:12px 14px 12px 0;color:#667392;font-size:12.5px;line-height:1.5;">
+          <span style="color:#182044;font-size:13px;">This code expires in <strong>${expiry}</strong>.</span><br/>${expiryNote}
+        </td>
+      </tr></table>
+    </td></tr>
+    <tr><td align="center" style="padding:16px 24px 18px;border-top:1px solid #EEF0FA;color:#8290AF;">
+      <p style="margin:0 0 8px;font-size:11.5px;line-height:1.6;">&#169; ${year} Unideals. All rights reserved.<br/>India</p>
+      <p style="margin:0;font-size:11.5px;line-height:1.6;">
+        <a href="${siteUrl}/privacy-policy" style="color:#3838EC;text-decoration:none;">Privacy Policy</a>
+        <span style="padding:0 8px;color:#AAB2CC;">&#8226;</span>
+        <a href="${siteUrl}/termscondition" style="color:#3838EC;text-decoration:none;">Terms of Service</a>
+      </p>
+    </td></tr>
+  </table>
+</td></tr></table>
+</body></html>`;
+};

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { refreshChatUnread } from "../../../services/chatUnread.js";
+import VerifiedTick from "../../../components/common/VerifiedTick.jsx";
 import {
   Ban,
   ChevronDown,
@@ -33,6 +34,7 @@ import { chatSettingsOf, wallpaperById } from "../utils/wallpapers.js";
 import { formatName } from "../utils/display.js";
 import Profile_left_part from "../../user/components/Profile_left_part.jsx";
 import { useAppScreen } from "../../../components/layout/MobileAppBar.jsx";
+import { useAppShell } from "../../user/components/account/AccountKit.jsx";
 import { productPath } from "../../../utils/productPath.js";
 import * as chatApi from "../services/chatApi.js";
 
@@ -1067,6 +1069,8 @@ const ChatPanel = ({ embedded = false }) => {
 
   // Phones: the inbox is a full-screen app view (site header hidden).
   useAppScreen();
+  // Tablets/desktop: dock the navbar full-width like the other account tabs.
+  useAppShell();
 
   // Fresh thread: close search/menu, forget the old query.
   useEffect(() => {
@@ -1314,10 +1318,11 @@ const ChatPanel = ({ embedded = false }) => {
                     <p className="truncate text-[14px] font-semibold leading-tight text-slate-900 dark:text-white">{productTitle}</p>
                     <p className="flex min-w-0 items-center gap-1.5 text-[12px] leading-tight text-slate-500 dark:text-zinc-400">
                       {peerOnline && <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />}
-                      <span className="truncate">
-                        {otherName}
-                        {peerOnline ? " · online" : peerTyping ? " · typing…" : ""}
-                      </span>
+                      <span className="truncate">{otherName}</span>
+                      {detail?.otherParty?.is_college_verified && <VerifiedTick verified size="xs" />}
+                      {(peerOnline || peerTyping) && (
+                        <span className="shrink-0">{peerOnline ? "· online" : "· typing…"}</span>
+                      )}
                       <span className="shrink-0 font-semibold text-slate-700 lg:hidden dark:text-zinc-200">
                         · ₹{Number(agreedPrice ?? askingPrice ?? headerPrice ?? 0).toLocaleString("en-IN")}
                       </span>

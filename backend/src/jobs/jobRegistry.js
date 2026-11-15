@@ -1,5 +1,13 @@
+import os from "os";
+import crypto from "crypto";
 import cron from "node-cron";
 import { JobRun, JobState } from "../models/JobRun.model.js";
+
+// Identifies this process in job leases (several API instances may run).
+const INSTANCE_ID = `${os.hostname()}:${process.pid}:${crypto.randomBytes(3).toString("hex")}`;
+// How long a finished run keeps its lease (blocks duplicate ticks of the
+// same minute on other instances). Must stay below the 1-minute minimum.
+const LEASE_HOLD_MS = 30 * 1000;
 
 /**
  * Registry for scheduled background jobs.
@@ -10,8 +18,10 @@ import { JobRun, JobState } from "../models/JobRun.model.js";
  *   counts as "did something"; frequent jobs only write history then.
  *
  * Every run is recorded (JobState always, JobRun when meaningful), errors
- * never escape into node-cron, and a job never overlaps itself on this
- * instance. Staff can trigger a run from the admin console.
+ * never escape into node-cron, and a job never overlaps itself: locally via
+ * `running`, and across API instances via a lease on its JobState document
+ * (one atomic write, no extra round trip). Set RUN_JOBS=false on instances
+ * that should never run jobs. Staff can trigger a run from the admin console.
  */
 
 const jobs = new Map();
@@ -58,11 +68,46 @@ export const runJob = async (key, { trigger = "schedule", triggeredBy = null } =
 
   running.add(key);
   const startedAt = new Date();
-  await JobState.updateOne(
-    { key },
-    { $set: { last_run_at: startedAt, last_status: "running" } },
-    { upsert: true },
-  ).catch(() => {});
+  // Cross-instance lease: one atomic write both claims the job and marks it
+  // running. Another instance's tick (or a crash-orphaned lease that hasn't
+  // expired) makes the filter miss; the upsert then hits the unique `key`
+  // and throws 11000, which means "someone else has it".
+  const leaseMs = job.leaseMs || (job.frequent ? 2 * 60 * 1000 : 30 * 60 * 1000);
+  try {
+    await JobState.findOneAndUpdate(
+      {
+        key,
+        $or: [
+          { lease_until: null },
+          { lease_until: { $lte: startedAt } },
+          // Staff "Run now" may skip the short post-run hold (it exists to
+          // swallow duplicate scheduled ticks), but never a run in progress.
+          ...(trigger === "manual" ? [{ last_status: { $ne: "running" } }] : []),
+        ],
+      },
+      {
+        $set: {
+          lease_owner: INSTANCE_ID,
+          lease_until: new Date(startedAt.getTime() + leaseMs),
+          last_run_at: startedAt,
+          last_status: "running",
+        },
+      },
+      { upsert: true, projection: { _id: 1 } },
+    );
+  } catch (error) {
+    running.delete(key);
+    if (error?.code === 11000) {
+      if (trigger === "manual") {
+        const busy = new Error("This job is running (or just ran) on another server. Try again shortly.");
+        busy.statusCode = 409;
+        throw busy;
+      }
+      return null; // another instance owns this tick
+    }
+    console.error(`[Job:${key}] could not acquire lease:`, error?.message || error);
+    return null;
+  }
 
   let status = "success";
   let result = null;
@@ -79,6 +124,10 @@ export const runJob = async (key, { trigger = "schedule", triggeredBy = null } =
 
   const finishedAt = new Date();
   const duration = finishedAt.getTime() - startedAt.getTime();
+  // Keep the lease a little past the run so instances whose cron fired a
+  // moment later for the SAME tick can't start a second run; it never
+  // reaches the next tick (smallest interval is one minute).
+  const leaseAfterRun = { lease_owner: INSTANCE_ID, lease_until: new Date(Math.max(finishedAt.getTime(), startedAt.getTime() + LEASE_HOLD_MS)) };
 
   const stateUpdate =
     status === "success"
@@ -90,6 +139,7 @@ export const runJob = async (key, { trigger = "schedule", triggeredBy = null } =
             last_result: result,
             last_success_at: finishedAt,
             consecutive_failures: 0,
+            ...leaseAfterRun,
           },
           $inc: { run_count: 1 },
         }
@@ -101,6 +151,7 @@ export const runJob = async (key, { trigger = "schedule", triggeredBy = null } =
             last_result: null,
             last_failure_at: finishedAt,
             last_error: errorMessage,
+            ...leaseAfterRun,
           },
           $inc: { run_count: 1, failure_count: 1, consecutive_failures: 1 },
         };
@@ -126,6 +177,10 @@ export const runJob = async (key, { trigger = "schedule", triggeredBy = null } =
  * Start every registered job's schedule (call once after DB connect).
  */
 export const startScheduledJobs = () => {
+  if (String(process.env.RUN_JOBS || "").toLowerCase() === "false") {
+    console.log("[Jobs] RUN_JOBS=false: scheduled jobs disabled on this instance");
+    return;
+  }
   for (const job of jobs.values()) {
     cron.schedule(job.schedule, () => {
       runJob(job.key).catch(() => {});

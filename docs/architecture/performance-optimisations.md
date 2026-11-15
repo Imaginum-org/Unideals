@@ -4,6 +4,8 @@ Goal: make every interaction feel instant, and cut DB calls and infra load so th
 
 Each item lists **what changed**, **why**, and **where**.
 
+The November 2026 pass (job leases, query and index work, deploy steps) is logged in [changelog/2026-11-db-and-jobs-optimisation.md](../changelog/2026-11-db-and-jobs-optimisation.md).
+
 ---
 
 ## 1. Backend: fewer DB calls

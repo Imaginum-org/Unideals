@@ -20,6 +20,7 @@ import {
 } from "../services/auth.service.js";
 import { safeErrorMessage } from "../utils/response.js";
 import escapeHtml from "../utils/escapeHtml.js";
+import { fetchGoogleGender } from "../services/genderRequest.service.js";
 
 const sha256 = (value) =>
   crypto.createHash("sha256").update(String(value)).digest("hex");
@@ -159,7 +160,15 @@ const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_REDIRECT_URI,
 );
 
-const findOrCreateGoogleUser = async (payload) => {
+// Optional: read the Google account's gender (People API) so most Google
+// sign-ups skip the gender question. Off unless GOOGLE_GENDER_SCOPE=true,
+// because Google treats this as a sensitive scope: turn it on only after the
+// OAuth consent screen is verified for it, or users see an "unverified app"
+// warning. One Tap never includes gender; those users pick in the app.
+const GOOGLE_GENDER_SCOPE = "https://www.googleapis.com/auth/user.gender.read";
+const googleGenderEnabled = () => String(process.env.GOOGLE_GENDER_SCOPE || "").toLowerCase() === "true";
+
+const findOrCreateGoogleUser = async (payload, { googleGender = null } = {}) => {
   const email = payload?.email?.toLowerCase();
 
   if (!email) {
@@ -197,8 +206,18 @@ const findOrCreateGoogleUser = async (payload) => {
       is_email_verified: true,
       verifyTokenEmail: "",
       verifyTokenEmailExpiry: null,
+      ...(googleGender
+        ? { gender: googleGender, genderSource: "google", genderUpdatedAt: new Date() }
+        : {}),
     });
   } else {
+    // Gender is set once: Google only fills it in when it was never set.
+    if (googleGender && !user.gender) {
+      user.gender = googleGender;
+      user.genderSource = "google";
+      user.genderUpdatedAt = new Date();
+    }
+
     if (picture && !user.avatar?.url) {
       user.avatar = {
         ...(user.avatar?.toObject?.() || user.avatar || {}),
@@ -435,7 +454,7 @@ export const googleAuthRedirectController = async (req, res) => {
       // "online": we only need the ID token once; never request a Google
       // refresh token we don't store or use.
       access_type: "online",
-      scope: ["openid", "email", "profile"],
+      scope: ["openid", "email", "profile", ...(googleGenderEnabled() ? [GOOGLE_GENDER_SCOPE] : [])],
       prompt: "select_account",
       state,
     });
@@ -498,7 +517,13 @@ export const googleAuthCallbackController = async (req, res) => {
         mobileReturn,
       );
     }
-    const user = await findOrCreateGoogleUser(payload);
+    // Only if the person granted the gender permission on the consent screen.
+    const grantedScopes = String(tokens.scope || "").split(/\s+/);
+    const googleGender =
+      googleGenderEnabled() && grantedScopes.includes(GOOGLE_GENDER_SCOPE)
+        ? await fetchGoogleGender(tokens.access_token)
+        : null;
+    const user = await findOrCreateGoogleUser(payload, { googleGender });
 
     const oauthLoginCode = crypto.randomBytes(32).toString("hex");
     const hashedOauthLoginCode = crypto

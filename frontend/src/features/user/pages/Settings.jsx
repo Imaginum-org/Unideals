@@ -13,7 +13,6 @@ import {
   MapPin,
   Phone,
   Plus,
-  Shield,
   ShieldCheck,
   Trash2,
   User,
@@ -22,7 +21,7 @@ import { uploadImage } from "../../../utils/imageUpload.js";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import { useUser, clearAccountScopedStorage } from "../../../context/useUserContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
-import { logoutUser, resendVerification } from "../../auth/api/authApi";
+import { logoutUser } from "../../auth/api/authApi";
 import { getUserProducts } from "../../product/api/productApi.js";
 import PickupSpotModal from "../components/PickupSpotModal.jsx";
 import AlertDialogDemo from "../components/Deletebutton.jsx";
@@ -40,12 +39,13 @@ import {
   updateAvatar,
   updateProfile,
   removeAvatar,
-  requestGenderChange,
   getGenderChangeStatus,
 } from "../api/userApi";
+import GenderChangeRequest from "../components/GenderChangeRequest.jsx";
+import CollegeVerification from "../components/CollegeVerification.jsx";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
-const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "Verification"];
+const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "College email"];
 
 // Section nav: what each section is for (shown in the sidebar + as the
 // section subtitle).
@@ -54,7 +54,7 @@ const SECTION_META = {
   Security: { icon: Lock, hint: "Password and sign-in" },
   "Pickup Spots": { icon: MapPin, hint: "Where buyers meet you" },
   Chat: { icon: MessageCircle, hint: "Read receipts, typing and wallpaper" },
-  Verification: { icon: BadgeCheck, hint: "Your email verification" },
+  "College email": { icon: BadgeCheck, hint: "Get the verified tick so buyers know you're a real student." },
 };
 
 const formatMemberSince = (date) => {
@@ -78,7 +78,8 @@ function Settings() {
 
   // ?tab=security etc. deep-links straight to a section.
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabSlug = (t) => t.toLowerCase().split(" ").join("-");
+  // "College email" keeps the old ?tab=verification link working.
+  const tabSlug = (t) => (t === "College email" ? "verification" : t.toLowerCase().split(" ").join("-"));
   const activeTab = tabs.find((t) => tabSlug(t) === searchParams.get("tab")) || "Profile";
   const setActiveTab = (tab) => {
     const next = new URLSearchParams(searchParams);
@@ -106,8 +107,7 @@ function Settings() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
   const [genderRequest, setGenderRequest] = useState(null);
-  const [requestedGender, setRequestedGender] = useState("");
-  const [requestSaving, setRequestSaving] = useState(false);
+  const [genderSource, setGenderSource] = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -183,36 +183,31 @@ function Settings() {
     fetchPickupSpots();
   }, [fetchPickupSpots]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await getGenderChangeStatus();
-        if (!cancelled && res.data?.success) setGenderRequest(res.data.genderChangeRequest || null);
-      } catch {
-        // best-effort only
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const handleGenderRequest = async () => {
-    if (!requestedGender || requestSaving) return;
-    setRequestSaving(true);
+  const loadGenderStatus = useCallback(async () => {
     try {
-      const res = await requestGenderChange(requestedGender);
+      const res = await getGenderChangeStatus();
       if (res.data?.success) {
         setGenderRequest(res.data.genderChangeRequest || null);
-        toast.success("Request sent for admin approval.");
-        setRequestedGender("");
-        // Close gender editing so phone/campus stay editable while pending.
-        setEditingField(null);
+        setGenderSource(res.data.genderSource || null);
       }
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Could not send request.");
-    } finally {
-      setRequestSaving(false);
+    } catch {
+      // best-effort only
     }
+  }, []);
+
+  useEffect(() => {
+    loadGenderStatus();
+  }, [loadGenderStatus]);
+
+  // From <GenderChangeRequest>: a sent, cancelled or already-decided request.
+  const handleGenderRequestChange = (next, { refresh = false } = {}) => {
+    if (refresh) {
+      loadGenderStatus();
+      return;
+    }
+    setGenderRequest(next);
+    // Sent or cancelled: close the row so phone/campus stay editable.
+    setEditingField(null);
   };
 
   // Reset all drafts from the saved profile (used when starting / cancelling).
@@ -224,7 +219,6 @@ function Settings() {
         ? userDetails.campus_id?.slug
         : null;
     setCampusSlug(slug || "");
-    setRequestedGender("");
   };
 
   const startEditing = (field) => {
@@ -483,19 +477,6 @@ function Settings() {
     }
   };
 
-  const handleResendVerification = async () => {
-    if (!userDetails?.email) {
-      toast.error("No email on your account");
-      return;
-    }
-    try {
-      await resendVerification({ email: userDetails.email });
-      toast.success("Verification email sent");
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to resend email");
-    }
-  };
-
   const handleLogout = async () => {
     try {
       const res = await logoutUser();
@@ -603,7 +584,7 @@ function Settings() {
         value={activeTab}
         onChange={setActiveTab}
       />
-      <div className="mb-4 hidden lg:block">
+      <div className={cn("mb-4", activeTab === "College email" ? "block" : "hidden lg:block")}>
         <h2 className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-white">{activeTab}</h2>
         <p className="text-[13px] text-slate-500 dark:text-zinc-400">{SECTION_META[activeTab].hint}</p>
       </div>
@@ -738,47 +719,29 @@ function Settings() {
                     ) : (
                       <p className="text-[14px] font-medium capitalize text-slate-900 dark:text-white">{userDetails?.gender || "Not added"}</p>
                     )}
+                    {userDetails?.gender && editingField !== "gender" && genderRequest?.status === "pending" && (
+                      <p className="mt-0.5 text-[12.5px] font-medium text-amber-600 dark:text-amber-400">
+                        {genderRequest.idCardOnFile === false
+                          ? "ID photo expired. Tap Change to send it again."
+                          : `Change to ${genderRequest.requestedGender} is waiting for review`}
+                      </p>
+                    )}
+                    {userDetails?.gender && editingField !== "gender" && genderRequest?.status !== "pending" && genderSource === "google" && (
+                      <p className="mt-0.5 text-[12.5px] text-slate-500 dark:text-zinc-400">From your Google account</p>
+                    )}
                     {userDetails?.gender && editingField === "gender" && (
-                      <div className="mt-2.5 rounded-lg bg-neutral-50 px-3.5 py-3 text-[12.5px] text-slate-600 dark:bg-white/[0.03] dark:text-zinc-300">
-                        Gender is locked after setup. To change it, request admin approval.
-                        {genderRequest?.status === "pending" ? (
-                          <span className="mt-1 block font-semibold text-amber-600 dark:text-amber-400">
-                            Pending approval for “{genderRequest.requestedGender}”.
-                          </span>
-                        ) : (
-                          <>
-                            {genderRequest?.status === "rejected" && (
-                              <span className="mt-1 block font-semibold text-red-600 dark:text-red-400">
-                                Your last request wasn&apos;t approved. You can send a new one.
-                              </span>
-                            )}
-                            <span className="mt-2.5 flex flex-wrap items-center gap-2">
-                              <Select
-                                className="w-48"
-                                value={requestedGender}
-                                onChange={setRequestedGender}
-                                placeholder="Select new gender"
-                                ariaLabel="Requested gender"
-                                options={["male", "female", "other"]
-                                  .filter((g) => g !== userDetails?.gender)
-                                  .map((g) => ({ value: g, label: g.charAt(0).toUpperCase() + g.slice(1) }))}
-                              />
-                              <button type="button" onClick={handleGenderRequest} disabled={!requestedGender || requestSaving} className={btnPrimary}>
-                                <ButtonLoader loading={requestSaving} loadingText="Sending…">
-                                  Request approval
-                                </ButtonLoader>
-                              </button>
-                            </span>
-                          </>
-                        )}
-                      </div>
+                      <GenderChangeRequest
+                        currentGender={userDetails.gender}
+                        request={genderRequest}
+                        onRequestChange={handleGenderRequestChange}
+                      />
                     )}
                   </div>
                 </div>
                 {editingField === "gender" ? (
                   <span className="flex shrink-0 items-center gap-3 pt-5 sm:pt-0">
-                    <button type="button" onClick={cancelEditing} disabled={isSavingProfile || requestSaving} className={mutedBtn}>
-                      Cancel
+                    <button type="button" onClick={cancelEditing} disabled={isSavingProfile} className={mutedBtn}>
+                      {userDetails?.gender ? "Close" : "Cancel"}
                     </button>
                     {!userDetails?.gender && (
                       <button type="button" onClick={() => handleSaveField("gender")} disabled={isSavingProfile || !gender} className={linkBtn}>
@@ -888,25 +851,15 @@ function Settings() {
         />
       )}
 
-      {activeTab === "Verification" && (
-        <Panel title="Email verification">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3.5">
-              <Shield className={cn("h-5 w-5 shrink-0", userDetails?.is_email_verified ? "text-emerald-500" : "text-amber-500")} aria-hidden="true" />
-              <div>
-                <p className="text-[15px] font-semibold text-slate-900 dark:text-white">
-                  {userDetails?.is_email_verified ? "Your email is verified" : "Verification pending"}
-                </p>
-                <p className="text-[13px] text-slate-500 dark:text-zinc-400">{userDetails?.email || "No email on file"}</p>
-              </div>
-            </div>
-            {!userDetails?.is_email_verified && (
-              <button type="button" onClick={handleResendVerification} className={btnPrimary}>
-                Resend verification email
-              </button>
-            )}
-          </div>
-        </Panel>
+      {activeTab === "College email" && (
+        <div className="flex flex-col gap-4 sm:gap-5">
+        <CollegeVerification
+          onVerified={() => {
+            setUserDetails((prev) => (prev ? { ...prev, is_college_verified: true } : prev));
+            updateUserDetails({ is_college_verified: true });
+          }}
+        />
+        </div>
       )}
 
         </div>
