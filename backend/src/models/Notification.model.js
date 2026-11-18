@@ -85,6 +85,9 @@ const notificationSchema = new Schema(
     read_at: { type: Date, default: null },
     // First click on a direct notification (broadcast clicks live on receipts).
     clicked_at: { type: Date, default: null },
+    // Direct only: included in an unread-digest email, so it never counts
+    // toward (or appears in) another one. Reset when a grouped chat row grows.
+    emailed_at: { type: Date, default: null },
     stats: {
       total_sent: { type: Number, default: 0 },
       delivered: { type: Number, default: 0 }, // recipients online at send time

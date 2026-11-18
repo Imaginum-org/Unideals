@@ -31,6 +31,8 @@ const header = (variant) => {
 </td></tr>`;
 };
 
+export const emailHeader = header;
+
 // Hero: soft halo with the illustration + a few sparkles around it.
 const hero = (illustration) => `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 14px;"><tr>

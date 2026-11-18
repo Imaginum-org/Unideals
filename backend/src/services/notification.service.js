@@ -175,7 +175,8 @@ export const notifyNewMessage = async ({ conversationId, senderId, receiverId, s
         is_read: false,
         is_dismissed: { $ne: true },
       },
-      { $set: { message, sent_at: now, expires_at: retentionDate(now) }, $inc: { group_count: 1 } },
+      // emailed_at reset: new messages in an already-emailed thread count again.
+      { $set: { message, sent_at: now, expires_at: retentionDate(now), emailed_at: null }, $inc: { group_count: 1 } },
       { returnDocument: "after" },
     ).lean();
 

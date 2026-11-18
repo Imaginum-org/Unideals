@@ -16,7 +16,7 @@ const getClient = () => {
   return resend;
 };
 
-const sendEmail = async ({ sendTo, subject, html }) => {
+const sendEmail = async ({ sendTo, subject, html, headers }) => {
   if (!sendTo || !subject || !html) {
     throw new Error("Missing email parameters ");
   }
@@ -28,10 +28,16 @@ const sendEmail = async ({ sendTo, subject, html }) => {
       to: sendTo,
       subject: subject,
       html: html,
+      ...(headers && { headers }),
     });
 
     if (error) {
-      throw new Error(error.message || "Email sending failed");
+      // Keep Resend's error name (e.g. "daily_quota_exceeded") so batch
+      // senders can stop instead of burning through the rest of the list.
+      const failure = new Error(error.message || "Email sending failed");
+      failure.code = error.name || null;
+      failure.statusCode = error.statusCode || null;
+      throw failure;
     }
     return data;
   } catch (error) {

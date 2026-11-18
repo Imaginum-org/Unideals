@@ -8,9 +8,14 @@ import {
   dismissNotification,
   registerDevice,
   unregisterDevice,
+  unsubscribeEmailDigest,
 } from "../controllers/notification.controller.js";
 
 const router = express.Router();
+
+// Opened from an email, without a session: authorised by the signed link.
+router.get("/email/unsubscribe", unsubscribeEmailDigest);
+router.post("/email/unsubscribe", unsubscribeEmailDigest);
 
 router.use(auth);
 

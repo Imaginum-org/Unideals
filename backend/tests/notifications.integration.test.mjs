@@ -253,6 +253,148 @@ await test("bad input is rejected and each user keeps at most 10 devices", async
   assert.equal(await DeviceToken.countDocuments({ token: tok(21) }), 1, "newest kept");
 });
 
+console.log("\nEmail alerts (unread digest + staff attention)");
+const mail = await import(B + "src/services/emailAlerts.service.js");
+const { JobState } = await import(B + "src/models/JobRun.model.js");
+// Start clean: everything from the tests above counts as read.
+await Notification.updateMany({}, { $set: { is_read: true } });
+process.env.FRONTEND_URL = "https://unideals.test";
+process.env.ADMIN_FRONTEND_URL = "https://admin.unideals.test";
+process.env.API_PUBLIC_URL = "https://api.unideals.test";
+delete process.env.EMAIL_ALERTS_ENABLED;
+
+const H = 60 * 60 * 1000;
+const t0 = Date.now();
+const at = (hours) => new Date(t0 + hours * H);
+const outbox = [];
+const fakeSend = async (msg) => {
+  outbox.push(msg);
+};
+const opts = (hours, send = fakeSend) => ({ now: at(hours), send, gapMs: 0 });
+const unread = (user, count, hoursAgoFrom, { groupCount = 1, type = "order" } = {}) =>
+  Notification.insertMany(
+    Array.from({ length: count }, (_, i) => ({
+      title: `Update ${i}`, message: "Something happened", type, is_broadcast: false,
+      recipient_id: user._id, status: "sent", sent_at: at(hoursAgoFrom), is_read: false, group_count: groupCount,
+    })),
+  );
+const mailsTo = (user) => outbox.filter((m) => m.sendTo === user.email);
+
+const heavy = await mkUser({ name: "Hana Heavy" });
+const light = await mkUser({ name: "Lee Light" });
+const fresh = await mkUser({ name: "Fay Fresh" });
+await unread(heavy, 5, 0); // 5 items, sitting since t0
+await unread(light, 4, 0); // below the threshold
+await unread(fresh, 6, 20); // piled up, but only 10h old at the t0+30h run
+
+await test("off unless EMAIL_ALERTS_ENABLED=true", async () => {
+  assert.deepEqual(await mail.sendUnreadDigests(opts(30)), { sent: 0 });
+  assert.equal(outbox.length, 0);
+  process.env.EMAIL_ALERTS_ENABLED = "true";
+});
+
+await test("digest goes only to users with 5+ unread items that sat a day", async () => {
+  const result = await mail.sendUnreadDigests(opts(30));
+  assert.equal(result.sent, 1);
+  assert.equal(mailsTo(heavy).length, 1);
+  assert.equal(mailsTo(light).length, 0, "4 items is below the threshold");
+  assert.equal(mailsTo(fresh).length, 0, "not unread long enough yet");
+  const msg = mailsTo(heavy)[0];
+  assert.match(msg.subject, /5 unread updates/);
+  assert.match(msg.html, /Hi Hana/);
+  assert.match(msg.html, /https:\/\/unideals\.test\/notification/);
+  assert.match(msg.headers["List-Unsubscribe"], /api\.unideals\.test\/api\/notifications\/email\/unsubscribe\?u=/);
+  assert.equal(await Notification.countDocuments({ recipient_id: heavy._id, emailed_at: { $ne: null } }), 5);
+});
+
+await test("emailed items never count again, and the cooldown holds for 3 days", async () => {
+  outbox.length = 0;
+  await mail.sendUnreadDigests(opts(30 + 24 * 4));
+  assert.equal(mailsTo(heavy).length, 0, "same 5 items are not re-sent");
+  await unread(heavy, 5, 31);
+  await mail.sendUnreadDigests(opts(60)); // new pile, but only 30h after the last email
+  assert.equal(mailsTo(heavy).length, 0, "cooldown");
+  await mail.sendUnreadDigests(opts(30 + 24 * 3 + 1));
+  assert.equal(mailsTo(heavy).length, 1, "after the cooldown, the new items are sent");
+});
+
+await test("chat messages count individually via group_count", async () => {
+  outbox.length = 0;
+  const chatty = await mkUser({ name: "Cho" });
+  await unread(chatty, 1, 200, { groupCount: 7, type: "message" });
+  await mail.sendUnreadDigests(opts(230));
+  assert.equal(mailsTo(chatty).length, 1);
+  assert.match(mailsTo(chatty)[0].subject, /7 unread updates/);
+});
+
+await test("daily cap limits digests per rolling 24h", async () => {
+  outbox.length = 0;
+  process.env.EMAIL_DIGEST_DAILY_CAP = "1";
+  const a = await mkUser();
+  const b = await mkUser();
+  await unread(a, 6, 300);
+  await unread(b, 6, 300);
+  const first = await mail.sendUnreadDigests(opts(330));
+  assert.equal(first.sent, 1);
+  const second = await mail.sendUnreadDigests(opts(340)); // same 24h window: budget used up
+  assert.equal(second.sent, 0);
+  assert.equal(mailsTo(a).length + mailsTo(b).length, 1, "only one of the two eligible users");
+  delete process.env.EMAIL_DIGEST_DAILY_CAP;
+});
+
+await test("a quota error stops the batch and releases the claim", async () => {
+  outbox.length = 0;
+  const q = await mkUser();
+  await unread(q, 6, 400);
+  let calls = 0;
+  const quotaSend = async () => {
+    calls += 1;
+    throw Object.assign(new Error("quota"), { code: "daily_quota_exceeded" });
+  };
+  const result = await mail.sendUnreadDigests(opts(430, quotaSend));
+  assert.equal(calls, 1, "stopped after the first quota error");
+  assert.equal(result.sent, 0);
+  const user = await User.findById(q._id).lean();
+  assert.equal(user.email_digest_sent_at, null, "claim released, retried next run");
+  assert.equal(await Notification.countDocuments({ recipient_id: q._id, emailed_at: { $ne: null } }), 0);
+});
+
+await test("signed unsubscribe link opts the user out; bad links don't", async () => {
+  outbox.length = 0;
+  const u = await mkUser();
+  await unread(u, 6, 500);
+  await mail.sendUnreadDigests(opts(530));
+  const link = new URL(mailsTo(u)[0].headers["List-Unsubscribe"].slice(1, -1));
+  assert.equal(link.searchParams.get("u"), String(u._id));
+  const sig = link.searchParams.get("t");
+  assert.equal(await mail.unsubscribeFromDigest(String(u._id), sig.slice(0, -1) + "x"), false);
+  assert.equal(await mail.unsubscribeFromDigest(String(seller._id), sig), false, "signature is per user");
+  assert.equal(await mail.unsubscribeFromDigest(String(u._id), sig), true);
+  assert.equal((await User.findById(u._id).lean()).email_digest_enabled, false);
+  outbox.length = 0;
+  await unread(u, 6, 600);
+  await mail.sendUnreadDigests(opts(630));
+  assert.equal(mailsTo(u).length, 0, "opted out");
+});
+
+await test("staff alert: admins emailed once a day when the queue reaches 10", async () => {
+  outbox.length = 0;
+  const admin = await mkUser({ name: "Ada Admin", role: "admin" });
+  await JobState.insertMany(Array.from({ length: 9 }, (_, i) => ({ key: `t-${i}`, last_status: "failed" })));
+  await mail.sendStaffAttentionAlerts(opts(0));
+  assert.equal(mailsTo(admin).length, 0, "9 is below the threshold");
+  await JobState.create({ key: "t-9", last_status: "failed" });
+  await mail.sendStaffAttentionAlerts(opts(0));
+  assert.equal(mailsTo(admin).length, 1);
+  assert.match(mailsTo(admin)[0].subject, /10 items need attention/);
+  assert.match(mailsTo(admin)[0].html, /Background jobs failing/);
+  assert.ok(!outbox.some((m) => m.sendTo === seller.email), "regular users never get staff alerts");
+  await mail.sendStaffAttentionAlerts(opts(5));
+  assert.equal(mailsTo(admin).length, 1, "max once a day");
+  await mail.sendStaffAttentionAlerts(opts(25));
+  assert.equal(mailsTo(admin).length, 2);
+});
+
 await mongoose.disconnect();
 await mongod.stop();
 console.log(`\n${passed} passed, ${failed} failed`);

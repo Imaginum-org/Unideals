@@ -228,6 +228,14 @@ const userSchema = new Schema(
       default: null,
     },
 
+    // "You have unread notifications" email (services/emailAlerts.service.js).
+    // Opt-out via the signed link in the email; sent_at drives the cooldown
+    // and the shared daily cap that protects the Resend free quota.
+    email_digest_enabled: { type: Boolean, default: true },
+    email_digest_sent_at: { type: Date, default: null },
+    // Staff only: last "admin queue needs attention" email.
+    staff_alert_sent_at: { type: Date, default: null },
+
     subscription_details: {
       type: Schema.Types.ObjectId,
       ref: "Subscription",

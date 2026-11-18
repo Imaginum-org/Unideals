@@ -118,7 +118,10 @@ Ordered by impact.
 
 1. **No system (OS) push.** Users who close the tab learn about offers, deals and messages only when they come back. This is the biggest product gap for a marketplace. See §8.
 2. **No user preferences.** No per-category mute (e.g. turn off promotions but keep deal updates), no quiet hours, no unsubscribe. This is needed before push or email: without it, push opt-outs will be high.
-3. **No email fallback or digest.** Resend is already a dependency (auth emails). An "unread for 24h → email" digest for deal events would recover inactive users.
+3. ~~**No email fallback or digest.**~~ Done in `services/emailAlerts.service.js` + `jobs/emailAlerts.job.js` (off unless `EMAIL_ALERTS_ENABLED=true`):
+   - **Unread digest** (daily, 13:30 UTC): users with ≥ `EMAIL_DIGEST_MIN_UNREAD` (default 5) unread *direct* items (chat messages counted via `group_count`), the oldest unread for ≥ 24h, within the last 7 days. Campaigns are excluded. Per-user cooldown 3 days; items get `emailed_at` and never count twice. Signed one-click unsubscribe (`/api/notifications/email/unsubscribe`) sets `User.email_digest_enabled=false`.
+   - **Staff attention alert** (hourly check): when pending reports + gender requests + auto-hidden listings + failing jobs ≥ `STAFF_ALERT_THRESHOLD` (default 10), each admin gets at most one email a day.
+   - **Quota:** Resend free = 100/day, 3,000/month, shared with verification/reset emails. Digests are capped at `EMAIL_DIGEST_DAILY_CAP` (default 30) per rolling 24h, and a batch stops at the first quota/rate-limit error. Still missing: a Settings toggle to turn the digest back on after unsubscribing.
 4. **Single-instance realtime.** Socket.IO has no Redis adapter. With more than one backend instance, emits and `delivered` counts only cover users on the same instance. Add `@socket.io/redis-adapter` before scaling out.
 5. **Missing triggers:** subscription expiring/expired, boost ending, new review on a seller, stale-deal follow-ups (`GET /api/deals/pending-followups` exists but nothing sends them), account suspension, role demotion or admin promotion.
 6. **Feed has no pagination.** It is capped at 50 + 50 with no "load more", and there is no lightweight unread-count endpoint (the bell loads the whole feed).

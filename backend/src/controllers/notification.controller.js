@@ -1,6 +1,7 @@
 import * as notificationService from "../services/notification.service.js";
 import { registerDeviceToken, unregisterDeviceToken } from "../services/push.service.js";
 import { forwardServiceError } from "../utils/response.js";
+import { unsubscribeFromDigest } from "../services/emailAlerts.service.js";
 import { isCampusInScope } from "../services/campusScope.service.js";
 
 // Campus-limited staff can only reach (and see) their own campuses.
@@ -241,6 +242,31 @@ export const adminEstimateRecipients = async (req, res, next) => {
       message: "Recipient estimate calculated",
       data: { count },
     });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// ==================== EMAIL DIGEST UNSUBSCRIBE ====================
+
+const unsubscribePage = (ok) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unideals emails</title></head>
+<body style="margin:0;font-family:'Segoe UI',Arial,sans-serif;background:#F5F6FF;color:#11183D;">
+<div style="max-width:420px;margin:15vh auto;padding:28px 24px;background:#fff;border:1px solid #E8EAFE;border-radius:14px;text-align:center;">
+<h1 style="font-size:20px;margin:0 0 8px;">${ok ? "You're unsubscribed" : "This link isn't valid"}</h1>
+<p style="font-size:14px;line-height:1.6;color:#596785;margin:0;">${
+  ok
+    ? "You won't get unread-notification emails anymore. Account emails like password resets still arrive."
+    : "It may have been copied incompletely. Try the link from the email again."
+}</p></div></body></html>`;
+
+// GET (link click) and POST (RFC 8058 one-click from the mail client)
+// /api/notifications/email/unsubscribe?u=<userId>&t=<signature>. No login:
+// the HMAC signature in the link is the authorisation.
+export const unsubscribeEmailDigest = async (req, res, next) => {
+  try {
+    const ok = await unsubscribeFromDigest(String(req.query.u || ""), String(req.query.t || ""));
+    if (req.method === "POST") return res.status(ok ? 200 : 400).json({ success: ok });
+    return res.status(ok ? 200 : 400).type("html").send(unsubscribePage(ok));
   } catch (error) {
     forwardServiceError(error, next);
   }
