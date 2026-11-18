@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Check, ChevronsRight } from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Check, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useGirlsMode } from "../../context/GirlsModeContext.jsx";
 import { useUser } from "../../context/useUserContext.jsx";
 import { cn } from "../../utils/cn.js";
@@ -19,6 +19,11 @@ import { cn } from "../../utils/cn.js";
  * - The switch drives the page's audience-tab handler (`tab` / `onChange`),
  *   so theme + feed flip together, including a reliable OFF.
  * - The wrapper is click-through (see comment in render).
+ * - The handle is draggable: up/down along the edge, and across the screen
+ *   to snap onto the left or right edge (nearest wins). The spot is saved in
+ *   localStorage and clamped clear of the header, the phone tab bar and the
+ *   AI assistant launcher (bottom-right). A tap without movement still
+ *   toggles the panel.
  */
 
 /** Cherry-blossom mark: 5 soft petals, rosy centre, golden stamens. */
@@ -174,7 +179,7 @@ const PERKS = [
 
 const PANEL_WIDTH = 304;
 // Phones: a compact panel (never wider than ~82% of the screen) docked
-// just above the bottom tab bar, within thumb reach.
+// just above the AI assistant launcher, within thumb reach.
 const COMPACT_QUERY = "(max-width: 639.98px)";
 const compactWidth = () =>
   typeof window === "undefined" ? 264 : Math.min(264, Math.round(window.innerWidth * 0.82));
@@ -190,6 +195,57 @@ const useCompact = () => {
     return () => mq.removeEventListener("change", on);
   }, []);
   return compact;
+};
+
+// ---------- Drag-to-move ----------
+const POS_KEY = "cm:girlsHandlePos";
+const DRAG_THRESHOLD = 6; // px of movement before a press becomes a drag
+const EDGE_GAP = 12;
+// Clearance kept above the AI assistant launcher on the right edge
+// (FloatingAssistant: 56px button at tabbar + 0.75rem on phones, 1.5rem on
+// larger screens), plus a small gap.
+const LAUNCHER_CLEAR_COMPACT = 88;
+const LAUNCHER_CLEAR = 96;
+
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+const readSavedPos = () => {
+  try {
+    const p = JSON.parse(window.localStorage.getItem(POS_KEY) || "null");
+    if ((p?.side === "left" || p?.side === "right") && Number.isFinite(p?.ratio)) {
+      return { side: p.side, ratio: clamp(p.ratio, 0, 1) };
+    }
+  } catch {
+    /* storage unavailable — fall back to the default spot */
+  }
+  return null;
+};
+
+const savePos = (pos) => {
+  try {
+    window.localStorage.setItem(POS_KEY, JSON.stringify(pos));
+  } catch {
+    /* ignore */
+  }
+};
+
+/** Resolves a CSS length (e.g. "var(--tabbar-h)") to px via a probe element. */
+const cssPx = (value) => {
+  const probe = document.createElement("div");
+  probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;height:${value}`;
+  document.body.appendChild(probe);
+  const px = probe.offsetHeight;
+  probe.remove();
+  return px;
+};
+
+/** Allowed range for the handle's top edge (viewport px). */
+const verticalBounds = (vp, side, handleH, compact) => {
+  const min = vp.header + EDGE_GAP;
+  const bottomClear =
+    side === "right" ? (compact ? LAUNCHER_CLEAR_COMPACT : LAUNCHER_CLEAR) : EDGE_GAP;
+  const max = Math.max(min, vp.h - vp.tabbar - bottomClear - handleH);
+  return { min, max };
 };
 
 // Session-only memory of a manual collapse. Lives in module scope, so it
@@ -261,7 +317,130 @@ export default function GirlsEntryPill({ tab, onChange, resetOnMount = false }) 
     return () => document.removeEventListener("pointerdown", onDown);
   }, [expanded, compact]);
 
+  // ---------- Drag-to-move ----------
+  const prefersReducedMotion = useReducedMotion();
+  // null = default spot (CSS classes below); otherwise a saved edge + top.
+  const [pos, setPos] = useState(() => (typeof window === "undefined" ? null : readSavedPos()));
+  const [dragOffset, setDragOffset] = useState(null); // live {x, y} while dragging
+  const [handleH, setHandleH] = useState(0);
+  const [viewport, setViewport] = useState(null);
+  const dragRef = useRef(null);
+  const suppressClickRef = useRef(false);
+  const snapFromRef = useRef(null);
+
+  // Viewport + chrome sizes (header / tab bar vary by breakpoint & page).
+  useLayoutEffect(() => {
+    if (!eligible) return undefined;
+    const measure = () =>
+      setViewport({
+        h: window.innerHeight,
+        header: cssPx("var(--header-h, 0px)"),
+        tabbar: cssPx("var(--tabbar-h, 0px)"),
+      });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [eligible]);
+
+  // Handle height (changes with compact size and the "on" dot).
+  useLayoutEffect(() => {
+    const el = handleRef.current;
+    if (!eligible || !el) return undefined;
+    const measure = () => setHandleH(el.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [eligible]);
+
+  // FLIP: glide from the drop point to the snapped spot.
+  useLayoutEffect(() => {
+    const from = snapFromRef.current;
+    snapFromRef.current = null;
+    if (!from || prefersReducedMotion) return;
+    const to = handleRef.current?.getBoundingClientRect();
+    if (!to || !rootRef.current?.animate) return;
+    rootRef.current.animate(
+      [
+        { transform: `translate(${from.left - to.left}px, ${from.top - to.top}px)` },
+        { transform: "translate(0px, 0px)" },
+      ],
+      { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+    );
+  }, [pos, prefersReducedMotion]);
+
   if (!eligible) return null;
+
+  const onHandlePointerDown = (event) => {
+    if (event.button !== 0) return;
+    dragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+  };
+
+  const onHandlePointerMove = (event) => {
+    const d = dragRef.current;
+    if (!d || d.id !== event.pointerId) return;
+    const dx = event.clientX - d.x;
+    const dy = event.clientY - d.y;
+    if (!d.moved) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      d.moved = true;
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      if (expanded) setExpanded(false);
+    }
+    setDragOffset({ x: dx, y: dy });
+  };
+
+  const onHandlePointerUp = (event) => {
+    const d = dragRef.current;
+    if (!d || d.id !== event.pointerId) return;
+    dragRef.current = null;
+    if (!d.moved) return;
+    // Swallow the click that follows a drag (reset next tick in case the
+    // pointer was released off the button and no click fires).
+    suppressClickRef.current = true;
+    setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+    const rect = handleRef.current.getBoundingClientRect();
+    const side = rect.left + rect.width / 2 < window.innerWidth / 2 ? "left" : "right";
+    const vp = viewport ?? { h: window.innerHeight, header: 0, tabbar: 0 };
+    const { min, max } = verticalBounds(vp, side, rect.height, compact);
+    const next = { side, ratio: clamp(rect.top, min, max) / vp.h };
+    snapFromRef.current = { left: rect.left, top: rect.top };
+    setDragOffset(null);
+    setPos(next);
+    savePos(next);
+  };
+
+  const onHandleClick = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    setExpanded((v) => !v);
+  };
+
+  const isLeft = pos?.side === "left";
+  const dragging = dragOffset !== null;
+
+  // Placement: default spot via classes until the user drags it somewhere.
+  // A custom spot in the lower half anchors by the bottom so the open panel
+  // grows upward and stays on screen.
+  let alignEnd = compact;
+  let placementClass = compact ? "bottom-[calc(var(--tabbar-h)+5.5rem)]" : "top-[20%]";
+  const placementStyle = {};
+  if (pos && viewport && handleH) {
+    const { min, max } = verticalBounds(viewport, pos.side, handleH, compact);
+    const top = clamp(pos.ratio * viewport.h, min, max);
+    alignEnd = top + handleH / 2 > viewport.h / 2;
+    placementClass = null;
+    if (alignEnd) placementStyle.bottom = viewport.h - top - handleH;
+    else placementStyle.top = top;
+  }
+  if (dragging) {
+    placementStyle.transform = `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`;
+  }
 
   const handleSwitch = (event) => {
     if (typeof document !== "undefined") {
@@ -282,31 +461,47 @@ export default function GirlsEntryPill({ tab, onChange, resetOnMount = false }) 
     <div
       ref={rootRef}
       className={cn(
-        "pointer-events-none fixed right-0 z-40 font-figtree",
-        compact ? "bottom-[calc(var(--tabbar-h)+1rem)]" : "top-[20%]",
+        "pointer-events-none fixed z-40 font-figtree",
+        isLeft ? "left-0" : "right-0",
+        // Default phone spot sits above the floating AI assistant launcher
+        // (56px button at tabbar + 0.75rem) so the two never overlap.
+        placementClass,
       )}
+      style={placementStyle}
     >
       <motion.div
+        // Remount on side change so the slide offset doesn't animate across.
+        key={isLeft ? "left" : "right"}
         initial={false}
-        animate={{ x: expanded ? 0 : panelWidth }}
+        animate={{ x: expanded ? 0 : isLeft ? -panelWidth : panelWidth }}
         transition={{ type: "spring", stiffness: 340, damping: 34 }}
-        className={cn("flex", compact ? "items-end" : "items-start")}
+        className={cn("flex", isLeft && "flex-row-reverse", alignEnd ? "items-end" : "items-start")}
       >
-        {/* ---------- Edge handle ---------- */}
+        {/* ---------- Edge handle (tap: open/close · drag: move) ---------- */}
         <button
           ref={handleRef}
           type="button"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={onHandleClick}
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerUp}
           aria-expanded={expanded}
           aria-controls="girls-mode-panel"
           aria-label={expanded ? "Collapse Girl Mode panel" : "Open Girl Mode panel"}
+          title="Tap to open · drag to move"
           className={cn(
-            "pointer-events-auto relative flex shrink-0 flex-col items-center rounded-l-2xl transition-[box-shadow,transform]",
+            "pointer-events-auto relative flex shrink-0 touch-none select-none flex-col items-center transition-[box-shadow,transform]",
+            isLeft ? "rounded-r-2xl hover:translate-x-0.5" : "rounded-l-2xl hover:-translate-x-0.5",
+            dragging ? "cursor-grabbing" : "cursor-grab",
             compact ? "w-8 gap-1.5 py-2.5" : "w-10 gap-2 py-3",
-            " duration-200 hover:-translate-x-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#131313]",
+            " duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#131313]",
             isOn
               ? "bg-gradient-to-b from-[#F472B6] to-[#DB2777] text-white shadow-[0_12px_30px_-10px_rgba(219,39,119,0.75)]"
-              : "border border-r-0 border-pink-200 bg-white text-[#DB2777] shadow-[0_12px_30px_-12px_rgba(219,39,119,0.5)] dark:border-pink-900/60 dark:bg-[#1A1D20] dark:text-pink-300",
+              : cn(
+                  "border border-pink-200 bg-white text-[#DB2777] shadow-[0_12px_30px_-12px_rgba(219,39,119,0.5)] dark:border-pink-900/60 dark:bg-[#1A1D20] dark:text-pink-300",
+                  isLeft ? "border-l-0" : "border-r-0",
+                ),
           )}
         >
           <FlowerIcon size={compact ? 17 : 22} onDark={isOn} />
@@ -332,8 +527,14 @@ export default function GirlsEntryPill({ tab, onChange, resetOnMount = false }) 
           aria-label="Girl Mode"
           aria-hidden={!expanded}
           className={cn(
-            "shrink-0 overflow-hidden border border-r-0",
-            compact ? "rounded-l-2xl" : "rounded-bl-3xl",
+            "shrink-0 overflow-hidden border",
+            isLeft ? "border-l-0" : "border-r-0",
+            // Round the outer corners; the one level with the handle stays square.
+            compact
+              ? isLeft ? "rounded-r-2xl" : "rounded-l-2xl"
+              : alignEnd
+                ? isLeft ? "rounded-tr-3xl" : "rounded-tl-3xl"
+                : isLeft ? "rounded-br-3xl" : "rounded-bl-3xl",
             " border-pink-100 bg-white shadow-[0_20px_44px_-12px_rgba(157,23,77,0.28)] transition-opacity duration-200 dark:border-pink-950/70 dark:bg-[#1A1D20] dark:shadow-[0_20px_44px_-12px_rgba(0,0,0,0.6)]",
             expanded ? "opacity-100" : "opacity-0",
           )}
@@ -361,7 +562,11 @@ export default function GirlsEntryPill({ tab, onChange, resetOnMount = false }) 
               aria-label="Collapse Girl Mode panel"
               className="absolute right-2.5 top-2.5 z-10 grid h-7 w-7 place-items-center rounded-full bg-white/75 text-[#9D174D] shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 dark:bg-white/10 dark:text-pink-100 dark:hover:bg-white/20"
             >
-              <ChevronsRight className="h-4 w-4" strokeWidth={2.4} />
+              {isLeft ? (
+                <ChevronsLeft className="h-4 w-4" strokeWidth={2.4} />
+              ) : (
+                <ChevronsRight className="h-4 w-4" strokeWidth={2.4} />
+              )}
             </button>
           </div>
 
