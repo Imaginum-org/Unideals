@@ -52,6 +52,14 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const isQuotaError = (error) => QUOTA_ERRORS.has(error?.code) || error?.statusCode === 429;
 const firstUrl = (value) => String(value || "").split(",")[0].trim().replace(/\/+$/, "");
 
+// Why a run sent nothing, shown on the admin Background Jobs page. A string,
+// so jobRegistry's didWork() ignores it and frequent runs don't flood history.
+const skipReason = (cfg, urlVar, url) => {
+  if (!cfg.enabled) return "Email alerts are off (EMAIL_ALERTS_ENABLED is not true)";
+  if (!url) return `${urlVar} is not set`;
+  return null;
+};
+
 // Lazy: config/sendEmail.js throws at import time without RESEND_API_KEY.
 const defaultSend = async (message) => (await import("../config/sendEmail.js")).default(message);
 
@@ -150,11 +158,12 @@ const digestEmail = ({ user, items, rowCount, rows, frontendUrl }) => {
 export const sendUnreadDigests = async ({ now = new Date(), send = defaultSend, gapMs = SEND_GAP_MS } = {}) => {
   const cfg = config();
   const frontendUrl = firstUrl(process.env.FRONTEND_URL);
-  if (!cfg.enabled || !frontendUrl) return { sent: 0 };
+  const digestSkip = skipReason(cfg, "FRONTEND_URL", frontendUrl);
+  if (digestSkip) return { sent: 0, skipped: digestSkip };
 
   const sentLastDay = await User.countDocuments({ email_digest_sent_at: { $gt: new Date(now - DAY) } });
   const budget = cfg.digestDailyCap - sentLastDay;
-  if (budget <= 0) return { sent: 0, budgetLeft: 0 };
+  if (budget <= 0) return { sent: 0, budgetLeft: 0, skipped: "Daily digest cap reached" };
 
   const since = new Date(now - DIGEST_WINDOW_MS);
   const cooldownCut = new Date(now - DIGEST_COOLDOWN_MS);
@@ -260,11 +269,14 @@ export const getAttentionTotals = async () => {
 export const sendStaffAttentionAlerts = async ({ now = new Date(), send = defaultSend, gapMs = SEND_GAP_MS } = {}) => {
   const cfg = config();
   const adminUrl = firstUrl(process.env.ADMIN_FRONTEND_URL);
-  if (!cfg.enabled || !adminUrl) return { sent: 0 };
+  const staffSkip = skipReason(cfg, "ADMIN_FRONTEND_URL", adminUrl);
+  if (staffSkip) return { sent: 0, skipped: staffSkip };
 
   const counts = await getAttentionTotals();
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
-  if (total < cfg.staffThreshold) return { sent: 0 };
+  if (total < cfg.staffThreshold) {
+    return { sent: 0, skipped: `Queue below threshold (${total} of ${cfg.staffThreshold})` };
+  }
 
   const offCooldown = [{ staff_alert_sent_at: null }, { staff_alert_sent_at: { $lte: new Date(now - STAFF_COOLDOWN_MS) } }];
   const admins = await User.find({

@@ -232,7 +232,9 @@ export const getUserDetails = async (userId) => {
 
   const [user, listingsCount, recentProducts, reportCount] = await Promise.all([
     User.findOne({ _id: userId, role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] } })
-      .select("name email avatar mobile gender role status campus_id subscription createdAt last_login_date gamification")
+      .select(
+        "name email avatar mobile gender genderSource role status campus_id subscription createdAt last_login_date gamification is_college_verified college_verified_at email_digest_enabled email_digest_sent_at",
+      )
       .populate("campus_id", "name short_name slug")
       .lean(),
     Product.countDocuments({ seller_id: userId, is_deleted: false }),
@@ -253,9 +255,16 @@ export const getUserDetails = async (userId) => {
     avatar: user.avatar,
     mobile: user.mobile,
     gender: user.gender,
+    genderSource: user.genderSource || null,
     role: user.role,
     status: user.status,
     subscription: user.subscription,
+    // Verified tick only; the college address itself is never shown to staff.
+    isCollegeVerified: Boolean(user.is_college_verified),
+    collegeVerifiedAt: user.college_verified_at || null,
+    // Unread-notification email digest (emailAlerts.service.js).
+    emailDigestEnabled: user.email_digest_enabled !== false,
+    emailDigestSentAt: user.email_digest_sent_at || null,
     campus: user.campus_id
       ? {
           id: user.campus_id._id?.toString(),

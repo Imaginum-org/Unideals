@@ -288,7 +288,9 @@ await unread(light, 4, 0); // below the threshold
 await unread(fresh, 6, 20); // piled up, but only 10h old at the t0+30h run
 
 await test("off unless EMAIL_ALERTS_ENABLED=true", async () => {
-  assert.deepEqual(await mail.sendUnreadDigests(opts(30)), { sent: 0 });
+  const off = await mail.sendUnreadDigests(opts(30));
+  assert.equal(off.sent, 0);
+  assert.match(off.skipped, /EMAIL_ALERTS_ENABLED/, "the admin Jobs page shows why nothing was sent");
   assert.equal(outbox.length, 0);
   process.env.EMAIL_ALERTS_ENABLED = "true";
 });
