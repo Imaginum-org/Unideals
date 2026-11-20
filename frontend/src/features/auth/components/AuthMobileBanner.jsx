@@ -32,10 +32,10 @@ function AuthMobileBanner({ taglines = defaultTaglines }) {
   }, [taglineKey]);
 
   return (
-    <div className="mt-[3vh] flex shrink-0 flex-col items-center gap-3 sm:mt-[4vh] md:hidden font-figtree">
+    <div className="mt-5 flex shrink-0 flex-col items-center gap-3 px-6 font-figtree md:hidden">
       <p
-        className={`text-center text-[0.8rem] font-medium transition-opacity duration-300 sm:text-[0.75rem] ${
-          fade ? "opacity-90" : "opacity-0"
+        className={`text-center text-[0.9375rem] font-medium tracking-[-0.01em] text-white transition-all duration-300 ${
+          fade ? "translate-y-0 opacity-95" : "translate-y-1 opacity-0"
         }`}
       >
         {taglines[currentIndex]}
@@ -46,7 +46,7 @@ function AuthMobileBanner({ taglines = defaultTaglines }) {
           <span
             key={tagline}
             className={`h-0.5 rounded-full transition-all duration-300 ${
-              currentIndex === index ? "w-7 bg-[#F7F8FA]" : "w-3 bg-[#F7F8FA]/50"
+              currentIndex === index ? "w-6 bg-white" : "w-2 bg-white/45"
             }`}
           />
         ))}

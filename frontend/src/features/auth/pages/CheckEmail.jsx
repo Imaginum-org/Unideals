@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { checkEmailVerification, resendVerification } from "../api/authApi";
-import checkemailicon from "/checkemailicon.webp";
-import { ArrowLeft, OctagonAlert, Pencil } from "lucide-react";
-import AuthPageRightPart from "../components/AuthPageRightPart";
+import { Check, Lightbulb, Mail, MailCheck, Pencil } from "lucide-react";
+import AuthShell from "../components/AuthShell.jsx";
 import AuthMessageBanner from "../components/AuthMessageBanner";
-import AuthMobileBanner from "../components/AuthMobileBanner";
-import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
+import {
+  AuthBackLink,
+  AuthField,
+  AuthHeading,
+  AuthPrimaryButton,
+  AuthStatusIcon,
+  OpenMailButton,
+  authLinkClass,
+} from "../components/AuthUI.jsx";
+import { formatTimer, getMailProvider } from "../utils/mailProvider.js";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
@@ -29,12 +36,6 @@ function CheckEmail() {
   const [formMessage, setFormMessage] = useState(null);
 
   const clearFormMessage = () => setFormMessage(null);
-
-  const formatTimer = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -155,144 +156,128 @@ function CheckEmail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollCount]);
 
+  const shownEmail = emailInput.trim();
+  const provider = getMailProvider(shownEmail);
+  const autoChecking = Boolean(shownEmail) && pollCount < 3 && formMessage?.variant !== "success";
+
   return (
-    <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-[#F7F8FA] dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden">
-      {/* ── LEFT PANEL ── */}
-      <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#F7F8FA] font-figtree dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
-        <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-[#F7F8FA] dark:md:bg-[#131313] md:text-[#111827]">
-          <div className="flex shrink-0 items-center justify-center mt-[3.5vh] sm:mt-[4vh] md:justify-start md:mt-2 md:pl-4 xl:mt-4 xl:pl-7">
-            <AuthBrandLogo />
+    <AuthShell>
+      <div className="auth-stagger text-center">
+        <AuthStatusIcon icon={MailCheck} />
+
+        <AuthHeading
+          align="center"
+          title="Verify your email"
+          subtitle="We’ve sent a verification link to the address below. Open it to confirm your account."
+          className="mb-5"
+        />
+
+        {isEditingEmail ? (
+          <form
+            className="flex items-start gap-2 text-left"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (emailInput.trim()) setIsEditingEmail(false);
+            }}
+          >
+            <AuthField
+              className="flex-1"
+              icon={Mail}
+              label="Email address"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={emailInput}
+              maxLength={254}
+              autoFocus
+              onChange={(e) => {
+                setEmailInput(e.target.value);
+                clearFormMessage();
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!emailInput.trim()}
+              aria-label="Save email"
+              className="grid size-[3.25rem] shrink-0 place-items-center rounded-xl bg-[#393AF2] text-white transition hover:bg-[#2F30E0] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#393AF2]/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Check className="size-5" strokeWidth={2.6} />
+            </button>
+          </form>
+        ) : (
+          <div className="mx-auto flex max-w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white py-2 pl-4 pr-2 dark:border-white/10 dark:bg-[#1b1c20]">
+            <span className="min-w-0 truncate text-[0.9375rem] font-semibold text-slate-900 dark:text-white">
+              {shownEmail || "No email yet"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsEditingEmail(true)}
+              aria-label="Change email"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.8125rem] font-semibold text-[#393AF2] transition hover:bg-[#393AF2]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#393AF2]/40 dark:text-[#9A9BFF] dark:hover:bg-white/5"
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Change
+            </button>
           </div>
+        )}
 
-          <AuthMobileBanner />
+        {formMessage ? (
+          <AuthMessageBanner variant={formMessage.variant} className="mt-4 text-left">
+            {formMessage.text}
+          </AuthMessageBanner>
+        ) : null}
 
-          <div className="flex min-h-0 flex-1 items-end justify-center md:items-center">
-            <div className="w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-hidden md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:py-0 md:shadow-none">
-              <div className="flex flex-col items-center text-center">
-                <div className="mb-[1.5vh] flex h-14 w-14 items-center justify-center rounded-full bg-blue-700/10 transition-colors duration-300 dark:bg-blue-500/20 sm:h-16 sm:w-16 md:mb-3 md:h-12 md:w-12 lg:mb-4 xl:mb-[1.9vh] xl:h-14 xl:w-14 2xl:h-16 2xl:w-16">
-                  <img
-                    src={checkemailicon}
-                    alt="Check Email Icon"
-                    className="h-6 w-7 sm:h-7 sm:w-8 md:h-5 md:w-6 lg:h-7 lg::w-8 "
-                  />
-                </div>
-                <h2 className="font-figtree font-semibold leading-snug tracking-normal text-zinc-900 transition-colors duration-300 dark:text-zinc-100 text-[1.25rem] sm:text-[1.125rem] md:text-[1.15rem] lg:text-lg xl:text-[1.45rem] 2xl:text-[1.5rem]">
-                  Check Your Email
-                </h2>
-                <p className="mt-1.5 font-figtree text-[0.75rem] leading-snug text-gray-700 transition-colors duration-300 dark:text-[#D6D6D6] sm:text-[0.8125rem] md:text-[0.72rem] lg:text-xs xl:text-[0.8rem] 2xl:text-[0.85rem]">
-                  We’ve sent a verification link to your email address.
-                  <br className="hidden sm:block" />
-                  Please click the link to confirm your account.
-                </p>
-                {isEditingEmail ? (
-                  <div className="mt-[2.2vh] w-full md:mt-[1.8vh]">
-                    <input
-                      type="email"
-                      value={emailInput}
-                      onChange={(e) => {
-                        setEmailInput(e.target.value);
-                        clearFormMessage();
-                      }}
-                      placeholder="you@college.edu"
-                      maxLength={254}
-                      autoFocus
-                      className="h-10 w-full rounded-xl border border-transparent bg-[#F7F8FA] px-3 text-center text-sm font-semibold text-zinc-900 outline-none transition placeholder:font-normal placeholder:text-gray-400 focus:border-[#393AF2] focus:bg-[#F7F8FA] focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-[#1e1e1e] dark:text-zinc-100 dark:focus:bg-[#1e1e1e] md:text-xs lg:text-[0.8rem]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingEmail(false)}
-                      disabled={!emailInput.trim()}
-                      className="mt-2 text-[0.75rem] font-semibold text-[#393AF2] transition hover:text-[#2426C7] disabled:opacity-50"
-                    >
-                      Done
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-[2.2vh] flex max-w-full items-center gap-2 rounded-xl border border-slate-300/30 bg-slate-100 px-4 py-2 transition-colors duration-300 dark:border-zinc-800 dark:bg-[#1e1e1e] md:mt-[1.8vh]">
-                    <span className="block truncate text-sm font-semibold text-zinc-900 transition-colors duration-300 dark:text-zinc-100 md:text-xs lg:text-[0.8rem] 2xl:text-[0.85rem]">
-                      {emailInput.trim() || "Unknown Email"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingEmail(true)}
-                      aria-label="Change email"
-                      className="flex shrink-0 items-center gap-1 text-[0.7rem] font-semibold text-[#393AF2] transition hover:text-[#2426C7]"
-                    >
-                      <Pencil className="size-3" />
-                      Change
-                    </button>
-                  </div>
-                )}
-              </div>
+        <div className="mt-6 space-y-3">
+          <AuthPrimaryButton
+            type="button"
+            onClick={() => handleVerifyStatus(false)}
+            loading={isChecking}
+            loadingText="Checking…"
+            withArrow={false}
+          >
+            I&apos;ve verified my email
+          </AuthPrimaryButton>
+          {provider ? <OpenMailButton provider={provider} /> : null}
+        </div>
 
-              {formMessage ? (
-                <div className="mt-[2.2vh] md:mt-[1.8vh]">
-                  <AuthMessageBanner variant={formMessage.variant}>
-                    {formMessage.text}
-                  </AuthMessageBanner>
-                </div>
-              ) : null}
+        {autoChecking ? (
+          <p className="mt-3 inline-flex items-center gap-2 text-[0.75rem] text-slate-400 dark:text-zinc-500">
+            <span className="auth-live-dot size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+            Checking automatically…
+          </p>
+        ) : null}
 
-              <div className="mt-[2.2vh] space-y-[2vh] md:mt-[1.8vh] md:space-y-3 lg:mt-3 lg:space-y-3 xl:mt-[2.9vh] xl:space-y-[2.2vh]">
-                <button
-                  onClick={() => handleVerifyStatus(false)}
-                  disabled={isChecking}
-                  className="h-[6.3vh] w-full rounded-lg bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 md:mt-0 md:h-10 md:text-xs lg:h-10 lg:text-sm xl:h-[6.4vh] xl:text-[0.8rem] 2xl:h-[6.4vh] 2xl:text-[0.85rem]"
-                >
-                  {isChecking ? "Checking..." : "Reload / I’ve Verified"}
-                </button>
+        <p className="mt-5 text-[0.875rem] text-slate-500 dark:text-zinc-400">
+          Didn&apos;t receive the email?{" "}
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={isResending || resendCooldown > 0}
+            className={`${authLinkClass} tabular-nums disabled:cursor-not-allowed disabled:text-slate-400 dark:disabled:text-zinc-500`}
+          >
+            {isResending ? (
+              <ButtonLoader loading loadingText="Sending…" />
+            ) : resendCooldown > 0 ? (
+              `Resend in ${formatTimer(resendCooldown)}`
+            ) : (
+              "Resend email"
+            )}
+          </button>
+        </p>
 
-                <div className="flex flex-wrap items-center justify-center gap-1 text-center text-[0.75rem] sm:text-[0.8125rem] md:text-[0.7rem] lg:text-xs xl:text-[0.75rem] 2xl:text-[0.759rem]">
-                  <span className="text-gray-700 transition-colors duration-300 dark:text-gray-400">
-                    Didn’t receive the email?
-                  </span>
-                  <button
-                    onClick={handleResend}
-                    disabled={isResending || resendCooldown > 0}
-                    className="font-semibold text-blue-700 transition-colors hover:text-[#2426C7] disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    {isResending
-                      ? <ButtonLoader loading loadingText="Sending…" />
-                      : resendCooldown > 0
-                        ? `Resend Email (${formatTimer(resendCooldown)})`
-                        : "Resend Email"}
-                  </button>
-                </div>
-                {resendCooldown > 0 ? (
-                  <p className="mt-2 text-center text-[0.7rem] text-gray-500 dark:text-gray-400">
-                    You can resend another verification email in{" "}
-                    {formatTimer(resendCooldown)}.
-                  </p>
-                ) : null}
+        <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-200/70 bg-amber-50/70 p-4 text-left dark:border-amber-500/20 dark:bg-amber-500/[0.07]">
+          <Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
+          <p className="text-[0.8125rem] leading-relaxed text-slate-600 dark:text-zinc-300">
+            Not there after a few minutes? Check your spam folder, and make sure your university
+            firewall isn&apos;t blocking our domain.
+          </p>
+        </div>
 
-                <div className="inline-flex items-start justify-start gap-3 rounded-xl bg-slate-100 p-4 outline outline-1 outline-offset-[-0.0625rem] outline-slate-300/10 transition-colors duration-300 dark:bg-[#1e1e1e] dark:outline-zinc-800 md:p-3 lg:p-4">
-                  <div className="pt-1">
-                    <OctagonAlert className="size-[0.9375rem] text-red-500 dark:text-red-400" />
-                  </div>
-                  <div className="text-xs font-normal leading-5 text-gray-700 transition-colors duration-300 dark:text-gray-300 md:text-[0.7rem] md:leading-4 lg:text-xs lg:leading-5 xl:text-[0.75rem]">
-                    Check your spam folder if you don&apos;t see the message
-                    within a few minutes. Make sure your university firewall
-                    isn&apos;t blocking our domain.
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-[2.7vh] flex items-center justify-center md:mt-[1.8vh] lg:mt-2.5 xl:mt-3.5">
-                <Link
-                  to="/signup"
-                  className="inline-flex items-center gap-1.5 text-[0.75rem] font-medium text-[#393AF2] transition hover:text-[#2426C7] sm:text-[0.8125rem] lg:text-xs xl:text-[0.8125rem]"
-                >
-                  <ArrowLeft className="size-[0.875rem]" /> Back to Registration
-                </Link>
-              </div>
-            </div>
-          </div>
+        <div className="mt-8 flex justify-center">
+          <AuthBackLink to="/signup">Back to sign up</AuthBackLink>
         </div>
       </div>
-
-      {/* ── RIGHT PANEL ── */}
-      <AuthPageRightPart />
-    </div>
+    </AuthShell>
   );
 }
 

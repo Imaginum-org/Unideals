@@ -1,28 +1,30 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  Check,
-  Eye,
-  EyeOff,
-  LockKeyhole,
-  Mail,
-  UserRound,
-} from "lucide-react";
+import { LockKeyhole, Mail, UserRound } from "lucide-react";
 import { registerUser } from "../api/authApi.js";
 import { toast } from "../../../components/ui/toast.js";
-import AuthPageRightPart from "../components/AuthPageRightPart";
+import AuthShell from "../components/AuthShell.jsx";
 import AuthMessageBanner from "../components/AuthMessageBanner";
-import AuthMobileBanner from "../components/AuthMobileBanner";
-import AuthBrandLogo from "../components/AuthBrandLogo.jsx";
 import LegalAgreementModal from "../components/LegalAgreementModal";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import SignInwithGoogle from "../components/signinWithGoogle";
+import {
+  AuthCheckbox,
+  AuthDivider,
+  AuthField,
+  AuthHeading,
+  AuthPrimaryButton,
+  CapsLockHint,
+  FieldTick,
+  PasswordToggle,
+  authLinkClass,
+} from "../components/AuthUI.jsx";
+import useCapsLock from "../hooks/useCapsLock.js";
 import {
   isPasswordStrongEnough,
   suggestPassword,
 } from "../utils/passwordStrength.js";
 import useSafeTimeout from "../../../hooks/useSafeTimeout.js";
-import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
 
 function Signup() {
   const [email, setEmail] = useState("");
@@ -41,6 +43,8 @@ function Signup() {
   const location = useLocation();
   const safeTimeout = useSafeTimeout();
   const showPasswordOk = isPasswordStrongEnough(password);
+  const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password;
+  const { capsLock, capsLockProps } = useCapsLock();
 
   const clearFormMessage = () => setFormMessage(null);
 
@@ -128,8 +132,11 @@ function Signup() {
   const hasConfirmError =
     isError && (errorText.includes("match") || errorText.includes("password"));
 
+  // Keep a pending return-to when hopping back to log in.
+  const authLinkState = location.state?.from ? { from: location.state.from } : undefined;
+
   return (
-    <div className="flex min-h-[100dvh] overflow-x-hidden select-none bg-[#F7F8FA] dark:bg-[#131313] md:h-[100dvh] md:overflow-hidden">
+    <>
       {legalTab ? (
         <LegalAgreementModal
           activeTab={legalTab}
@@ -146,297 +153,163 @@ function Signup() {
         />
       ) : null}
 
-      {/* ── LEFT PANEL ── */}
-      <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#F7F8FA] font-figtree dark:bg-[#131313] md:h-full md:min-h-0 md:w-[44%] lg:w-[41%] xl:w-[41%] 2xl:w-[41%]">
-        <div className="relative flex min-h-[100dvh] flex-col bg-gradient-to-br from-[#2f35f4] to-[#7472f5] text-white md:h-full md:min-h-0 md:bg-none md:bg-[#F7F8FA] dark:md:bg-[#131313] md:text-[#111827]">
-          {/* Logo */}
-          <div className="flex shrink-0 items-center justify-center mt-[3.5vh] sm:mt-[4vh] md:justify-start md:mt-2 md:pl-4 xl:mt-4 xl:pl-7">
-            <AuthBrandLogo />
-          </div>
+      <AuthShell>
+        <form onSubmit={handleRegister} className="auth-stagger">
+          <AuthHeading
+            title="Create your account"
+            subtitle="Enter your details to start your academic journey."
+          />
 
-          <AuthMobileBanner />
+          <SignInwithGoogle />
 
-          {/* Form card */}
-          <div className="flex min-h-0 flex-1 items-end justify-center md:items-center  xl:px-16">
-            <form
-              onSubmit={handleRegister}
-              className=" w-full h-[80dvh] md:h-auto overflow-y-auto overflow-x-hidden no-scrollbar rounded-t-[1.6rem] bg-[#F7F8FA] px-5 pb-8 pt-8 text-[#18181B] shadow-[0_-1.125rem_3.125rem_rgba(30,35,120,0.18)] dark:bg-[#131313] dark:text-white sm:px-10 md:mt-0 md:max-h-[calc(100dvh-5rem)] md:min-h-0 md:flex-none md:rounded-none md:overflow-y-auto md:overflow-x-hidden md:w-full md:max-w-[35vw] lg:max-w-[30vw] xl:max-w-[28.5vw] 2xl:max-w-[28.5vw] md:px-[1vw] 3xl:max-w-[56rem] md:p-0 md:shadow-none"
-            >
-              {/* Heading */}
-              <div className="mb-4 md:mb-[2vh] lg:mb-2.5 xl:mb-[2.5vh] 2xl:mb-[2.6vh]">
-                <h1 className="font-figtree text-[1.25rem] sm:text-[1.125rem] md:text-[1.15rem] lg:text-lg xl:text-[1.2rem] 2xl:text-[1.5rem] font-semibold leading-snug tracking-normal">
-                  Create Account
-                </h1>
-                <p className="mt-1 font-figtree text-[0.75rem] leading-snug text-gray-700 dark:text-[#D6D6D6] sm:text-[0.8125rem] md:text-[0.72rem] lg:text-xs xl:text-[0.8rem] 2xl:text-[0.85rem]">
-                  Enter your details to start your academic journey.
-                </p>
-              </div>
+          <AuthDivider label="or register with email" />
 
-              {/* Google button */}
-              <SignInwithGoogle />
+          {formMessage ? (
+            <AuthMessageBanner variant={formMessage.variant} className="mb-4">
+              {formMessage.text}
+            </AuthMessageBanner>
+          ) : null}
 
-              {/* Divider */}
-              <div className="my-[2.8vh] sm:my-4 md:my-[2.8vh] lg:my-2.5 xl:my-[3vh] 2xl:my-[3vh] flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-300/30 dark:bg-[#3A3A3A]" />
-                <span className="text-[0.5625rem] font-normal uppercase leading-tight tracking-[0.18em] text-gray-500 sm:text-[0.625rem] md:text-[0.49rem] xl:text-[0.525rem] 2xl:text-[0.6rem]">
-                  or register with email
-                </span>
-                <div className="h-px flex-1 bg-slate-300/30 dark:bg-[#3A3A3A]" />
-              </div>
+          <div className="space-y-3.5">
+            <AuthField
+              icon={UserRound}
+              label="Full name"
+              type="text"
+              name="name"
+              autoComplete="name"
+              value={fname}
+              maxLength={60}
+              error={hasNameError}
+              onChange={(e) => {
+                setFname(e.target.value);
+                clearFormMessage();
+              }}
+              required
+            />
 
-              {formMessage ? (
-                <div className="mb-3 sm:mb-3.5 md:mb-2.5 lg:mb-2.5 xl:mb-[2vh]">
-                  <AuthMessageBanner variant={formMessage.variant}>
-                    {formMessage.text}
-                  </AuthMessageBanner>
-                </div>
-              ) : null}
+            <AuthField
+              icon={Mail}
+              label="Email"
+              type="email"
+              name="email"
+              autoComplete="email"
+              inputMode="email"
+              value={email}
+              maxLength={254}
+              error={hasEmailError}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearFormMessage();
+              }}
+              required
+            />
 
-              {/* Fields */}
-              <div className="space-y-[2.4vh] sm:space-y-3.5 md:space-y-[2.1vh] lg:space-y-2.5 xl:space-y-[2.2vh] 2xl:space-y-[2.3vh]">
-                {/* Full Name */}
-                <label className="block">
-                  <span className="relative block group">
-                    <UserRound className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-500 sm:left-4 md:size-3.5 xl:size-4 2xl:size-4" />
-                    <span
-                      className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
-                        fname
-                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
-                          : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
-                    >
-                      Full Name
-                    </span>
-                    <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] md:text-sm ${
-                        hasNameError
-                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
-                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
-                      }`}
-                      type="text"
-                      placeholder=" "
-                      value={fname}
-                      maxLength={60}
-                      onChange={(e) => {
-                        setFname(e.target.value);
-                        clearFormMessage();
-                      }}
-                      required
-                    />
-                  </span>
-                </label>
+            <div>
+              <AuthField
+                icon={LockKeyhole}
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                name="new-password"
+                autoComplete="new-password"
+                value={password}
+                maxLength={72}
+                error={hasPasswordError}
+                {...capsLockProps}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearFormMessage();
+                }}
+                trailingWidth="lg"
+                trailing={
+                  <>
+                    <FieldTick show={showPasswordOk} label="Strong enough" />
+                    <PasswordToggle shown={showPassword} onToggle={() => setShowPassword((v) => !v)} />
+                  </>
+                }
+                required
+              />
+              <CapsLockHint show={capsLock} />
+              <PasswordStrengthMeter
+                password={password}
+                onSuggest={() => {
+                  const fresh = suggestPassword(fname, email);
+                  setPassword(fresh);
+                  setConfirmPassword(fresh);
+                  clearFormMessage();
+                  toast.success("Strong password filled. Save it somewhere safe.", {
+                    id: "suggest-password",
+                  });
+                }}
+              />
+            </div>
 
-                {/* Email */}
-                <label className="block">
-                  <span className="relative block group">
-                    <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-500 sm:left-4 md:size-3.5  xl:size-4 2xl:size-4" />
-                    <span
-                      className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
-                        email
-                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
-                          : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
-                    >
-                      Email
-                    </span>
-                    <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 pr-3 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-sm lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] ${
-                        hasEmailError
-                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
-                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
-                      }`}
-                      type="email"
-                      placeholder=" "
-                      value={email}
-                      maxLength={254}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        clearFormMessage();
-                      }}
-                      required
-                    />
-                  </span>
-                </label>
-
-                {/* Password */}
-                <label className="block">
-                  <span className="relative block group">
-                    <LockKeyhole className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-500 sm:left-4 md:size-3.5   xl:size-4 2xl:size-4" />
-                    <span
-                      className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
-                        password
-                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
-                          : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
-                    >
-                      Password
-                    </span>
-                    <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-sm lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] pr-20 ${
-                        hasPasswordError
-                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
-                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
-                      }`}
-                      type={showPassword ? "text" : "password"}
-                      placeholder=" "
-                      value={password}
-                      maxLength={72}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        clearFormMessage();
-                      }}
-                      required
-                    />
-                    <div className="absolute right-[2.7rem] top-1/2 -translate-y-1/2 flex items-center gap-2">
-                      {showPasswordOk ? (
-                        <span className="text-emerald-600 dark:text-emerald-400">
-                          <Check className="size-[1rem]" strokeWidth={3} />
-                        </span>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-[#393AF2] sm:right-4"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showPassword ? (
-                        <EyeOff className="size-[1.125rem]" />
-                      ) : (
-                        <Eye className="size-[1.125rem]" />
-                      )}
-                    </button>
-                  </span>
-                  <PasswordStrengthMeter
-                    password={password}
-                    email={email}
-                    onSuggest={() => {
-                      const fresh = suggestPassword(fname, email);
-                      setPassword(fresh);
-                      setConfirmPassword(fresh);
-                      clearFormMessage();
-                      toast.success("Strong password filled. Save it somewhere safe.", {
-                        id: "suggest-password",
-                      });
-                    }}
+            <AuthField
+              icon={LockKeyhole}
+              label="Confirm password"
+              type={showConfirmPassword ? "text" : "password"}
+              name="confirm-password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              maxLength={72}
+              error={hasConfirmError}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                clearFormMessage();
+              }}
+              trailingWidth="lg"
+              trailing={
+                <>
+                  <FieldTick show={passwordsMatch} label="Passwords match" />
+                  <PasswordToggle
+                    shown={showConfirmPassword}
+                    onToggle={() => setShowConfirmPassword((v) => !v)}
                   />
-                </label>
-
-                {/* Confirm Password */}
-                <label className="block">
-                  <span className="relative block group">
-                    <LockKeyhole className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-500 sm:left-4 md:size-3.5   xl:size-4 2xl:size-4" />
-                    <span
-                      className={`pointer-events-none absolute left-10 sm:left-11 px-1 transition-all duration-200 ${
-                        confirmPassword
-                          ? "-top-0 -translate-y-1/2 bg-white text-[0.625rem] text-[#393AF2] dark:bg-white dark:text-[#818cf8]"
-                          : "top-1/2 -translate-y-1/2 text-[0.75rem] md:text-[0.7rem] xl:text-[0.75rem] text-gray-500/80"
-                      } group-focus-within:-top-0 group-focus-within:-translate-y-1/2 group-focus-within:bg-white group-focus-within:text-[0.625rem] group-focus-within:text-[#393AF2] dark:group-focus-within:bg-white dark:group-focus-within:text-[#818cf8] 2xl:text-xs`}
-                    >
-                      Confirm Password
-                    </span>
-                    <input
-                      className={`h-[6.3vh] w-full rounded-xl border pl-10 text-sm text-black auth-field outline-none transition placeholder:text-gray-500/60 dark:text-black sm:h-11 md:h-10 md:rounded-xl md:pl-11 md:text-sm lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] pr-12 ${
-                        hasConfirmError
-                          ? "border-red-500 bg-white focus:border-red-500 dark:border-red-500 dark:bg-white"
-                          : "border-transparent bg-white focus:border-[#393AF2] focus:bg-white focus:ring-4 focus:ring-[#393AF2]/10 dark:bg-white dark:focus:bg-white"
-                      }`}
-                      type={showConfirmPassword ? "text" : "password"}
-                      placeholder=" "
-                      value={confirmPassword}
-                      maxLength={72}
-                      onChange={(e) => {
-                        setConfirmPassword(e.target.value);
-                        clearFormMessage();
-                      }}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-[#393AF2] sm:right-4"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      aria-label={
-                        showConfirmPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="size-[1.125rem]" />
-                      ) : (
-                        <Eye className="size-[1.125rem]" />
-                      )}
-                    </button>
-                  </span>
-                </label>
-              </div>
-
-              {/* Terms checkbox */}
-              <label className="mt-[2.2vh] flex items-start gap-2.5 text-[0.6875rem] leading-snug text-gray-700 sm:text-[0.625rem] md:mt-[1.8vh] md:gap-2 md:text-[0.55rem] lg:mt-2.5 lg:gap-2.5 lg:text-[0.6875rem] xl:mt-2.6 xl:gap-2.5 xl:text-[0.6875rem] 2xl:text-[0.75rem] 2xl:mt-[2.2vh]">
-                <input
-                  type="checkbox"
-                  required
-                  checked={acceptedLegal}
-                  onChange={(event) => {
-                    const checked = event.target.checked;
-                    setAcceptedLegal(checked);
-                    if (checked && !legalMeta) {
-                      setLegalMeta({
-                        version: "v1.0",
-                        acceptedAt: new Date().toISOString(),
-                      });
-                    }
-                  }}
-                  className="mt-0.2 size-3.5 rounded border-slate-300/50 bg-white text-[#393AF2] accent-[#393AF2] focus:ring-[#393AF2] md:mt-[0.2vh] xl:mt-[0.1vh] md:size-2.5 lg:size-3 xl:size-3 shrink-0  2xl:size-3 2xl:mt-[0.19vh] dark:border-zinc-500 dark:bg-white"
-                />
-                <span>
-                  I agree to the{" "}
-                  <button
-                    type="button"
-                    onClick={() => setLegalTab("terms")}
-                    className="font-medium text-[#393AF2]"
-                  >
-                    Terms & Conditions
-                  </button>{" "}
-                  and{" "}
-                  <button
-                    type="button"
-                    onClick={() => setLegalTab("privacy")}
-                    className="font-medium text-[#393AF2]"
-                  >
-                    Privacy Policy
-                  </button>
-                  .
-                </span>
-              </label>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-[2.2vh] h-[6.3vh] sm:h-11 md:h-10 lg:h-10 xl:h-[6.4vh] 2xl:h-[6.4vh] w-full rounded-lg bg-[#393AF2] text-sm font-semibold text-white transition hover:bg-[#2829D8] focus:outline-none focus:ring-4 focus:ring-[#393AF2]/25 disabled:cursor-not-allowed disabled:opacity-60  md:mt-[2.8vh]  md:text-xs lg:mt-2.5 lg:text-sm xl:text-[0.8rem] xl:mt-[3vh] 2xl:text-[0.85rem] 2xl:mt-[2.6vh]"
-              >
-                <ButtonLoader loading={isSubmitting} loadingText="Creating…">Create Account</ButtonLoader>
-              </button>
-
-              {/* Login link */}
-              <div className="mt-[2.7vh] text-center text-xs text-gray-700 sm:text-[0.8125rem] md:mt-[1.8vh] md:text-[0.7rem] lg:mt-2.5 lg:text-xs xl:mt-3.5 xl:text-sm 2xl:text-sm">
-                Already have an account?{" "}
-                <Link
-                  to="/login"
-                  className="font-semibold text-blue-700 transition hover:text-[#2426C7]"
-                >
-                  Log In
-                </Link>
-              </div>
-            </form>
+                </>
+              }
+              required
+            />
           </div>
-        </div>
-      </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <AuthPageRightPart />
-    </div>
+          <div className="mt-4">
+            <AuthCheckbox
+              required
+              checked={acceptedLegal}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setAcceptedLegal(checked);
+                if (checked && !legalMeta) {
+                  setLegalMeta({
+                    version: "v1.0",
+                    acceptedAt: new Date().toISOString(),
+                  });
+                }
+              }}
+            >
+              I agree to the{" "}
+              <button type="button" onClick={() => setLegalTab("terms")} className={authLinkClass}>
+                Terms &amp; Conditions
+              </button>{" "}
+              and{" "}
+              <button type="button" onClick={() => setLegalTab("privacy")} className={authLinkClass}>
+                Privacy Policy
+              </button>
+              .
+            </AuthCheckbox>
+          </div>
+
+          <AuthPrimaryButton className="mt-5" loading={isSubmitting} loadingText="Creating account…">
+            Create account
+          </AuthPrimaryButton>
+
+          <p className="mt-5 text-center text-[0.875rem] text-slate-500 dark:text-zinc-400">
+            Already have an account?{" "}
+            <Link to="/login" state={authLinkState} className={authLinkClass}>
+              Log in
+            </Link>
+          </p>
+        </form>
+      </AuthShell>
+    </>
   );
 }
 

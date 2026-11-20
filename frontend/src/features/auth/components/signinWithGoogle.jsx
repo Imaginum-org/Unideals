@@ -2,7 +2,7 @@ import { getGoogleAuthUrl } from "../api/authApi";
 
 const GoogleIcon = () => (
   <svg
-    className="size-4 shrink-0 lg:size-5 xl:size-5"
+    className="size-[1.125rem] shrink-0"
     viewBox="0 0 24 24"
     aria-hidden="true"
   >
@@ -25,7 +25,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-function SignInwithGoogle({ className = "" }) {
+function SignInwithGoogle({ className = "", label = "Continue with Google" }) {
   const handleGoogleSignIn = () => {
     window.location.href = getGoogleAuthUrl();
   };
@@ -34,10 +34,10 @@ function SignInwithGoogle({ className = "" }) {
     <button
       type="button"
       onClick={handleGoogleSignIn}
-      className={`flex h-[6.3vh] w-full items-center justify-center gap-2 rounded-lg border border-slate-300/30 bg-[#F7F8FA] text-sm font-semibold text-gray-700 shadow-[0_0.0625rem_0.125rem_rgba(0,0,0,0.05)] transition hover:border-slate-300 hover:bg-[#F9FAFB] dark:border-[#363A42] dark:bg-[#1A1D20] dark:text-white dark:hover:bg-[#20242A] sm:h-11 md:h-10 md:text-xs lg:h-10 lg:text-sm xl:h-[6.4vh] xl:text-[0.8rem] 2xl:h-[6.4vh] 2xl:text-[0.85rem] font-figtree ${className}`}
+      className={`flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-5 font-figtree text-[0.9375rem] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition hover:border-slate-300 hover:bg-slate-50 active:translate-y-px focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#393AF2]/20 dark:border-white/10 dark:bg-[#1b1c20] dark:text-zinc-100 dark:hover:border-white/20 dark:hover:bg-[#212227] ${className}`}
     >
       <GoogleIcon />
-      Google
+      {label}
     </button>
   );
 }
