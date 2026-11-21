@@ -70,6 +70,24 @@ const statusBadge = (status) => {
 // Upsert merge for the thread poll: appends new bubbles and applies tick
 // upgrades (sent -> delivered -> read) onto rendered messages, oldest first.
 // Returns the previous array untouched when nothing changed (no re-render).
+// Client mirrors of the server's per-person media cooldowns (the server is
+// the authority; a 429 Retry-After overrides these).
+const VOICE_COOLDOWN_MS = 3000;
+const IMAGE_COOLDOWN_MS = 4000;
+
+/** [until, setUntil, active]: a deadline that re-renders once it passes. */
+const useCooldownUntil = () => {
+  const [until, setUntil] = useState(0);
+  const [, rerender] = useState(0);
+  useEffect(() => {
+    const left = until - Date.now();
+    if (left <= 0) return undefined;
+    const t = setTimeout(() => rerender((x) => x + 1), left + 30);
+    return () => clearTimeout(t);
+  }, [until]);
+  return [until, setUntil, until > Date.now()];
+};
+
 const mergeThreadMessages = (prev, incoming) => {
   if (!incoming?.length) return prev;
   const map = new Map(prev.map((m) => [String(m._id), m]));
@@ -84,6 +102,7 @@ const mergeThreadMessages = (prev, incoming) => {
       ex.message_status !== m.message_status ||
       ex.text !== m.text ||
       ex.message_type !== m.message_type ||
+      JSON.stringify(ex.reactions || null) !== JSON.stringify(m.reactions || null) ||
       JSON.stringify(ex.reply || null) !== JSON.stringify(m.reply || null)
     ) {
       map.set(k, { ...ex, ...m });
@@ -730,6 +749,44 @@ const ChatPanel = ({ embedded = false }) => {
     );
   }, []);
 
+  // Reactions (realtime): replace that message's small reactions array.
+  const handleSocketReaction = useCallback((info) => {
+    if (!info?.messageId || String(info.conversationId) !== selectedIdRef.current) return;
+    setMessages((prev) =>
+      prev.map((m) => (String(m._id) === String(info.messageId) ? { ...m, reactions: info.reactions || [] } : m)),
+    );
+  }, []);
+
+  // Optimistic: show it now, confirm with the server's array, roll back on error.
+  const handleReact = useCallback(
+    async (msg, emoji) => {
+      const cid = selectedIdRef.current;
+      if (!cid || !msg?._id || !me) return;
+      const before = msg.reactions || [];
+      const next = [...before.filter((r) => String(r.user_id) !== String(me)), ...(emoji ? [{ user_id: me, emoji }] : [])];
+      const apply = (reactions) =>
+        setMessages((prev) => prev.map((m) => (String(m._id) === String(msg._id) ? { ...m, reactions } : m)));
+      apply(next);
+      try {
+        apply(await chatApi.setReaction(cid, msg._id, emoji));
+      } catch (err) {
+        apply(before);
+        toast.error(err?.response?.data?.message || "Couldn't react to that message");
+      }
+    },
+    [me],
+  );
+
+  // Stable bubble callbacks. MessageBubble is memoised, so passing fresh
+  // inline functions re-rendered EVERY message on every keystroke; these
+  // keep identity and always call the latest handler via a ref.
+  const bubbleActions = useRef({});
+  const onBubbleAccept = useCallback((m) => bubbleActions.current.respondOffer?.(m, "accept"), []);
+  const onBubbleDecline = useCallback((m) => bubbleActions.current.respondOffer?.(m, "decline"), []);
+  const onBubbleCounter = useCallback(() => bubbleActions.current.counter?.(), []);
+  const onBubbleReply = useCallback((m) => bubbleActions.current.reply?.(m), []);
+  const onBubbleJump = useCallback((id) => bubbleActions.current.jumpToMessage?.(id), []);
+
   const handleSocketRead = useCallback(
     (info) => {
       const cid = String(info?.conversationId || "");
@@ -770,6 +827,7 @@ const ChatPanel = ({ embedded = false }) => {
     onDeal: handleSocketDeal,
     onDelivered: handleSocketDelivered,
     onRead: handleSocketRead,
+    onReaction: handleSocketReaction,
     onTyping: handleSocketTyping,
     onPresence: handleSocketPresence,
     onStatus: setSocketLive,
@@ -781,7 +839,7 @@ const ChatPanel = ({ embedded = false }) => {
   // Upload goes straight to ImageKit; the API only gets the file id. A 429
   // (per-account minute/hour/day limits) pauses the mic for Retry-After.
   const canRecordVoice = useMemo(() => voiceSupported(), []);
-  const [voiceBlockedUntil, setVoiceBlockedUntil] = useState(0);
+  const [voiceBlockedUntil, setVoiceBlockedUntil, voiceCooling] = useCooldownUntil();
   const handleSendVoice = async ({ blob, mime, durationMs, peaks }) => {
     const cid = selectedId;
     if (!cid) return;
@@ -795,6 +853,7 @@ const ChatPanel = ({ embedded = false }) => {
         peaks,
         replyTo: quote?._id,
       });
+      setVoiceBlockedUntil(Date.now() + VOICE_COOLDOWN_MS);
       if (saved && cid === selectedIdRef.current) {
         setMessages((prev) => (prev.some((m) => String(m._id) === String(saved._id)) ? prev : [...prev, { ...saved, burst: true }]));
         setReplyingTo(null);
@@ -818,7 +877,7 @@ const ChatPanel = ({ embedded = false }) => {
   const imageInputRef = useRef(null);
   const [pendingImage, setPendingImage] = useState(null); // { file, url, width, height }
   const [imageProgress, setImageProgress] = useState(null); // 0–1 while uploading
-  const [imageBlockedUntil, setImageBlockedUntil] = useState(0);
+  const [imageBlockedUntil, setImageBlockedUntil, imageCooling] = useCooldownUntil();
   const pendingUrlRef = useRef(null);
   const clearPendingImage = useCallback(() => {
     if (pendingUrlRef.current) URL.revokeObjectURL(pendingUrlRef.current);
@@ -839,6 +898,7 @@ const ChatPanel = ({ embedded = false }) => {
     const url = URL.createObjectURL(file);
     pendingUrlRef.current = url;
     const size = await readImageSize(url);
+    setOfferOpen(false); // a photo is a message, not an offer
     setPendingImage({ file, url, ...size });
     setTimeout(() => composerRef.current?.focus(), 0);
   };
@@ -863,6 +923,7 @@ const ChatPanel = ({ embedded = false }) => {
         caption,
         replyTo: quote?._id,
       });
+      setImageBlockedUntil(Date.now() + IMAGE_COOLDOWN_MS);
       if (saved && cid === selectedIdRef.current) {
         setMessages((prev) => (prev.some((m) => String(m._id) === String(saved._id)) ? prev : [...prev, { ...saved, burst: true }]));
         setReplyingTo(null);
@@ -1380,7 +1441,12 @@ const ChatPanel = ({ embedded = false }) => {
       hint: offerAllowed ? "Open the offer panel" : "The price is already locked for this deal",
       icon: IndianRupee,
       tone: "bg-[var(--accent-soft)] text-[var(--accent-text)] ring-[var(--accent-ring)]",
-      run: () => (offerAllowed ? setOfferOpen(true) : toast("Final price is already locked for this deal")),
+      run: () =>
+        pendingImage
+          ? toast("Send or remove the photo first")
+          : offerAllowed
+            ? setOfferOpen(true)
+            : toast("Final price is already locked for this deal"),
     },
     {
       cmd: "/available",
@@ -1499,7 +1565,7 @@ const ChatPanel = ({ embedded = false }) => {
   ];
   const composerHint = composerHints[hintIdx % composerHints.length];
   const typedAmount = /^\s*₹?\s*\d[\d,]*\s*$/.test(chatInput) ? Number(chatInput.replace(/[^0-9]/g, "")) : 0;
-  if (offerAllowed && typedAmount > 0 && slashMatches.length === 0) {
+  if (offerAllowed && !pendingImage && typedAmount > 0 && slashMatches.length === 0) {
     slashMatches.push({
       cmd: `₹${typedAmount.toLocaleString("en-IN")}`,
       label: "Make an offer",
@@ -1517,6 +1583,19 @@ const ChatPanel = ({ embedded = false }) => {
     if (!c.keepInput) setChatInput("");
     setSlashIdx(0);
     c.run();
+  };
+
+  bubbleActions.current = {
+    respondOffer,
+    jumpToMessage,
+    counter: () => {
+      dismissHint();
+      setOfferOpen(true);
+    },
+    reply: (m) => {
+      startReply(m);
+      setTimeout(() => composerRef.current?.focus(), 0);
+    },
   };
 
   const iconBtn =
@@ -1982,17 +2061,12 @@ const ChatPanel = ({ embedded = false }) => {
                                 acting={actingOffer}
                                 isLastOfGroup={n.lastOfGroup}
                                 query={searchOpen && q.length >= 2 ? q : ""}
-                                onAccept={(msg) => respondOffer(msg, "accept")}
-                                onDecline={(msg) => respondOffer(msg, "decline")}
-                                onCounter={() => {
-                                  dismissHint();
-                                  setOfferOpen(true);
-                                }}
-                                onReply={(msg) => {
-                                  startReply(msg);
-                                  setTimeout(() => composerRef.current?.focus(), 0);
-                                }}
-                                onJumpTo={jumpToMessage}
+                                onAccept={onBubbleAccept}
+                                onDecline={onBubbleDecline}
+                                onCounter={onBubbleCounter}
+                                onReact={handleReact}
+                                onReply={onBubbleReply}
+                                onJumpTo={onBubbleJump}
                               />
                             </div>
                           ),
@@ -2228,9 +2302,9 @@ const ChatPanel = ({ embedded = false }) => {
                       />
                       <button
                         type="button"
-                        title="Send a photo"
+                        title={imageCooling ? "Wait a moment before sending another photo" : "Send a photo"}
                         aria-label="Send a photo"
-                        disabled={coolingDown || imageProgress != null}
+                        disabled={coolingDown || imageProgress != null || imageCooling}
                         onClick={() => imageInputRef.current?.click()}
                         className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-600 transition-colors hover:bg-neutral-100 hover:text-[var(--accent-text)] disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-white/5"
                       >
@@ -2239,8 +2313,10 @@ const ChatPanel = ({ embedded = false }) => {
                       <button
                         ref={rupeeBtnRef}
                         type="button"
-                        title="Make an offer"
+                        title={pendingImage ? "Send or remove the photo first" : "Make an offer"}
                         aria-label="Make an offer"
+                        // A photo + caption is a message, not an offer.
+                        disabled={Boolean(pendingImage)}
                         onClick={() => {
                           // After confirmation the price is locked: say so
                           // instead of opening a dead popup.
@@ -2250,7 +2326,7 @@ const ChatPanel = ({ embedded = false }) => {
                           }
                           setOfferOpen((v) => !v);
                         }}
-                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-[19px] font-semibold transition-colors ${
+                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-[19px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${
                           offerOpen
                             ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
                             : "text-slate-600 hover:bg-neutral-100 hover:text-[var(--accent-text)] dark:text-zinc-300 dark:hover:bg-white/5"
@@ -2327,7 +2403,7 @@ const ChatPanel = ({ embedded = false }) => {
                       {canRecordVoice && !chatInput.trim() && !pendingImage ? (
                         <VoiceRecorder
                           key={selectedId}
-                          disabled={coolingDown || !selectedId}
+                          disabled={coolingDown || !selectedId || voiceCooling}
                           blockedUntil={voiceBlockedUntil}
                           onSend={handleSendVoice}
                         />

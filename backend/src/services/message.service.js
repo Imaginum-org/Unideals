@@ -5,7 +5,7 @@ import Message from "../models/message.model.js";
 import Report from "../models/Report.model.js";
 import ChatCooldown from "../models/ChatCooldown.model.js";
 import User from "../models/User.model.js";
-import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS, VOICE_LIMITS, CHAT_IMAGE_LIMITS } from "../config/constants.js";
+import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS, VOICE_LIMITS, CHAT_IMAGE_LIMITS, MESSAGE_REACTIONS } from "../config/constants.js";
 import { chatImageUrl, cloudinaryConfigured, isOwnChatImage, verifyUploadResponse } from "../utils/cloudinary.js";
 import { getFileDetails, isInVoiceFolderOf, isValidFileId } from "../utils/imagekit.js";
 import { AppError } from "../utils/appError.js";
@@ -393,6 +393,47 @@ export const sendImageMessage = async ({ conversationId, senderId, publicId, ver
       ? `📷 ${cleanCaption.slice(0, 480)}`
       : "📷 Photo";
   return publishSent({ conversation, message, senderId, receiverId, preview, type: MESSAGE_TYPE.IMAGE });
+};
+
+/**
+ * React to a message (or clear your reaction with emoji = null).
+ * One conversation read (participant check) + ONE atomic pipeline update
+ * that drops this user's old reaction and appends the new one, so rapid
+ * taps or both people reacting at once can never duplicate or lose
+ * entries. The filter also pins the message to this conversation and
+ * skips system/flagged messages. Broadcast is the small new array only.
+ */
+export const setReaction = async ({ conversationId, messageId, userId, emoji = null }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+    throw new AppError("Invalid message", 400);
+  }
+  if (emoji !== null && !MESSAGE_REACTIONS.includes(emoji)) throw new AppError("Unsupported reaction", 400);
+
+  const conversation = await Conversation.findById(conversationId).select("buyer_id seller_id").lean();
+  if (!conversation) throw new AppError("Conversation not found", 404);
+  assertParticipant(conversation, userId);
+
+  const me = new mongoose.Types.ObjectId(String(userId));
+  const others = { $filter: { input: { $ifNull: ["$reactions", []] }, cond: { $ne: ["$$this.user_id", me] } } };
+  const updated = await Message.findOneAndUpdate(
+    {
+      _id: messageId,
+      conversation_id: conversation._id,
+      message_type: { $ne: MESSAGE_TYPE.SYSTEM },
+      is_flagged: { $ne: true },
+    },
+    [{ $set: { reactions: emoji ? { $concatArrays: [others, [{ user_id: me, emoji }]] } : others } }],
+    { returnDocument: "after", updatePipeline: true, projection: { reactions: 1 } },
+  ).lean();
+  if (!updated) throw new AppError("Message not found", 404);
+
+  const reactions = updated.reactions || [];
+  emitToConversation(conversation._id, "message:reaction", {
+    conversationId: String(conversation._id),
+    messageId: String(messageId),
+    reactions,
+  });
+  return reactions;
 };
 
 const fmtClock = (ms) => {

@@ -6,8 +6,9 @@ export const VOICE_MAX_MS = 120 * 1000;
 export const VOICE_MIN_MS = 700;
 export const VOICE_MAX_BYTES = 2 * 1024 * 1024;
 export const VOICE_PEAKS = 48;
-// Speech-grade Opus/AAC: ~180–240 KB per minute.
-const BITRATE = 32000;
+// Speech-grade mono. Opus is transparent for voice at 24 kbps (~180 KB/min);
+// AAC (iPhone/Safari MP4) needs a little more to stay clear (~240 KB/min).
+const bitrateFor = (mime) => (/opus/i.test(mime) || /webm|ogg/i.test(mime) ? 24000 : 32000);
 
 // MP4/AAC first: it plays on every browser incl. older iOS Safari. WebM/Opus
 // (Chrome, Firefox, Android) is the fallback, and is smaller.
@@ -29,7 +30,7 @@ export const pickVoiceMime = () => {
   return CANDIDATES.find((t) => window.MediaRecorder.isTypeSupported?.(t)) || "";
 };
 
-export const recorderOptions = (mime) => ({ ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: BITRATE });
+export const recorderOptions = (mime) => ({ ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: bitrateFor(mime) });
 
 const extFor = (mime) => (/mp4/.test(mime) ? "m4a" : /ogg/.test(mime) ? "ogg" : "webm");
 

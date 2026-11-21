@@ -75,6 +75,21 @@ const messageSchema = new mongoose.Schema(
       default: undefined,
     },
 
+    // Reactions: at most one per participant (a chat has two), so this
+    // array never holds more than 2 tiny entries. Set/cleared atomically.
+    reactions: {
+      type: [
+        new mongoose.Schema(
+          {
+            user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+            emoji: { type: String, required: true },
+          },
+          { _id: false },
+        ),
+      ],
+      default: undefined,
+    },
+
     // Reference to deal (for offer/system messages)
     deal_id: {
       type: mongoose.Schema.Types.ObjectId,

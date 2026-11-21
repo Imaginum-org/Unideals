@@ -110,6 +110,10 @@ export const MESSAGE_TYPE = Object.freeze({
   AUDIO: "audio", // voice note (file lives on ImageKit, see sendVoiceMessage)
 });
 
+// Message reactions: a fixed WhatsApp-style set (no free-form text, so
+// nothing to moderate and payloads stay tiny).
+export const MESSAGE_REACTIONS = Object.freeze(["👍", "❤️", "😂", "😮", "😢", "🙏"]);
+
 // Chat photos (Cloudinary): caption cap; size is capped by the signed
 // incoming transformation (max 1600px) and the client pre-compresses.
 export const CHAT_IMAGE_LIMITS = Object.freeze({ MAX_CAPTION: 1000 });

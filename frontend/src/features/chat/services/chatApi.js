@@ -139,3 +139,9 @@ export const sendImage = async (id, { publicId, version, signature, width, heigh
   });
   return data?.data;
 };
+
+// Set (or clear with null) your reaction; returns the message's reactions.
+export const setReaction = async (id, messageId, emoji) => {
+  const { data } = await axios.put(`/api/conversations/${id}/messages/${messageId}/reaction`, { emoji });
+  return data?.data || [];
+};

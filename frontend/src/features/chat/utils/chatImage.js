@@ -19,16 +19,20 @@ export const readImageSize = (url) =>
   });
 
 /**
- * Shrink on the device before upload (≤1600px, ~0.8 MB): faster on campus
- * Wi-Fi and fewer Cloudinary credits. HEIC can't be decoded in most
- * browsers, so it goes up as-is (Cloudinary converts on delivery).
+ * Shrink on the device before upload: WebP (typically 25–35% smaller than
+ * JPEG at the same quality), ≤1440px, ~0.5 MB. A chat photo never needs
+ * more, uploads finish faster on campus Wi-Fi, and Cloudinary storage +
+ * bandwidth credits drop. Browsers that can't encode WebP fall back to
+ * JPEG inside the library. HEIC can't be decoded in most browsers, so it
+ * goes up as-is and Cloudinary compresses it on arrival (signed incoming
+ * transformation, server side).
  */
 export const prepareChatImage = async (file) => {
   if (!isChatImageFile(file)) throw new Error("Only photos can be shared (JPG, PNG, WEBP or HEIC).");
   if (file.size > MAX_INPUT_BYTES) throw new Error("That photo is too large (max 15 MB).");
   if (!CAN_COMPRESS.has(file.type)) return file;
   try {
-    return await compressImage(file, { maxSizeMB: 0.8, maxWidthOrHeight: 1600, initialQuality: 0.82 });
+    return await compressImage(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1440, initialQuality: 0.8, fileType: "image/webp" });
   } catch {
     return file;
   }

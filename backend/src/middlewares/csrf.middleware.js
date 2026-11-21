@@ -7,12 +7,19 @@ const EXEMPT_PREFIXES = ["/api/payments/webhook"];
 
 const normalize = (origin) => String(origin || "").trim().replace(/\/+$/, "");
 
-const configuredOrigins = () =>
-  [process.env.FRONTEND_URL, process.env.ADMIN_FRONTEND_URL]
+// Same local dev origins the CORS allowlist accepts outside production
+// (app.js). Keeping both checks in step means local login works with a
+// production FRONTEND_URL in .env; production stays strict.
+const DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
+
+const configuredOrigins = () => [
+  ...[process.env.FRONTEND_URL, process.env.ADMIN_FRONTEND_URL]
     .filter(Boolean)
     .flatMap((value) => String(value).split(","))
     .map(normalize)
-    .filter(Boolean);
+    .filter(Boolean),
+  ...(process.env.NODE_ENV === "production" ? [] : DEV_ORIGINS),
+];
 
 export const verifyOrigin = (req, res, next) => {
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();

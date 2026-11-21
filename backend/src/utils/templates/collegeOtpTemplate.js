@@ -1,17 +1,26 @@
 import escapeHtml from "../escapeHtml.js";
 import { renderOtpEmail } from "./emailLayout.js";
 
-const collegeOtpTemplate = ({ name, code, siteUrl }) =>
-  renderOtpEmail({
+const collegeOtpTemplate = ({ name, code, siteUrl }) => {
+  const digits = String(code).replace(/\D/g, "");
+  const firstName = String(name || "").trim().split(/\s+/)[0] || "there";
+  // FRONTEND_URL may list several origins; links use the first.
+  const first = String(siteUrl || "").split(",")[0].trim() || "https://app.unideals.in";
+  const site = escapeHtml(first.replace(/\/+$/, ""));
+  return renderOtpEmail({
     title: "Verify your college email",
-    greeting: `Hi <strong style="color:#4A4DFE;">${escapeHtml(name || "there")}</strong>,`,
+    greeting: `Hi ${escapeHtml(firstName)},`,
     message:
-      "Use this code to confirm this is your college email. Once verified, a verified tick appears next to your name so buyers know you&#8217;re a real student.",
-    code: String(code).replace(/\D/g, ""),
+      "Enter the code below on Unideals to confirm this is your college email. Once verified, a verified tick appears next to your name so buyers know you&#8217;re a real student.",
+    code: digits,
     expiry: "10 minutes",
-    expiryNote: "If you didn&#8217;t ask for this, you can ignore this email. Nobody can use it without your Unideals account.",
-    siteUrl: escapeHtml(siteUrl || "https://unideals.in"),
-    preheader: `Your Unideals college verification code is ${String(code).replace(/\D/g, "")}.`,
+    expiryNote:
+      "Didn&#8217;t request this? You can safely ignore this email. Nobody can use this code without signing in to your Unideals account, and we&#8217;ll never ask you to share it.",
+    ctaLabel: "Open verification settings",
+    ctaUrl: `${site}/settings?tab=verification`,
+    siteUrl: site,
+    preheader: `Your Unideals verification code is ${digits}. It expires in 10 minutes.`,
   });
+};
 
 export default collegeOtpTemplate;

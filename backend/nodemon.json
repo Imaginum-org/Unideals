@@ -1,0 +1,7 @@
+{
+  "watch": ["server.js", "src", ".env"],
+  "ext": "js,mjs,cjs,json",
+  "ignore": ["tests/**", "scripts/**", "docs/**", "node_modules/**", "*.test.mjs", "coverage/**"],
+  "delay": 400,
+  "signal": "SIGTERM"
+}

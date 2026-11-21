@@ -2,7 +2,7 @@ import * as adminProfileService from "../services/adminProfile.service.js";
 import * as auditLogService from "../services/auditLog.service.js";
 import { setAuthCookies } from "../services/auth.service.js";
 import generatedAccessToken from "../utils/generatedAccessToken.js";
-import generatedRefreshToken from "../utils/generatedRefreshToken.js";
+import generatedRefreshToken, { sessionIdOf } from "../utils/generatedRefreshToken.js";
 import { safeErrorMessage } from "../utils/response.js";
 
 const sendFailure = (res, error) =>
@@ -40,8 +40,8 @@ export const changeMyPassword = async (req, res) => {
 
     // Every other session is now revoked (tokenVersion bumped). Keep this
     // one signed in by issuing fresh tokens at the new version.
-    const accessToken = await generatedAccessToken(userId, tokenVersion);
     const refreshToken = await generatedRefreshToken(userId, tokenVersion);
+    const accessToken = await generatedAccessToken(userId, tokenVersion, sessionIdOf(refreshToken));
     setAuthCookies(res, accessToken, refreshToken);
 
     auditLogService

@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
 import { loadAuthUser } from "../utils/userCache.js";
+import { isSessionActive } from "../utils/sessionCache.js";
 import { USER_STATUS } from "../config/constants.js";
 
 const auth = async (req, res, next) => {
@@ -52,6 +53,16 @@ const auth = async (req, res, next) => {
     ) {
       return res.status(401).json({
         message: "Session revoked. Please log in again.",
+        success: false,
+        error: true,
+      });
+    }
+
+    // Device session signed out (logout on this device): its access token
+    // ends too. Cached check, see utils/sessionCache.js.
+    if (decoded.sid && !(await isSessionActive(decoded.sid))) {
+      return res.status(401).json({
+        message: "Session ended. Please log in again.",
         success: false,
         error: true,
       });
@@ -129,6 +140,7 @@ export const optionalAuth = async (req, res, next) => {
     }
 
     if (user.status !== USER_STATUS.ACTIVE) return next();
+    if (decoded.sid && !(await isSessionActive(decoded.sid))) return next();
 
     req.userId = user._id;
     req.user = user;

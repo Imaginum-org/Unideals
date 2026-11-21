@@ -1,9 +1,10 @@
-import { memo, useRef } from "react";
-import { Check, CheckCheck, Copy, Reply, RotateCcw, ShieldAlert, X } from "lucide-react";
+import { memo, useCallback, useRef, useState } from "react";
+import { Check, CheckCheck, Copy, Reply, RotateCcw, ShieldAlert, SmilePlus, X } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 import { formatName } from "../utils/display.js";
 import VoiceNote from "./VoiceNote.jsx";
 import ChatPhoto from "./ChatPhoto.jsx";
+import { ReactionChips, ReactionPicker } from "./MessageReactions.jsx";
 
 export const fmtTime = (iso) => {
   try {
@@ -91,6 +92,7 @@ const MessageBubble = ({
   onCounter,
   onReply,
   onJumpTo,
+  onReact,
   acting,
   isLastOfGroup = true,
   query = "",
@@ -99,16 +101,29 @@ const MessageBubble = ({
   const pressTimer = useRef(null);
   const repliable = msg?.message_type !== "system" && !msg?.is_flagged;
   const copyable = msg?.message_type === "text" && !msg?.is_flagged;
+  // Saved (non-optimistic) user messages can be reacted to.
+  const reactable = repliable && Boolean(onReact) && !String(msg?._id || "").startsWith("temp-");
+  const [picker, setPicker] = useState(null); // null | "hover" | "press"
+  const closePicker = useCallback(() => setPicker(null), []);
+  const myReaction = (msg?.reactions || []).find((r) => String(r.user_id) === String(myId))?.emoji || null;
+  const pick = useCallback(
+    (emoji) => {
+      setPicker(null);
+      onReact?.(msg, emoji);
+    },
+    [onReact, msg],
+  );
 
   const onTouchStart = (e) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    if (copyable) {
+    if (reactable || copyable) {
       clearTimeout(pressTimer.current);
       pressTimer.current = setTimeout(() => {
         touchStart.current = null;
-        copyText(msg.text);
         navigator.vibrate?.(10);
-      }, 500);
+        if (reactable) setPicker("press");
+        else copyText(msg.text);
+      }, 450);
     }
   };
   const onTouchMove = (e) => {
@@ -137,6 +152,18 @@ const MessageBubble = ({
         isMine ? "right-full mr-1.5" : "left-full ml-1.5"
       }`}
     >
+      {reactable && (
+        <button
+          type="button"
+          onClick={() => setPicker((v) => (v ? null : "hover"))}
+          aria-label="React"
+          title="React"
+          aria-expanded={Boolean(picker)}
+          className="grid size-7 place-items-center rounded-full text-slate-500 hover:bg-neutral-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+        >
+          <SmilePlus size={14} />
+        </button>
+      )}
       <button
         type="button"
         onClick={() => onReply?.(msg)}
@@ -159,6 +186,24 @@ const MessageBubble = ({
       )}
     </div>
   ) : null;
+
+  const Picker = picker ? (
+    <ReactionPicker
+      isMine={isMine}
+      mine={myReaction}
+      onPick={pick}
+      onClose={closePicker}
+      onCopy={
+        picker === "press" && copyable
+          ? () => {
+              setPicker(null);
+              copyText(msg.text);
+            }
+          : null
+      }
+    />
+  ) : null;
+  const Chips = <ReactionChips reactions={msg?.reactions} myId={myId} isMine={isMine} onToggle={(e) => onReact?.(msg, e)} />;
 
   const QuoteBlock = msg?.reply ? (
     <button
@@ -210,6 +255,7 @@ const MessageBubble = ({
       <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
         <div className="relative w-[260px] max-w-[85%]">
           {Toolbar}
+          {Picker}
           <div
             className={`overflow-hidden rounded-2xl border shadow-sm ${
               isMine
@@ -260,6 +306,7 @@ const MessageBubble = ({
               </div>
             </div>
           </div>
+          {Chips}
         </div>
       </div>
     );
@@ -285,6 +332,7 @@ const MessageBubble = ({
       <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
         <div className="relative max-w-[86%] md:max-w-[70%]">
           {Toolbar}
+          {Picker}
           <div
             className={`relative p-1 shadow-[0_1px_1px_rgba(15,23,42,0.06)] ${
               isMine
@@ -314,6 +362,7 @@ const MessageBubble = ({
               </div>
             )}
           </div>
+          {Chips}
         </div>
       </div>
     );
@@ -324,6 +373,7 @@ const MessageBubble = ({
       <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
         <div className="relative max-w-[86%] md:max-w-[70%]">
           {Toolbar}
+          {Picker}
           <div
             className={`relative px-2.5 pb-1.5 pt-2 shadow-[0_1px_1px_rgba(15,23,42,0.06)] ${
               isMine
@@ -338,6 +388,7 @@ const MessageBubble = ({
               {isMine && <Ticks status={msg.message_status} />}
             </span>
           </div>
+          {Chips}
         </div>
       </div>
     );
@@ -347,6 +398,7 @@ const MessageBubble = ({
     <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
       <div className="relative max-w-[82%] md:max-w-[70%]">
         {Toolbar}
+          {Picker}
         <div
           className={`relative break-words px-3 pb-1.5 pt-1.5 text-[14px] leading-[20px] shadow-[0_1px_1px_rgba(15,23,42,0.06)] [overflow-wrap:anywhere] ${
             isMine
@@ -363,6 +415,7 @@ const MessageBubble = ({
             {isMine && <Ticks status={msg.message_status} />}
           </span>
         </div>
+        {Chips}
       </div>
     </div>
   );

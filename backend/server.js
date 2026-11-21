@@ -20,6 +20,7 @@ if (missingEnv.length) {
 }
 
 import http from "http";
+import mongoose from "mongoose";
 import app from "./src/app.js";
 import { connectDB } from "./src/config/db.js";
 import { backfillSellerTiers, ensureAdminPlans } from "./src/utils/sellerTierSync.js";
@@ -30,6 +31,7 @@ import { scheduleDispatchNotifications } from "./src/jobs/dispatchScheduledNotif
 import { scheduleEmailAlerts } from "./src/jobs/emailAlerts.job.js";
 import { scheduleSweepVoiceFiles } from "./src/jobs/sweepVoiceFiles.job.js";
 import { startScheduledJobs } from "./src/jobs/jobRegistry.js";
+import { cloudinaryMissing } from "./src/utils/cloudinary.js";
 import { initSockets } from "./src/sockets/index.js";
 
 const PORT = process.env.PORT || 5000;
@@ -37,6 +39,15 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await connectDB();
+
+    // Optional integrations: say clearly (names only, never values) what is
+    // off, so a missing env var is one glance at the logs, not a mystery.
+    const cldMissing = cloudinaryMissing();
+    console.log(
+      cldMissing.length
+        ? `[Cloudinary] chat photos OFF, missing: ${cldMissing.join(", ")}`
+        : "[Cloudinary] chat photos ON",
+    );
 
     scheduleCleanupDeletedProducts();
     scheduleExpireBoosts();
@@ -52,6 +63,28 @@ const startServer = async () => {
 
     const httpServer = http.createServer(app);
     initSockets(httpServer);
+
+    // Graceful shutdown (deploys, nodemon restarts): stop accepting new
+    // requests, give in-flight ones up to 8s to finish, then close Mongo.
+    let shuttingDown = false;
+    const shutdown = (signal) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      console.log(`[Server] ${signal} received, finishing in-flight requests…`);
+      const force = setTimeout(() => process.exit(0), 8000);
+      force.unref();
+      httpServer.close(async () => {
+        try {
+          await mongoose.connection.close();
+        } catch {
+          // already closed
+        }
+        process.exit(0);
+      });
+      httpServer.closeIdleConnections?.();
+    };
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
 
     httpServer.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

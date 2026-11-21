@@ -117,3 +117,18 @@ export const sendImage = async (req, res, next) => {
     forwardServiceError(error, next);
   }
 };
+
+// PUT /api/conversations/:id/messages/:messageId/reaction { emoji | null }
+export const reactToMessage = async (req, res, next) => {
+  try {
+    const reactions = await messageService.setReaction({
+      conversationId: req.params.id,
+      messageId: req.params.messageId,
+      userId: req.userId,
+      emoji: req.body.emoji ?? null,
+    });
+    return res.status(200).json({ success: true, data: reactions });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};

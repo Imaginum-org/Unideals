@@ -41,17 +41,6 @@ mongoose.connection.on("disconnected", () => {
   console.warn("MongoDB disconnected");
 });
 
-// Graceful Shutdown
-const gracefulShutdown = async () => {
-  try {
-    await mongoose.connection.close();
-    console.log("MongoDB connection closed");
-    process.exit(0);
-  } catch (err) {
-    console.error("Error while closing MongoDB connection:", err);
-    process.exit(1);
-  }
-};
-
-process.on("SIGINT", gracefulShutdown);
-process.on("SIGTERM", gracefulShutdown);
+// Shutdown is handled in server.js: it stops taking requests and lets the
+// in-flight ones finish BEFORE closing this connection (closing first is
+// what produced "MongoClientClosedError: Operation interrupted").

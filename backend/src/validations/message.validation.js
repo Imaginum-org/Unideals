@@ -42,3 +42,8 @@ export const sendImageSchema = z.object({
   caption: z.string().trim().max(1000, "Caption too long").optional(),
   replyTo: objectId.optional(),
 });
+
+export const reactionSchema = z.object({
+  // null clears your reaction; the allowed set is enforced in the service.
+  emoji: z.string().trim().max(16).nullable(),
+});

@@ -1,9 +1,12 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import userModel from "../models/User.model.js";
 import { USER_STATUS } from "../config/constants.js";
 import generatedAccessToken from "../utils/generatedAccessToken.js";
-import generatedRefreshToken from "../utils/generatedRefreshToken.js";
+import generatedRefreshToken, { hashRefreshToken, sessionIdOf } from "../utils/generatedRefreshToken.js";
+import AuthSession from "../models/AuthSession.model.js";
+import { forgetSession } from "../utils/sessionCache.js";
 
 export const getAuthCookieOptions = () => {
   const frontendUrl = process.env.FRONTEND_URL || "";
@@ -37,10 +40,14 @@ export const setAuthCookies = (res, accessToken, refreshToken) => {
     maxAge: 15 * 60 * 1000,
   });
 
-  res.cookie("refreshToken", refreshToken, {
-    ...baseCookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  // A grace-window replay has no new refresh token: leave the cookie the
+  // first (rotating) response just set.
+  if (refreshToken) {
+    res.cookie("refreshToken", refreshToken, {
+      ...baseCookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+  }
 };
 
 export const clearAuthCookies = (res) => {
@@ -188,8 +195,8 @@ export const loginWithPassword = async ({
 
   clearLoginFailures(normalizedEmail);
 
-  const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
   const refreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
+  const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0, sessionIdOf(refreshToken));
 
   await userModel.findByIdAndUpdate(user._id, {
     last_login_date: new Date(),
@@ -214,6 +221,15 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
     process.env.SECRET_KEY_REFRESH_TOKEN,
     { algorithms: ["HS256"] },
   );
+
+  // Per-device session (tokens carrying `sid`). One indexed lookup by _id.
+  if (decoded.sid) {
+    return refreshDeviceSession({ decoded, refreshToken, allowedRoles });
+  }
+
+  // ---- Legacy single-token sessions (issued before per-device sessions).
+  // Still honoured until they expire; a successful refresh moves the user
+  // onto a device session and clears the old fields.
   const user = await userModel
     .findById(decoded.id)
     .select("+refresh_token +refresh_token_prev +refresh_token_prev_expires_at");
@@ -285,8 +301,13 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
     };
   }
 
-  const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
   const newRefreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
+  const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0, sessionIdOf(newRefreshToken));
+  // Migrated: the legacy token must not be usable any more.
+  await userModel.updateOne(
+    { _id: user._id },
+    { $set: { refresh_token: null, refresh_token_prev: null, refresh_token_prev_expires_at: null } },
+  );
 
   return {
     accessToken,
@@ -295,15 +316,95 @@ export const refreshSession = async ({ refreshToken, allowedRoles = null }) => {
   };
 };
 
+const sessionError = (message = "Invalid or expired refresh token", statusCode = 401) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+/**
+ * Refresh for a per-device session: the token's hash must be this
+ * session's current one (or the previous one inside the grace window).
+ * Then the same account checks as before (token version, status, role),
+ * and the session rotates atomically. Other devices are untouched.
+ */
+const refreshDeviceSession = async ({ decoded, refreshToken, allowedRoles }) => {
+  if (!mongoose.Types.ObjectId.isValid(decoded.sid) || !mongoose.Types.ObjectId.isValid(decoded.id)) {
+    throw sessionError();
+  }
+  const hash = hashRefreshToken(refreshToken);
+  const [session, user] = await Promise.all([
+    AuthSession.findOne({ _id: decoded.sid, user_id: decoded.id })
+      .select("token_hash prev_hash prev_expires_at")
+      .lean(),
+    userModel.findById(decoded.id),
+  ]);
+  if (!session || !user) throw sessionError();
+
+  const isCurrent = session.token_hash === hash;
+  const isGrace =
+    !isCurrent &&
+    session.prev_hash === hash &&
+    session.prev_expires_at &&
+    new Date(session.prev_expires_at).getTime() > Date.now();
+  // Never revoke on a failed refresh (stale cookies, races): just fail it.
+  if (!isCurrent && !isGrace) throw sessionError();
+
+  if (typeof decoded.v !== "number" || (typeof user.tokenVersion === "number" && decoded.v !== user.tokenVersion)) {
+    throw sessionError("Session revoked. Please log in again.");
+  }
+  if (user.status !== USER_STATUS.ACTIVE) {
+    const statusLabel = user.status === USER_STATUS.SUSPENDED ? "suspended" : "inactive";
+    const error = sessionError(`Your account is ${statusLabel}. Please contact support.`, 403);
+    error.accountBlocked = true;
+    error.accountStatus = user.status;
+    throw error;
+  }
+  if (allowedRoles && !allowedRoles.includes(user.role)) throw sessionError("Invalid credentials");
+
+  // Same device session before and after rotation.
+  const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0, decoded.sid);
+  if (isGrace) {
+    // A parallel request already rotated this session: hand out a fresh
+    // access token and keep the refresh token the first reply set.
+    return { accessToken, refreshToken: null, user: sanitizeAuthUser(user) };
+  }
+  const newRefreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0, { sessionId: decoded.sid });
+  return { accessToken, refreshToken: newRefreshToken, user: sanitizeAuthUser(user) };
+};
+
+/** Sign out ONE device: delete the session this refresh token belongs to. */
+export const revokeSessionByToken = async (refreshToken) => {
+  if (!refreshToken) return false;
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.SECRET_KEY_REFRESH_TOKEN, { algorithms: ["HS256"] });
+    if (!decoded.sid) return revokeRefreshTokenByToken(refreshToken); // legacy token
+    const hash = hashRefreshToken(refreshToken);
+    forgetSession(decoded.sid);
+    const res = await AuthSession.deleteOne({
+      _id: decoded.sid,
+      user_id: decoded.id,
+      $or: [{ token_hash: hash }, { prev_hash: hash }],
+    });
+    return res.deletedCount > 0;
+  } catch {
+    return false;
+  }
+};
+
+/** Sign out EVERY device (password reset, "log out everywhere", admin). */
 export const revokeRefreshToken = async (userId) => {
   if (!userId) return;
 
-  await userModel.findByIdAndUpdate(userId, {
-    refresh_token: null,
-    refresh_token_prev: null,
-    refresh_token_prev_expires_at: null,
-    $inc: { tokenVersion: 1 },
-  });
+  await Promise.all([
+    userModel.findByIdAndUpdate(userId, {
+      refresh_token: null,
+      refresh_token_prev: null,
+      refresh_token_prev_expires_at: null,
+      $inc: { tokenVersion: 1 },
+    }),
+    AuthSession.deleteMany({ user_id: userId }),
+  ]);
 };
 
 export const revokeRefreshTokenByToken = async (refreshToken) => {

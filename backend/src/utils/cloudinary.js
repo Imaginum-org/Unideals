@@ -14,15 +14,42 @@ import crypto from "crypto";
 
 export const CHAT_IMAGE_TAG = "chat";
 export const CHAT_IMAGE_FORMATS = "jpg,jpeg,png,webp,heic,heif,avif";
-// Incoming transformation: whatever is uploaded is stored at most 1600px.
-const INCOMING = "c_limit,h_1600,w_1600";
+// Incoming transformation (applied before storing): at most 1600px and
+// recompressed with q_auto:good, so even an uncompressed upload (e.g. HEIC
+// straight from an iPhone) is stored small. Saves storage credits; delivery
+// adds f_auto/q_auto on top.
+const INCOMING = "c_limit,h_1600,w_1600,q_auto:good";
 const SIGN_TTL_S = 10 * 60;
 
-const cfg = () => ({
-  cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
-  apiKey: process.env.CLOUDINARY_API_KEY || "",
-  apiSecret: process.env.CLOUDINARY_API_SECRET || "",
-});
+// Hosting dashboards often keep stray quotes/spaces in pasted values.
+const clean = (v) => String(v || "").trim().replace(/^["']|["']$/g, "").trim();
+
+// Either the three separate variables, or Cloudinary's single
+// CLOUDINARY_URL (cloudinary://<api_key>:<api_secret>@<cloud_name>).
+const fromUrl = () => {
+  const raw = clean(process.env.CLOUDINARY_URL);
+  const m = /^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/.exec(raw);
+  return m ? { apiKey: m[1], apiSecret: m[2], cloudName: m[3] } : {};
+};
+
+const cfg = () => {
+  const url = fromUrl();
+  return {
+    cloudName: clean(process.env.CLOUDINARY_CLOUD_NAME) || url.cloudName || "",
+    apiKey: clean(process.env.CLOUDINARY_API_KEY) || url.apiKey || "",
+    apiSecret: clean(process.env.CLOUDINARY_API_SECRET) || url.apiSecret || "",
+  };
+};
+
+/** Names of the missing settings (never values), for the startup log. */
+export const cloudinaryMissing = () => {
+  const c = cfg();
+  return [
+    !c.cloudName && "CLOUDINARY_CLOUD_NAME",
+    !c.apiKey && "CLOUDINARY_API_KEY",
+    !c.apiSecret && "CLOUDINARY_API_SECRET",
+  ].filter(Boolean);
+};
 
 export const cloudinaryConfigured = () => {
   const c = cfg();
