@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Check, Gift, Info, Lock, Medal, Rocket, Sparkles } from "lucide-react";
+import { ArrowRight, Gift, Info, Lock, Medal, Rocket, Sparkles } from "lucide-react";
 import { BADGE_CATALOGUE, LEVEL_REWARDS_GUIDE, rankName, RANK_CONFIG, RANK_TIERS_GUIDE } from "../../../utils/badgeConfig.js";
 import RankGuideModal from "./RankGuideModal.jsx";
+import RankEmblem from "./RankEmblem.jsx";
 import { fetchMyRewards } from "../api/badgeApi.js";
 import { cn } from "../../../utils/cn.js";
 
@@ -60,13 +61,7 @@ export default function LevelCard({
           />
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <span
-                className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl text-[34px] shadow-sm ring-1 ring-black/5"
-                style={{ background: rank.bg }}
-                aria-hidden="true"
-              >
-                {rank.icon}
-              </span>
+              <RankEmblem title={rank_title} color={rank.color} size={64} className="shrink-0 drop-shadow-md" />
               <div className="min-w-0">
                 <p className="text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">Level {level}</p>
                 <h2 className="text-[24px] font-semibold leading-tight tracking-tight" style={{ color: rank.color }}>
@@ -141,16 +136,14 @@ export default function LevelCard({
                 <li key={t.title} className="flex min-w-[96px] flex-1 flex-col items-center text-center" aria-current={current ? "step" : undefined}>
                   <div className="flex w-full items-center">
                     <span className={cn("h-0.5 flex-1", i === 0 ? "bg-transparent" : done || current ? "bg-[var(--accent)]" : "bg-neutral-200 dark:bg-neutral-700")} />
-                    <span
-                      className={cn(
-                        "grid h-9 w-9 shrink-0 place-items-center rounded-full text-[17px] transition",
-                        current ? "ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#1A1D20]" : "",
-                        !done && !current && "opacity-50 grayscale",
-                      )}
-                      style={{ background: t.bg, ...(current ? { "--tw-ring-color": t.color } : {}) }}
-                      title={`${t.name} · Level ${t.minLevel}+`}
-                    >
-                      {done ? <Check className="h-4 w-4" style={{ color: t.color }} strokeWidth={3} /> : t.icon}
+                    <span className="grid shrink-0 place-items-center" title={`${t.name} · Level ${t.minLevel}+`}>
+                      <RankEmblem
+                        title={t.title}
+                        color={t.color}
+                        locked={!done && !current}
+                        size={current ? 38 : 34}
+                        className={cn(current ? "drop-shadow-md" : "text-slate-400 dark:text-zinc-500")}
+                      />
                     </span>
                     <span className={cn("h-0.5 flex-1", i === RANK_TIERS_GUIDE.length - 1 ? "bg-transparent" : done ? "bg-[var(--accent)]" : "bg-neutral-200 dark:bg-neutral-700")} />
                   </div>

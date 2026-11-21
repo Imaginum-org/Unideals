@@ -16,6 +16,12 @@ export const GIRLS_ERRORS = Object.freeze({
     code: "GIRLS_ONLY_PRODUCT",
     message: "This is a girls-only listing. Only girls can start this chat.",
   },
+  // Admin (not Female) listing in Girls Corner: the client must confirm first.
+  ADMIN_CONFIRM_GIRLS_ONLY: {
+    statusCode: 409,
+    code: "ADMIN_CONFIRM_GIRLS_ONLY",
+    message: "Your account isn't set as Female. Confirm to list this in Girls Corner anyway.",
+  },
   GENDER_LOCKED: {
     statusCode: 429,
     code: "GENDER_LOCKED",
@@ -35,6 +41,18 @@ export const canViewGirlsFeed = (gender, role) =>
 
 export const canSeeGirlsProduct = (gender, role) =>
   gender === "female" || isAdminRole(role);
+
+// Who may put a listing in Girls Corner: Female accounts, and admins once
+// they confirm (the client shows an "you are not female" prompt and resends
+// with confirmNotFemale: true). Everyone else is refused.
+export const assertCanListGirlsOnly = (user, confirmed = false) => {
+  if (isEligibleGender(user?.gender)) return;
+  if (user?.role === "admin") {
+    if (confirmed === true || confirmed === "true") return;
+    throw girlsCornerError("ADMIN_CONFIRM_GIRLS_ONLY");
+  }
+  throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
+};
 
 export const girlsCornerError = (key, extra = {}) => {
   const base = GIRLS_ERRORS[key] || { statusCode: 403, code: key, message: key };

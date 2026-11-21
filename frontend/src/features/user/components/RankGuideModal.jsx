@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Check, Gift, X } from "lucide-react";
 import { LEVEL_REWARDS_GUIDE, RANK_TIERS_GUIDE, XP_ACTIVITIES_GUIDE, rankName, xpToNextLevel } from "../../../utils/badgeConfig.js";
 import { cn } from "../../../utils/cn.js";
+import RankEmblem from "./RankEmblem.jsx";
 
 const TABS = [
   { id: "ranks", label: "Ranks" },
@@ -129,13 +130,13 @@ export default function RankGuideModal({ isOpen, onClose, currentRank = "Seedlin
                     )}
                   >
                     <div className="flex items-start gap-3">
-                      <span
-                        className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[20px]", !done && !current && "opacity-60 grayscale")}
-                        style={{ background: t.bg }}
-                        aria-hidden="true"
-                      >
-                        {t.icon}
-                      </span>
+                      <RankEmblem
+                        title={t.title}
+                        color={t.color}
+                        locked={!done && !current}
+                        size={40}
+                        className={cn("shrink-0", current ? "drop-shadow-md" : "text-slate-400 dark:text-zinc-500")}
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                           <p className="text-[14.5px] font-semibold text-slate-900 dark:text-white">{t.name}</p>

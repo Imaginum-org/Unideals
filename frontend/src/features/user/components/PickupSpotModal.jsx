@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, MapPin } from "lucide-react";
+import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "../../../components/ui/toast.js";
 
@@ -23,7 +23,6 @@ const PickupSpotModal = ({
     isPrimary: false,
   });
 
-  const [loadingLocation, setLoadingLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -88,49 +87,6 @@ const PickupSpotModal = ({
     }
   };
 
-  const handleCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error("Geolocation not supported");
-      return;
-    }
-
-    setLoadingLocation(true);
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch(
-            // Only the locality is needed: send ~100 m precision, never the exact fix.
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.coords.latitude.toFixed(3)}&longitude=${pos.coords.longitude.toFixed(3)}&localityLanguage=en`,
-            { referrerPolicy: "no-referrer", credentials: "omit" },
-          );
-
-          const data = await res.json();
-
-          setFormData((prev) => ({
-            ...prev,
-            name: data.locality || data.city || "Current location",
-            detail: [
-              data.locality || data.city,
-              data.principalSubdivision,
-              data.postcode,
-            ]
-              .filter(Boolean)
-              .join(", "),
-          }));
-        } catch {
-          toast.error("Unable to fetch location");
-        } finally {
-          setLoadingLocation(false);
-        }
-      },
-      () => {
-        toast.error("Location permission denied");
-        setLoadingLocation(false);
-      },
-    );
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -157,16 +113,6 @@ const PickupSpotModal = ({
           </div>
 
           <div className="flex flex-col gap-4">
-            <button
-              type="button"
-              onClick={handleCurrentLocation}
-              disabled={loadingLocation}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#D8DDEA] bg-[#F7F8FA] py-3 text-sm font-semibold text-[#334155] transition-colors hover:border-[#B8B6FF] hover:bg-[#F7F7FF] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#303641] dark:bg-[#20242B] dark:text-[#D7DEE8] dark:hover:border-[#4F46FF]/60 dark:hover:bg-[#252A35] lg:text-[15px]"
-            >
-              <MapPin size={18} />
-              <ButtonLoader loading={loadingLocation} loadingText="Locating…">Select Current Location</ButtonLoader>
-            </button>
-
             <input
               type="text"
               name="name"

@@ -29,9 +29,10 @@ export const fetchConversation = async (id, { signal } = {}) => {
   return data?.data;
 };
 
-export const fetchMessages = async (id, { limit = 50, before, signal } = {}) => {
+// `after`: incremental catch-up, only messages newer than that id.
+export const fetchMessages = async (id, { limit = 50, before, after, signal } = {}) => {
   const { data } = await axios.get(`/api/conversations/${id}/messages`, {
-    params: { limit, ...(before ? { before } : {}) },
+    params: { limit, ...(before ? { before } : after ? { after } : {}) },
     ...(signal ? { signal } : {}),
   });
   return { messages: data?.data || [], hasMore: Boolean(data?.hasMore) };
@@ -106,5 +107,16 @@ export const cancelDeal = async (id, reason = "") => {
 // Seller: step the deal back one stage (payment → pickup → confirmed → negotiating).
 export const revertDeal = async (id, from) => {
   const { data } = await axios.post(`/api/conversations/${id}/revert`, from ? { from } : {});
+  return data?.data;
+};
+
+// Voice note: the file is already on ImageKit; only its id + metadata go here.
+export const sendVoice = async (id, { fileId, durationMs, peaks, replyTo } = {}) => {
+  const { data } = await axios.post(`/api/conversations/${id}/voice`, {
+    fileId,
+    durationMs,
+    peaks,
+    ...(replyTo ? { replyTo } : {}),
+  });
   return data?.data;
 };

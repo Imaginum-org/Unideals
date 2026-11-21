@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
+  Handshake,
   MapPin,
   Package,
   ShoppingCart,
@@ -190,30 +191,67 @@ const DealProgress = ({
   );
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-neutral-800 dark:bg-[#1A1D20]">
+    <div className="relative overflow-hidden rounded-2xl bg-white/85 shadow-[0_10px_30px_-14px_rgba(15,23,42,0.35),0_2px_6px_-2px_rgba(15,23,42,0.08)] ring-1 ring-black/[0.06] backdrop-blur-xl backdrop-saturate-150 dark:bg-[#1A1D20]/85 dark:shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)] dark:ring-white/[0.08]">
+      {/* accent hairline along the top (collapsed only; the expanded card
+          shows the full stepper instead): the stage fills it left to right */}
+      <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-[2px] bg-[var(--accent-soft)] transition-opacity duration-200 ${open ? "opacity-0" : "opacity-100"}`}>
+        <span
+          className="block h-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] transition-[width] duration-700 ease-out"
+          style={{ width: status === "cancelled" ? "0%" : `${idx < 0 ? 8 : ((idx + 1) / STAGES.length) * 100}%` }}
+        />
+      </span>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
         aria-label={open ? "Collapse deal progress" : "Expand deal progress"}
-        className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5"
+        data-deal-header=""
+        className="flex w-full items-center justify-between gap-2.5 px-3 py-2 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.02]"
       >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white">Deal</span>
-          <span className="truncate text-[12.5px] text-slate-500 dark:text-zinc-400">
-            {idx >= 0 ? STAGES[idx] : dealStatusBadge(status).label}
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[var(--accent)] text-white shadow-[0_4px_10px_-4px_var(--accent-ring)]">
+            <Handshake size={14} aria-hidden="true" />
+          </span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-[13.5px] font-semibold text-slate-900 dark:text-white">Deal</span>
+            <span className="flex min-w-0 items-center gap-1.5 rounded-full bg-neutral-100/80 px-2 py-0.5 text-[11.5px] font-medium text-slate-600 dark:bg-white/5 dark:text-zinc-300">
+              <span
+                aria-hidden="true"
+                className={`relative inline-flex h-1.5 w-1.5 shrink-0 rounded-full ${
+                  status === "cancelled" ? "bg-red-500" : status === "completed" ? "bg-emerald-500" : "bg-[var(--accent)]"
+                }`}
+              >
+                {status !== "cancelled" && status !== "completed" && (
+                  <span className="absolute inset-0 animate-ping rounded-full bg-[var(--accent)] opacity-60 motion-reduce:animate-none" />
+                )}
+              </span>
+              <span className="truncate">{idx >= 0 ? STAGES[idx] : dealStatusBadge(status).label}</span>
+            </span>
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
-          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[12px] font-semibold tabular-nums text-slate-700 dark:bg-white/5 dark:text-zinc-200">
+          {/* mini stepper, visible even when collapsed */}
+          <span className="hidden items-center gap-1 sm:flex" aria-hidden="true">
+            {STAGES.map((label, i) => (
+              <span
+                key={label}
+                className={`h-1.5 w-5 rounded-full transition-colors duration-500 ${
+                  idx >= i && status !== "cancelled" ? "bg-[var(--accent)]" : "bg-neutral-200 dark:bg-neutral-700"
+                }`}
+              />
+            ))}
+          </span>
+          <span className="rounded-md bg-[var(--accent-soft)] px-2 py-0.5 text-[12.5px] font-bold tabular-nums text-[var(--accent-text)]">
             {inr(deal?.current_price)}
           </span>
-          <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-neutral-100 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
+            <ChevronDown size={14} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+          </span>
         </span>
       </button>
 
       {open && (
-        <div className="border-t border-neutral-100 px-3.5 pb-3.5 pt-3 dark:border-neutral-800">
+        <div className="border-t border-black/[0.05] px-3.5 pb-3.5 pt-3 dark:border-white/[0.06]">
           {/* 3-stage stepper */}
           <ol className="grid grid-cols-3 gap-1.5" aria-label="Deal stages">
             {STAGES.map((label, i) => {
@@ -221,7 +259,7 @@ const DealProgress = ({
               const current = idx === i;
               return (
                 <li key={label} className="min-w-0" aria-current={current ? "step" : undefined}>
-                  <div className={`h-1.5 rounded-full transition-colors duration-500 ${done ? "bg-[var(--accent)]" : "bg-neutral-200 dark:bg-neutral-700"}`} />
+                  <div className={`h-1.5 rounded-full transition-colors duration-500 ${done ? "bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)]" : "bg-neutral-200 dark:bg-neutral-700"}`} />
                   <p
                     className={`mt-1.5 flex items-center gap-1 truncate text-[11.5px] ${
                       done ? "font-semibold text-slate-800 dark:text-zinc-100" : "text-slate-400 dark:text-zinc-500"

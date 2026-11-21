@@ -5,7 +5,8 @@ import Message from "../models/message.model.js";
 import Report from "../models/Report.model.js";
 import ChatCooldown from "../models/ChatCooldown.model.js";
 import User from "../models/User.model.js";
-import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS } from "../config/constants.js";
+import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS, VOICE_LIMITS } from "../config/constants.js";
+import { getFileDetails, isInVoiceFolderOf, isValidFileId } from "../utils/imagekit.js";
 import { AppError } from "../utils/appError.js";
 import { emitToConversation, emitToUser } from "../utils/socket.js";
 import { screenText, BLOCKED_PLACEHOLDER } from "../utils/profanity.js";
@@ -280,17 +281,149 @@ export const sendTextMessage = async ({ conversationId, senderId, text, replyTo 
   return payload;
 };
 
+const fmtClock = (ms) => {
+  const s = Math.max(1, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+// ImageKit may label a WebM/MP4 audio-only file as video/*.
+const VOICE_MIME_RE = /^(audio\/[a-z0-9.+-]+|video\/(webm|mp4))$/i;
+
+/**
+ * Voice note. The client records, uploads straight to ImageKit (signed,
+ * into its own /voice folder, tag "voice"), then sends only the fileId.
+ * Nothing about the file is trusted from the client: owner folder, size,
+ * type and URL come from ImageKit's record (one API call), and the
+ * partial-unique index on audio.file_id stops a file being sent twice.
+ * Bandwidth never touches this server. Rate limits live on the route
+ * (per account, minute/hour/day) on top of the shared abuse cooldown.
+ */
+export const sendVoiceMessage = async ({ conversationId, senderId, fileId, durationMs, peaks = [], replyTo = null }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw new AppError("Invalid conversation ID", 400);
+  }
+  if (!isValidFileId(fileId)) throw new AppError("Invalid voice note", 400);
+  const duration = Math.round(Number(durationMs));
+  if (!Number.isFinite(duration) || duration < VOICE_LIMITS.MIN_DURATION_MS) {
+    throw new AppError("Voice note is too short", 400);
+  }
+  if (duration > VOICE_LIMITS.MAX_DURATION_MS + 1500) {
+    throw new AppError("Voice notes can be up to 2 minutes", 400);
+  }
+
+  await assertNotCoolingDown(senderId);
+
+  // Cheap DB checks before the external call.
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation || !conversation.is_active) {
+    throw new AppError("Conversation not found", 404);
+  }
+  assertParticipant(conversation, senderId);
+  const receiverId = otherPartyOf(conversation, senderId);
+  if (await Message.exists({ "audio.file_id": fileId })) {
+    throw new AppError("This voice note was already sent", 409);
+  }
+
+  let replyToId = null;
+  if (replyTo) {
+    if (!mongoose.Types.ObjectId.isValid(replyTo)) throw new AppError("Invalid reply reference", 400);
+    const quoted = await Message.findById(replyTo).select("conversation_id message_type").lean();
+    if (!quoted || String(quoted.conversation_id) !== String(conversation._id)) {
+      throw new AppError("Replied message not found in this chat", 400);
+    }
+    if (quoted.message_type === MESSAGE_TYPE.SYSTEM) throw new AppError("Cannot reply to system messages", 400);
+    replyToId = quoted._id;
+  }
+
+  let file;
+  try {
+    file = await getFileDetails(fileId);
+  } catch {
+    throw new AppError("Voice note upload not found. Please record it again.", 400);
+  }
+  const endpoint = String(process.env.IMAGEKIT_URL_ENDPOINT || "").replace(/\/+$/, "");
+  if (!isInVoiceFolderOf(file?.filePath, senderId)) throw new AppError("Invalid voice note", 403);
+  if (!(Number(file?.size) > 0) || Number(file.size) > VOICE_LIMITS.MAX_BYTES) {
+    throw new AppError("Voice note is too large", 413);
+  }
+  if (file?.mime && !VOICE_MIME_RE.test(file.mime)) throw new AppError("Unsupported audio format", 415);
+  if (!endpoint || !String(file?.url || "").startsWith(`${endpoint}/`)) throw new AppError("Invalid voice note", 400);
+
+  // Waveform: at most PEAKS bars, each an integer 0–100.
+  const cleanPeaks = (Array.isArray(peaks) ? peaks : [])
+    .slice(0, VOICE_LIMITS.PEAKS)
+    .map((v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0))));
+
+  let message;
+  try {
+    message = await Message.create({
+      conversation_id: conversation._id,
+      sender_id: senderId,
+      receiver_id: receiverId,
+      message_type: MESSAGE_TYPE.AUDIO,
+      text: "Voice message",
+      message_status: MESSAGE_STATUS.SENT,
+      reply_to: replyToId,
+      audio: {
+        url: file.url,
+        file_id: fileId,
+        duration_ms: Math.min(duration, VOICE_LIMITS.MAX_DURATION_MS),
+        mime: file.mime || "",
+        size: Number(file.size) || 0,
+        peaks: cleanPeaks,
+      },
+    });
+  } catch (err) {
+    if (err?.code === 11000) throw new AppError("This voice note was already sent", 409);
+    throw err;
+  }
+
+  const preview = `🎤 Voice message (${fmtClock(message.audio.duration_ms)})`;
+  const activityAt = new Date();
+  const unreadSide = String(conversation.buyer_id) === String(receiverId) ? "buyer" : "seller";
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    {
+      $set: {
+        last_message: preview,
+        last_message_type: MESSAGE_TYPE.AUDIO,
+        last_message_sender: senderId,
+        last_activity_at: activityAt,
+      },
+      $inc: { [`unread_count.${unreadSide}`]: 1 },
+    },
+  );
+
+  const [payload] = await attachReplies([toClientMessage(message)]);
+  emitToConversation(conversation._id, "message:new", payload);
+  emitToUser(receiverId, "conversation:updated", {
+    conversationId: String(conversation._id),
+    last_message: preview,
+    last_activity_at: activityAt,
+  });
+  try {
+    const sender = await loadAuthUser(User, senderId);
+    notifyNewMessage({
+      conversationId: conversation._id,
+      senderId,
+      receiverId,
+      senderName: sender?.name || "A user",
+      textSnippet: preview,
+    });
+  } catch {
+    // never break sending if notification fails
+  }
+  return payload;
+};
+
 /**
  * Paginated messages, oldest -> newest for rendering.
  * `before` = ObjectId cursor; loads older messages.
  */
-export const getMessages = async ({ conversationId, userId, limit = 50, before = null }) => {
+export const getMessages = async ({ conversationId, userId, limit = 50, before = null, after = null }) => {
   if (!mongoose.Types.ObjectId.isValid(conversationId)) {
     throw new AppError("Invalid conversation ID", 400);
   }
-  const conversation = await Conversation.findById(conversationId).select(
-    "buyer_id seller_id",
-  );
+  const conversation = await Conversation.findById(conversationId).select("buyer_id seller_id").lean();
   if (!conversation) throw new AppError("Conversation not found", 404);
   assertParticipant(conversation, userId);
 
@@ -303,12 +436,24 @@ export const getMessages = async ({ conversationId, userId, limit = 50, before =
       throw new AppError("Invalid message cursor", 400);
     }
     filter._id = { $lt: new mongoose.Types.ObjectId(before) };
+  } else if (after) {
+    // Incremental catch-up (safety-net polls, post-action refresh): only
+    // messages newer than the client's last one. Usually zero rows, so the
+    // reply/receipt work below is skipped too.
+    if (!mongoose.Types.ObjectId.isValid(after)) {
+      throw new AppError("Invalid message cursor", 400);
+    }
+    filter._id = { $gt: new mongoose.Types.ObjectId(after) };
   }
 
   const docs = await Message.find(filter)
-    .sort({ _id: -1 })
+    .sort({ _id: after && !before ? 1 : -1 })
     .limit(lim)
     .lean();
+  if (after && !before) {
+    docs.reverse(); // keep the newest-first shape the code below expects
+    if (!docs.length) return { messages: [], hasMore: false };
+  }
   // Mask flagged originals, clients never see abusive text, moderators do.
   let ordered = docs.reverse().map((m) =>
     m.is_flagged ? { ...m, text: BLOCKED_PLACEHOLDER } : m,
@@ -372,13 +517,16 @@ export const markConversationRead = async ({ conversationId, userId, receipt = t
   if (!mongoose.Types.ObjectId.isValid(conversationId)) {
     throw new AppError("Invalid conversation ID", 400);
   }
-  const conversation = await Conversation.findById(conversationId);
+  const conversation = await Conversation.findById(conversationId)
+    .select("buyer_id seller_id unread_count")
+    .lean();
   if (!conversation) throw new AppError("Conversation not found", 404);
   assertParticipant(conversation, userId);
 
   const now = new Date();
   const target = receipt === false ? MESSAGE_STATUS.DELIVERED : MESSAGE_STATUS.READ;
-  await Message.updateMany(
+  const side = String(conversation.buyer_id) === String(userId) ? "buyer" : "seller";
+  const res = await Message.updateMany(
     {
       conversation_id: conversation._id,
       receiver_id: userId,
@@ -387,14 +535,15 @@ export const markConversationRead = async ({ conversationId, userId, receipt = t
     { $set: { message_status: target, delivered_at: now, ...(receipt === false ? {} : { read_at: now }) } },
   );
 
-  if (String(conversation.buyer_id) === String(userId)) {
-    conversation.unread_count.buyer = 0;
-  } else {
-    conversation.unread_count.seller = 0;
+  // One atomic write, and only when there is something to clear (opening a
+  // thread that's already read costs a single indexed updateMany, no save).
+  if ((conversation.unread_count?.[side] || 0) !== 0) {
+    await Conversation.updateOne({ _id: conversation._id }, { $set: { [`unread_count.${side}`]: 0 } });
+    conversation.unread_count = { ...(conversation.unread_count || {}), [side]: 0 };
   }
-  await conversation.save();
 
-  if (receipt !== false) {
+  // Nothing changed: no broadcast (the peer would only re-render).
+  if (receipt !== false && res.modifiedCount > 0) {
     emitToConversation(conversation._id, "message:read", {
       conversationId: String(conversation._id),
       readBy: String(userId),

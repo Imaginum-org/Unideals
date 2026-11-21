@@ -10,12 +10,15 @@ import {
   Crown,
   ExternalLink,
   Flag,
+  IndianRupee,
+  Mic,
   Lock,
   MessagesSquare,
   MoreVertical,
   Search,
   Send,
   ShieldAlert,
+  ShieldCheck,
   Timer,
   WifiOff,
   X,
@@ -28,6 +31,9 @@ import ConversationCard from "../components/ConversationCard.jsx";
 import MessageBubble from "../components/MessageBubble.jsx";
 import DealProgress from "../components/DealProgress.jsx";
 import ReportUserModal from "../components/ReportUserModal.jsx";
+import VoiceRecorder from "../components/VoiceRecorder.jsx";
+import { uploadVoice, voiceSupported } from "../utils/voice.js";
+import { deleteImage } from "../../../utils/imageUpload.js";
 import { useChatSocket } from "../hooks/useChatSocket.js";
 import { dealStatusBadge } from "../utils/dealStage.js";
 import { chatSettingsOf, wallpaperById } from "../utils/wallpapers.js";
@@ -151,6 +157,11 @@ const ChatPanel = ({ embedded = false }) => {
 
   const messagesEndRef = useRef(null);
   const threadScrollRef = useRef(null);
+  // Floating deal bar: its live height pads the thread so nothing hides under it.
+  const dealBarRef = useRef(null);
+  const [dealBarH, setDealBarH] = useState(0);
+  const dealBarHRef = useRef(0);
+  dealBarHRef.current = dealBarH;
   const listRef = useRef(null);
   const typingTimeout = useRef(null);
   const sidebarRef = useRef(null);
@@ -284,6 +295,30 @@ const ChatPanel = ({ embedded = false }) => {
   const [stickyDay, setStickyDay] = useState("");
   // True while the matching in-flow day sticker is itself on screen, the
   // floating pill hides then (WhatsApp behaviour) to avoid doubling.
+  const hasDeal = Boolean(deal);
+  useEffect(() => {
+    const el = dealBarRef.current;
+    if (!hasDeal || !el) {
+      setDealBarH(0);
+      return undefined;
+    }
+    // Reserve only the collapsed bar (wrapper top padding + header row).
+    // Expanding floats the panel over the thread, so the messages never
+    // jump when the bar opens or closes.
+    const header = () => el.querySelector("[data-deal-header]");
+    const measure = () => {
+      const h = header();
+      if (!h) return;
+      const top = h.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      setDealBarH(Math.ceil(top + h.getBoundingClientRect().height));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(measure);
+    if (header()) ro.observe(header());
+    return () => ro.disconnect();
+  }, [hasDeal, selectedId]);
+
   const [stickyHidden, setStickyHidden] = useState(true);
   const stickyHiddenRef = useRef(true);
 
@@ -308,7 +343,7 @@ const ChatPanel = ({ embedded = false }) => {
       dayScanRef.current = false;
       const box = threadScrollRef.current;
       if (!box) return;
-      const top = box.getBoundingClientRect().top;
+      const top = box.getBoundingClientRect().top + dealBarHRef.current;
       const line = top + 72;
       let current = "";
       const hidden = stickyHiddenRef.current;
@@ -362,20 +397,49 @@ const ChatPanel = ({ embedded = false }) => {
     loadList();
   }, [loadList]);
 
+  // Many events refresh the list at once (an action, its deal broadcast,
+  // the list-update ping, window focus). Coalesce silent refreshes into one
+  // request per burst instead of 2–4 identical conversation-list queries.
+  const listTimerRef = useRef(null);
+  // Newest saved (non-optimistic) message id, for `after` catch-up fetches.
+  const messagesRef = useRef([]);
+  messagesRef.current = messages;
+  const lastServerId = () => {
+    const list = messagesRef.current;
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const id = String(list[i]?._id || "");
+      if (id && !id.startsWith("temp-")) return id;
+    }
+    return null;
+  };
+  // Pull only what's new since the last message on screen (one cheap
+  // indexed query, usually empty) and merge it in.
+  const catchUp = useCallback(async (cid) => {
+    const after = lastServerId();
+    const m = await chatApi.fetchMessages(cid, after ? { limit: 50, after } : { limit: 50 });
+    if (cid === selectedIdRef.current) setMessages((prev) => mergeThreadMessages(prev, m.messages));
+  }, []);
+
+  const scheduleList = useCallback(() => {
+    clearTimeout(listTimerRef.current);
+    listTimerRef.current = setTimeout(() => loadList(true), 350);
+  }, [loadList]);
+  useEffect(() => () => clearTimeout(listTimerRef.current), []);
+
   // Poll the list as a safety net only. While the socket is live it already
   // pushes new chats / unread, so polling backs off 12s → 60s (5x fewer
   // conversation-list DB queries per open chat tab). Hidden tabs never poll.
   useEffect(() => {
     const t = setInterval(() => {
-      if (!document.hidden) loadList(true);
+      if (!document.hidden) scheduleList();
     }, socketLive ? 60000 : 12000);
-    const onFocus = () => loadList(true);
+    const onFocus = () => scheduleList();
     window.addEventListener("focus", onFocus);
     return () => {
       clearInterval(t);
       window.removeEventListener("focus", onFocus);
     };
-  }, [loadList, socketLive]);
+  }, [scheduleList, socketLive]);
 
   // Mobile: an open thread goes full-screen (global header + tab bar step
   // aside via html[data-chat-thread], see index.css).
@@ -400,7 +464,7 @@ const ChatPanel = ({ embedded = false }) => {
   const wasLiveRef = useRef(true);
   useEffect(() => {
     if (socketLive && !wasLiveRef.current) {
-      loadList(true);
+      scheduleList();
       if (selectedId) {
         chatApi
           .fetchMessages(selectedId, { limit: 50 })
@@ -427,7 +491,7 @@ const ChatPanel = ({ embedded = false }) => {
         const conv = await chatApi.createConversation(deepProduct);
         if (cancelled || !conv?._id) return;
         setSelectedId(String(conv._id));
-        loadList(true);
+        scheduleList();
         // Clear query so refresh doesn't recreate.
         setSearchParams({}, { replace: true });
       } catch (err) {
@@ -505,7 +569,7 @@ const ChatPanel = ({ embedded = false }) => {
         setMessages(m.messages);
         setHasMore(m.hasMore);
         chatApi.markRead(id, { receipt: receiptsOn }).catch(() => {});
-        loadList(true);
+        scheduleList();
       } catch (err) {
         if (signal.aborted || err?.code === "ERR_CANCELED") return;
         toast.error(err?.response?.data?.message || "Could not open conversation");
@@ -514,7 +578,7 @@ const ChatPanel = ({ embedded = false }) => {
         if (threadAbortRef.current === ctrl) setThreadLoading(false);
       }
     },
-    [loadList, receiptsOn],
+    [scheduleList, receiptsOn],
   );
 
   // Deep links (?conversation= from orders, ?product= creation) only set the
@@ -537,18 +601,26 @@ const ChatPanel = ({ embedded = false }) => {
     const t = setInterval(async () => {
       if (document.hidden) return;
       try {
-        const m = await chatApi.fetchMessages(selectedId, { limit: 50 });
-        // Upsert merge: appends new bubbles AND picks up tick upgrades
-        // (sent -> delivered -> read) on messages we already render.
+        if (socketLive) {
+          // Live socket already delivers messages, ticks and deal changes:
+          // the safety net only asks for anything newer than what we have.
+          await catchUp(selectedId);
+          return;
+        }
+        // Socket down: full window, so tick upgrades (sent -> delivered ->
+        // read) on rendered messages are picked up too, plus the deal.
+        const [m, d] = await Promise.all([
+          chatApi.fetchMessages(selectedId, { limit: 50 }),
+          chatApi.fetchDeal(selectedId).catch(() => null),
+        ]);
         setMessages((prev) => mergeThreadMessages(prev, m.messages));
-        const d = await chatApi.fetchDeal(selectedId).catch(() => null);
         if (d) setDeal(d);
       } catch {
         // ignore
       }
     }, socketLive ? 30000 : 5000);
     return () => clearInterval(t);
-  }, [selectedId, socketLive]);
+  }, [selectedId, socketLive, catchUp]);
 
   // Smart auto-scroll: follow live chat at the bottom, never yank history.
   const prevLenRef = useRef(0);
@@ -599,7 +671,10 @@ const ChatPanel = ({ embedded = false }) => {
       // Ignore our own socket echo, own sends render from the REST
       // response (optimistic temp -> saved replace). Rendering the echo too
       // is what duplicated every outgoing message.
-      if (me && String(msg?.sender_id || "") === String(me)) return;
+      // System chips (deal cancelled, pickup set…) have no optimistic copy,
+      // so they always render, even when we triggered them ourselves (e.g.
+      // the seller cancelling from Orders or another tab).
+      if (me && String(msg?.sender_id || "") === String(me) && msg?.message_type !== "system") return;
       if (cid === selectedIdRef.current) {
         setMessages((prev) => {
           if (prev.some((x) => String(x._id) === String(msg._id))) return prev;
@@ -607,10 +682,10 @@ const ChatPanel = ({ embedded = false }) => {
         });
         chatApi.markRead(cid, { receipt: receiptsOn }).catch(() => {});
       } else {
-        loadList(true);
+        scheduleList();
       }
     },
-    [loadList, me, receiptsOn],
+    [scheduleList, me, receiptsOn],
   );
 
   const handleSocketDeal = useCallback(
@@ -621,9 +696,9 @@ const ChatPanel = ({ embedded = false }) => {
       setDeal((prev) =>
         !prev?._id || String(prev._id) === String(d._id) ? d : prev,
       );
-      loadList(true);
+      scheduleList();
     },
-    [loadList],
+    [scheduleList],
   );
 
   // Tick lifecycle, realtime:
@@ -688,9 +763,45 @@ const ChatPanel = ({ embedded = false }) => {
     onTyping: handleSocketTyping,
     onPresence: handleSocketPresence,
     onStatus: setSocketLive,
-    onListUpdate: () => loadList(true),
+    onListUpdate: () => scheduleList(),
     enabled: Boolean(me),
   });
+
+  // ---- voice notes ----
+  // Upload goes straight to ImageKit; the API only gets the file id. A 429
+  // (per-account minute/hour/day limits) pauses the mic for Retry-After.
+  const canRecordVoice = useMemo(() => voiceSupported(), []);
+  const [voiceBlockedUntil, setVoiceBlockedUntil] = useState(0);
+  const handleSendVoice = async ({ blob, mime, durationMs, peaks }) => {
+    const cid = selectedId;
+    if (!cid) return;
+    const quote = replyingTo;
+    let uploaded = null;
+    try {
+      uploaded = await uploadVoice(blob, mime);
+      const saved = await chatApi.sendVoice(cid, {
+        fileId: uploaded.fileId,
+        durationMs,
+        peaks,
+        replyTo: quote?._id,
+      });
+      if (saved && cid === selectedIdRef.current) {
+        setMessages((prev) => (prev.some((m) => String(m._id) === String(saved._id)) ? prev : [...prev, { ...saved, burst: true }]));
+        setReplyingTo(null);
+        requestAnimationFrame(() => scrollToBottom());
+      }
+      scheduleList();
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 429) {
+        const retry = Number(err.response?.headers?.["retry-after"]) || 60;
+        setVoiceBlockedUntil(Date.now() + retry * 1000);
+      }
+      // Never leave an unsent upload behind (the daily sweep is the backstop).
+      if (uploaded?.fileId && status !== 409) deleteImage(uploaded.fileId);
+      toast.error(err?.response?.data?.message || err?.message || "Couldn't send the voice note");
+    }
+  };
 
   // ---- send text ----
   const handleSend = async (e, preset) => {
@@ -737,7 +848,7 @@ const ChatPanel = ({ embedded = false }) => {
         prev.map((m) => (m._id === temp._id ? { ...saved, burst: true } : m)),
       );
       setReplyingTo(null);
-      loadList(true);
+      scheduleList();
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m._id !== temp._id));
       const cd = err?.response?.data;
@@ -754,8 +865,8 @@ const ChatPanel = ({ embedded = false }) => {
   };
 
   // ---- offers ----
-  const handleMakeOffer = async () => {
-    const amt = Math.trunc(Number(offerAmount));
+  const handleMakeOffer = async (preset) => {
+    const amt = Math.trunc(Number(preset ?? offerAmount));
     if (!amt || amt < 1 || !selectedId) {
       toast.error("Enter a valid amount");
       return;
@@ -778,8 +889,9 @@ const ChatPanel = ({ embedded = false }) => {
       setMessages((prev) => [...prev, message]);
       setOfferAmount("");
       setOfferOpen(false);
+      if (preset != null) setChatInput("");
       dismissHint();
-      loadList(true);
+      scheduleList();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Could not send offer");
     } finally {
@@ -793,10 +905,9 @@ const ChatPanel = ({ embedded = false }) => {
     try {
       const d = await chatApi.respondOffer(selectedId, String(msg._id), action);
       setDeal(d);
-      // Merge, don't replace, loaded history above must survive deal events.
-      const fresh = await chatApi.fetchMessages(selectedId, { limit: 50 });
-      setMessages((prev) => mergeThreadMessages(prev, fresh.messages));
-      loadList(true);
+      // Only the new system chip(s) since our last message.
+      await catchUp(selectedId);
+      scheduleList();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Could not respond to offer");
     } finally {
@@ -859,10 +970,9 @@ const ChatPanel = ({ embedded = false }) => {
     try {
       const d = await fn();
       setDeal(d);
-      // Merge, don't replace, loaded history above must survive deal events.
-      const fresh = await chatApi.fetchMessages(selectedId, { limit: 50 });
-      setMessages((prev) => mergeThreadMessages(prev, fresh.messages));
-      loadList(true);
+      // Only the new system chip(s) since our last message.
+      await catchUp(selectedId);
+      scheduleList();
       if (successMsg) toast.success(successMsg);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Action failed");
@@ -1065,6 +1175,20 @@ const ChatPanel = ({ embedded = false }) => {
   const [unreadAnchor, setUnreadAnchor] = useState(null); // { id, count, resolved, dividerId }
   const menuRef = useRef(null);
   const composerRef = useRef(null);
+  // Slash commands: typing "/" opens a menu above the composer.
+  const [slashIdx, setSlashIdx] = useState(0);
+  const [slashDismissed, setSlashDismissed] = useState(false);
+  // Rotating composer hint (teaches "/" commands and price-to-offer).
+  const [hintIdx, setHintIdx] = useState(0);
+  const composerEmpty = chatInput === "";
+  useEffect(() => setHintIdx(0), [selectedId]);
+  useEffect(() => {
+    if (!selectedId || !composerEmpty) return undefined;
+    const t = setInterval(() => {
+      if (!document.hidden) setHintIdx((i) => i + 1);
+    }, 3500);
+    return () => clearInterval(t);
+  }, [selectedId, composerEmpty]);
   const searchInputRef = useRef(null);
 
   // Phones: the inbox is a full-screen app view (site header hidden).
@@ -1147,6 +1271,63 @@ const ChatPanel = ({ embedded = false }) => {
   const totalUnread = conversations.reduce((t, c) => t + (c.unread || 0), 0);
   const nothingToShow = visibleProConvs.length === 0 && visibleNormalConvs.length === 0;
   const charCount = chatInput.length;
+
+  // "/" commands: only while the draft is a single slash-word ("/rep…").
+  const SLASH_COMMANDS = [
+    {
+      cmd: "/user-report",
+      label: `Report ${otherName || "user"}`,
+      hint: "Flag harassment, scams or abuse",
+      icon: ShieldAlert,
+      tone: "bg-red-50 text-red-600 ring-red-100 dark:bg-red-950/30 dark:text-red-400 dark:ring-red-900/40",
+      run: () => setReportOpen(true),
+    },
+    {
+      cmd: "/product-report",
+      label: "Report listing",
+      hint: "Fake, misleading or prohibited item",
+      icon: Flag,
+      tone: "bg-amber-50 text-amber-600 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:ring-amber-900/40",
+      run: () => setReportProductOpen(true),
+    },
+  ];
+  const slashWord = /^\/[\w-]*$/.test(chatInput) ? chatInput.toLowerCase() : null;
+  // Prefix match, or loose match ignoring dashes ("/report" finds both).
+  const slashMatches =
+    slashWord == null
+      ? []
+      : SLASH_COMMANDS.filter(
+          (c) => c.cmd.startsWith(slashWord) || c.cmd.replace(/-/g, "").includes(slashWord.slice(1).replace(/-/g, "")),
+        );
+  // A bare number ("500", "₹1,200") suggests sending it as an offer, while
+  // the price is still open (same rule as the ₹ button).
+  const offerAllowed = !deal || ["negotiating", "offer_accepted", "cancelled"].includes(deal.status || "negotiating");
+  const composerHints = [
+    "Message",
+    "Type / for options",
+    ...(offerAllowed ? ["Type a price to make an offer"] : []),
+  ];
+  const composerHint = composerHints[hintIdx % composerHints.length];
+  const typedAmount = /^\s*₹?\s*\d[\d,]*\s*$/.test(chatInput) ? Number(chatInput.replace(/[^0-9]/g, "")) : 0;
+  if (offerAllowed && typedAmount > 0 && slashMatches.length === 0) {
+    slashMatches.push({
+      cmd: `₹${typedAmount.toLocaleString("en-IN")}`,
+      label: "Make an offer",
+      hint: `Send ₹${typedAmount.toLocaleString("en-IN")} as an offer to ${otherName || "them"}`,
+      icon: IndianRupee,
+      tone: "bg-[var(--accent-soft)] text-[var(--accent-text)] ring-[var(--accent-ring)]",
+      title: "Offer",
+      run: () => handleMakeOffer(typedAmount),
+      keepInput: true,
+    });
+  }
+  const slashOpen = Boolean(selectedId) && !slashDismissed && slashMatches.length > 0;
+  const activeSlash = slashMatches[Math.min(slashIdx, slashMatches.length - 1)];
+  const runSlash = (c) => {
+    if (!c.keepInput) setChatInput("");
+    setSlashIdx(0);
+    c.run();
+  };
 
   const iconBtn =
     "grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-neutral-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white";
@@ -1294,7 +1475,7 @@ const ChatPanel = ({ embedded = false }) => {
           {selectedId ? (
             <>
               {/* Header */}
-              <div className="z-20 border-b border-neutral-200/80 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:pt-0 dark:border-neutral-800 dark:bg-[#16181B]/95">
+              <div className="relative z-30 border-b border-neutral-200/80 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:pt-0 dark:border-neutral-800 dark:bg-[#16181B]/95">
                 <div className="flex h-14 items-center gap-2 px-1.5 lg:px-4">
                   <button
                     type="button"
@@ -1463,10 +1644,12 @@ const ChatPanel = ({ embedded = false }) => {
                 )}
               </div>
 
-              {/* Deal card */}
+              {/* Thread: one wallpaper behind the floating deal bar and the messages */}
+              <div className={`relative flex min-h-0 flex-1 flex-col ${wallCls}`}>
+              {/* Deal card, floating over the thread */}
               {deal && (
-                <div className="px-3 pt-2.5 lg:px-6">
-                  <div className="mx-auto max-w-3xl">
+                <div ref={dealBarRef} className="pointer-events-none absolute inset-0 z-20 flex flex-col px-3 pb-3 pt-2.5 lg:px-6">
+                  <div className="no-scrollbar pointer-events-auto mx-auto max-h-full w-full max-w-3xl overflow-y-auto rounded-2xl">
                     <DealProgress
                       deal={deal}
                       role={role}
@@ -1485,7 +1668,12 @@ const ChatPanel = ({ embedded = false }) => {
               )}
 
               {/* Messages */}
-              <div ref={threadScrollRef} onScroll={handleThreadScroll} className={`flex-1 overflow-y-auto overscroll-contain px-3 py-4 lg:px-6 ${wallCls}`}>
+              <div
+                ref={threadScrollRef}
+                onScroll={handleThreadScroll}
+                style={deal && dealBarH ? { paddingTop: dealBarH + 12, scrollPaddingTop: dealBarH + 12 } : undefined}
+                className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 lg:px-6"
+              >
                 <div className="mx-auto max-w-3xl">
                   {!threadLoading && (
                     <div className="mb-3 flex justify-center">
@@ -1497,7 +1685,8 @@ const ChatPanel = ({ embedded = false }) => {
                   )}
                   {messages.length > 0 && !threadLoading && (
                     <div
-                      className={`pointer-events-none sticky top-1 z-10 flex justify-center transition-opacity duration-150 ${
+                      style={{ top: deal && dealBarH ? dealBarH + 4 : 4 }}
+                      className={`pointer-events-none sticky z-10 flex justify-center transition-opacity duration-150 ${
                         stickyDay && !stickyHidden ? "opacity-100" : "opacity-0"
                       }`}
                     >
@@ -1621,6 +1810,7 @@ const ChatPanel = ({ embedded = false }) => {
                   )}
                 </div>
               </div>
+              </div>
 
               {/* Jump to latest */}
               {showJump && (
@@ -1641,7 +1831,47 @@ const ChatPanel = ({ embedded = false }) => {
 
               {/* Composer */}
               <div className="border-t border-neutral-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:border-0 lg:bg-transparent lg:px-6 lg:pb-4 lg:backdrop-blur-none dark:border-neutral-800 dark:bg-[#16181B]/95 lg:dark:bg-transparent">
-                <div className="mx-auto max-w-3xl lg:rounded-2xl lg:border lg:border-neutral-200/80 lg:bg-white lg:shadow-[0_8px_30px_-12px_rgba(15,23,42,0.18)] lg:dark:border-neutral-800 lg:dark:bg-[#1A1D20]">
+                <div className="relative mx-auto max-w-3xl lg:rounded-2xl lg:border lg:border-neutral-200/80 lg:bg-white lg:shadow-[0_8px_30px_-12px_rgba(15,23,42,0.18)] lg:dark:border-neutral-800 lg:dark:bg-[#1A1D20]">
+                  {slashOpen && (
+                    <div className="absolute inset-x-3 bottom-full z-30 mb-2 overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-[0_16px_40px_-16px_rgba(15,23,42,0.3)] lg:inset-x-0 dark:border-neutral-800 dark:bg-[#1A1D20]">
+                      <p className="border-b border-neutral-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:border-neutral-800 dark:text-zinc-500">
+                        {slashMatches[0]?.title || "Commands"}
+                      </p>
+                      <ul role="listbox" aria-label="Chat commands" className="p-1">
+                        {slashMatches.map((c) => {
+                          const Icon = c.icon;
+                          const on = c === activeSlash;
+                          return (
+                            <li key={c.cmd} role="option" aria-selected={on}>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onMouseEnter={() => setSlashIdx(slashMatches.indexOf(c))}
+                                onClick={() => runSlash(c)}
+                                className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${on ? "bg-neutral-100 dark:bg-white/5" : ""}`}
+                              >
+                                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ring-1 ring-inset ${c.tone}`}>
+                                  <Icon className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-baseline gap-2">
+                                    <span className="font-mono text-[13px] font-semibold text-slate-900 dark:text-white">{c.cmd}</span>
+                                    <span className="truncate text-[12.5px] text-slate-500 dark:text-zinc-400">{c.label}</span>
+                                  </span>
+                                  <span className="block truncate text-[12px] text-slate-400 dark:text-zinc-500">{c.hint}</span>
+                                </span>
+                                {on && (
+                                  <kbd className="hidden shrink-0 rounded border border-neutral-200 px-1.5 py-0.5 text-[10.5px] font-medium text-slate-400 lg:inline dark:border-neutral-700 dark:text-zinc-500">
+                                    Enter
+                                  </kbd>
+                                )}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                   {coolingDown && (
                     <p className="mx-3 mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-[12px] font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-300">
                       <Timer size={13} className="shrink-0" />
@@ -1745,7 +1975,7 @@ const ChatPanel = ({ embedded = false }) => {
                         </div>
                       </div>
                     )}
-                    <form onSubmit={handleSend} className="flex items-end gap-1.5">
+                    <form onSubmit={handleSend} className="relative flex items-end gap-1.5">
                       <button
                         ref={rupeeBtnRef}
                         type="button"
@@ -1776,6 +2006,8 @@ const ChatPanel = ({ embedded = false }) => {
                           maxLength={2000}
                           onChange={(e) => {
                             setChatInput(e.target.value);
+                            setSlashIdx(0);
+                            setSlashDismissed(false);
                             if (typingOn) {
                               sendTyping(true);
                               clearTimeout(typingTimeout.current);
@@ -1783,6 +2015,24 @@ const ChatPanel = ({ embedded = false }) => {
                             }
                           }}
                           onKeyDown={(e) => {
+                            if (slashOpen) {
+                              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                                e.preventDefault();
+                                const n = slashMatches.length;
+                                setSlashIdx((i) => (Math.min(i, n - 1) + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
+                                return;
+                              }
+                              if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+                                e.preventDefault();
+                                if (activeSlash) runSlash(activeSlash);
+                                return;
+                              }
+                              if (e.key === "Escape") {
+                                e.preventDefault();
+                                setSlashDismissed(true);
+                                return;
+                              }
+                            }
                             // Enter sends, Shift+Enter adds a line (desktop).
                             // On touch keyboards Enter inserts a newline.
                             const coarse = window.matchMedia?.("(pointer: coarse)").matches;
@@ -1792,7 +2042,7 @@ const ChatPanel = ({ embedded = false }) => {
                             }
                             if (e.key === "Escape" && replyingTo) setReplyingTo(null);
                           }}
-                          placeholder={coolingDown ? "Sending paused…" : "Message"}
+                          placeholder={coolingDown ? "Sending paused…" : composerHint}
                           aria-label="Type a message"
                           disabled={coolingDown}
                           onFocus={() => {
@@ -1805,14 +2055,24 @@ const ChatPanel = ({ embedded = false }) => {
                           className="max-h-[132px] min-h-[24px] w-full resize-none bg-transparent text-[16px] leading-6 text-slate-900 outline-none placeholder:text-slate-400 lg:text-[14px] lg:leading-[22px] dark:text-zinc-100"
                         />
                       </div>
-                      <button
-                        type="submit"
-                        disabled={!chatInput.trim() || coolingDown}
-                        aria-label="Send message"
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] disabled:bg-neutral-300 disabled:shadow-none dark:disabled:bg-neutral-700"
-                      >
-                        <Send size={17} className="-ml-0.5" />
-                      </button>
+                      {/* Empty composer: mic (voice note). Typing: send. */}
+                      {canRecordVoice && !chatInput.trim() ? (
+                        <VoiceRecorder
+                          key={selectedId}
+                          disabled={coolingDown || !selectedId}
+                          blockedUntil={voiceBlockedUntil}
+                          onSend={handleSendVoice}
+                        />
+                      ) : (
+                        <button
+                          type="submit"
+                          disabled={!chatInput.trim() || coolingDown}
+                          aria-label="Send message"
+                          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] disabled:bg-neutral-300 disabled:shadow-none dark:disabled:bg-neutral-700"
+                        >
+                          <Send size={17} className="-ml-0.5" />
+                        </button>
+                      )}
                     </form>
                     <div className="mt-1.5 hidden items-center justify-between px-1 text-[11px] text-slate-400 lg:flex dark:text-zinc-500">
                       <span className="flex items-center gap-1">
@@ -1829,22 +2089,76 @@ const ChatPanel = ({ embedded = false }) => {
               </div>
             </>
           ) : (
-            <div className="hidden flex-1 flex-col items-center justify-center gap-3 p-8 text-center lg:flex">
-              <span className="grid size-14 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-text)]">
-                <MessagesSquare className="h-7 w-7" aria-hidden="true" />
-              </span>
-              <h2 className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-white">Your messages</h2>
-              <p className="max-w-xs text-[13px] text-slate-500 dark:text-zinc-400">
-                Pick a conversation to read it, make an offer or set up a pickup.
-              </p>
-              <ul className="mt-2 space-y-1.5 text-left text-[12.5px] text-slate-500 dark:text-zinc-400">
-                <li className="flex items-center gap-2">
-                  <Lock className="h-3.5 w-3.5 text-emerald-500" /> Meet on campus and pay at pickup
-                </li>
-                <li className="flex items-center gap-2">
-                  <Search className="h-3.5 w-3.5 text-slate-400" /> Search any conversation from its header
-                </li>
-              </ul>
+            <div className="relative hidden flex-1 items-center justify-center overflow-hidden p-8 lg:flex">
+              {/* Backdrop: brand glow + a faint dot grid fading out from the centre */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background:
+                    "radial-gradient(60% 50% at 50% 38%, var(--accent-soft) 0%, transparent 70%)",
+                }}
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 opacity-60 [background-image:radial-gradient(circle_at_1px_1px,rgba(100,116,139,0.18)_1px,transparent_0)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_55%_50%_at_50%_45%,#000_30%,transparent_75%)] dark:[background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.08)_1px,transparent_0)]"
+              />
+
+              <div className="relative flex w-full max-w-[34rem] flex-col items-center text-center">
+                {/* Brand mark */}
+                <div className="relative mb-5">
+                  <span
+                    aria-hidden="true"
+                    className="absolute -inset-4 rounded-full bg-[var(--accent)] opacity-[0.12] blur-xl"
+                  />
+                  <img
+                    src="/fav.svg"
+                    alt="Unideals"
+                    width="48"
+                    height="48"
+                    draggable="false"
+                    className="relative size-12 select-none rounded-[14px] shadow-[0_12px_28px_-10px_rgba(48,56,252,0.55)]"
+                  />
+                </div>
+
+                <h2 className="text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white">Select a conversation</h2>
+                <p className="mt-1.5 max-w-sm text-[14px] leading-relaxed text-slate-500 dark:text-zinc-400">
+                  Pick a chat from the list to message, negotiate and set up a pickup, all in one place.
+                </p>
+                {totalUnread > 0 && (
+                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[12.5px] font-semibold text-[var(--accent-text)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+                    {totalUnread} unread {totalUnread === 1 ? "message" : "messages"} waiting
+                  </span>
+                )}
+
+                <div className="mt-7 grid w-full grid-cols-3 gap-3 text-left">
+                  {[
+                    { icon: IndianRupee, title: "Make offers", body: "Type a price in chat to send an offer." },
+                    { icon: Mic, title: "Voice notes", body: "Hold the mic to record and send." },
+                    { icon: ShieldCheck, title: "Safe pickups", body: "Meet on campus, pay at pickup." },
+                  ].map(({ icon: Icon, title, body }) => (
+                    <div
+                      key={title}
+                      className="rounded-xl border border-neutral-200/80 bg-white/80 p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur dark:border-neutral-800 dark:bg-[#1A1D20]/80"
+                    >
+                      <span className="grid size-8 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <p className="mt-2.5 text-[13px] font-semibold text-slate-900 dark:text-white">{title}</p>
+                      <p className="mt-0.5 text-[12px] leading-snug text-slate-500 dark:text-zinc-400">{body}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mt-6 flex items-center gap-1.5 text-[12px] text-slate-400 dark:text-zinc-500">
+                  Tip: type
+                  <kbd className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600 shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:border-neutral-700 dark:bg-[#1A1D20] dark:text-zinc-300">
+                    /
+                  </kbd>
+                  in any chat for quick actions
+                </p>
+              </div>
             </div>
           )}
         </div>

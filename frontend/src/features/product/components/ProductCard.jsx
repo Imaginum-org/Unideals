@@ -1,6 +1,7 @@
 import { memo, forwardRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { FaStar, FaHeart, FaRegHeart, FaCrown } from "react-icons/fa";
+import { FaStar, FaCrown } from "react-icons/fa";
+import { Heart } from "lucide-react";
 import { useWishlist } from "../../../context/WishlistContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { ikCard, ikCardSrcSet } from "../../../utils/imageTransform.js";
@@ -14,6 +15,7 @@ import { isHotDeal } from "../../../utils/hotDeal.js";
 import { useNavigate } from "react-router-dom";
 import { productPath } from "../../../utils/productPath.js";
 import { useUser } from "../../../context/useUserContext.jsx";
+import { TickIcon } from "../../../components/common/VerifiedTick.jsx";
 
 const FALLBACK_IMAGE = "/logo.svg";
 
@@ -59,36 +61,36 @@ const getTierStyles = (tier) => {
   switch (tier) {
     case "pro_plus":
       return {
-        cardBg: "bg-[#F7F8FA] dark:bg-[#18181B]",
+        cardBg: "bg-white dark:bg-[#18181B]",
         cardBorder: "border border-[#E2E6FB] dark:border-indigo-900/50",
         cardHoverBorder:
           "hover:border-[#C7D2FE] dark:hover:border-indigo-800",
         cardShadow:
-          "shadow-[0_4px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)]",
+          "shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:shadow-[0_16px_32px_-14px_rgba(15,23,42,0.22)]",
         badgeBg:
           "bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black shadow-lg shadow-[#FFD700]/40",
         icon: <FaCrown className="animate-pulse" size={12} />,
       };
     case "pro":
       return {
-        cardBg: "bg-[#F7F8FA] dark:bg-[#18181B]",
+        cardBg: "bg-white dark:bg-[#18181B]",
         cardBorder: "border border-[#E2E6FB] dark:border-indigo-900/50",
         cardHoverBorder:
           "hover:border-[#C7D2FE] dark:hover:border-indigo-800",
         cardShadow:
-          "shadow-[0_4px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)]",
+          "shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:shadow-[0_16px_32px_-14px_rgba(15,23,42,0.22)]",
         badgeBg:
           "bg-gradient-to-r from-[#3838EC] to-[#5C6DFF] text-white shadow-lg shadow-[#3838EC]/40",
         icon: <FaStar className="animate-pulse" size={10} />,
       };
     default:
       return {
-        cardBg: "bg-[#F7F8FA] dark:bg-[#18181B]",
-        cardBorder: "border border-zinc-200 dark:border-zinc-800",
+        cardBg: "bg-white dark:bg-[#18181B]",
+        cardBorder: "border border-slate-200/80 dark:border-zinc-800",
         cardHoverBorder:
           "hover:border-[#D4D4D8] dark:hover:border-zinc-600",
         cardShadow:
-          "shadow-[0_4px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)]",
+          "shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:shadow-[0_16px_32px_-14px_rgba(15,23,42,0.22)]",
         badgeBg: "bg-zinc-800 text-white",
         icon: null,
       };
@@ -169,9 +171,14 @@ const ProductCard = memo(
         sellerInfo?.profile_image ||
         sellerInfo?.image;
 
-      const sellerPlan =
-        sellerInfo?.subscription ||
-        (currentTier === "regular" ? "base_user" : currentTier);
+
+      // Plan badge shown beside the seller name (no longer on the avatar).
+      const planBadge =
+        sellerInfo?.subscription === "pro_plus"
+          ? { label: "PRO+", cls: "bg-gradient-to-r from-[#FFD700] to-[#FF8C00] text-black" }
+          : sellerInfo?.subscription === "pro"
+            ? { label: "PRO", cls: "bg-[#3838EC] text-white" }
+            : null;
 
       // Only show a rating badge when the backend provides a real one —
       // never a hardcoded number.
@@ -334,7 +341,6 @@ relative
 w-full
 overflow-hidden
 rounded-2xl
-bg-[#F7F8FA]
 font-figtree
 select-none
 transform-gpu
@@ -385,7 +391,7 @@ ${tierStyles.cardShadow}
               </div>
             )}
             {/* IMAGE SECTION */}
-            <div className="relative w-full aspect-[6/5] overflow-hidden rounded-xl">
+            <div className="pc-media relative w-full aspect-[6/5] overflow-hidden rounded-xl">
               <img
                 loading="lazy"
                 decoding="async"
@@ -406,58 +412,21 @@ group-hover:scale-[1.05]"
                 <HotDealChip className="pointer-events-none absolute left-2.5 top-2.5 z-20" />
               )}
 
-              {/* Chat Now Button */}
-              <div
-                className="
-absolute
-bottom-3
-left-1/2
-z-20
-
--translate-x-1/2
-
-translate-y-8
-opacity-0
-scale-95
-
-pointer-events-none
-
-transition-all
-duration-300
-ease-out
-
-group-hover:translate-y-0
-group-hover:opacity-100
-group-hover:scale-100
-group-hover:pointer-events-auto
-"
-              >
+              {/* Chat with seller: centred pill that slides up over the
+                  photo on hover (desktop); phones open the listing instead. */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex translate-y-4 scale-95 justify-center opacity-0 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:opacity-100">
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     openChat();
                   }}
-                  className="
-      rounded-lg
-      bg-[#3838EC]
-              px-3.5 sm:px-4
-      py-2
-              text-xs sm:text-[13px]
-      font-semibold
-      text-white
-      shadow-lg
-      transition-all
-      duration-200
-      hover:bg-[#2f2fd9]
-      hover:scale-[1.04]
-                  flex items-center justify-center gap-2
-      whitespace-nowrap
-      active:scale-95
-    "
+                  // Same look as the navbar Sell button.
+                  className="pc-chat pointer-events-none flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-[#FCFCFC] hover:bg-[var(--accent-hover)] shadow-[0_10px_24px_-10px_var(--accent-ring)] transition-all duration-200 hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-white group-hover:pointer-events-auto group-focus-within:pointer-events-auto active:scale-[0.98]"
                 >
-                  <MdOutlineChatBubbleOutline size={16} />
-                  <span>{isOwnListing ? "View listing" : "Chat Now"}</span>
+                  <MdOutlineChatBubbleOutline className="size-[1.15em]" aria-hidden="true" />
+                  <span>{isOwnListing ? "View listing" : "Chat with seller"}</span>
                 </button>
               </div>
 
@@ -465,35 +434,17 @@ group-hover:pointer-events-auto
                   live countdown) instead of a photo overlay, so the card
                   matches the Limited Time Deals design exactly. */}
 
-              {/* WISHLIST BUTTON — always visible on touch (mobile),
-                  hover-reveal on desktop */}
+              {/* WISHLIST — always visible on touch; on desktop it reveals on
+                  hover, and stays put once the item is saved. */}
               <div
-                className="
-absolute
-top-2.5
-right-2.5
-z-20
-
-translate-x-0
-opacity-100
-pointer-events-auto
-
-md:translate-x-6
-md:opacity-0
-md:scale-90
-md:pointer-events-none
-
-transition-all
-duration-300
-ease-out
-
-md:group-hover:translate-x-0
-md:group-hover:opacity-100
-md:group-hover:scale-100
-md:group-hover:pointer-events-auto
-"
+                className={`absolute right-2.5 top-2.5 z-20 transition-all duration-300 ease-out ${
+                  inWishlist
+                    ? ""
+                    : "md:pointer-events-none md:translate-x-3 md:-translate-y-3 md:scale-90 md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:translate-x-0 md:group-hover:translate-y-0 md:group-hover:scale-100 md:group-hover:opacity-100 md:group-focus-within:pointer-events-auto md:group-focus-within:translate-x-0 md:group-focus-within:translate-y-0 md:group-focus-within:scale-100 md:group-focus-within:opacity-100"
+                }`}
               >
                 <button
+                  type="button"
                   onClick={
                     showRemoveButton ? handleRemoveClick : handleWishlistClick
                   }
@@ -501,31 +452,13 @@ md:group-hover:pointer-events-auto
                   aria-label={
                     inWishlist ? "Remove from Wishlist" : "Add to Wishlist"
                   }
-                  className="
-      flex
-      h-9
-      w-9
-      items-center
-      justify-center
-
-      rounded-full
-
-      bg-[#F7F8FA]
-      backdrop-blur-xl
-
-      shadow-lg
-
-      transition-all
-      duration-200
-
-      hover:scale-110
-      active:scale-95
-    "
+                  aria-pressed={inWishlist}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-[0_4px_12px_-4px_rgba(15,23,42,0.3)] ring-1 ring-black/5 backdrop-blur-md transition-all duration-200 hover:bg-white hover:shadow-[0_6px_16px_-4px_rgba(15,23,42,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3838EC]/50 active:scale-90 disabled:opacity-70 dark:bg-zinc-900/90 dark:ring-white/10 dark:hover:bg-zinc-900"
                 >
                   {inWishlist ? (
-                    <FaHeart className="text-[#ef4444] text-base" />
+                    <Heart className="h-[17px] w-[17px] fill-rose-500 text-rose-500" strokeWidth={2} aria-hidden="true" />
                   ) : (
-                    <FaRegHeart className="text-zinc-500 text-base" />
+                    <Heart className="h-[17px] w-[17px] text-slate-600 dark:text-zinc-300" strokeWidth={2} aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -535,7 +468,7 @@ md:group-hover:pointer-events-auto
             <div className="pc-content flex flex-grow flex-col px-1.5 pb-1 pt-3">
               {/* CATEGORY — quiet eyebrow label (title + price lead) */}
               <div className="flex min-w-0 items-center gap-2">
-                <div className="truncate text-[11.5px] md:text-xs font-semibold tracking-[0.01em] text-[var(--accent-text)] capitalize">
+                <div className="pc-cat truncate font-semibold tracking-[0.01em] text-[var(--accent)] capitalize">
                   {formattedCategory}
                 </div>
                 {/* Girls Corner 🌸 text badge (never color-only, a11y) */}
@@ -547,62 +480,70 @@ md:group-hover:pointer-events-auto
               </div>
 
               {/* TITLE */}
-              {/* Fixed 2-line height so cards in a row always align */}
-              <h3 className="mt-1 min-h-[2.7em] text-[14px] md:text-[15px] font-semibold leading-[1.35] tracking-[-0.005em] text-slate-900 dark:text-white line-clamp-2">
+              {/* Price sits right under the title; the footer's mt-auto keeps
+                  footers aligned across a row. */}
+              <h3 className="pc-title mt-1 font-semibold leading-[1.3] tracking-[-0.01em] text-slate-900 dark:text-white line-clamp-2">
                 {title}
               </h3>
 
-              {/* PRICE & DISCOUNT — price · MRP · % off on one line. On narrow
-                  cards the struck MRP truncates first; price and discount
-                  never wrap or clip. */}
-              <div className="mt-2 flex min-w-0 items-baseline gap-1.5">
-                <span className="shrink-0 whitespace-nowrap text-[17px] font-bold tabular-nums tracking-tight text-slate-950 md:text-lg dark:text-white">
+              {/* PRICE · MRP · Save N% on one line. On narrow cards the struck
+                  MRP hides first so price and chip never wrap or clip. */}
+              <div className="mt-2 flex min-w-0 items-center gap-2">
+                <span className="pc-price shrink-0 whitespace-nowrap font-bold leading-none tabular-nums tracking-tight text-slate-950 dark:text-white">
                   ₹{formattedPrice.selling}
                 </span>
                 {savings > 0 && (
                   <>
-                    <span className={`${String(formattedPrice.selling).length > 5 ? "pc-mrp pc-mrp-long" : "pc-mrp"} min-w-0 truncate text-[12px] font-medium tabular-nums text-slate-400 line-through decoration-slate-300 md:text-[13px] dark:text-zinc-500 dark:decoration-zinc-600`}>
+                    <span className={`${String(formattedPrice.selling).length > 5 ? "pc-mrp pc-mrp-long" : "pc-mrp"} pc-mrp-text min-w-0 truncate font-medium tabular-nums text-slate-400 line-through decoration-slate-300 dark:text-zinc-500 dark:decoration-zinc-600`}>
                       ₹{formattedPrice.original}
                     </span>
                     {discountPct > 0 && (
                       <span
                         title={`You save ₹${formattedPrice.savings}`}
-                        className="shrink-0 whitespace-nowrap text-[12px] font-semibold tabular-nums text-emerald-600 md:text-[13px] dark:text-emerald-400"
+                        // Same chip as the product page's "Save N%".
+                        className="pc-save inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-emerald-700 font-medium tabular-nums text-white dark:bg-emerald-600"
                       >
-                        {discountPct}% off
+                        Save {discountPct}%
                       </span>
                     )}
                   </>
                 )}
               </div>
 
-
-
               {/* FOOTER (Avatar, Rating & Location) */}
-              <div className="mt-auto pt-3">
-              <div className="flex min-w-0 items-center gap-2 border-t border-[#EEF1F5] pt-2.5 dark:border-zinc-800">
+              <div className="mt-auto pt-4">
+              <div className="flex min-w-0 items-center gap-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
                 {/* Left Side: Avatar & Name */}
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <AvatarComponent
                     name={sellerName}
                     imageUrl={sellerAvatarUrl}
                     size="small"
-                    plan={sellerPlan}
-                    role={sellerInfo?.role}
-                    showBadge
                     className="shrink-0 h-6 w-6"
                   />
                   {/* Fills the free space and ends with "…" (a hard max-width used to
                       clip long names mid-letter, e.g. "Priyadarshin"). */}
-                  <span className="min-w-0 truncate capitalize text-[12px] md:text-[13px] font-medium text-slate-500 dark:text-zinc-400 md:max-w-[120px]">
+                  <span className="pc-meta min-w-0 truncate capitalize font-medium text-slate-600 dark:text-zinc-300">
                     {sellerName}
                   </span>
+                  {/* Verified student tick, then plan badge, right of the name */}
+                  {sellerInfo?.is_college_verified && (
+                    <span title="Verified student" className="shrink-0">
+                      <TickIcon className="h-4 w-4" />
+                      <span className="sr-only">Verified student</span>
+                    </span>
+                  )}
+                  {planBadge && (
+                    <span className={`shrink-0 rounded-full px-1.5 py-[3px] text-[9px] font-extrabold leading-none ${planBadge.cls}`}>
+                      {planBadge.label}
+                    </span>
+                  )}
 
                   {/* Rating Badge (real data only) */}
                   {sellerRating !== null && (
-                    <div className="flex shrink-0 items-center gap-1 border border-[#E1E1E1] dark:border-zinc-700 rounded-full px-1.5 sm:px-2 py-1 ml-0.5 sm:ml-1">
-                      <FaStar className="text-yellow-400 text-[11px]" />
-                      <span className="text-[11.5px] font-semibold tabular-nums text-slate-500 dark:text-zinc-400">
+                    <div className="ml-0.5 flex shrink-0 items-center gap-0.5 rounded-md bg-amber-50 px-1.5 py-0.5 ring-1 ring-inset ring-amber-100 dark:bg-amber-500/10 dark:ring-amber-500/20">
+                      <FaStar className="text-amber-400 text-[10px]" />
+                      <span className="pc-meta-sm font-semibold tabular-nums text-amber-700 dark:text-amber-300">
                         {sellerRating}
                       </span>
                     </div>
@@ -611,9 +552,9 @@ md:group-hover:pointer-events-auto
 
                 {/* Right Side: Location */}
                 {formattedLocation && (
-                  <div className="flex items-center justify-center gap-1 text-slate-400 shrink-0 dark:text-zinc-500">
+                  <div className="flex shrink-0 items-center justify-center gap-1 text-slate-500 dark:text-zinc-400">
                     <IoLocationOutline size={14} className="text-slate-400 dark:text-zinc-500" />
-                    <span className="hidden md:block text-[12px] font-medium truncate max-w-[110px]">
+                    <span className="pc-loc pc-meta-sm font-medium truncate max-w-[110px]">
                       {formattedLocation}
                     </span>
                   </div>

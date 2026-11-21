@@ -30,7 +30,7 @@ const sellerLookup = {
     localField: "seller_id",
     foreignField: "_id",
     as: "seller",
-    pipeline: [{ $project: { name: 1, avatar: 1, subscription: 1, is_college_verified: 1 } }],
+    pipeline: [{ $project: { name: 1, avatar: 1, subscription: 1, role: 1, is_college_verified: 1 } }],
   },
 };
 import Conversation from "../models/conversation.model.js";
@@ -52,6 +52,7 @@ import {
   canViewGirlsFeed,
   canSeeGirlsProduct,
   girlsCornerError,
+  assertCanListGirlsOnly,
   GIRLS_ERRORS,
 } from "../utils/girlsCorner.js";
 
@@ -338,16 +339,16 @@ export const createProduct = async (data, user) => {
   // Girls Corner 🌸 — seller opt-in guard. Coerce + strip snapshot (server-set).
   // Girls-only categories auto-enable Girl-only (seller is told in the UI).
   delete data.sellerGenderSnapshot;
+  const confirmNotFemale = data.confirmNotFemale;
+  delete data.confirmNotFemale;
   if (isGirlsOnlyCategory(data.category)) {
     data.isGirlsOnly = true;
   }
   const wantsGirlsOnly = data.isGirlsOnly === true || data.isGirlsOnly === "true";
   data.isGirlsOnly = Boolean(wantsGirlsOnly);
   if (data.isGirlsOnly) {
-    if (!isEligibleGender(user.gender)) {
-      throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
-    }
-    data.sellerGenderSnapshot = "female";
+    assertCanListGirlsOnly(user, confirmNotFemale);
+    if (isEligibleGender(user.gender)) data.sellerGenderSnapshot = "female";
   }
 
   // Plan entitlement: cap active (listed, visible) listings per tier.
@@ -716,6 +717,8 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
         "seller.name": 1,
         "seller.avatar": 1,
         "seller.subscription": 1,
+        "seller.role": 1,
+        "seller.is_college_verified": 1,
       },
     },
   );
@@ -1648,6 +1651,8 @@ export const updateProduct = async (productId, userId, data = {}) => {
   // Girls Corner 🌸 — everyone→girls-only needs female; widening always allowed.
   // Moving into a girls-only category auto-enables Girl-only (and needs
   // female); listings already in one can never be widened to everyone.
+  const confirmNotFemale = updates.confirmNotFemale;
+  delete updates.confirmNotFemale;
   const mergedCategory = updates.category ?? product.category;
   if (isGirlsOnlyCategory(mergedCategory)) {
     updates.isGirlsOnly = true;
@@ -1661,17 +1666,17 @@ export const updateProduct = async (productId, userId, data = {}) => {
     }
     if (updates.isGirlsOnly && !product.isGirlsOnly) {
       const { default: UserModel } = await import("../models/User.model.js");
-      const editor = await UserModel.findById(userId).select("gender").lean();
-      if (!isEligibleGender(editor?.gender)) throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
-      updates.sellerGenderSnapshot = "female";
+      const editor = await UserModel.findById(userId).select("gender role").lean();
+      assertCanListGirlsOnly(editor, confirmNotFemale);
+      if (isEligibleGender(editor?.gender)) updates.sellerGenderSnapshot = "female";
     }
   } else if (isGirlsOnlyCategory(mergedCategory) && !product.isGirlsOnly) {
     // Category changed into a girls-only one without touching the flag.
     const { default: UserModel } = await import("../models/User.model.js");
-    const editor = await UserModel.findById(userId).select("gender").lean();
-    if (!isEligibleGender(editor?.gender)) throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
+    const editor = await UserModel.findById(userId).select("gender role").lean();
+    assertCanListGirlsOnly(editor, confirmNotFemale);
     updates.isGirlsOnly = true;
-    updates.sellerGenderSnapshot = "female";
+    if (isEligibleGender(editor?.gender)) updates.sellerGenderSnapshot = "female";
   }
   assertImageHost(updates.images);
   await assertPickupSnapshot(updates.pickup_address_snapshot, userId);
@@ -1880,14 +1885,15 @@ export const relistProduct = async (productId, userId) => {
   // Relisting reactivates against the plan cap, same rule as creation.
   const { default: UserModel } = await import("../models/User.model.js");
   const owner = await UserModel.findById(product.seller_id)
-    .select("subscription gender")
+    .select("subscription gender role")
     .lean();
-  // Girls Corner 🌸 — relist re-checks female for girls-only.
+  // Girls Corner 🌸 — relist re-checks female for girls-only (admins
+  // already confirmed when they first listed it).
   // Girls-only categories auto-carry the flag (incl. legacy docs).
   if (isGirlsOnlyCategory(product.category)) {
     product.isGirlsOnly = true;
   }
-  if (product.isGirlsOnly && !isEligibleGender(owner?.gender)) {
+  if (product.isGirlsOnly && !isEligibleGender(owner?.gender) && owner?.role !== "admin") {
     throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
   }
   const listingLimit = getListingLimit(owner?.subscription);

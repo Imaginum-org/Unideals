@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Info, HelpCircle, ChevronRight, Sparkles } from "lucide-react";
 import { getBadgeMeta, rankName, RANK_CONFIG, TIER_STYLES } from "../../../utils/badgeConfig.js";
 import RankGuideModal from "./RankGuideModal.jsx";
+import RankEmblem from "./RankEmblem.jsx";
 
 /**
  * BadgeMiniStrip — compact level/badge widget for the Overview page.
@@ -50,9 +51,7 @@ export default function BadgeMiniStrip({ gamification, loading = false }) {
           {/* Row 1: Rank + Info Icon + Level */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <span className="text-2xl w-9 h-9 flex items-center justify-center rounded-xl bg-[#F7F8FA] dark:bg-[#252525] shadow-sm shrink-0">
-                {rank.icon}
-              </span>
+              <RankEmblem title={rank_title} color={rank.color} size={36} className="shrink-0 drop-shadow-sm" />
               <div>
                 <div className="flex items-center gap-1.5">
                   <p className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">

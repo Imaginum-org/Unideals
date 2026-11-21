@@ -34,6 +34,8 @@ const PreviewStep = () => {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [publishStage, setPublishStage] = useState("");
   const [limitInfo, setLimitInfo] = useState(null);
+  // Admin (not Female) listing in Girls Corner: ask once per submit.
+  const [girlsConfirm, setGirlsConfirm] = useState(null); // { resolve } while open
 
   const { formData, goToStep, loading, setLoading, setErrors, resetForm, isEditMode, isDraft, editProductId } =
     useProductListing();
@@ -144,6 +146,17 @@ const PreviewStep = () => {
     return uploads;
   };
 
+  // Admins may list in Girls Corner, but only after confirming they know
+  // their account isn't set as Female. Resolves true to continue.
+  const needsGirlsConfirm =
+    Boolean(formData.isGirlsOnly) && userDetails?.role === "admin" && userDetails?.gender !== "female";
+  const confirmGirlsListing = () =>
+    needsGirlsConfirm ? new Promise((resolve) => setGirlsConfirm({ resolve })) : Promise.resolve(true);
+  const closeGirlsConfirm = (ok) => {
+    girlsConfirm?.resolve(ok);
+    setGirlsConfirm(null);
+  };
+
   // One payload shape for create, edit, draft and publish.
   const buildPayload = (images) => ({
     title: formData.title.trim(),
@@ -153,6 +166,7 @@ const PreviewStep = () => {
     selling_price: Number(formData.sellingPrice),
     original_price: Number(formData.originalPrice),
     isGirlsOnly: Boolean(formData.isGirlsOnly),
+    ...(needsGirlsConfirm ? { confirmNotFemale: true } : {}),
     is_negotiable: formData.negotiable,
     payment_preference: formData.paymentMethod,
     images,
@@ -195,6 +209,7 @@ const PreviewStep = () => {
    */
   const handleSaveDraft = async () => {
     if (loading) return;
+    if (!(await confirmGirlsListing())) return;
     try {
       setLoading(true);
       const uploads = await uploadNewImages();
@@ -222,6 +237,7 @@ const PreviewStep = () => {
   const handleSaveChanges = async (publish = false) => {
     if (loading) return;
     if (!revalidateAll()) return;
+    if (!(await confirmGirlsListing())) return;
     try {
       setLoading(true);
       if (publish && !(await precheckListingLimit())) return;
@@ -266,6 +282,7 @@ const PreviewStep = () => {
   const handlePublish = async () => {
     if (loading) return;
     if (!revalidateAll()) return;
+    if (!(await confirmGirlsListing())) return;
     try {
       setLoading(true);
       if (!(await precheckListingLimit())) return;
@@ -538,6 +555,50 @@ const PreviewStep = () => {
 
       {limitInfo && (
         <LimitModal title="You're out of listings" message={limitInfo.message} onClose={() => setLimitInfo(null)} />
+      )}
+
+      {girlsConfirm && (
+        <div
+          className="fixed inset-0 z-[999] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4 dark:bg-black/70"
+          onClick={() => closeGirlsConfirm(false)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="girls-confirm-title"
+            aria-describedby="girls-confirm-desc"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.key === "Escape" && closeGirlsConfirm(false)}
+            className="w-full max-w-[420px] rounded-t-2xl border border-neutral-200/80 bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_24px_64px_-20px_rgba(15,23,42,0.35)] sm:rounded-2xl sm:p-6 dark:border-neutral-800 dark:bg-[#1A1D20]"
+          >
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-pink-50 text-[22px] ring-1 ring-inset ring-pink-100 dark:bg-pink-500/10 dark:ring-pink-500/20" aria-hidden="true">
+              🌸
+            </span>
+            <h2 id="girls-confirm-title" className="mt-4 text-[17px] font-semibold tracking-tight text-slate-900 dark:text-white">
+              You are not set as Female
+            </h2>
+            <p id="girls-confirm-desc" className="mt-1.5 text-[13.5px] leading-relaxed text-slate-500 dark:text-zinc-400">
+              Girls Corner listings are only shown to female students. As an admin you can still list this item there. Do you want to proceed?
+            </p>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => closeGirlsConfirm(false)}
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-neutral-200 bg-white px-4 text-[14px] font-semibold text-slate-700 transition-colors hover:bg-neutral-50 sm:h-10 dark:border-neutral-700 dark:bg-transparent dark:text-zinc-200 dark:hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => closeGirlsConfirm(true)}
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-[var(--accent)] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:h-10"
+              >
+                Yes, list it
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

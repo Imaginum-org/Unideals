@@ -635,7 +635,7 @@ export const revertDealStage = async ({ conversationId, userId, from }) => {
  */
 export const cancelDeal = async ({ conversationId, userId, reason = "" }) => {
   const conversation = await loadConversation(conversationId);
-  roleOf(conversation, userId); // participant check
+  const cancellerRole = roleOf(conversation, userId); // participant check
 
   const deal = await ensureDeal(conversation);
   if (deal.status === DEAL_STATUS.COMPLETED) {
@@ -654,7 +654,7 @@ export const cancelDeal = async ({ conversationId, userId, reason = "" }) => {
   await pushSystemMessage({
     conversation,
     senderId: userId,
-    text: "Deal cancelled. Item's back on the shelf.",
+    text: `${cancellerRole === "seller" ? "Seller" : "Buyer"} cancelled the deal. Item's back on the shelf.`,
     deal,
   });
   // Notify the other party about cancellation — fire-and-forget

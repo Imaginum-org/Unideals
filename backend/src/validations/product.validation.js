@@ -59,6 +59,8 @@ export const createProductSchema = z
 
     // Girls Corner 🌸 — seller opt-in per listing.
     isGirlsOnly: z.boolean().optional(),
+    // Admins who aren't Female confirm a Girls Corner listing with this.
+    confirmNotFemale: z.boolean().optional(),
 
     // Stock count for single-seller chat sales (default 1, range 1–99).
     quantity: z.coerce

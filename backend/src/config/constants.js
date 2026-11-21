@@ -107,6 +107,15 @@ export const MESSAGE_TYPE = Object.freeze({
   SYSTEM: "system",
   IMAGE: "image",
   FILE: "file",
+  AUDIO: "audio", // voice note (file lives on ImageKit, see sendVoiceMessage)
+});
+
+// Voice notes: hard caps enforced on send (client mirrors them).
+export const VOICE_LIMITS = Object.freeze({
+  MAX_DURATION_MS: 120 * 1000,
+  MIN_DURATION_MS: 700,
+  MAX_BYTES: 2 * 1024 * 1024,
+  PEAKS: 48, // waveform bars stored per note
 });
 
 export const CONVERSATION_ROLE = Object.freeze({

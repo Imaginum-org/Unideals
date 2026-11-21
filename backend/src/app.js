@@ -119,6 +119,8 @@ app.use(
     },
     credentials: true, // allows cookies
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    // Lets the client read rate-limit waits (e.g. the voice-note cooldown).
+    exposedHeaders: ["Retry-After", "RateLimit", "RateLimit-Policy"],
   }),
 );
 

@@ -1,15 +1,16 @@
 import * as messageService from "../services/message.service.js";
 import { forwardServiceError } from "../utils/response.js";
 
-// GET /api/conversations/:id/messages?limit=&before=
+// GET /api/conversations/:id/messages?limit=&before=|after=
 export const listMessages = async (req, res, next) => {
   try {
-    const { limit = "50", before } = req.query;
+    const { limit = "50", before, after } = req.query;
     const result = await messageService.getMessages({
       conversationId: req.params.id,
       userId: req.userId,
       limit,
       before,
+      after,
     });
     return res.status(200).json({
       success: true,
@@ -61,6 +62,23 @@ export const markRead = async (req, res, next) => {
       message: "Marked as read",
       data: conversation,
     });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// POST /api/conversations/:id/voice { fileId, durationMs, peaks?, replyTo? }
+export const sendVoice = async (req, res, next) => {
+  try {
+    const message = await messageService.sendVoiceMessage({
+      conversationId: req.params.id,
+      senderId: req.userId,
+      fileId: req.body.fileId,
+      durationMs: req.body.durationMs,
+      peaks: req.body.peaks,
+      replyTo: req.body.replyTo || null,
+    });
+    return res.status(201).json({ success: true, message: "Voice message sent", data: message });
   } catch (error) {
     forwardServiceError(error, next);
   }

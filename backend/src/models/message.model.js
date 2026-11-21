@@ -42,6 +42,23 @@ const messageSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Voice note (message_type "audio"). The file is on ImageKit in the
+    // sender's own folder; url comes from ImageKit's record, never the client.
+    audio: {
+      type: new mongoose.Schema(
+        {
+          url: { type: String, required: true },
+          file_id: { type: String, required: true },
+          duration_ms: { type: Number, required: true },
+          mime: { type: String, default: "" },
+          size: { type: Number, default: 0 },
+          peaks: { type: [Number], default: [] },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
+
     // Reference to deal (for offer/system messages)
     deal_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -143,6 +160,13 @@ messageSchema.index({
   receiver_id: 1,
   message_status: 1,
 });
+
+// One upload = one message (blocks replaying a fileId), and lets the orphan
+// sweep check "is this file used?" with an index hit.
+messageSchema.index(
+  { "audio.file_id": 1 },
+  { unique: true, partialFilterExpression: { "audio.file_id": { $exists: true } } },
+);
 
 const Message = mongoose.model("Message", messageSchema);
 
