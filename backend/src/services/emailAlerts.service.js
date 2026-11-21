@@ -161,7 +161,7 @@ export const sendUnreadDigests = async ({ now = new Date(), send = defaultSend, 
   const digestSkip = skipReason(cfg, "FRONTEND_URL", frontendUrl);
   if (digestSkip) return { sent: 0, skipped: digestSkip };
 
-  const sentLastDay = await User.countDocuments({ email_digest_sent_at: { $gt: new Date(now - DAY) } });
+  const sentLastDay = await User.countDocuments({ email_digest_sent_at: { $type: "date", $gt: new Date(now - DAY) } });
   const budget = cfg.digestDailyCap - sentLastDay;
   if (budget <= 0) return { sent: 0, budgetLeft: 0, skipped: "Daily digest cap reached" };
 
@@ -256,7 +256,7 @@ export const getAttentionTotals = async () => {
   const [pendingReports, pendingGenderRequests, autoHiddenListings, failingJobs] = await Promise.all([
     Report.countDocuments({ status: REPORT_STATUS.PENDING }),
     User.countDocuments({ "genderChangeRequest.status": "pending" }),
-    Product.countDocuments({ auto_hidden_at: { $ne: null }, is_deleted: false }),
+    Product.countDocuments({ auto_hidden_at: { $type: "date" }, is_deleted: false }),
     JobState.countDocuments({ last_status: "failed" }),
   ]);
   return { pendingReports, pendingGenderRequests, autoHiddenListings, failingJobs };

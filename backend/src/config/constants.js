@@ -110,6 +110,10 @@ export const MESSAGE_TYPE = Object.freeze({
   AUDIO: "audio", // voice note (file lives on ImageKit, see sendVoiceMessage)
 });
 
+// Chat photos (Cloudinary): caption cap; size is capped by the signed
+// incoming transformation (max 1600px) and the client pre-compresses.
+export const CHAT_IMAGE_LIMITS = Object.freeze({ MAX_CAPTION: 1000 });
+
 // Voice notes: hard caps enforced on send (client mirrors them).
 export const VOICE_LIMITS = Object.freeze({
   MAX_DURATION_MS: 120 * 1000,

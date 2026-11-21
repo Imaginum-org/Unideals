@@ -410,6 +410,13 @@ const userSchema = new Schema(
 );
 
 userSchema.index({ status: 1 });
+// Hourly attention count of pending gender requests: only pending rows.
+userSchema.index(
+  { "genderChangeRequest.status": 1 },
+  { partialFilterExpression: { "genderChangeRequest.status": "pending" } },
+);
+// Daily digest budget: users emailed recently (null = never, not indexed).
+userSchema.index({ email_digest_sent_at: 1 }, { partialFilterExpression: { email_digest_sent_at: { $type: "date" } } });
 // Campus leaderboard: top XP on one campus, sorted by the index.
 userSchema.index({ campus_id: 1, "gamification.total_xp": -1 });
 

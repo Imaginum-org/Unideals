@@ -59,6 +59,22 @@ const messageSchema = new mongoose.Schema(
       default: undefined,
     },
 
+    // Chat photo (message_type "image"), stored on Cloudinary. public_id +
+    // version were verified against Cloudinary's signed upload response.
+    image: {
+      type: new mongoose.Schema(
+        {
+          url: { type: String, required: true },
+          public_id: { type: String, required: true },
+          version: { type: Number, required: true },
+          width: { type: Number, default: 0 },
+          height: { type: Number, default: 0 },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
+
     // Reference to deal (for offer/system messages)
     deal_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -166,6 +182,12 @@ messageSchema.index({
 messageSchema.index(
   { "audio.file_id": 1 },
   { unique: true, partialFilterExpression: { "audio.file_id": { $exists: true } } },
+);
+
+// One upload = one message; also the "is this photo used?" lookup for the sweep.
+messageSchema.index(
+  { "image.public_id": 1 },
+  { unique: true, partialFilterExpression: { "image.public_id": { $exists: true } } },
 );
 
 const Message = mongoose.model("Message", messageSchema);

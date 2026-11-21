@@ -1,6 +1,7 @@
 import Message from "../models/message.model.js";
 import { MESSAGE_TYPE } from "../config/constants.js";
 import { VOICE_TAG, bulkDeleteImages, listTaggedFiles } from "../utils/imagekit.js";
+import { CHAT_IMAGE_TAG, cloudinaryConfigured, deleteChatImages, listByTag } from "../utils/cloudinary.js";
 
 const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000;
 const PAGE = 1000;
@@ -45,4 +46,45 @@ export const deleteConversationVoiceFiles = async (conversationId) => {
     .select("audio.file_id")
     .lean();
   return bulkDeleteImages(rows.map((r) => r.audio?.file_id).filter(Boolean));
+};
+
+// ---- Chat photos (Cloudinary) ----
+
+const IMAGE_PAGES = 10; // ≤ 5,000 tagged images inspected per run (10 Admin API calls)
+
+/**
+ * Daily: delete chat photos uploaded but never sent (older than a day).
+ * Tag listing pages are 500 each; "used?" is one indexed $in per page and
+ * deletes go 100 per Admin API call, so a run stays well inside the hourly
+ * Admin API allowance.
+ */
+export const sweepOrphanChatImages = async () => {
+  if (!cloudinaryConfigured()) return { skipped: 1 };
+  const cutoff = Date.now() - ORPHAN_AGE_MS;
+  let checked = 0;
+  let deleted = 0;
+  let cursor;
+  for (let page = 0; page < IMAGE_PAGES; page += 1) {
+    const data = await listByTag(CHAT_IMAGE_TAG, { cursor });
+    const old = (data?.resources || []).filter((r) => r?.public_id && new Date(r.created_at).getTime() < cutoff);
+    checked += old.length;
+    if (old.length) {
+      const used = await Message.find({ "image.public_id": { $in: old.map((r) => r.public_id) } })
+        .select("image.public_id")
+        .lean();
+      const usedSet = new Set(used.map((m) => m.image?.public_id));
+      deleted += await deleteChatImages(old.filter((r) => !usedSet.has(r.public_id)).map((r) => r.public_id));
+    }
+    cursor = data?.next_cursor;
+    if (!cursor) break;
+  }
+  return { checked, deleted };
+};
+
+/** Both sides deleted the chat: its photos are unreachable, remove them. */
+export const deleteConversationImages = async (conversationId) => {
+  const rows = await Message.find({ conversation_id: conversationId, message_type: MESSAGE_TYPE.IMAGE })
+    .select("image.public_id")
+    .lean();
+  return deleteChatImages(rows.map((r) => r.image?.public_id).filter(Boolean));
 };

@@ -44,6 +44,7 @@ const DealProgress = ({
   defaultLocation = "",
   busy = false,
   open = true,
+  scheduleNonce = 0,
   onToggle,
   onConfirmDeal,
   onSchedulePickup,
@@ -153,6 +154,13 @@ const DealProgress = ({
     else if (defaultLocation) setLocation(defaultLocation);
     setScheduling(true);
   };
+  // "/pickup" from the composer: jump straight into the schedule form.
+  useEffect(() => {
+    if (!scheduleNonce || !isSeller) return;
+    if (status === "deal_confirmed" || status === "pickup_scheduled") openSchedule();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleNonce]);
+
   const scheduleForm = (
     <div className="grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]">
       <input

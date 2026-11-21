@@ -120,3 +120,22 @@ export const sendVoice = async (id, { fileId, durationMs, peaks, replyTo } = {})
   });
   return data?.data;
 };
+
+// Chat photos (Cloudinary): signed single-use upload ticket, then the send.
+export const getImageSignature = async () => {
+  const { data } = await axios.get("/api/conversations/uploads/image-signature");
+  return data?.data;
+};
+
+export const sendImage = async (id, { publicId, version, signature, width, height, caption, replyTo } = {}) => {
+  const { data } = await axios.post(`/api/conversations/${id}/image`, {
+    publicId,
+    version,
+    signature,
+    width,
+    height,
+    ...(caption ? { caption } : {}),
+    ...(replyTo ? { replyTo } : {}),
+  });
+  return data?.data;
+};

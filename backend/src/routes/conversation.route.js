@@ -3,7 +3,7 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import auth from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validation.middleware.js";
 import { createConversationSchema } from "../validations/conversation.validation.js";
-import { markReadSchema, sendMessageSchema, sendVoiceSchema } from "../validations/message.validation.js";
+import { markReadSchema, sendImageSchema, sendMessageSchema, sendVoiceSchema } from "../validations/message.validation.js";
 import {
   makeOfferSchema,
   respondOfferSchema,
@@ -21,6 +21,8 @@ import {
   listMessages,
   sendMessage,
   sendVoice,
+  sendImage,
+  imageUploadSignature,
   markRead,
 } from "../controllers/message.controller.js";
 import {
@@ -88,9 +90,19 @@ const voiceLimiters = [
   voiceLimit(24 * 60 * 60 * 1000, Number(process.env.VOICE_PER_DAY) || 200, "Daily voice note limit reached. Try again tomorrow."),
 ];
 
+// Chat photos: same per-account layering. Signing is cheap but each ticket
+// allows an upload, so it is capped too.
+const imageLimiters = [
+  voiceLimit(60 * 1000, Number(process.env.CHAT_IMAGES_PER_MINUTE) || 10, "You're sending photos too fast. Try again in a minute."),
+  voiceLimit(60 * 60 * 1000, Number(process.env.CHAT_IMAGES_PER_HOUR) || 80, "Photo limit reached for this hour. Try again later."),
+  voiceLimit(24 * 60 * 60 * 1000, Number(process.env.CHAT_IMAGES_PER_DAY) || 300, "Daily photo limit reached. Try again tomorrow."),
+];
+const imageSignLimiter = voiceLimit(60 * 1000, 20, "Too many photo uploads. Try again in a minute.");
+
 router.get("/", auth, listLimiter, listConversations);
 // Must be registered before "/:id" so "unread-count" isn't read as an id.
 router.get("/unread-count", auth, listLimiter, getUnreadCount);
+router.get("/uploads/image-signature", auth, imageSignLimiter, imageUploadSignature);
 router.post("/", auth, messageLimiter, validate(createConversationSchema), createConversation);
 
 router.get("/:id", auth, listLimiter, getConversation);
@@ -99,6 +111,7 @@ router.patch("/:id/read", auth, listLimiter, validate(markReadSchema), markRead)
 router.get("/:id/messages", auth, listLimiter, listMessages);
 router.post("/:id/messages", auth, messageLimiter, validate(sendMessageSchema), sendMessage);
 router.post("/:id/voice", auth, ...voiceLimiters, validate(sendVoiceSchema), sendVoice);
+router.post("/:id/image", auth, ...imageLimiters, validate(sendImageSchema), sendImage);
 
 router.get("/:id/deal", auth, listLimiter, getDeal);
 router.post("/:id/offers", auth, offerLimiter, validate(makeOfferSchema), makeOffer);

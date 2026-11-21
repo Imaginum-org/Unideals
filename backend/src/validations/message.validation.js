@@ -32,3 +32,13 @@ export const sendVoiceSchema = z.object({
   peaks: z.array(z.coerce.number().min(0).max(100)).max(48).optional(),
   replyTo: objectId.optional(),
 });
+
+export const sendImageSchema = z.object({
+  publicId: z.string().trim().min(1).max(255).regex(/^[A-Za-z0-9_\-/]+$/, "Invalid photo"),
+  version: z.coerce.number().int().positive(),
+  signature: z.string().trim().regex(/^[a-f0-9]{40}$/i, "Invalid photo"),
+  width: z.coerce.number().int().min(0).max(20000).optional(),
+  height: z.coerce.number().int().min(0).max(20000).optional(),
+  caption: z.string().trim().max(1000, "Caption too long").optional(),
+  replyTo: objectId.optional(),
+});

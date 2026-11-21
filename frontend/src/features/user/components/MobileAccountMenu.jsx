@@ -7,6 +7,7 @@ import {
   Crown,
   FileText,
   Heart,
+  KeyRound,
   LifeBuoy,
   LogOut,
   Package,
@@ -32,6 +33,7 @@ const GROUPS = [
     items: [
       { to: "/myorders", label: "Orders", icon: Package },
       { to: "/productlisted", label: "My listings", icon: ShoppingBag },
+      { to: "/rentals", label: "Rentals", icon: KeyRound, soon: true },
       { to: "/wishlist", label: "Wishlist", icon: Heart },
       { to: "/notification", label: "Notifications", icon: Bell, badgeKey: "notif" },
     ],
@@ -55,7 +57,7 @@ const GROUPS = [
   },
 ];
 
-function Row({ to, label, icon: Icon, badge }) {
+function Row({ to, label, icon: Icon, badge, soon = false }) {
   return (
     <Link
       to={to}
@@ -63,6 +65,11 @@ function Row({ to, label, icon: Icon, badge }) {
     >
       <Icon className="h-[17px] w-[17px] shrink-0 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-slate-800 dark:text-zinc-100">{label}</span>
+      {soon && (
+        <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--accent-text)]">
+          Soon
+        </span>
+      )}
       {badge > 0 && (
         <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#FF3B30] px-1.5 text-[11px] font-bold text-white">
           {badge > 99 ? "99+" : badge}

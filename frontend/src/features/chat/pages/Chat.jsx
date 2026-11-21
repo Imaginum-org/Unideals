@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { refreshChatUnread } from "../../../services/chatUnread.js";
 import VerifiedTick from "../../../components/common/VerifiedTick.jsx";
 import {
@@ -10,8 +10,14 @@ import {
   Crown,
   ExternalLink,
   Flag,
+  CalendarDays,
+  Handshake,
+  ImagePlus,
   IndianRupee,
+  MapPin,
   Mic,
+  PackageSearch,
+  Users,
   Lock,
   MessagesSquare,
   MoreVertical,
@@ -33,6 +39,7 @@ import DealProgress from "../components/DealProgress.jsx";
 import ReportUserModal from "../components/ReportUserModal.jsx";
 import VoiceRecorder from "../components/VoiceRecorder.jsx";
 import { uploadVoice, voiceSupported } from "../utils/voice.js";
+import { CHAT_IMAGE_ACCEPT, isChatImageFile, prepareChatImage, readImageSize, uploadChatImage } from "../utils/chatImage.js";
 import { deleteImage } from "../../../utils/imageUpload.js";
 import { useChatSocket } from "../hooks/useChatSocket.js";
 import { dealStatusBadge } from "../utils/dealStage.js";
@@ -154,6 +161,9 @@ const ChatPanel = ({ embedded = false }) => {
   const [threadLoading, setThreadLoading] = useState(false);
   // Deal card starts open; collapsing gives the thread more room.
   const [dealOpen, setDealOpen] = useState(true);
+  // Bumped by /pickup: tells the deal card to open its schedule form.
+  const [scheduleNonce, setScheduleNonce] = useState(0);
+  const navigate = useNavigate();
 
   const messagesEndRef = useRef(null);
   const threadScrollRef = useRef(null);
@@ -803,6 +813,75 @@ const ChatPanel = ({ embedded = false }) => {
     }
   };
 
+  // ---- photos (Cloudinary) ----
+  // One photo per message with an optional caption (the composer text).
+  const imageInputRef = useRef(null);
+  const [pendingImage, setPendingImage] = useState(null); // { file, url, width, height }
+  const [imageProgress, setImageProgress] = useState(null); // 0–1 while uploading
+  const [imageBlockedUntil, setImageBlockedUntil] = useState(0);
+  const pendingUrlRef = useRef(null);
+  const clearPendingImage = useCallback(() => {
+    if (pendingUrlRef.current) URL.revokeObjectURL(pendingUrlRef.current);
+    pendingUrlRef.current = null;
+    setPendingImage(null);
+    setImageProgress(null);
+  }, []);
+  // Switching chats (or leaving) drops an unsent attachment.
+  useEffect(() => clearPendingImage, [selectedId, clearPendingImage]);
+  const pickImage = async (file) => {
+    if (!file) return;
+    if (!isChatImageFile(file)) {
+      toast.error("Only photos can be shared (JPG, PNG, WEBP or HEIC).");
+      return;
+    }
+    if (imageProgress != null) return;
+    if (pendingUrlRef.current) URL.revokeObjectURL(pendingUrlRef.current);
+    const url = URL.createObjectURL(file);
+    pendingUrlRef.current = url;
+    const size = await readImageSize(url);
+    setPendingImage({ file, url, ...size });
+    setTimeout(() => composerRef.current?.focus(), 0);
+  };
+  const handleSendImage = async () => {
+    const cid = selectedId;
+    const img = pendingImage;
+    if (!cid || !img || imageProgress != null || coolingDown) return;
+    if (Date.now() < imageBlockedUntil) {
+      toast.error(`Photos are paused. Try again in ${Math.ceil((imageBlockedUntil - Date.now()) / 1000)}s.`);
+      return;
+    }
+    const caption = chatInput.trim();
+    const quote = replyingTo;
+    setImageProgress(0);
+    try {
+      const prepared = await prepareChatImage(img.file);
+      const up = await uploadChatImage(prepared, { onProgress: (f) => setImageProgress(Math.min(0.97, f)) });
+      const saved = await chatApi.sendImage(cid, {
+        ...up,
+        width: img.width,
+        height: img.height,
+        caption,
+        replyTo: quote?._id,
+      });
+      if (saved && cid === selectedIdRef.current) {
+        setMessages((prev) => (prev.some((m) => String(m._id) === String(saved._id)) ? prev : [...prev, { ...saved, burst: true }]));
+        setReplyingTo(null);
+        setChatInput("");
+        requestAnimationFrame(() => scrollToBottom());
+      }
+      clearPendingImage();
+      scheduleList();
+    } catch (err) {
+      setImageProgress(null);
+      const status = err?.response?.status;
+      if (status === 429) {
+        const retry = Number(err.response?.headers?.["retry-after"]) || 60;
+        setImageBlockedUntil(Date.now() + retry * 1000);
+      }
+      toast.error(err?.response?.data?.message || err?.message || "Couldn't send the photo");
+    }
+  };
+
   // ---- send text ----
   const handleSend = async (e, preset) => {
     e?.preventDefault();
@@ -1273,7 +1352,118 @@ const ChatPanel = ({ embedded = false }) => {
   const charCount = chatInput.length;
 
   // "/" commands: only while the draft is a single slash-word ("/rep…").
-  const SLASH_COMMANDS = [
+  const offerAllowed = !deal || ["negotiating", "offer_accepted", "cancelled"].includes(deal.status || "negotiating");
+  // Insert a ready-to-edit message into the composer (never auto-sends).
+  const draft = (text) => {
+    setChatInput(text);
+    setTimeout(() => {
+      const el = composerRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange?.(text.length, text.length);
+    }, 0);
+  };
+  const isSeller = role === "selling";
+  const dealLive = deal && !["completed", "cancelled"].includes(deal.status || "negotiating");
+  const ALL_COMMANDS = [
+    {
+      cmd: "/photo",
+      label: "Send a photo",
+      hint: "Share a picture of the item, a defect or the pickup spot",
+      icon: ImagePlus,
+      tone: "bg-sky-50 text-sky-600 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-400 dark:ring-sky-900/40",
+      run: () => imageInputRef.current?.click(),
+    },
+    {
+      cmd: "/offer",
+      label: isSeller ? "Suggest a price" : "Make an offer",
+      hint: offerAllowed ? "Open the offer panel" : "The price is already locked for this deal",
+      icon: IndianRupee,
+      tone: "bg-[var(--accent-soft)] text-[var(--accent-text)] ring-[var(--accent-ring)]",
+      run: () => (offerAllowed ? setOfferOpen(true) : toast("Final price is already locked for this deal")),
+    },
+    {
+      cmd: "/available",
+      roles: ["buying"],
+      label: "Is it still available?",
+      hint: "Ask the seller before you plan a pickup",
+      icon: PackageSearch,
+      tone: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:ring-emerald-900/40",
+      run: () => draft(`Hi! Is "${productTitle}" still available?`),
+    },
+    {
+      cmd: "/meet",
+      roles: ["buying"],
+      label: "Suggest meeting on campus",
+      hint: "Propose a time to see the item before paying",
+      icon: Users,
+      tone: "bg-violet-50 text-violet-600 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-400 dark:ring-violet-900/40",
+      run: () => draft("Can we meet on campus so I can check the item? I'm free today after classes or tomorrow."),
+    },
+    {
+      cmd: "/confirm",
+      roles: ["selling"],
+      when: () => Boolean(deal) && ["negotiating", "offer_accepted"].includes(deal.status || "negotiating"),
+      label: "Confirm the deal",
+      hint: "Lock the final price in the deal card",
+      icon: Handshake,
+      tone: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:ring-emerald-900/40",
+      run: () => setDealOpen(true),
+    },
+    {
+      cmd: "/pickup",
+      roles: ["selling"],
+      when: () => Boolean(deal) && ["deal_confirmed", "pickup_scheduled"].includes(deal.status),
+      label: deal?.status === "pickup_scheduled" ? "Reschedule pickup" : "Schedule pickup",
+      hint: "Pick a date and a campus spot",
+      icon: CalendarDays,
+      tone: "bg-sky-50 text-sky-600 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-400 dark:ring-sky-900/40",
+      run: () => {
+        setDealOpen(true);
+        setScheduleNonce((n) => n + 1);
+      },
+    },
+    {
+      cmd: "/spot",
+      roles: ["selling"],
+      label: "Share pickup spot",
+      hint: defaultPickup || "No pickup spot on this listing yet",
+      icon: MapPin,
+      tone: "bg-rose-50 text-rose-600 ring-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:ring-rose-900/40",
+      run: () => (defaultPickup ? draft(`📍 Pickup spot: ${defaultPickup}`) : toast("Add a pickup spot to the listing first")),
+    },
+    {
+      cmd: "/deal",
+      when: () => Boolean(deal),
+      label: dealOpen ? "Collapse deal card" : "Show deal card",
+      hint: "Price, pickup and payment progress",
+      icon: Handshake,
+      tone: "bg-neutral-100 text-slate-600 ring-neutral-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-white/10",
+      run: () => setDealOpen((v) => !v),
+    },
+    {
+      cmd: "/listing",
+      label: "Open the listing",
+      hint: productTitle,
+      icon: ExternalLink,
+      tone: "bg-neutral-100 text-slate-600 ring-neutral-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-white/10",
+      run: () => {
+        const target = product?._id ? product : detail?.product_id;
+        if (target) navigate(productPath(target));
+      },
+    },
+    {
+      cmd: "/cancel-deal",
+      when: () => Boolean(dealLive) && deal.status !== "negotiating",
+      label: "Cancel this deal",
+      hint: "The item becomes available again",
+      icon: XCircle,
+      tone: "bg-red-50 text-red-600 ring-red-100 dark:bg-red-950/30 dark:text-red-400 dark:ring-red-900/40",
+      run: () => {
+        if (!window.confirm("Cancel this deal? The item becomes available again.")) return;
+        runDealAction(() => chatApi.cancelDeal(selectedId, "Cancelled from chat"), "Deal cancelled");
+      },
+    },
     {
       cmd: "/user-report",
       label: `Report ${otherName || "user"}`,
@@ -1291,6 +1481,7 @@ const ChatPanel = ({ embedded = false }) => {
       run: () => setReportProductOpen(true),
     },
   ];
+  const SLASH_COMMANDS = ALL_COMMANDS.filter((c) => (!c.roles || c.roles.includes(role)) && (!c.when || c.when()));
   const slashWord = /^\/[\w-]*$/.test(chatInput) ? chatInput.toLowerCase() : null;
   // Prefix match, or loose match ignoring dashes ("/report" finds both).
   const slashMatches =
@@ -1301,7 +1492,6 @@ const ChatPanel = ({ embedded = false }) => {
         );
   // A bare number ("500", "₹1,200") suggests sending it as an offer, while
   // the price is still open (same rule as the ₹ button).
-  const offerAllowed = !deal || ["negotiating", "offer_accepted", "cancelled"].includes(deal.status || "negotiating");
   const composerHints = [
     "Message",
     "Type / for options",
@@ -1645,7 +1835,19 @@ const ChatPanel = ({ embedded = false }) => {
               </div>
 
               {/* Thread: one wallpaper behind the floating deal bar and the messages */}
-              <div className={`relative flex min-h-0 flex-1 flex-col ${wallCls}`}>
+              <div
+                className={`relative flex min-h-0 flex-1 flex-col ${wallCls}`}
+                onDragOver={(e) => {
+                  if ([...(e.dataTransfer?.items || [])].some((i) => i.kind === "file")) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  const file = [...(e.dataTransfer?.files || [])].find((f) => f.type.startsWith("image/"));
+                  if (file) {
+                    e.preventDefault();
+                    pickImage(file);
+                  }
+                }}
+              >
               {/* Deal card, floating over the thread */}
               {deal && (
                 <div ref={dealBarRef} className="pointer-events-none absolute inset-0 z-20 flex flex-col px-3 pb-3 pt-2.5 lg:px-6">
@@ -1653,6 +1855,7 @@ const ChatPanel = ({ embedded = false }) => {
                     <DealProgress
                       deal={deal}
                       role={role}
+                      scheduleNonce={scheduleNonce}
                       defaultLocation={defaultPickup}
                       busy={busy}
                       open={dealOpen}
@@ -1892,6 +2095,35 @@ const ChatPanel = ({ embedded = false }) => {
                     ))}
                   </div>
 
+                  {pendingImage && (
+                    <div className="mx-3 mt-2 flex items-center gap-3 rounded-xl border border-neutral-200/80 bg-white p-2 shadow-sm dark:border-neutral-800 dark:bg-[#1A1D20]">
+                      <img src={pendingImage.url} alt="Selected photo" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-slate-900 dark:text-white">
+                          {imageProgress != null ? "Sending photo…" : "Photo ready"}
+                        </p>
+                        {imageProgress != null ? (
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-200"
+                              style={{ width: `${Math.round(imageProgress * 100)}%` }}
+                            />
+                          </div>
+                        ) : (
+                          <p className="truncate text-[12px] text-slate-500 dark:text-zinc-400">Add a caption below, then send</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearPendingImage}
+                        disabled={imageProgress != null}
+                        aria-label="Remove photo"
+                        className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-500 hover:bg-neutral-100 disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-white/5"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
                   {replyingTo && (
                     <div className="mx-3 mt-1.5 flex items-stretch overflow-hidden rounded-lg bg-neutral-100 dark:bg-white/5">
                       <span className="w-[3px] shrink-0 bg-[var(--accent)]" />
@@ -1975,7 +2207,35 @@ const ChatPanel = ({ embedded = false }) => {
                         </div>
                       </div>
                     )}
-                    <form onSubmit={handleSend} className="relative flex items-end gap-1.5">
+                    <form
+                      onSubmit={(e) => {
+                        if (pendingImage) {
+                          e.preventDefault();
+                          handleSendImage();
+                        } else handleSend(e);
+                      }}
+                      className="relative flex items-end gap-1.5"
+                    >
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept={CHAT_IMAGE_ACCEPT}
+                        className="hidden"
+                        onChange={(e) => {
+                          pickImage(e.target.files?.[0]);
+                          e.target.value = "";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        title="Send a photo"
+                        aria-label="Send a photo"
+                        disabled={coolingDown || imageProgress != null}
+                        onClick={() => imageInputRef.current?.click()}
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-600 transition-colors hover:bg-neutral-100 hover:text-[var(--accent-text)] disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-white/5"
+                      >
+                        <ImagePlus size={19} />
+                      </button>
                       <button
                         ref={rupeeBtnRef}
                         type="button"
@@ -2038,11 +2298,19 @@ const ChatPanel = ({ embedded = false }) => {
                             const coarse = window.matchMedia?.("(pointer: coarse)").matches;
                             if (e.key === "Enter" && !e.shiftKey && !coarse && !e.nativeEvent.isComposing) {
                               e.preventDefault();
-                              handleSend(e);
+                              if (pendingImage) handleSendImage();
+                              else handleSend(e);
                             }
                             if (e.key === "Escape" && replyingTo) setReplyingTo(null);
                           }}
-                          placeholder={coolingDown ? "Sending paused…" : composerHint}
+                          placeholder={coolingDown ? "Sending paused…" : pendingImage ? "Add a caption…" : composerHint}
+                          onPaste={(e) => {
+                            const file = [...(e.clipboardData?.files || [])].find((f) => f.type.startsWith("image/"));
+                            if (file) {
+                              e.preventDefault();
+                              pickImage(file);
+                            }
+                          }}
                           aria-label="Type a message"
                           disabled={coolingDown}
                           onFocus={() => {
@@ -2056,7 +2324,7 @@ const ChatPanel = ({ embedded = false }) => {
                         />
                       </div>
                       {/* Empty composer: mic (voice note). Typing: send. */}
-                      {canRecordVoice && !chatInput.trim() ? (
+                      {canRecordVoice && !chatInput.trim() && !pendingImage ? (
                         <VoiceRecorder
                           key={selectedId}
                           disabled={coolingDown || !selectedId}
@@ -2066,8 +2334,8 @@ const ChatPanel = ({ embedded = false }) => {
                       ) : (
                         <button
                           type="submit"
-                          disabled={!chatInput.trim() || coolingDown}
-                          aria-label="Send message"
+                          disabled={(!chatInput.trim() && !pendingImage) || coolingDown || imageProgress != null}
+                          aria-label={pendingImage ? "Send photo" : "Send message"}
                           className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] disabled:bg-neutral-300 disabled:shadow-none dark:disabled:bg-neutral-700"
                         >
                           <Send size={17} className="-ml-0.5" />

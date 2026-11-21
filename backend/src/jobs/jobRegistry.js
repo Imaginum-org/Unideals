@@ -8,6 +8,9 @@ const INSTANCE_ID = `${os.hostname()}:${process.pid}:${crypto.randomBytes(3).toS
 // How long a finished run keeps its lease (blocks duplicate ticks of the
 // same minute on other instances). Must stay below the 1-minute minimum.
 const LEASE_HOLD_MS = 30 * 1000;
+// Every schedule is read in this timezone, so moving hosts (or a host that
+// isn't on UTC) never shifts when jobs run. Override with JOBS_TIMEZONE.
+export const JOBS_TIMEZONE = process.env.JOBS_TIMEZONE || "UTC";
 
 /**
  * Registry for scheduled background jobs.
@@ -182,11 +185,15 @@ export const startScheduledJobs = () => {
     return;
   }
   for (const job of jobs.values()) {
-    cron.schedule(job.schedule, () => {
-      runJob(job.key).catch(() => {});
-    });
+    cron.schedule(
+      job.schedule,
+      () => {
+        runJob(job.key).catch(() => {});
+      },
+      { timezone: JOBS_TIMEZONE },
+    );
   }
-  console.log(`[Jobs] ${jobs.size} scheduled jobs registered`);
+  console.log(`[Jobs] ${jobs.size} scheduled jobs registered (${JOBS_TIMEZONE})`);
 };
 
 export const listJobDefinitions = () =>

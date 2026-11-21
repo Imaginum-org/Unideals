@@ -379,6 +379,11 @@ productSchema.index({
 productSchema.index({ is_boosted: 1, boost_expires_at: -1, boost_tier: 1 });
 // Trending rail: campus live listings by views, no in-memory sort.
 productSchema.index({ campus_id: 1, status: 1, is_deleted: 1, views_count: -1 });
+// Nightly Girls Corner sweep: distinct sellers of live girls-only listings.
+productSchema.index(
+  { seller_id: 1 },
+  { partialFilterExpression: { isGirlsOnly: true, status: "listed", is_deleted: false } },
+);
 // Nightly purge of soft-deleted listings ({ is_deleted, updatedAt < … }).
 productSchema.index({ is_deleted: 1, updatedAt: 1 });
 // Nightly purge of stale drafts + staff filters by status.

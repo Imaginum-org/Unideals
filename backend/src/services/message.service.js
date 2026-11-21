@@ -5,7 +5,8 @@ import Message from "../models/message.model.js";
 import Report from "../models/Report.model.js";
 import ChatCooldown from "../models/ChatCooldown.model.js";
 import User from "../models/User.model.js";
-import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS, VOICE_LIMITS } from "../config/constants.js";
+import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS, VOICE_LIMITS, CHAT_IMAGE_LIMITS } from "../config/constants.js";
+import { chatImageUrl, cloudinaryConfigured, isOwnChatImage, verifyUploadResponse } from "../utils/cloudinary.js";
 import { getFileDetails, isInVoiceFolderOf, isValidFileId } from "../utils/imagekit.js";
 import { AppError } from "../utils/appError.js";
 import { emitToConversation, emitToUser } from "../utils/socket.js";
@@ -281,6 +282,119 @@ export const sendTextMessage = async ({ conversationId, senderId, text, replyTo 
   return payload;
 };
 
+// Quote target must be a non-system message inside THIS conversation.
+const resolveReplyTo = async (conversation, replyTo) => {
+  if (!replyTo) return null;
+  if (!mongoose.Types.ObjectId.isValid(replyTo)) throw new AppError("Invalid reply reference", 400);
+  const quoted = await Message.findById(replyTo).select("conversation_id message_type").lean();
+  if (!quoted || String(quoted.conversation_id) !== String(conversation._id)) {
+    throw new AppError("Replied message not found in this chat", 400);
+  }
+  if (quoted.message_type === MESSAGE_TYPE.SYSTEM) throw new AppError("Cannot reply to system messages", 400);
+  return quoted._id;
+};
+
+// Shared tail of every user send: preview + unread bump, realtime, push.
+const publishSent = async ({ conversation, message, senderId, receiverId, preview, type }) => {
+  const activityAt = new Date();
+  const unreadSide = String(conversation.buyer_id) === String(receiverId) ? "buyer" : "seller";
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    {
+      $set: {
+        last_message: preview,
+        last_message_type: type,
+        last_message_sender: senderId,
+        last_activity_at: activityAt,
+      },
+      $inc: { [`unread_count.${unreadSide}`]: 1 },
+    },
+  );
+  const [payload] = await attachReplies([toClientMessage(message)]);
+  emitToConversation(conversation._id, "message:new", payload);
+  emitToUser(receiverId, "conversation:updated", {
+    conversationId: String(conversation._id),
+    last_message: preview,
+    last_activity_at: activityAt,
+  });
+  try {
+    const sender = await loadAuthUser(User, senderId);
+    notifyNewMessage({
+      conversationId: conversation._id,
+      senderId,
+      receiverId,
+      senderName: sender?.name || "A user",
+      textSnippet: preview,
+    });
+  } catch {
+    // never break sending if notification fails
+  }
+  return payload;
+};
+
+/**
+ * Chat photo (Cloudinary). The browser uploaded with a server-signed,
+ * server-chosen public_id in the sender's own folder; here we only verify
+ * Cloudinary's response signature locally (no Admin API call), so a client
+ * can't invent or borrow an image. Caption goes through the same abuse
+ * screen as text. Rate limits live on the route.
+ */
+export const sendImageMessage = async ({ conversationId, senderId, publicId, version, signature, width = 0, height = 0, caption = "", replyTo = null }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) throw new AppError("Invalid conversation ID", 400);
+  if (!cloudinaryConfigured()) throw new AppError("Photo sharing isn't available right now", 503);
+  const ver = Number(version);
+  if (!isOwnChatImage(publicId, senderId) || !Number.isInteger(ver) || ver <= 0) {
+    throw new AppError("Invalid photo", 400);
+  }
+  if (!verifyUploadResponse({ publicId, version: ver, signature })) throw new AppError("Invalid photo", 403);
+  const cleanCaption = String(caption || "").trim().slice(0, CHAT_IMAGE_LIMITS.MAX_CAPTION);
+
+  await assertNotCoolingDown(senderId);
+
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation || !conversation.is_active) throw new AppError("Conversation not found", 404);
+  assertParticipant(conversation, senderId);
+  const receiverId = otherPartyOf(conversation, senderId);
+  const replyToId = await resolveReplyTo(conversation, replyTo);
+
+  const screen = cleanCaption ? screenText(cleanCaption) : { flagged: false };
+  const dim = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
+  let message;
+  try {
+    message = await Message.create({
+      conversation_id: conversation._id,
+      sender_id: senderId,
+      receiver_id: receiverId,
+      message_type: MESSAGE_TYPE.IMAGE,
+      text: cleanCaption,
+      message_status: MESSAGE_STATUS.SENT,
+      reply_to: replyToId,
+      image: { url: chatImageUrl(publicId, ver), public_id: publicId, version: ver, width: dim(width), height: dim(height) },
+      ...(screen.flagged
+        ? { is_flagged: true, flag_reason: screen.matched || "inappropriate_content", flagged_at: new Date() }
+        : {}),
+    });
+  } catch (err) {
+    if (err?.code === 11000) throw new AppError("This photo was already sent", 409);
+    throw err;
+  }
+  if (screen.flagged) {
+    fileAutoReport({ conversation, senderId, receiverId, excerpt: cleanCaption });
+    try {
+      await registerStrike(senderId);
+    } catch {
+      // ignore
+    }
+  }
+
+  const preview = screen.flagged
+    ? BLOCKED_PLACEHOLDER
+    : cleanCaption
+      ? `📷 ${cleanCaption.slice(0, 480)}`
+      : "📷 Photo";
+  return publishSent({ conversation, message, senderId, receiverId, preview, type: MESSAGE_TYPE.IMAGE });
+};
+
 const fmtClock = (ms) => {
   const s = Math.max(1, Math.round(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -323,16 +437,7 @@ export const sendVoiceMessage = async ({ conversationId, senderId, fileId, durat
     throw new AppError("This voice note was already sent", 409);
   }
 
-  let replyToId = null;
-  if (replyTo) {
-    if (!mongoose.Types.ObjectId.isValid(replyTo)) throw new AppError("Invalid reply reference", 400);
-    const quoted = await Message.findById(replyTo).select("conversation_id message_type").lean();
-    if (!quoted || String(quoted.conversation_id) !== String(conversation._id)) {
-      throw new AppError("Replied message not found in this chat", 400);
-    }
-    if (quoted.message_type === MESSAGE_TYPE.SYSTEM) throw new AppError("Cannot reply to system messages", 400);
-    replyToId = quoted._id;
-  }
+  const replyToId = await resolveReplyTo(conversation, replyTo);
 
   let file;
   try {
@@ -378,41 +483,7 @@ export const sendVoiceMessage = async ({ conversationId, senderId, fileId, durat
   }
 
   const preview = `🎤 Voice message (${fmtClock(message.audio.duration_ms)})`;
-  const activityAt = new Date();
-  const unreadSide = String(conversation.buyer_id) === String(receiverId) ? "buyer" : "seller";
-  await Conversation.updateOne(
-    { _id: conversation._id },
-    {
-      $set: {
-        last_message: preview,
-        last_message_type: MESSAGE_TYPE.AUDIO,
-        last_message_sender: senderId,
-        last_activity_at: activityAt,
-      },
-      $inc: { [`unread_count.${unreadSide}`]: 1 },
-    },
-  );
-
-  const [payload] = await attachReplies([toClientMessage(message)]);
-  emitToConversation(conversation._id, "message:new", payload);
-  emitToUser(receiverId, "conversation:updated", {
-    conversationId: String(conversation._id),
-    last_message: preview,
-    last_activity_at: activityAt,
-  });
-  try {
-    const sender = await loadAuthUser(User, senderId);
-    notifyNewMessage({
-      conversationId: conversation._id,
-      senderId,
-      receiverId,
-      senderName: sender?.name || "A user",
-      textSnippet: preview,
-    });
-  } catch {
-    // never break sending if notification fails
-  }
-  return payload;
+  return publishSent({ conversation, message, senderId, receiverId, preview, type: MESSAGE_TYPE.AUDIO });
 };
 
 /**

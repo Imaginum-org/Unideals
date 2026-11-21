@@ -13,7 +13,7 @@ import {
   FolderIcon,
 } from "@animateicons/react/lucide";
 import { Settings01Icon } from "@animateicons/react/huge";
-import { ArrowUpRight, CircleHelp, Crown, PanelLeftClose, PanelLeftOpen, PlayCircle, Sparkles, Trophy } from "lucide-react";
+import { ArrowUpRight, CircleHelp, Crown, KeyRound, PanelLeftClose, PanelLeftOpen, PlayCircle, Sparkles, Trophy } from "lucide-react";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
@@ -136,7 +136,7 @@ const useCollapsedTooltip = (enabled) => {
 };
 
 // ─── NavItem defined OUTSIDE the parent so hooks are stable across renders ───
-const NavItem = ({ path, label, icon: Icon, badge, isCollapsed, pathname }) => {
+const NavItem = ({ path, label, icon: Icon, badge, soon = false, isCollapsed, pathname }) => {
   const iconRef = useRef(null);
   const tooltip = useCollapsedTooltip(isCollapsed);
   const isActive =
@@ -180,6 +180,11 @@ const NavItem = ({ path, label, icon: Icon, badge, isCollapsed, pathname }) => {
         <Icon ref={iconRef} size={17} strokeWidth={isActive ? 2.25 : 1.75} className="shrink-0" />
         {!isCollapsed && (
           <span className={cn("min-w-0 flex-1 truncate text-[13.5px]", isActive ? "font-semibold" : "font-medium")}>{label}</span>
+        )}
+        {soon && !isCollapsed && (
+          <span className="rounded-full bg-[var(--accent-soft)] px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-[var(--accent-text)]">
+            Soon
+          </span>
         )}
         {badge > 0 &&
           (isCollapsed ? (
@@ -306,6 +311,7 @@ function Profile_left_part() {
         { path: "/notification", label: "Notifications", icon: BellIcon, badge: notifUnread },
         { path: "/myorders", label: "Orders", icon: BoxIcon },
         { path: "/productlisted", label: "My listings", icon: ShoppingBagIcon },
+        { path: "/rentals", label: "Rentals", icon: KeyRound, soon: true },
         { path: "/wishlist", label: "Wishlist", icon: HeartIcon },
         { path: "/achievements", label: "Achievements", icon: Trophy },
       ],

@@ -1,5 +1,6 @@
 import * as messageService from "../services/message.service.js";
 import { forwardServiceError } from "../utils/response.js";
+import { cloudinaryConfigured, signChatImageUpload } from "../utils/cloudinary.js";
 
 // GET /api/conversations/:id/messages?limit=&before=|after=
 export const listMessages = async (req, res, next) => {
@@ -79,6 +80,39 @@ export const sendVoice = async (req, res, next) => {
       replyTo: req.body.replyTo || null,
     });
     return res.status(201).json({ success: true, message: "Voice message sent", data: message });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// GET /api/conversations/uploads/image-signature — one signed, single-use
+// upload ticket for a chat photo (Cloudinary, own folder, fixed public_id).
+export const imageUploadSignature = async (req, res, next) => {
+  try {
+    if (!cloudinaryConfigured()) {
+      return res.status(503).json({ success: false, message: "Photo sharing isn't available right now" });
+    }
+    return res.status(200).json({ success: true, data: signChatImageUpload(req.userId) });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// POST /api/conversations/:id/image { publicId, version, signature, width?, height?, caption?, replyTo? }
+export const sendImage = async (req, res, next) => {
+  try {
+    const message = await messageService.sendImageMessage({
+      conversationId: req.params.id,
+      senderId: req.userId,
+      publicId: req.body.publicId,
+      version: req.body.version,
+      signature: req.body.signature,
+      width: req.body.width,
+      height: req.body.height,
+      caption: req.body.caption || "",
+      replyTo: req.body.replyTo || null,
+    });
+    return res.status(201).json({ success: true, message: "Photo sent", data: message });
   } catch (error) {
     forwardServiceError(error, next);
   }

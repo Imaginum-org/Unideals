@@ -3,6 +3,7 @@ import { Check, CheckCheck, Copy, Reply, RotateCcw, ShieldAlert, X } from "lucid
 import { toast } from "../../../components/ui/toast.js";
 import { formatName } from "../utils/display.js";
 import VoiceNote from "./VoiceNote.jsx";
+import ChatPhoto from "./ChatPhoto.jsx";
 
 export const fmtTime = (iso) => {
   try {
@@ -274,6 +275,45 @@ const MessageBubble = ({
             Message blocked
           </p>
           <p className="mt-0.5 text-[11.5px] text-red-600/90 dark:text-red-400/80">Flagged and sent to the admin team for review.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (msg?.message_type === "image" && msg.image?.url && !msg.is_flagged) {
+    return (
+      <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
+        <div className="relative max-w-[86%] md:max-w-[70%]">
+          {Toolbar}
+          <div
+            className={`relative p-1 shadow-[0_1px_1px_rgba(15,23,42,0.06)] ${
+              isMine
+                ? "bg-[#E8E8FD] text-slate-900 dark:bg-[#2E2F6B] dark:text-zinc-100"
+                : "bg-white text-slate-900 ring-1 ring-black/[0.04] dark:bg-[#1F2226] dark:text-zinc-100 dark:ring-white/5"
+            } ${isLastOfGroup ? (isMine ? "rounded-2xl rounded-br-md" : "rounded-2xl rounded-bl-md") : "rounded-2xl"}`}
+          >
+            {QuoteBlock && <div className="px-1.5 pt-1">{QuoteBlock}</div>}
+            <div className="relative">
+              <ChatPhoto image={msg.image} alt={msg.text || "Photo"} />
+              {!msg.text && (
+                <span className="pointer-events-none absolute bottom-1.5 right-1.5 flex select-none items-center gap-[3px] rounded-full bg-black/45 px-1.5 py-0.5 text-[10.5px] leading-none text-white backdrop-blur-sm">
+                  {fmtTime(msg.createdAt)}
+                  {isMine && <Ticks status={msg.message_status} />}
+                </span>
+              )}
+            </div>
+            {msg.text && (
+              <div className="max-w-[min(16.5rem,64vw)] break-words px-2 pb-1 pt-1.5 text-[14px] leading-[20px] [overflow-wrap:anywhere]">
+                <span className="whitespace-pre-wrap">
+                  <RichText text={msg.text} query={query} />
+                </span>
+                <span className="float-right ml-2 mt-[7px] flex select-none items-center gap-[3px] text-[10.5px] leading-none text-slate-500/80 dark:text-zinc-400">
+                  {fmtTime(msg.createdAt)}
+                  {isMine && <Ticks status={msg.message_status} />}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

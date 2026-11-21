@@ -84,7 +84,7 @@ const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
  * - Sold listings (deal completed): 15 days after completion, so finished
  *   deals vanish fast and nobody trips over dead listings.
  * - Manually deleted listings: 30 days (unchanged grace window).
- * Runs daily at 2 AM
+ * Runs daily at 2 AM IST (low-traffic window)
  */
 export const scheduleCleanupDeletedProducts = () => {
   defineJob({
@@ -92,8 +92,8 @@ export const scheduleCleanupDeletedProducts = () => {
     name: "Purge deleted listings",
     description:
       "Permanently removes listings deleted 30+ days ago (15+ if sold), plus listings whose seller no longer exists, and their images.",
-    schedule: "0 2 * * *",
-    scheduleLabel: "Daily at 02:00",
+    schedule: "30 20 * * *",
+    scheduleLabel: "Daily at 02:00 IST (20:30 UTC)",
     run: async () => {
       // Served by { is_deleted: 1, updatedAt: 1 }.
       const deletedListings = await purgeInBatches({
@@ -109,8 +109,8 @@ export const scheduleCleanupDeletedProducts = () => {
     key: "purge-stale-drafts",
     name: "Purge stale drafts",
     description: "Deletes drafts that haven't been touched in 30 days, with their images.",
-    schedule: "30 2 * * *",
-    scheduleLabel: "Daily at 02:30",
+    schedule: "0 21 * * *",
+    scheduleLabel: "Daily at 02:30 IST (21:00 UTC)",
     run: async () => ({
       // Served by { status: 1, updatedAt: 1 }.
       draftsDeleted: await purgeInBatches({ status: "draft", is_deleted: false, updatedAt: { $lt: daysAgo(30) } }),
@@ -121,8 +121,8 @@ export const scheduleCleanupDeletedProducts = () => {
     key: "girls-corner-sweep",
     name: "Girls Corner eligibility sweep",
     description: "Unlists Girls Corner listings whose seller is no longer eligible.",
-    schedule: "45 2 * * *",
-    scheduleLabel: "Daily at 02:45",
+    schedule: "15 21 * * *",
+    scheduleLabel: "Daily at 02:45 IST (21:15 UTC)",
     run: () => autoUnlistInvalidGirlsListings(),
   });
 };
