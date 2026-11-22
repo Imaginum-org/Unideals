@@ -54,24 +54,6 @@ export const percentChange = (current, previous) => {
   return diff >= 0 ? `+${diff}%` : `${diff}%`;
 };
 
-const sumField = (Model, match, field, stages = []) =>
-  Model.aggregate([{ $match: match }, ...stages, { $group: { _id: null, total: { $sum: field } } }])
-    .then((rows) => rows?.[0]?.total || 0)
-    .catch(() => 0);
-
-// When a deal finished: completed_at, falling back to updatedAt for legacy
-// deals completed before completed_at was recorded.
-const completedIn = (range) => ({
-  status: DEAL_STATUS.COMPLETED,
-  $or: [{ completed_at: range }, { completed_at: null, updatedAt: range }],
-});
-
-// When a payment cleared: verified_at, falling back to createdAt.
-const verifiedIn = (range) => ({
-  status: PAYMENT_STATUS.VERIFIED,
-  $or: [{ verified_at: range }, { verified_at: null, createdAt: range }],
-});
-
 /**
  * scope: null (every campus) or campus ids — limits every number to those
  * campuses. can(section): counts for sections the caller can't view are 0,
@@ -79,70 +61,108 @@ const verifiedIn = (range) => ({
  */
 export const getDashboardMetrics = async ({ scope = null, can = () => true } = {}) => {
   const { current, previous } = comparisonWindows();
-  const completed = { status: DEAL_STATUS.COMPLETED };
-  const verified = { status: PAYMENT_STATUS.VERIFIED };
   const people = { role: STAFF_AND_USERS, ...campusMatch(scope) };
   const inCampus = campusMatch(scope);
   const dealStages = dealScopeStages(scope);
   const paymentStages = paymentScopeStages(scope);
-  const countDeals = (match) => countScoped(Deal, match, dealStages).catch(() => 0);
   const zero = () => Promise.resolve(0);
 
+  // One pass per collection, summing every number with conditions, instead
+  // of a separate count per number (26 round trips became 10). Fewer
+  // connection slots held, so student requests don't queue behind this.
+  const rangeChecks = (expr, range) =>
+    Object.entries(range).map(([op, value]) => ({ [op]: [expr, value] }));
+  const sumIf = (conds, value = 1) => ({ $sum: { $cond: [{ $and: conds }, value, 0] } });
+  const firstRow = (rows) => rows?.[0] || {};
+
+  const userRollup = User.aggregate([
+    { $match: people },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        active: sumIf([{ $eq: ["$status", USER_STATUS.ACTIVE] }]),
+        suspended: sumIf([{ $eq: ["$status", USER_STATUS.SUSPENDED] }]),
+        inactive: sumIf([{ $eq: ["$status", USER_STATUS.INACTIVE] }]),
+        now: sumIf(rangeChecks("$createdAt", current)),
+        prev: sumIf(rangeChecks("$createdAt", previous)),
+      },
+    },
+  ]).then(firstRow);
+
+  const productRollup = Product.aggregate([
+    { $match: { is_deleted: false, ...inCampus } },
+    {
+      $group: {
+        _id: null,
+        listed: sumIf([{ $eq: ["$status", PRODUCT_STATUS.LISTED] }]),
+        blocked: sumIf([{ $eq: ["$status", PRODUCT_STATUS.BLOCKED] }]),
+        autoHidden: sumIf([{ $eq: [{ $type: "$auto_hidden_at" }, "date"] }]),
+        now: sumIf(rangeChecks("$createdAt", current)),
+        prev: sumIf(rangeChecks("$createdAt", previous)),
+      },
+    },
+  ]).then(firstRow);
+
+  // Completed deals: when = completed_at, or updatedAt for legacy rows.
+  const dealWhen = { $ifNull: ["$completed_at", "$updatedAt"] };
+  const dealRollup = Deal.aggregate([
+    { $match: { status: DEAL_STATUS.COMPLETED } },
+    ...dealStages,
+    {
+      $group: {
+        _id: null,
+        count: { $sum: 1 },
+        // Deal prices are stored in rupees.
+        volume: { $sum: "$current_price" },
+        now: sumIf(rangeChecks(dealWhen, current)),
+        prev: sumIf(rangeChecks(dealWhen, previous)),
+        volumeNow: sumIf(rangeChecks(dealWhen, current), "$current_price"),
+        volumePrev: sumIf(rangeChecks(dealWhen, previous), "$current_price"),
+      },
+    },
+  ])
+    .then(firstRow)
+    .catch(() => ({}));
+
+  // Verified payments (paise): when = verified_at, or createdAt.
+  const paidWhen = { $ifNull: ["$verified_at", "$createdAt"] };
+  const paymentRollup = Payment.aggregate([
+    { $match: { status: PAYMENT_STATUS.VERIFIED } },
+    ...paymentStages,
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$amount" },
+        now: sumIf(rangeChecks(paidWhen, current), "$amount"),
+        prev: sumIf(rangeChecks(paidWhen, previous), "$amount"),
+      },
+    },
+  ])
+    .then(firstRow)
+    .catch(() => ({}));
+
   const [
-    totalUsers,
-    activeUsers,
-    suspendedUsers,
-    inactiveUsers,
-    listedProducts,
-    blockedProducts,
+    users,
+    products,
+    deals,
+    payments,
     pendingReports,
     pendingGenderRequests,
-    autoHiddenListings,
     failingJobs,
     activeCampusesList,
-    completedDeals,
-    dealVolumeRupees,
-    platformRevenuePaise,
-    usersNow,
-    usersPrev,
-    productsNow,
-    productsPrev,
-    dealsNow,
-    dealsPrev,
-    volumeNow,
-    volumePrev,
-    revenueNow,
-    revenuePrev,
     campusDistributionRaw,
     recentAuditLogs,
   ] = await Promise.all([
-    User.countDocuments(people),
-    User.countDocuments({ ...people, status: USER_STATUS.ACTIVE }),
-    User.countDocuments({ ...people, status: USER_STATUS.SUSPENDED }),
-    User.countDocuments({ ...people, status: USER_STATUS.INACTIVE }),
-    Product.countDocuments({ status: PRODUCT_STATUS.LISTED, is_deleted: false, ...inCampus }),
-    Product.countDocuments({ status: PRODUCT_STATUS.BLOCKED, is_deleted: false, ...inCampus }),
+    userRollup,
+    productRollup,
+    dealRollup,
+    paymentRollup,
     can("reports") ? countScoped(Report, { status: REPORT_STATUS.PENDING }, reportScopeStages(scope)) : zero(),
     can("genderRequests") ? User.countDocuments({ "genderChangeRequest.status": "pending", ...inCampus }).catch(() => 0) : zero(),
-    can("listings") ? Product.countDocuments({ auto_hidden_at: { $type: "date" }, is_deleted: false, ...inCampus }).catch(() => 0) : zero(),
     can("jobs") ? JobState.countDocuments({ last_status: "failed" }).catch(() => 0) : zero(),
     // One read serves both the count and the users-by-campus rows below.
     Campus.find({ is_active: true, ...(scope ? { _id: { $in: scope } } : {}) }).select("name").lean(),
-    countDeals(completed),
-    // Deal prices are stored in rupees.
-    sumField(Deal, completed, "$current_price", dealStages),
-    // Payment.amount is stored in paise.
-    sumField(Payment, verified, "$amount", paymentStages),
-    User.countDocuments({ ...people, createdAt: current }).catch(() => 0),
-    User.countDocuments({ ...people, createdAt: previous }).catch(() => 0),
-    Product.countDocuments({ is_deleted: false, createdAt: current, ...inCampus }).catch(() => 0),
-    Product.countDocuments({ is_deleted: false, createdAt: previous, ...inCampus }).catch(() => 0),
-    countDeals(completedIn(current)),
-    countDeals(completedIn(previous)),
-    sumField(Deal, completedIn(current), "$current_price", dealStages),
-    sumField(Deal, completedIn(previous), "$current_price", dealStages),
-    sumField(Payment, verifiedIn(current), "$amount", paymentStages),
-    sumField(Payment, verifiedIn(previous), "$amount", paymentStages),
     User.aggregate([
       { $match: { role: STAFF_AND_USERS, campus_id: scope ? campusIn(scope) : { $ne: null } } },
       // Legacy accounts may hold campus_id as a string; normalise first.
@@ -154,6 +174,27 @@ export const getDashboardMetrics = async ({ scope = null, can = () => true } = {
     ]).catch(() => []),
     can("auditLog") ? AuditLog.find({}).sort({ createdAt: -1 }).limit(8).lean() : Promise.resolve([]),
   ]);
+
+  const totalUsers = users.total || 0;
+  const activeUsers = users.active || 0;
+  const suspendedUsers = users.suspended || 0;
+  const inactiveUsers = users.inactive || 0;
+  const usersNow = users.now || 0;
+  const usersPrev = users.prev || 0;
+  const listedProducts = products.listed || 0;
+  const blockedProducts = products.blocked || 0;
+  const autoHiddenListings = can("listings") ? products.autoHidden || 0 : 0;
+  const productsNow = products.now || 0;
+  const productsPrev = products.prev || 0;
+  const completedDeals = deals.count || 0;
+  const dealVolumeRupees = deals.volume || 0;
+  const dealsNow = deals.now || 0;
+  const dealsPrev = deals.prev || 0;
+  const volumeNow = deals.volumeNow || 0;
+  const volumePrev = deals.volumePrev || 0;
+  const platformRevenuePaise = payments.total || 0;
+  const revenueNow = payments.now || 0;
+  const revenuePrev = payments.prev || 0;
 
   // Users by campus: every active campus appears, even with zero users.
   const countMap = new Map();

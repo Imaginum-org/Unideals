@@ -15,7 +15,10 @@ const fail = (res, error) =>
 // GET /admin/access — catalogue, my effective access, and (Super Admin) the support policy.
 export const getAccess = async (req, res) => {
   try {
-    return ok(res, "Access fetched", await accessService.getAccessOverview(req.user));
+    // Every admin page asks for this (often several times at once); cached
+    // per person, cleared by any staff write (access edits included).
+    const data = await cachedAdminStat(`access:${req.user._id}:${req.user.role}`, () => accessService.getAccessOverview(req.user));
+    return ok(res, "Access fetched", data);
   } catch (error) {
     return fail(res, error);
   }
