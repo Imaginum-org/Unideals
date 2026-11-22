@@ -37,3 +37,8 @@ desktop.ini
 
 # Local tooling
 .claude/settings.local.json
+
+# Agent skills and local marketing assets (not part of the app)
+.claude/
+.agents/
+marketing/
