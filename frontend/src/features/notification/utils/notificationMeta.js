@@ -1,4 +1,4 @@
-import { Bell, Megaphone, MessageSquare, Package, ShieldAlert, Tag, TrendingDown } from "lucide-react";
+import { Bell, Handshake, Megaphone, MessageSquare, Package, ShieldAlert, Tag, TrendingDown } from "lucide-react";
 
 // One place that maps a notification to its icon, colours and label, shared
 // by the header dropdown and the /notification inbox.
@@ -48,6 +48,14 @@ const META = {
     iconColor: "text-rose-500",
     dotColor: "bg-rose-500",
   },
+  // [rent] Rent & Borrow
+  rent: {
+    Icon: Handshake,
+    label: "Rent & Borrow",
+    tone: "bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-300",
+    iconColor: "text-teal-500",
+    dotColor: "bg-teal-500",
+  },
   general: {
     Icon: Bell,
     label: "Update",
@@ -67,6 +75,7 @@ const kindFromLabel = (type = "") => {
   if (t.includes("OFFER") || t.includes("PROMO")) return "promotion";
   if (t.includes("ANNOUNCE")) return "announcement";
   if (t.includes("MODERAT") || t.includes("FLAG")) return "moderation";
+  if (t.includes("RENT")) return "rent"; // [rent]
   return "general";
 };
 

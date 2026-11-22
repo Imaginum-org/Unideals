@@ -44,6 +44,9 @@ import {
   getNotificationMeta,
 } from "../../features/notification/utils/notificationMeta.js";
 import { productPath } from "../../utils/productPath.js";
+import { LuHandshake } from "react-icons/lu"; // [rent]
+import { useRentConfig } from "../../features/rent/hooks/useRentConfig.js"; // [rent]
+import { PostMenuButton } from "../../features/rent/components/PostMenu.jsx"; // [rent]
 
 const ProfileDropdown = ({
   userDetails,
@@ -59,12 +62,14 @@ const ProfileDropdown = ({
     userDetails?.campus ||
     null;
   const soldCount = userDetails?.soldCount ?? userDetails?.stats?.sold ?? 0;
+  const { enabled: rentEnabled } = useRentConfig(); // [rent]
 
   const menuGroups = [
     [
       { to: "/profile", icon: <LuUserRound />, label: "My Profile" },
       { to: "/productlisted", icon: <LuPackage />, label: "My Listings" },
       { to: "/myorders", icon: <BsBoxSeam />, label: "Orders" },
+      ...(rentEnabled ? [{ to: "/rentals", icon: <LuHandshake />, label: "Rentals" }] : []), // [rent]
       { to: "/wishlist", icon: <IoIosHeartEmpty />, label: "Wishlist" },
       { to: "/achievements", icon: <LuTrophy />, label: "Achievements" },
       { to: "/chat", icon: <FiMessageSquare />, label: "Messages" },
@@ -611,6 +616,7 @@ const Header = () => {
     fetchUserProfile,
     clearUserData,
   } = useUser();
+  const { enabled: rentEnabled } = useRentConfig(); // [rent]
   const {
     notifications,
     unreadCount,
@@ -825,6 +831,7 @@ const Header = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const inRentMode = rentEnabled && (location.pathname === "/rent" || location.pathname.startsWith("/rent/")); // [rent]
   // Phones: sub-pages get a back chevron in the app bar (tab roots don't).
   // Account pages fall back to the Profile tab, everything else to Home,
   // when there's no in-app history to pop (deep link / fresh tab).
@@ -832,7 +839,8 @@ const Header = () => {
   const OTHER_SUBPAGES = ["/product/", "/category/", "/search", "/price", "/privacy-policy"];
   const matchesRoute = (list) =>
     list.some((r) => location.pathname === r || location.pathname.startsWith(r.endsWith("/") ? r : `${r}/`));
-  const mobileBackTo = matchesRoute(ACCOUNT_SUBPAGES) ? "/profile" : matchesRoute(OTHER_SUBPAGES) ? "/" : null;
+  const RENT_SUBPAGES = rentEnabled ? ["/rent/"] : []; // [rent] item pages go back to the board
+  const mobileBackTo = matchesRoute(ACCOUNT_SUBPAGES) ? "/profile" : matchesRoute(RENT_SUBPAGES) ? "/rent" : matchesRoute(OTHER_SUBPAGES) ? "/" : null;
   const handleMobileBack = () => {
     if (window.history.state && window.history.state.idx > 0) navigate(-1);
     else navigate(mobileBackTo || "/", { replace: true });
@@ -2086,6 +2094,24 @@ lg:pr-24"
                   </div>
 
                   <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+                  {/* [rent] desktop entry, next to Post. Inside the rent zone it turns dark (pressed). */}
+                  {rentEnabled && (
+                    <Link
+                      to="/rent"
+                      aria-current={inRentMode ? "page" : undefined}
+                      className={`hidden shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors duration-200 sm:flex md:px-4 md:text-base ${
+                        inRentMode
+                          ? "border-[#1E1B6B] bg-[#1E1B6B] text-white shadow-[inset_0_1px_2px_rgba(0,0,0,0.25)] hover:bg-[#17145A] dark:border-indigo-400 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                          : "border-[#3838EC]/30 text-[#3838EC] hover:bg-[#3838EC]/5 dark:border-indigo-400/40 dark:text-indigo-300 dark:hover:bg-indigo-400/10"
+                      }`}
+                    >
+                      <LuHandshake className="size-4" />
+                      <span>Rent</span>
+                    </Link>
+                  )}
+                  {rentEnabled ? (
+                    <PostMenuButton /> /* [rent] "Post": Sell or Rent */
+                  ) : (
                   <Link
                     to="/upload"
                     className="flex shrink-0 items-center gap-2 rounded-lg bg-[#3838EC] px-3 py-2 text-sm font-medium text-[#FCFCFC] transition-all duration-200 hover:scale-[1.02] md:px-4 md:text-base lg:px-5"
@@ -2093,6 +2119,7 @@ lg:pr-24"
                       <span>Sell</span>
                       <FaPlus className="size-3" />
                     </Link>
+                  )}
 
                     <div className="relative shrink-0" ref={menuRefDesktop}>
                       <button

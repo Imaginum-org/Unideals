@@ -38,6 +38,7 @@ const ConversationCard = ({ conv, selected, onClick }) => {
   const name = formatName(other?.name);
   const photo = avatarUrl(other?.avatar);
   const buying = conv?.role !== "selling";
+  const rent = conv?.context === "rent"; // [rent] Rent & Borrow thread
   const unread = conv?.unread || 0;
   const hasUnread = unread > 0;
 
@@ -94,12 +95,14 @@ const ConversationCard = ({ conv, selected, onClick }) => {
           >
             <span
               className={`mr-1.5 inline-block rounded px-1 align-[1px] text-[9.5px] font-bold uppercase tracking-wide ${
-                buying
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  : "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                rent
+                  ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" // [rent]
+                  : buying
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-[var(--accent-soft)] text-[var(--accent-text)]"
               }`}
             >
-              {buying ? "Buying" : "Selling"}
+              {rent ? (buying ? "Borrowing" : "Lending") : buying ? "Buying" : "Selling"}
             </span>
             <span className="font-medium text-slate-700 dark:text-zinc-300">{name}</span>
             {other?.is_college_verified && <TickIcon className="ml-0.5 inline h-3.5 w-3.5 align-[-2px]" />}

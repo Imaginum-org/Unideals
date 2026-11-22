@@ -37,6 +37,11 @@ import { useAppScreen } from "../../../components/layout/MobileAppBar.jsx";
 import { useAppShell } from "../../user/components/account/AccountKit.jsx";
 import { productPath } from "../../../utils/productPath.js";
 import * as chatApi from "../services/chatApi.js";
+import { useRentConfig } from "../../rent/hooks/useRentConfig.js"; // [rent]
+import RentChatStrip from "../../rent/components/RentChatStrip.jsx"; // [rent]
+
+// [rent] Rent & Borrow threads get handover-style replies.
+const RENT_QUICK_CHIPS = ["Yes", "No", "Coming down now", "Where should we meet?", "Is it free tonight?", "Thanks!"];
 
 const QUICK_CHIPS = [
   "Yes",
@@ -118,6 +123,7 @@ const dayLabel = (iso) => {
 const ChatPanel = ({ embedded = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { userDetails } = useUser();
+  const { enabled: rentEnabled } = useRentConfig(); // [rent]
   const me = userDetails?._id ? String(userDetails._id) : null;
   // Chat preferences live here (top) so every callback below can read them
   // without hitting temporal-dead-zone errors.
@@ -470,6 +476,8 @@ const ChatPanel = ({ embedded = false }) => {
           otherParty: cached.otherParty || null,
           product_id: cached.product || null,
           product_snapshot: cached.product_snapshot || null,
+          context: cached.context || "product", // [rent]
+          rentBookingId: cached.rentBookingId || null, // [rent]
         });
         setDeal(
           cached.dealStatus
@@ -499,8 +507,10 @@ const ChatPanel = ({ embedded = false }) => {
         if (signal.aborted) return;
         setDetail(d);
         setDeal(
-          d?.deal ||
-            (await chatApi.fetchDeal(id, { signal }).catch(() => null)),
+          d?.context === "rent" // [rent] no deals on rent threads
+            ? null
+            : d?.deal ||
+                (await chatApi.fetchDeal(id, { signal }).catch(() => null)),
         );
         setMessages(m.messages);
         setHasMore(m.hasMore);
@@ -529,6 +539,9 @@ const ChatPanel = ({ embedded = false }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, me]);
 
+  const rentThreadRef = useRef(false); // [rent] rent threads have no deal to poll
+  rentThreadRef.current = detail?.context === "rent"; // [rent]
+
   // Poll the active thread: every 5s only when the socket is down (covers
   // gaps / offline); 30s while live, since messages, ticks and deal changes
   // arrive over the socket. Was 2 requests every 5s per open chat.
@@ -541,7 +554,7 @@ const ChatPanel = ({ embedded = false }) => {
         // Upsert merge: appends new bubbles AND picks up tick upgrades
         // (sent -> delivered -> read) on messages we already render.
         setMessages((prev) => mergeThreadMessages(prev, m.messages));
-        const d = await chatApi.fetchDeal(selectedId).catch(() => null);
+        const d = rentThreadRef.current ? null : await chatApi.fetchDeal(selectedId).catch(() => null); // [rent]
         if (d) setDeal(d);
       } catch {
         // ignore
@@ -1019,6 +1032,8 @@ const ChatPanel = ({ embedded = false }) => {
   const negotiable = product?.is_negotiable !== false;
   const badge = statusBadge(deal?.status);
   const role = detail?.role || "buying";
+  const rentChat = detail?.context === "rent"; // [rent]
+  const rentBookingPath = rentChat && detail?.rentBookingId ? "/rent/booking/" + detail.rentBookingId : null; // [rent]
   const wallCls = wallpaperById(chatSettings.wallpaper).cls;
   const otherId = detail?.otherParty?._id
     ? String(detail.otherParty._id)
@@ -1042,6 +1057,9 @@ const ChatPanel = ({ embedded = false }) => {
     Number(deal.current_price) !== askingPrice
       ? Number(deal.current_price)
       : null;
+  // [rent] Free rent threads say "Free" instead of ₹0.
+  const priceText =
+    rentChat && !headerPrice ? "Free" : "₹" + Number(agreedPrice ?? askingPrice ?? headerPrice ?? 0).toLocaleString("en-IN");
   const popupAsking = Number(
     deal?.original_price ?? askingPrice ?? deal?.current_price ?? 0,
   );
@@ -1192,7 +1210,7 @@ const ChatPanel = ({ embedded = false }) => {
               />
             </label>
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {["all", "buying", "selling"].map((t) => (
+              {["all", "buying", "selling", ...(rentEnabled ? ["rent"] : [])].map((t) => ( // [rent] "rent" tab
                 <button
                   key={t}
                   type="button"
@@ -1304,7 +1322,7 @@ const ChatPanel = ({ embedded = false }) => {
                   >
                     <ChevronLeft className="h-6 w-6" />
                   </button>
-                  <Link to={productPath(product?._id ? product : detail?.product_id || "")} className="shrink-0" title="View listing">
+                  <Link to={rentBookingPath || productPath(product?._id ? product : detail?.product_id || "")} className="shrink-0" title={rentChat ? "View booking" : "View listing"}>
                     <img
                       src={typeof productImg === "string" ? productImg : "/logo.svg"}
                       alt={productTitle}
@@ -1324,13 +1342,13 @@ const ChatPanel = ({ embedded = false }) => {
                         <span className="shrink-0">{peerOnline ? "· online" : "· typing…"}</span>
                       )}
                       <span className="shrink-0 font-semibold text-slate-700 lg:hidden dark:text-zinc-200">
-                        · ₹{Number(agreedPrice ?? askingPrice ?? headerPrice ?? 0).toLocaleString("en-IN")}
+                        · {priceText /* [rent] */}
                       </span>
                     </p>
                   </div>
                   <div className="hidden shrink-0 items-baseline gap-1.5 pr-1 lg:flex">
                     <span className="text-[14px] font-semibold tabular-nums text-slate-900 dark:text-white">
-                      ₹{Number(agreedPrice ?? askingPrice ?? headerPrice ?? 0).toLocaleString("en-IN")}
+                      {priceText /* [rent] */}
                     </span>
                     {agreedPrice != null && (
                       <span className="text-[12px] text-slate-400 line-through">₹{Number(askingPrice || 0).toLocaleString("en-IN")}</span>
@@ -1360,11 +1378,12 @@ const ChatPanel = ({ embedded = false }) => {
                       >
                         <Link
                           role="menuitem"
-                          to={productPath(product?._id ? product : detail?.product_id || "")}
+                          to={rentBookingPath || productPath(product?._id ? product : detail?.product_id || "")}
                           className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-slate-700 hover:bg-neutral-100 dark:text-zinc-200 dark:hover:bg-white/5"
                         >
-                          <ExternalLink className="h-4 w-4 text-slate-400" /> View listing
+                          <ExternalLink className="h-4 w-4 text-slate-400" /> {rentChat ? "View booking" : "View listing"}
                         </Link>
+                        {!rentChat && ( // [rent] no deal card on rent threads
                         <button
                           role="menuitem"
                           type="button"
@@ -1377,6 +1396,7 @@ const ChatPanel = ({ embedded = false }) => {
                           <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${dealOpen ? "rotate-180" : ""}`} />
                           {dealOpen ? "Collapse deal card" : "Expand deal card"}
                         </button>
+                        )}
                         {deal && !["completed", "cancelled", "negotiating"].includes(deal.status) && (
                           <button
                             role="menuitem"
@@ -1392,6 +1412,7 @@ const ChatPanel = ({ embedded = false }) => {
                           </button>
                         )}
                         <div className="my-1 h-px bg-neutral-100 dark:bg-neutral-800" />
+                        {!rentChat && ( // [rent] rent posts are reported on their own page
                         <button
                           role="menuitem"
                           type="button"
@@ -1403,6 +1424,7 @@ const ChatPanel = ({ embedded = false }) => {
                         >
                           <Flag className="h-4 w-4 text-amber-500" /> Report listing
                         </button>
+                        )}
                         <button
                           role="menuitem"
                           type="button"
@@ -1462,6 +1484,26 @@ const ChatPanel = ({ embedded = false }) => {
                   </p>
                 )}
               </div>
+
+              {/* [rent] Booking strip in place of the deal card */}
+              {rentChat && detail?.rentBookingId && (
+                <div className="px-3 pt-2.5 lg:px-6">
+                  <div className="mx-auto max-w-3xl">
+                    <RentChatStrip
+                      bookingId={detail.rentBookingId}
+                      refreshKey={messages.length}
+                      open={dealOpen}
+                      onToggle={() => setDealOpen((v) => !v)}
+                      onAction={() =>
+                        chatApi
+                          .fetchMessages(selectedId, { limit: 50 })
+                          .then((m) => setMessages((prev) => mergeThreadMessages(prev, m.messages)))
+                          .catch(() => {})
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Deal card */}
               {deal && (
@@ -1649,7 +1691,7 @@ const ChatPanel = ({ embedded = false }) => {
                     </p>
                   )}
                   <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-3 pb-1 pt-2.5">
-                    {QUICK_CHIPS.map((chip) => (
+                    {(rentChat ? RENT_QUICK_CHIPS : QUICK_CHIPS).map((chip) => ( // [rent]
                       <button
                         key={chip}
                         type="button"
@@ -1746,6 +1788,7 @@ const ChatPanel = ({ embedded = false }) => {
                       </div>
                     )}
                     <form onSubmit={handleSend} className="flex items-end gap-1.5">
+                      {!rentChat && ( // [rent] no offers on rent threads
                       <button
                         ref={rupeeBtnRef}
                         type="button"
@@ -1768,6 +1811,7 @@ const ChatPanel = ({ embedded = false }) => {
                       >
                         ₹
                       </button>
+                      )}
                       <div className="flex min-w-0 flex-1 items-end rounded-[20px] bg-neutral-100 px-3.5 py-2 focus-within:ring-2 focus-within:ring-[var(--accent-ring)] dark:bg-white/5">
                         <textarea
                           ref={composerRef}

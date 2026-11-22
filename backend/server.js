@@ -29,6 +29,7 @@ import { scheduleExpireSubscriptions } from "./src/jobs/expireSubscriptions.job.
 import { scheduleDispatchNotifications } from "./src/jobs/dispatchScheduledNotifications.job.js";
 import { scheduleEmailAlerts } from "./src/jobs/emailAlerts.job.js";
 import { startScheduledJobs } from "./src/jobs/jobRegistry.js";
+import { scheduleRentJobs } from "./src/jobs/rent.job.js"; // [rent]
 import { initSockets } from "./src/sockets/index.js";
 
 const PORT = process.env.PORT || 5000;
@@ -42,6 +43,7 @@ const startServer = async () => {
     scheduleExpireSubscriptions();
     scheduleDispatchNotifications();
     scheduleEmailAlerts();
+    scheduleRentJobs(); // [rent]
     // Start every job defined above (records runs for the admin console).
     startScheduledJobs();
     // Plan-rank backfill for listings (search ranking perk); idempotent.

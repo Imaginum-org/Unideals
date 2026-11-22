@@ -22,6 +22,7 @@ export const ACCESS_FEATURES = [
   { key: "auditLog", label: "Audit log", description: "Every staff action", manage: null },
   { key: "systemStatus", label: "Service status", description: "API and dependency health", manage: null },
   { key: "jobs", label: "Background jobs", description: "Scheduled job health and history", manage: "Run a job immediately" },
+  { key: "rent", label: "Rent & Borrow", description: "Rent posts and per-campus block lists", manage: "Hide or restore posts, edit blocks, switch it on or off per campus" }, // [rent]
 ];
 
 export const ACCESS_FEATURE_KEYS = ACCESS_FEATURES.map((f) => f.key);
@@ -51,4 +52,5 @@ export const CAMPUS_SCOPED_SECTIONS = [
   "reports",
   "genderRequests",
   "notifications",
+  "rent", // [rent]
 ];

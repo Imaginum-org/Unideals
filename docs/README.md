@@ -19,6 +19,7 @@ Everything beyond the top-level [README](../README.md) lives here. Keep each doc
 | [features/subscriptions-and-monetization.md](features/subscriptions-and-monetization.md) | **Source of truth** for plans (Free / Pro / Pro+), Founder vs semester pricing, boosts and add-ons. Mirrored by `backend/src/config/subscriptionPlans.js` and the pricing page |
 | [features/gamification-badges-and-levels.md](features/gamification-badges-and-levels.md) | XP, rank tiers, badge catalogue, data models and endpoints |
 | [features/girls-corner.md](features/girls-corner.md) | Girls Corner 🌸: women-only listing space, gender confirmation, privacy rules, edge cases, rollout |
+| [features/rent-and-borrow.md](features/rent-and-borrow.md) | Rent & Borrow: lend, share or request small things inside a hostel block; offline payments; behind `RENT_ENABLED`; how to remove it |
 
 ## Operations
 

@@ -49,6 +49,7 @@ const DIRECT_TYPE_LABELS = {
   order: "ORDER UPDATE",
   price_drop: "PRICE DROP",
   moderation: "MODERATION",
+  rent: "RENT & BORROW", // [rent]
 };
 
 const formatRelativeTime = (date) => {
@@ -346,6 +347,40 @@ export const notifyPriceDrop = async ({ productId, productTitle, oldPrice, newPr
   } catch (error) {
     console.error("Failed to notify price drop:", error?.message);
     return null;
+  }
+};
+
+// ---- Rent & Borrow ---- [rent]
+
+/** One Rent & Borrow update to one user (booking stages, messages). Never throws. */
+export const notifyRent = ({ userId, title, message, actionUrl = "/rentals", actionLabel = "Open", groupKey = null, imageUrl = null }) =>
+  sendDirect({ recipientId: userId, type: "rent", title, message, actionUrl, actionLabel, groupKey, imageUrl });
+
+/**
+ * Same text to many students ("someone in your block needs an iron").
+ * Callers pick and throttle the recipients; this only stores, emits and
+ * sends one multicast push. Never throws.
+ */
+export const notifyRentFanout = async ({ recipientIds, title, message, actionUrl, actionLabel = "I can help", groupKey = null, imageUrl = null }) => {
+  try {
+    if (!recipientIds?.length) return [];
+    const now = new Date();
+    const notifications = await Notification.insertMany(
+      recipientIds.map((recipientId) =>
+        directDoc({ recipientId, type: "rent", title, message, actionUrl, actionLabel, groupKey, imageUrl, now }),
+      ),
+      { ordered: false },
+    );
+    for (const notification of notifications) {
+      emitToUser(notification.recipient_id, EVENT, toClientNotification(notification));
+    }
+    if (notifications.length) {
+      pushToUsers(recipientIds, { ...toClientNotification(notifications[0]), id: "", tag: groupKey });
+    }
+    return notifications;
+  } catch (error) {
+    console.error("Failed to send rent alerts:", error?.message);
+    return [];
   }
 };
 

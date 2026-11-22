@@ -18,6 +18,7 @@ import VerifiedTick, { TickIcon } from "../../../components/common/VerifiedTick.
 import CollegeVerifyPrompt from "../components/overview/CollegeVerifyPrompt.jsx";
 import CampusBanner from "../components/overview/CampusBanner.jsx";
 import { ratingWeather } from "../components/overview/ratingWeather.js";
+import RentProfileCard from "../../rent/components/RentProfileCard.jsx"; // [rent]
 
 const PLAN_LABEL = { pro: "Pro", pro_plus: "Pro+" };
 const inr = (n) => (n == null || n === "" ? "" : `₹${Number(n).toLocaleString("en-IN")}`);
@@ -499,6 +500,7 @@ function ProfileOverview() {
 
           <div className="flex flex-col gap-4 self-start sm:gap-5">
           <EarningsCard insights={insights} loading={numbersLoading} />
+          <RentProfileCard /> {/* [rent] */}
           <section className={cn(CARD, "px-5 py-4")}>
             <SectionHead title="Saved" meta={listing.saved || null} to="/wishlist" />
             {savedItems.length === 0 ? (

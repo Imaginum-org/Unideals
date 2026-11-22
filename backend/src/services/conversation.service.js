@@ -148,6 +148,7 @@ export const getConversationById = async (conversationId, userId = null) => {
         : conversation.unread_count?.seller || 0
       : 0,
     deal: deal || null,
+    rentBookingId: conversation.rent_booking_id ? String(conversation.rent_booking_id) : null, // [rent]
   };
 };
 
@@ -175,7 +176,8 @@ export const getUserConversations = async ({
       ],
     });
   }
-  if (role !== "all") {
+  if (role === "rent") and.push({ context: "rent" }); // [rent] Rent & Borrow threads only
+  if (role !== "all" && role !== "rent") { // [rent] "rent" filters like "all"
     and.push(
       role === "buying"
         ? { "deleted_for.buyer": false }
@@ -216,7 +218,7 @@ export const getUserConversations = async ({
   // People are needed for every row (Pro ranking + name search); products
   // and deals only for the page actually returned (see below).
   let rows = await Conversation.find({ $and: and })
-    .select("buyer_id seller_id product_id product_snapshot last_message last_message_type last_activity_at unread_count createdAt updatedAt")
+    .select("buyer_id seller_id product_id product_snapshot last_message last_message_type last_activity_at unread_count createdAt updatedAt context rent_booking_id") // [rent] context fields
     .populate("buyer_id", "name avatar subscription role is_college_verified")
     .populate("seller_id", "name avatar subscription role is_college_verified")
     .sort({ last_activity_at: -1 })
@@ -321,7 +323,9 @@ export const getUserConversations = async ({
       last_message_type: r.last_message_type,
       last_activity_at: r.last_activity_at,
       unread,
-      dealStatus: deal?.status || "negotiating",
+      dealStatus: r.context === "rent" ? null : deal?.status || "negotiating", // [rent] no deal card
+      context: r.context || "product", // [rent]
+      rentBookingId: r.rent_booking_id ? String(r.rent_booking_id) : null, // [rent]
       dealPrice: deal?.current_price ?? r.product_snapshot?.selling_price,
       updatedAt: r.updatedAt,
       createdAt: r.createdAt,

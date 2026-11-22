@@ -24,6 +24,8 @@ const PROTECTED_PREFIXES = [
   "/notification",
   "/upload",
   "/productlisted",
+  "/rent", // [rent]
+  "/rentals", // [rent]
 ];
 
 const isProtectedPath = (pathname = "") =>

@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedLayout from "../layouts/ProtectedLayout.jsx";
 import PublicOnlyRoute from "../layouts/PublicOnlyRoute.jsx";
@@ -96,6 +96,14 @@ const Notification = page(() => import("../features/notification/pages/Notificat
 const SearchResults = page(() => import("../features/search/pages/SearchResults.jsx"));
 const PhoneUpload = page(() => import("../features/handoff/pages/PhoneUpload.jsx"));
 const NotFound = page(() => import("../components/NotFound.jsx"));
+// [rent] Rent & Borrow (features/rent; hidden unless the server enables it)
+const RentHome = page(() => import("../features/rent/pages/RentHome.jsx"));
+const RentPostForm = page(() => import("../features/rent/pages/RentPostForm.jsx"));
+const RentPostDetail = page(() => import("../features/rent/pages/RentPostDetail.jsx"));
+const RentBooking = page(() => import("../features/rent/pages/RentBooking.jsx"));
+const RentRentals = page(() => import("../features/rent/pages/RentRentals.jsx"));
+// Old activity links (notifications, bookmarks) land on Profile → Rentals.
+const RentActivityRedirect = () => <Navigate to={`/rentals${useLocation().search}`} replace />;
 
 // Path prefix → page, used by prefetchRoute(). First match wins, so longer
 // prefixes ("/profileoverview") come before shorter ones ("/profile").
@@ -124,6 +132,13 @@ const PREFETCH_TABLE = [
   ["/contact", ContactUs],
   ["/faq", FAQ],
   ["/guides", VideoGuides],
+  // [rent]
+  ["/rent/booking/", RentBooking],
+  ["/rentals", RentRentals],
+  ["/rent/new", RentPostForm],
+  ["/rent/edit/", RentPostForm],
+  ["/rent/", RentPostDetail],
+  ["/rent", RentHome],
 ];
 
 /** Start downloading the JS for the page at `pathname` (no-op if cached). */
@@ -200,6 +215,14 @@ export default function AppRoutes() {
             <Route path="/upload" element={<ProductListing />} />
             <Route path="/upload/:productId" element={<ProductListing />} />
             <Route path="/productlisted" element={<ProductListed />} />
+            {/* [rent] Rent & Borrow */}
+            <Route path="/rent" element={<RentHome />} />
+            <Route path="/rent/new" element={<RentPostForm />} />
+            <Route path="/rent/edit/:id" element={<RentPostForm />} />
+            <Route path="/rent/activity" element={<RentActivityRedirect />} />
+            <Route path="/rentals" element={<RentRentals />} />
+            <Route path="/rent/booking/:id" element={<RentBooking />} />
+            <Route path="/rent/:id" element={<RentPostDetail />} />
           </Route>
         </Route>
 

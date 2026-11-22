@@ -6,6 +6,7 @@ import {
   CircleHelp,
   Crown,
   FileText,
+  Handshake,
   Heart,
   LifeBuoy,
   LogOut,
@@ -20,6 +21,7 @@ import { useNotification } from "../../../context/NotificationContext.jsx";
 import { logoutUser } from "../../auth/api/authApi.js";
 import { toast } from "../../../components/ui/toast.js";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
+import { useRentConfig } from "../../rent/hooks/useRentConfig.js"; // [rent]
 
 // Phones only (md:hidden). On desktop the account pages share the left
 // sidebar; on a phone that sidebar is hidden, so the Profile tab ends with
@@ -32,6 +34,7 @@ const GROUPS = [
     items: [
       { to: "/myorders", label: "Orders", icon: Package },
       { to: "/productlisted", label: "My listings", icon: ShoppingBag },
+      { to: "/rentals", label: "Rentals", icon: Handshake, rentOnly: true }, // [rent]
       { to: "/wishlist", label: "Wishlist", icon: Heart },
       { to: "/notification", label: "Notifications", icon: Bell, badgeKey: "notif" },
     ],
@@ -78,6 +81,7 @@ export default function MobileAccountMenu() {
   const { clearUserData } = useUser();
   const { unreadCount } = useNotification();
   const [loggingOut, setLoggingOut] = useState(false);
+  const { enabled: rentEnabled } = useRentConfig(); // [rent]
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -107,7 +111,7 @@ export default function MobileAccountMenu() {
             {group.title}
           </h2>
           <div className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200/80 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-[#1A1D20]">
-            {group.items.map((item) => (
+            {group.items.filter((item) => !item.rentOnly || rentEnabled).map((item) => ( // [rent] filter
               <Row key={item.to} {...item} badge={item.badgeKey === "notif" ? unreadCount : 0} />
             ))}
           </div>

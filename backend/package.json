@@ -28,7 +28,9 @@
     "test:labs": "node tests/labs.integration.test.mjs",
     "test:college": "node tests/collegeVerification.integration.test.mjs",
     "test:performance": "node tests/performance.integration.test.mjs",
-    "test:seo": "node tests/seo.integration.test.mjs"
+    "test:seo": "node tests/seo.integration.test.mjs",
+    "test:rent": "node tests/rent.integration.test.mjs",
+    "seed:rent-blocks": "node src/seeds/rentBlocks.seed.js"
   },
   "keywords": [
     "nodejs",

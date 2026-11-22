@@ -105,6 +105,11 @@ const conversationSchema = new mongoose.Schema(
       },
     },
 
+    // [rent] Rent & Borrow threads share this inbox (services/rentChat.service.js).
+    // For them product_id holds the RentPost id and rent_booking_id the booking.
+    context: { type: String, enum: ["product", "rent"], default: "product" }, // [rent]
+    rent_booking_id: { type: mongoose.Schema.Types.ObjectId, ref: "RentBooking", default: null }, // [rent]
+
     // Conversation status
     is_active: {
       type: Boolean,

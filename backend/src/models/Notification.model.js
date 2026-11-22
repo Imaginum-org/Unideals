@@ -9,7 +9,7 @@ export const retentionDate = (from = new Date()) =>
 
 // Admin campaigns may only use the first five; the rest are system events.
 export const CAMPAIGN_TYPES = ["general", "promotion", "order", "announcement", "message"];
-export const NOTIFICATION_TYPES = [...CAMPAIGN_TYPES, "price_drop", "moderation"];
+export const NOTIFICATION_TYPES = [...CAMPAIGN_TYPES, "price_drop", "moderation", "rent"]; // [rent] "rent"
 export const NOTIFICATION_AUDIENCES = ["all", "buyers", "sellers", "campus"];
 
 // draft -> (scheduled ->) sending -> sent | failed ; scheduled -> cancelled

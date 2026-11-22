@@ -27,6 +27,7 @@ const MainLayout = () => {
     "/termscondition",
     "/subscription",
     "/achievements",
+    "/rent", // [rent]
   ];
 
   const shouldShowFooter = !hideFooterRoutes.some((route) =>

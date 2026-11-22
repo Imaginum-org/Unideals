@@ -30,6 +30,7 @@ import { CampusEmptyState } from "../../../components/ui/EmptyStates.jsx";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { loginWithGoogleOneTap } from "../../auth/api/authApi.js";
 import PageSeo from "../../../components/seo/PageSeo.jsx";
+import RentHomeBanner from "../../rent/components/RentHomeBanner.jsx"; // [rent]
 
 const HOME_GOOGLE_LOGIN_TRIGGER_KEY = "homeGoogleLoginTriggered";
 const GOOGLE_ID_SCRIPT_ID = "google-identity-services-script";
@@ -486,6 +487,7 @@ const Home = () => {
       </div>
 
       <div className="w-full min-h-screen bg-[#F7F8FA] flex flex-col items-center px-5 sm:px-[4.5vw] pb-24 lg:pb-0 dark:bg-[#131313]">
+        <RentHomeBanner /> {/* [rent] */}
         {/* Category section */}
         <div id="categories" className="flex w-full max-w-[var(--page-max)] mx-auto flex-col gap-2 lg:gap-4 xl:gap-6 lg:mt-8 mt-4 scroll-mt-20">
           <div>

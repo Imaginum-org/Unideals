@@ -13,7 +13,8 @@ import {
   FolderIcon,
 } from "@animateicons/react/lucide";
 import { Settings01Icon } from "@animateicons/react/huge";
-import { ArrowUpRight, CircleHelp, Crown, PanelLeftClose, PanelLeftOpen, PlayCircle, Sparkles, Trophy } from "lucide-react";
+import { ArrowUpRight, CircleHelp, Crown, Handshake, PanelLeftClose, PanelLeftOpen, PlayCircle, Sparkles, Trophy } from "lucide-react";
+import { useRentConfig } from "../../rent/hooks/useRentConfig.js"; // [rent]
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
@@ -281,6 +282,7 @@ function Profile_left_part() {
   }, [toggleCollapsed]);
 
   const chatUnread = useChatUnread(isLoggedIn);
+  const { enabled: rentEnabled } = useRentConfig(); // [rent]
 
   // Redirect to login only when the session is definitively gone.
   useEffect(() => {
@@ -306,6 +308,7 @@ function Profile_left_part() {
         { path: "/notification", label: "Notifications", icon: BellIcon, badge: notifUnread },
         { path: "/myorders", label: "Orders", icon: BoxIcon },
         { path: "/productlisted", label: "My listings", icon: ShoppingBagIcon },
+        ...(rentEnabled ? [{ path: "/rentals", label: "Rentals", icon: Handshake }] : []), // [rent]
         { path: "/wishlist", label: "Wishlist", icon: HeartIcon },
         { path: "/achievements", label: "Achievements", icon: Trophy },
       ],

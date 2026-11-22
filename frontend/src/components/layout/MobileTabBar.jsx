@@ -1,6 +1,8 @@
 import { memo, useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Compass, House, MessageCircle, Plus, UserRound } from "lucide-react";
+import { Compass, Handshake, House, MessageCircle, Plus, UserRound } from "lucide-react";
+import { useRentConfig } from "../../features/rent/hooks/useRentConfig.js"; // [rent]
+import { PostTabButton } from "../../features/rent/components/PostMenu.jsx"; // [rent]
 import { useUser } from "../../context/useUserContext.jsx";
 import { useChatUnread } from "../../services/chatUnread.js";
 import { cn } from "../../utils/cn.js";
@@ -16,7 +18,7 @@ import { cn } from "../../utils/cn.js";
 //  • while the on-screen keyboard is up (it would otherwise ride on top of
 //    the keyboard on Android because the viewport resizes).
 
-const HIDE_PREFIXES = ["/upload", "/product/", "/p/"];
+const HIDE_PREFIXES = ["/upload", "/product/", "/p/", "/rent/"]; // [rent] "/rent/" (sub-pages; the board keeps the bar)
 
 export const TAB_BAR_HEIGHT = 64; // px, excluding the safe-area inset
 
@@ -51,6 +53,7 @@ export const shouldShowTabBar = (pathname = "") =>
 const ACCOUNT_PREFIXES = [
   "/profile", "/settings", "/myorders", "/productlisted", "/wishlist", "/notification",
   "/achievements", "/badge", "/subscription", "/contact", "/faq", "/termscondition",
+  "/rentals", // [rent]
 ];
 
 function Tab({ to, label, icon: Icon, badge = 0, end = false, activeFor, children }) {
@@ -101,6 +104,7 @@ function MobileTabBar() {
   const { isLoggedIn, userDetails } = useUser();
   const unread = useChatUnread(isLoggedIn);
   const keyboardOpen = useKeyboardOpen();
+  const { enabled: rentEnabled } = useRentConfig(); // [rent]
 
   if (!shouldShowTabBar(pathname) || keyboardOpen) return null;
 
@@ -117,6 +121,10 @@ function MobileTabBar() {
 
         {/* Primary action */}
         <div className="flex flex-1 items-center justify-center">
+          {rentEnabled ? (
+            // [rent] one + for everything: Sell or Rent
+            <PostTabButton className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent)] [@media(max-height:480px)]:h-10 [@media(max-height:480px)]:w-10 [@media(max-height:480px)]:rounded-xl text-white shadow-[0_8px_20px_-6px_var(--accent-ring)] transition-transform duration-150 active:scale-95" />
+          ) : (
           <NavLink
             to="/upload"
             aria-label="Sell an item"
@@ -124,8 +132,11 @@ function MobileTabBar() {
           >
             <Plus className="h-6 w-6" strokeWidth={2.4} aria-hidden="true" />
           </NavLink>
+          )}
         </div>
 
+        {/* [rent] 6th tab, only while Rent & Borrow is on */}
+        {rentEnabled && <Tab to={isLoggedIn ? "/rent" : "/login"} label="Rent" icon={Handshake} />}
         <Tab to={isLoggedIn ? "/chat" : "/login"} label="Chats" icon={MessageCircle} badge={unread} />
         {isLoggedIn ? (
           <Tab

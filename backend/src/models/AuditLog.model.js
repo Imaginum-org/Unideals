@@ -40,7 +40,7 @@ const auditLogSchema = new Schema(
     // What entity was acted upon
     target_type: {
       type: String,
-      enum: ["user", "product", "campus", "report", "order", "settings"],
+      enum: ["user", "product", "campus", "report", "order", "settings", "rent"], // [rent] "rent"
       required: true,
       index: true,
     },

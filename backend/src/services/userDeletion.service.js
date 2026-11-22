@@ -26,6 +26,7 @@ import { getIO } from "../utils/socket.js";
 import { logAdminAction } from "./auditLog.service.js";
 import { recomputeSellerRating } from "./review.service.js";
 import { dropPersonAccess } from "./access.service.js";
+import { purgeRentDataForUser } from "./rentBooking.service.js"; // [rent]
 
 const { ObjectId } = mongoose.Types;
 
@@ -152,6 +153,7 @@ export const deleteUserPermanently = async ({ userId, actor, confirmEmail, reaso
     ...productImages.map(({ fileId, productId }) => deleteImageSafely(fileId, { ownerId: uid, excludeProductId: productId })),
     ...handoffImages.map((fileId) => deleteImageSafely(fileId, { ownerId: uid })),
     ...(avatarFileId ? [deleteImageSafely(avatarFileId, { ownerId: uid, excludeUserId: uid })] : []),
+    purgeRentDataForUser(uid), // [rent]
   ]);
 
   const campus = user.campus_id ? await Campus.findById(user.campus_id).select("name").lean() : null;

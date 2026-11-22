@@ -28,6 +28,8 @@ import dealRouter from "./routes/deal.route.js";
 import orderRouter from "./routes/order.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import reviewRouter from "./routes/review.routes.js";
+import rentRouter from "./routes/rent.routes.js"; // [rent]
+import rentAdminRouter from "./routes/rent.admin.routes.js"; // [rent]
 import { verifyOrigin } from "./middlewares/csrf.middleware.js";
 import { buildListingsSitemap } from "./services/sitemap.service.js";
 import { requestMetrics } from "./middlewares/requestMetrics.middleware.js";
@@ -258,6 +260,13 @@ app.use("/api/pickup-spots", pickupSpotRouter);
 app.use("/api/imagekit", imagekitRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/campuses", campusRouter);
+// [rent] staff Rent & Borrow tools; before /api/admin so its 404 never wins.
+app.use(
+  "/api/admin/rent",
+  (req, res, next) =>
+    req.method === "GET" ? adminReadLimiter(req, res, next) : next(),
+  rentAdminRouter,
+);
 app.use(
   "/api/admin",
   (req, res, next) =>
@@ -275,6 +284,7 @@ app.use("/api/deals", dealRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/reviews", reviewRouter);
+app.use("/api/rent", rentRouter); // [rent]
 
 // If no route matches
 app.use((req, res) => {

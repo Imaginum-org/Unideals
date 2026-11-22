@@ -48,6 +48,8 @@ const loadConversation = async (conversationId) => {
   if (!conversation || !conversation.is_active) {
     throw new AppError("Conversation not found", 404);
   }
+  // [rent] Rent & Borrow threads have no deal (the booking page tracks progress).
+  if (conversation.context === "rent") throw new AppError("Rent & Borrow chats don't use deals", 400);
   return conversation;
 };
 

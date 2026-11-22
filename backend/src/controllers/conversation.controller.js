@@ -41,7 +41,7 @@ export const listConversations = async (req, res, next) => {
     const { role = "all", search = "", page = "1", limit = "30" } = req.query;
     const result = await conversationService.getUserConversations({
       userId: req.userId,
-      role: ["all", "buying", "selling"].includes(role) ? role : "all",
+      role: ["all", "buying", "selling", "rent"].includes(role) ? role : "all", // [rent] "rent" tab
       search,
       page,
       limit,
