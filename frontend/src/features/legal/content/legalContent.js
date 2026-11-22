@@ -100,7 +100,7 @@ export const PRIVACY = {
           list: [
             { label: "Visible to students on your campus", text: "Your name, profile photo, campus, rank, badges, rating, plan badge, verified tick (if you have one) and your active listings with their pickup spot name." },
             { label: "Visible to the other person in a deal", text: "The meetup date, time and place you agree, the deal's stage, and messages the app adds to the chat about it, such as “marked as done” or a no-show report." },
-            { label: "Reviews", text: "When you rate a seller, your name, photo, star rating and comment appear on their profile." },
+            { label: "Reviews", text: "When you rate someone after a deal (a seller you bought from, or a buyer you sold to), your name, photo, star rating and comment appear on their profile." },
             { label: "Visible only in a chat", text: "What you write or send in that conversation, and whether you've read it (if read receipts are on)." },
             { label: "Never shown", text: "Your phone number, email, college email, gender, password, payment details or exact location. Even our staff see only whether you're verified, not your college address." },
           ],
@@ -462,7 +462,7 @@ export const TERMS = {
       body: [
         {
           list: [
-            "After a completed deal, the buyer can rate the seller once, with an optional comment. Your name and photo show with your review",
+            "After a completed deal, the buyer rates the seller and the seller rates the buyer, once each, with an optional comment. Rating is required before you continue using the app. Your name and photo show with your review",
             "Rate the deal you actually had. Fake, paid-for or swapped reviews, and reviews used to threaten or pressure someone, aren't allowed",
             "We may remove reviews that are abusive, share personal details or break these terms",
           ],

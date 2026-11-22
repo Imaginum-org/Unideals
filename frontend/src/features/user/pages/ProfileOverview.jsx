@@ -208,7 +208,7 @@ function ProfileOverview() {
   ].filter(Boolean);
 
   const ratingCount = ratings?.count || 0;
-  // Jenkins-style build weather for the buyer rating: clear sun when buyers
+  // Jenkins-style build weather for your rating: clear sun when people
   // are happy, clouds rolling in as it drops.
   const weather = !numbersLoading && ratingCount ? ratingWeather(ratings.avg) : null;
   const statCells = [
@@ -326,7 +326,7 @@ function ProfileOverview() {
             </div>
           </div>
 
-          {/* Buyer rating */}
+          {/* Your rating: from buyers you sold to and sellers you bought from */}
           <div className="flex flex-col gap-2 border-t border-neutral-100 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6 sm:px-6 dark:border-neutral-800">
             <div className="flex shrink-0 items-center gap-3">
               <span className="inline-flex items-center gap-2">
@@ -347,7 +347,7 @@ function ProfileOverview() {
               <div>
                 <StarRow value={ratingCount ? ratings.avg : 0} size="h-4 w-4" />
                 <p className="mt-0.5 text-[12px] text-slate-500 dark:text-zinc-400">
-                  {ratingCount ? `Buyer rating · ${ratingCount} review${ratingCount === 1 ? "" : "s"}` : "Buyer rating"}
+                  {ratingCount ? `Your rating · ${ratingCount} review${ratingCount === 1 ? "" : "s"}` : "Your rating"}
                 </p>
               </div>
             </div>
@@ -355,13 +355,14 @@ function ProfileOverview() {
               <figure className="min-w-0 flex-1 border-slate-200 sm:border-l sm:pl-6 dark:border-neutral-700">
                 <blockquote className="truncate text-[13px] text-slate-700 dark:text-zinc-200">“{ratings.recent[0].comment}”</blockquote>
                 <figcaption className="truncate text-[11.5px] text-slate-400 dark:text-zinc-500">
-                  {ratings.recent[0].buyer?.name || "A buyer"}
+                  {(ratings.recent[0].reviewer || ratings.recent[0].buyer)?.name || "A student"}
+                  {ratings.recent[0].reviewer_role === "seller" ? " (seller)" : " (buyer)"}
                   {ratings.recent[0].product_title ? ` · ${ratings.recent[0].product_title}` : ""}
                 </figcaption>
               </figure>
             ) : (
               <p className="min-w-0 flex-1 text-[12.5px] text-slate-500 sm:border-l sm:border-slate-200 sm:pl-6 dark:text-zinc-400 dark:sm:border-neutral-700">
-                {weather ? weather.hint : "Buyers rate you after a completed deal. Good ratings help you sell faster."}
+                {weather ? weather.hint : "After every completed deal, buyers rate you as a seller and sellers rate you as a buyer. Good ratings help you deal faster."}
               </p>
             )}
           </div>
