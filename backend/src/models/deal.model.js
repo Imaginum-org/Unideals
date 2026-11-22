@@ -203,6 +203,11 @@ dealSchema.index({
 });
 
 /**
+ * Admin orders page (newest first) and order counts by date
+ */
+dealSchema.index({ createdAt: -1 });
+
+/**
  * Pickup schedule lookup
  */
 dealSchema.index({

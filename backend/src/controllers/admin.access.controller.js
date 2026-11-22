@@ -1,4 +1,5 @@
 import User from "../models/User.model.js";
+import { cachedAdminStat, viewKey } from "../utils/adminStatsCache.js";
 import Product from "../models/Product.model.js";
 import Report from "../models/Report.model.js";
 import { JobState } from "../models/JobRun.model.js";
@@ -61,12 +62,12 @@ export const getAttention = async (req, res) => {
     const p = req.access.permissions;
     const scope = req.campusScope;
     const zero = () => Promise.resolve(0);
-    const [pendingReports, pendingGenderRequests, autoHiddenListings, failingJobs] = await Promise.all([
+    const [pendingReports, pendingGenderRequests, autoHiddenListings, failingJobs] = await cachedAdminStat(`attention:${viewKey(scope, p)}`, () => Promise.all([
       p.reports.view ? countScoped(Report, { status: REPORT_STATUS.PENDING }, reportScopeStages(scope)) : zero(),
       p.genderRequests.view ? User.countDocuments({ "genderChangeRequest.status": "pending", ...campusMatch(scope) }) : zero(),
-      p.listings.view ? Product.countDocuments({ auto_hidden_at: { $ne: null }, is_deleted: false, ...campusMatch(scope) }) : zero(),
+      p.listings.view ? Product.countDocuments({ auto_hidden_at: { $type: "date" }, is_deleted: false, ...campusMatch(scope) }) : zero(),
       p.jobs.view ? JobState.countDocuments({ last_status: "failed" }) : zero(),
-    ]);
+    ]));
     return ok(res, "Attention counts fetched", { pendingReports, pendingGenderRequests, autoHiddenListings, failingJobs });
   } catch (error) {
     return fail(res, error);

@@ -388,6 +388,8 @@ productSchema.index(
 productSchema.index({ is_deleted: 1, updatedAt: 1 });
 // Nightly purge of stale drafts + staff filters by status.
 productSchema.index({ status: 1, updatedAt: 1 });
+// Admin listings page (newest first) and new-listing counts by date.
+productSchema.index({ is_deleted: 1, createdAt: -1 });
 // Per-campus hot-deal cap check.
 productSchema.index({ campus_id: 1, hot_until: 1 });
 // Duplicate-listing check (same seller, title, price). No options: the

@@ -99,7 +99,7 @@ export const getDashboardMetrics = async ({ scope = null, can = () => true } = {
     pendingGenderRequests,
     autoHiddenListings,
     failingJobs,
-    activeCampuses,
+    activeCampusesList,
     completedDeals,
     dealVolumeRupees,
     platformRevenuePaise,
@@ -124,9 +124,10 @@ export const getDashboardMetrics = async ({ scope = null, can = () => true } = {
     Product.countDocuments({ status: PRODUCT_STATUS.BLOCKED, is_deleted: false, ...inCampus }),
     can("reports") ? countScoped(Report, { status: REPORT_STATUS.PENDING }, reportScopeStages(scope)) : zero(),
     can("genderRequests") ? User.countDocuments({ "genderChangeRequest.status": "pending", ...inCampus }).catch(() => 0) : zero(),
-    can("listings") ? Product.countDocuments({ auto_hidden_at: { $ne: null }, is_deleted: false, ...inCampus }).catch(() => 0) : zero(),
+    can("listings") ? Product.countDocuments({ auto_hidden_at: { $type: "date" }, is_deleted: false, ...inCampus }).catch(() => 0) : zero(),
     can("jobs") ? JobState.countDocuments({ last_status: "failed" }).catch(() => 0) : zero(),
-    Campus.countDocuments({ is_active: true, ...(scope ? { _id: { $in: scope } } : {}) }),
+    // One read serves both the count and the users-by-campus rows below.
+    Campus.find({ is_active: true, ...(scope ? { _id: { $in: scope } } : {}) }).select("name").lean(),
     countDeals(completed),
     // Deal prices are stored in rupees.
     sumField(Deal, completed, "$current_price", dealStages),
@@ -159,7 +160,6 @@ export const getDashboardMetrics = async ({ scope = null, can = () => true } = {
   for (const row of campusDistributionRaw) {
     if (row.campusName) countMap.set(row.campusName, row.count);
   }
-  const activeCampusesList = await Campus.find({ is_active: true, ...(scope ? { _id: { $in: scope } } : {}) }).select("name").lean();
   for (const campus of activeCampusesList) {
     if (!countMap.has(campus.name)) countMap.set(campus.name, 0);
   }
@@ -189,7 +189,7 @@ export const getDashboardMetrics = async ({ scope = null, can = () => true } = {
       autoHiddenListings: autoHiddenListings || 0,
       // Background jobs whose latest run failed.
       failingJobs: failingJobs || 0,
-      activeCampuses: activeCampuses || 0,
+      activeCampuses: activeCampusesList.length,
       // Completed peer-to-peer deals and their total value (GMV), rupees.
       completedDeals: completedDeals || 0,
       dealVolume: Math.round(dealVolumeRupees || 0),
@@ -302,27 +302,20 @@ export const getUserDetails = async (userId) => {
 export const getProductDetails = async (productId) => {
   if (!ObjectId.isValid(productId)) throw new Error("Invalid product id");
 
-  const product = await Product.findById(productId)
-    .populate("seller_id", "name email avatar status")
-    .populate("campus_id", "name short_name slug")
-    .lean();
+  const [product, reportCount, recentReports] = await Promise.all([
+    Product.findById(productId)
+      .populate("seller_id", "name email avatar status")
+      .populate("campus_id", "name short_name slug")
+      .lean(),
+    Report.countDocuments({ target_id: productId, target_model: "Product" }),
+    Report.find({ target_id: productId, target_model: "Product", status: REPORT_STATUS.PENDING })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate("reporter_id", "name email")
+      .lean(),
+  ]);
 
   if (!product) throw new Error("Product not found");
-
-  const reportCount = await Report.countDocuments({
-    target_id: productId,
-    target_model: "Product",
-  });
-
-  const recentReports = await Report.find({
-    target_id: productId,
-    target_model: "Product",
-    status: REPORT_STATUS.PENDING,
-  })
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .populate("reporter_id", "name email")
-    .lean();
 
   return {
     id: product._id.toString(),

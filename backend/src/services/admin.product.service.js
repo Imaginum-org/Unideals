@@ -13,6 +13,9 @@ import { withCampusScope } from "./campusScope.service.js";
 
 const { ObjectId } = mongoose.Types;
 
+// Seller-name search matches at most this many accounts.
+const MAX_SEARCH_SELLERS = 500;
+
 export const getProducts = async (query = {}, scope = null) => {
   const page = toPositiveInt(query.page, 1);
   const limit = toPositiveInt(query.limit, 5, 50);
@@ -33,7 +36,7 @@ export const getProducts = async (query = {}, scope = null) => {
 
   // "Needs review": listings auto-hidden by the report threshold.
   if (query.flag === "auto_hidden") {
-    match.auto_hidden_at = { $ne: null };
+    match.auto_hidden_at = { $type: "date" };
   }
 
   if (typeof query.campus === "string" && ObjectId.isValid(query.campus.trim())) {
@@ -44,85 +47,60 @@ export const getProducts = async (query = {}, scope = null) => {
     match.category = { $regex: new RegExp(`^${escapeRegex(query.category.trim())}$`, "i") };
   }
 
-  const pipeline = [
-    { $match: withCampusScope(match, scope) },
-    {
-      $lookup: {
-        from: "users",
-        localField: "seller_id",
-        foreignField: "_id",
-        as: "seller",
-      },
-    },
-    {
-      $unwind: {
-        path: "$seller",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-  ];
-
-  // Per-status totals for the admin tabs: same filters, minus status.
-  const { status: _ignoredStatus, ...matchWithoutStatus } = match;
-  const countPipeline = [{ $match: withCampusScope(matchWithoutStatus, scope) }];
-  let searchStage = null;
-
+  // Search: title/category on the listing, or name/email of the seller.
+  // Sellers are resolved once up front (capped) instead of joining every
+  // listing to its seller just to filter.
   if (query.search?.trim()) {
     const searchText = query.search.trim();
     const safeSearch = escapeRegex(searchText);
-    pipeline.push(searchStage = {
-      $match: {
-        $or: [
-          { title: { $regex: safeSearch, $options: "i" } },
-          { category: { $regex: safeSearch, $options: "i" } },
-          { "seller.name": { $regex: safeSearch, $options: "i" } },
-          { "seller.email": { $regex: safeSearch, $options: "i" } },
-          ...(ObjectId.isValid(searchText)
-            ? [
-                { _id: new ObjectId(searchText) },
-                { seller_id: new ObjectId(searchText) },
-              ]
-            : []),
-        ],
-      },
-    });
+    const sellerIds = await User.find({
+      $or: [
+        { name: { $regex: safeSearch, $options: "i" } },
+        { email: { $regex: safeSearch, $options: "i" } },
+      ],
+    })
+      .select("_id")
+      .limit(MAX_SEARCH_SELLERS)
+      .lean();
+    match.$or = [
+      { title: { $regex: safeSearch, $options: "i" } },
+      { category: { $regex: safeSearch, $options: "i" } },
+      ...(sellerIds.length ? [{ seller_id: { $in: sellerIds.map((u) => u._id) } }] : []),
+      ...(ObjectId.isValid(searchText)
+        ? [{ _id: new ObjectId(searchText) }, { seller_id: new ObjectId(searchText) }]
+        : []),
+    ];
   }
 
-  pipeline.push(
-    {
-      $lookup: {
-        from: "reports",
-        let: { productId: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $eq: ["$target_id", "$$productId"] },
-                  { $eq: ["$target_model", "Product"] },
-                ],
-              },
-              status: "pending",
-            },
-          },
-          { $count: "count" },
-        ],
-        as: "reportStats",
-      },
-    },
-    {
-      $addFields: {
-        reports: {
-          $ifNull: [{ $arrayElemAt: ["$reportStats.count", 0] }, 0],
-        },
-      },
-    },
-    { $sort: { createdAt: -1 } },
+  // Filter + sort on indexes; seller and open-report lookups run only for
+  // the page being returned.
+  const pipeline = [
+    { $match: withCampusScope(match, scope) },
+    { $sort: { createdAt: -1, _id: -1 } },
     {
       $facet: {
         data: [
           { $skip: skip },
           { $limit: limit },
+          {
+            $lookup: {
+              from: User.collection.name,
+              localField: "seller_id",
+              foreignField: "_id",
+              pipeline: [{ $project: { name: 1, email: 1, avatar: 1 } }],
+              as: "seller",
+            },
+          },
+          { $unwind: { path: "$seller", preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: Report.collection.name,
+              localField: "_id",
+              foreignField: "target_id",
+              pipeline: [{ $match: { target_model: "Product", status: "pending" } }, { $count: "count" }],
+              as: "reportStats",
+            },
+          },
           {
             $project: {
               _id: 0,
@@ -131,7 +109,7 @@ export const getProducts = async (query = {}, scope = null) => {
               title: 1,
               category: 1,
               status: 1,
-              reports: 1,
+              reports: { $ifNull: [{ $arrayElemAt: ["$reportStats.count", 0] }, 0] },
               created: "$createdAt",
               createdAt: 1,
               images: 1,
@@ -153,16 +131,14 @@ export const getProducts = async (query = {}, scope = null) => {
         total: [{ $count: "count" }],
       },
     },
-  );
+  ];
 
-  if (searchStage) {
-    countPipeline.push(
-      { $lookup: { from: "users", localField: "seller_id", foreignField: "_id", as: "seller" } },
-      { $unwind: { path: "$seller", preserveNullAndEmptyArrays: true } },
-      searchStage,
-    );
-  }
-  countPipeline.push({ $group: { _id: "$status", count: { $sum: 1 } } });
+  // Per-status totals for the admin tabs: same filters, minus status.
+  const { status: _ignoredStatus, ...matchWithoutStatus } = match;
+  const countPipeline = [
+    { $match: withCampusScope(matchWithoutStatus, scope) },
+    { $group: { _id: "$status", count: { $sum: 1 } } },
+  ];
 
   const [[result], statusRows] = await Promise.all([
     Product.aggregate(pipeline),

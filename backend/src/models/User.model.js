@@ -419,6 +419,8 @@ const userSchema = new Schema(
 );
 
 userSchema.index({ status: 1 });
+// Admin user list (newest first) and sign-up counts by date.
+userSchema.index({ role: 1, createdAt: -1 });
 // Hourly attention count of pending gender requests: only pending rows.
 userSchema.index(
   { "genderChangeRequest.status": 1 },

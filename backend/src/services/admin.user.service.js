@@ -56,45 +56,34 @@ export const getUsers = async (query = {}, scope = null) => {
     ];
   }
 
+  // Filter + sort on indexes first; the per-row lookups (listing count,
+  // campus) run only for the page being returned, never the whole match.
   const pipeline = [
     { $match: withCampusScope(match, scope) },
-    {
-      $lookup: {
-        from: "products",
-        let: { userId: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ["$seller_id", "$$userId"] },
-              is_deleted: false,
-            },
-          },
-          { $count: "count" },
-        ],
-        as: "listingStats",
-      },
-    },
-    {
-      $addFields: {
-        listings: {
-          $ifNull: [{ $arrayElemAt: ["$listingStats.count", 0] }, 0],
-        },
-      },
-    },
-    {
-      $lookup: {
-        from: Campus.collection.name,
-        localField: "campus_id",
-        foreignField: "_id",
-        as: "campus",
-      },
-    },
-    { $sort: { createdAt: -1 } },
+    { $sort: { createdAt: -1, _id: -1 } },
     {
       $facet: {
         data: [
           { $skip: skip },
           { $limit: limit },
+          {
+            $lookup: {
+              from: Product.collection.name,
+              localField: "_id",
+              foreignField: "seller_id",
+              pipeline: [{ $match: { is_deleted: false } }, { $count: "count" }],
+              as: "listingStats",
+            },
+          },
+          {
+            $lookup: {
+              from: Campus.collection.name,
+              localField: "campus_id",
+              foreignField: "_id",
+              pipeline: [{ $project: { name: 1, short_name: 1, slug: 1 } }],
+              as: "campus",
+            },
+          },
           {
             $project: {
               _id: 0,
@@ -117,7 +106,7 @@ export const getUsers = async (query = {}, scope = null) => {
                   },
                 },
               },
-              listings: 1,
+              listings: { $ifNull: [{ $arrayElemAt: ["$listingStats.count", 0] }, 0] },
               joined: "$createdAt",
               createdAt: 1,
             },

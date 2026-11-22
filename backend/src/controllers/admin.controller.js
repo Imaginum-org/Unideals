@@ -1,4 +1,5 @@
 import * as adminService from "../services/admin.service.js";
+import { cachedAdminStat, viewKey } from "../utils/adminStatsCache.js";
 import * as adminUserService from "../services/admin.user.service.js";
 import * as adminProductService from "../services/admin.product.service.js";
 import * as campusService from "../services/campus.service.js";
@@ -21,10 +22,12 @@ const sendFailure = (res, error, statusCode = error?.statusCode || 400) =>
 export const getDashboard = async (req, res) => {
   try {
     const permissions = req.access?.permissions || {};
-    const data = await adminService.getDashboardMetrics({
-      scope: req.campusScope,
-      can: (section) => Boolean(permissions[section]?.view),
-    });
+    const data = await cachedAdminStat(`dashboard:${viewKey(req.campusScope, permissions)}`, () =>
+      adminService.getDashboardMetrics({
+        scope: req.campusScope,
+        can: (section) => Boolean(permissions[section]?.view),
+      }),
+    );
     return sendSuccess(res, "Dashboard data fetched", { data });
   } catch (error) {
     return sendFailure(res, error);
