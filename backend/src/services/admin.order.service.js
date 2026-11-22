@@ -194,6 +194,9 @@ const toOrderRow = (d, campusMap) => {
     completedAt: d.completed_at,
     cancelledAt: d.cancelled_at,
     cancellationReason: d.cancellation_reason,
+    // How it completed: code | both_confirmed | auto | legacy | admin.
+    completedVia: d.completed_via || null,
+    noShow: d.no_show?.at ? { reporterRole: d.no_show.reporter_role, at: d.no_show.at } : null,
   };
 };
 
@@ -354,6 +357,7 @@ export const updateAdminOrderStatus = async (dealId, nextStatus, reason = "", ad
 
   if (targetStatus === DEAL_STATUS.COMPLETED) {
     updateFields.completed_at = new Date();
+    updateFields.completed_via = "admin";
     updateFields["item_received.is_confirmed"] = true;
     updateFields["item_received.confirmed_at"] = new Date();
     updateFields["payment_confirmed.is_confirmed"] = true;

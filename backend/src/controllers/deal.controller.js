@@ -81,6 +81,7 @@ export const schedulePickup = async (req, res, next) => {
       conversationId: req.params.id,
       userId: req.userId,
       date: req.body.date,
+      time: req.body.time || "",
       location: req.body.location,
     });
     return res.status(200).json({
@@ -93,7 +94,60 @@ export const schedulePickup = async (req, res, next) => {
   }
 };
 
-// POST /api/conversations/:id/payment-confirm, seller only
+const sendDeal = (res, message, deal) => res.status(200).json({ success: true, message, data: deal });
+
+// GET /api/conversations/:id/handover-code, buyer only. Never cached.
+export const getHandoverCode = async (req, res, next) => {
+  try {
+    const data = await dealService.getHandoverCode({ conversationId: req.params.id, userId: req.userId });
+    res.set("Cache-Control", "no-store");
+    return res.status(200).json({ success: true, message: "Handover code", data });
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// POST /api/conversations/:id/handover { code }, seller only
+export const verifyHandoverCode = async (req, res, next) => {
+  try {
+    const deal = await dealService.verifyHandoverCode({ conversationId: req.params.id, userId: req.userId, code: req.body.code });
+    return sendDeal(res, "Deal complete", deal);
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// POST /api/conversations/:id/done, either party
+export const markDealDone = async (req, res, next) => {
+  try {
+    const deal = await dealService.markDealDone({ conversationId: req.params.id, userId: req.userId });
+    return sendDeal(res, deal.status === "completed" ? "Deal complete" : "Marked as done", deal);
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// POST /api/conversations/:id/done/clear { reason? }, either party
+export const clearDoneRequest = async (req, res, next) => {
+  try {
+    const deal = await dealService.clearDoneRequest({ conversationId: req.params.id, userId: req.userId, reason: req.body?.reason || "" });
+    return sendDeal(res, "Updated", deal);
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// POST /api/conversations/:id/no-show, either party, after the meetup time
+export const reportNoShow = async (req, res, next) => {
+  try {
+    const deal = await dealService.reportNoShow({ conversationId: req.params.id, userId: req.userId });
+    return sendDeal(res, "No-show reported", deal);
+  } catch (error) {
+    forwardServiceError(error, next);
+  }
+};
+
+// POST /api/conversations/:id/payment-confirm, seller only (legacy)
 export const confirmPayment = async (req, res, next) => {
   try {
     const deal = await dealService.confirmPayment({

@@ -18,6 +18,8 @@ Everything beyond the top-level [README](../README.md) lives here. Keep each doc
 |---|---|
 | [features/subscriptions-and-monetization.md](features/subscriptions-and-monetization.md) | **Source of truth** for plans (Free / Pro / Pro+), Founder vs semester pricing, boosts and add-ons. Mirrored by `backend/src/config/subscriptionPlans.js` and the pricing page |
 | [features/gamification-badges-and-levels.md](features/gamification-badges-and-levels.md) | XP, rank tiers, badge catalogue, data models and endpoints |
+| [features/handover-code.md](features/handover-code.md) | The 4-digit handover code in depth: buyer and seller screens, how the code is made and checked, lockout, every edge case, API errors, support guide |
+| [features/deal-handover.md](features/deal-handover.md) | Finishing a deal at the meetup: handover code, "mark as done" with 48h auto-complete, no-shows, follow-up job, API |
 | [features/girls-corner.md](features/girls-corner.md) | Girls Corner 🌸: women-only listing space, gender confirmation, privacy rules, edge cases, rollout |
 
 ## Operations

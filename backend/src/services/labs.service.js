@@ -11,7 +11,10 @@ import { createTtlCache } from "../utils/ttlCache.js";
  * compared. Instead every comparable becomes a *resale ratio* (price ÷ what
  * it cost new), normalised for its condition, outliers dropped. The seller's
  * own original price × the typical ratio for their condition gives a
- * suggestion that is about *their* item. Real completed sales are preferred
+ * suggestion that is about *their* item. Age is handled the same way: each
+ * comparable is normalised by how old it was (when known) and the result is
+ * re-scaled to the seller's purchase date, so a 4-year-old laptop isn't
+ * priced like a 2-month-old one. Real completed sales are preferred
  * over asking prices when there are enough of them.
  *
  * Demand: live supply, real completed sales (from deals, not listing edit
@@ -46,6 +49,18 @@ export const CONDITION_FACTOR = Object.freeze({
 const DEFAULT_CONDITION = "gently_used";
 const factorOf = (condition) => CONDITION_FACTOR[condition] ?? CONDITION_FACTOR[DEFAULT_CONDITION];
 
+// Value kept with age: -8% a year, floored at 60% (mirrors the client's
+// rule-of-thumb). null when the purchase date is unknown or nonsense.
+const YEAR = 365.25 * 864e5;
+export const ageFactor = (purchaseDate, at = Date.now()) => {
+  if (!purchaseDate) return null;
+  const bought = new Date(purchaseDate).getTime();
+  const ref = new Date(at).getTime();
+  if (!Number.isFinite(bought) || !Number.isFinite(ref) || bought > ref + 864e5) return null;
+  const years = Math.max(0, (ref - bought) / YEAR);
+  return Math.max(0.6, 1 - 0.08 * years);
+};
+
 const badRequest = (message) => {
   const e = new Error(message);
   e.statusCode = 400;
@@ -69,10 +84,13 @@ export const roundPrice = (n) => {
 };
 
 /**
- * Comparables → condition-normalised resale ratios with outliers removed.
- * comps: [{ price, original, condition }]
+ * Comparables → condition- (and age-) normalised resale ratios with
+ * outliers removed. comps: [{ price, original, condition, bought?, at? }].
+ * sellerAge: the seller's own age factor, or null. With it, each comparable
+ * is divided by its own age factor; one whose age is unknown is treated as
+ * the same age as the seller's item (neutral). Without it, age is ignored.
  */
-export const normalisedRatios = (comps) => {
+export const normalisedRatios = (comps, sellerAge = null) => {
   const values = comps
     .map((c) => {
       const price = Number(c.price);
@@ -80,7 +98,8 @@ export const normalisedRatios = (comps) => {
       if (!(price > 0) || !(original > 0)) return null;
       const ratio = price / original;
       if (ratio < MIN_RATIO || ratio > MAX_RATIO) return null;
-      return ratio / factorOf(c.condition);
+      const age = sellerAge ? ageFactor(c.bought, c.at || Date.now()) ?? sellerAge : 1;
+      return ratio / (factorOf(c.condition) * age);
     })
     .filter((v) => v != null)
     .sort((a, b) => a - b);
@@ -100,20 +119,22 @@ const confidenceFor = (n) => (n >= 12 ? "high" : n >= 6 ? "medium" : "low");
  * Pure maths: market comparables + the seller's item → suggestion.
  * Exported for tests.
  */
-export const buildPriceInsight = ({ listed, sold, condition, originalPrice }) => {
-  const soldN = normalisedRatios(sold);
-  const listedN = normalisedRatios(listed);
+export const buildPriceInsight = ({ listed, sold, condition, originalPrice, purchaseDate = null }) => {
+  const sellerAge = ageFactor(purchaseDate);
+  const soldN = normalisedRatios(sold, sellerAge);
+  const listedN = normalisedRatios(listed, sellerAge);
   const basis = soldN.length >= MIN_SOLD ? "sold" : listedN.length >= MIN_LISTED ? "listed" : null;
   const base = {
     enoughData: Boolean(basis),
     basis,
+    ageAdjusted: Boolean(sellerAge),
     soldSamples: soldN.length,
     listedSamples: listedN.length,
   };
   if (!basis) return { ...base, samples: 0, confidence: null, ratio: null, suggestion: null };
 
   const values = basis === "sold" ? soldN : listedN;
-  const f = factorOf(condition);
+  const f = factorOf(condition) * (sellerAge || 1);
   const clamp = (r) => Math.min(Math.max(r * f, MIN_RATIO), MAX_RATIO);
   const ratio = {
     low: clamp(quantile(values, 0.25)),
@@ -196,14 +217,14 @@ const loadSold = async (campusId, category, since) => {
       campus_id: campusId,
       category,
     })
-      .select("condition original_price seller_id")
+      .select("condition original_price seller_id attributes.purchase_date")
       .lean();
     const byId = new Map(products.map((p) => [String(p._id), p]));
     legacyRows = legacy
       .map((d) => {
         const p = byId.get(productOf.get(String(d.conversation_id)));
         return p
-          ? { price: d.current_price, original: p.original_price, condition: p.condition, seller: String(p.seller_id), at: d.completed_at }
+          ? { price: d.current_price, original: p.original_price, condition: p.condition, bought: p.attributes?.purchase_date, seller: String(p.seller_id), at: d.completed_at }
           : null;
       })
       .filter(Boolean);
@@ -214,6 +235,7 @@ const loadSold = async (campusId, category, since) => {
       price: d.sale.sold_price,
       original: d.sale.original_price,
       condition: d.sale.condition,
+      bought: d.sale.purchase_date,
       seller: String(d.sale.seller_id || ""),
       at: d.completed_at,
     })),
@@ -233,7 +255,7 @@ const loadMarket = (campusId, category) =>
         status: PRODUCT_STATUS.LISTED,
         createdAt: { $gte: listedSince },
       })
-        .select("selling_price original_price condition seller_id")
+        .select("selling_price original_price condition seller_id attributes.purchase_date")
         .sort({ createdAt: -1 })
         .limit(400)
         .lean(),
@@ -244,6 +266,7 @@ const loadMarket = (campusId, category) =>
         price: p.selling_price,
         original: p.original_price,
         condition: p.condition,
+        bought: p.attributes?.purchase_date,
         seller: String(p.seller_id),
       })),
       sold,
@@ -276,7 +299,7 @@ const loadDemand = (campusId, category) =>
 
 /* ── Public API ─────────────────────────────────────────────────────── */
 
-export const getPriceInsights = async ({ campusId, userId, category, condition, originalPrice, includeDemand }) => {
+export const getPriceInsights = async ({ campusId, userId, category, condition, originalPrice, purchaseDate = null, includeDemand }) => {
   if (!campusId) throw badRequest("Campus required");
   if (!VALID_CATEGORIES.has(category)) throw badRequest("Pick a valid category");
   const cond = VALID_CONDITIONS.has(condition) ? condition : null;
@@ -294,11 +317,18 @@ export const getPriceInsights = async ({ campusId, userId, category, condition, 
       sold: market.sold.filter(notMine),
       condition: cond || DEFAULT_CONDITION,
       originalPrice,
+      purchaseDate,
     }),
   };
 
   if (includeDemand) {
-    const d = await loadDemand(campusId, category);
+    const market = await loadDemand(campusId, category);
+    // "Live now" is the competition: the seller's own live listings in this
+    // category don't count (the cached market numbers are campus-wide).
+    const own = me
+      ? await Product.countDocuments({ seller_id: me, campus_id: campusId, category, is_deleted: false, status: PRODUCT_STATUS.LISTED })
+      : 0;
+    const d = { ...market, live: Math.max(0, market.live - own) };
     result.demand = {
       level: demandLevel(d),
       live: d.live,

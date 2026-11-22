@@ -7,7 +7,7 @@ export const getMyLabs = (req, res) => {
   return res.status(200).json({ success: true, data: labsForUser(req.user) });
 };
 
-// GET /api/product/price-insights?category=&condition=&originalPrice=
+// GET /api/product/price-insights?category=&condition=&originalPrice=&purchaseDate=
 // Labs: "price_insights" (Pro & Pro+); demand only with "demand_meter" (Pro+).
 export const priceInsights = async (req, res, next) => {
   try {
@@ -27,6 +27,8 @@ export const priceInsights = async (req, res, next) => {
       condition: String(req.query.condition || ""),
       // The seller's own "price when new": the suggestion is for THIS item.
       originalPrice: Number.isFinite(original) && original > 0 && original <= 10_000_000 ? original : null,
+      // "YYYY-MM-DD": lets the suggestion account for the item's age.
+      purchaseDate: /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.purchaseDate || "")) ? String(req.query.purchaseDate) : null,
       includeDemand: hasLabsFeature(req.user, "demand_meter"),
     });
     return res.status(200).json({ success: true, data });

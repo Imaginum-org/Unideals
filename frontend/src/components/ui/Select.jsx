@@ -12,6 +12,11 @@ import { cn } from "../../utils/cn.js";
  * and type-to-jump. Closes on outside click. Opens upward when there isn't
  * room below (bottom of a sheet / short screen).
  *
+ * Options: { value, label, disabled?, icon?, description?, className? }.
+ * icon: a node shown before the label (also in the trigger); description:
+ * a muted second line in the list; className: extra classes for that row
+ * (e.g. a tint).
+ *
  * variant="toolbar" → compact pill (Sort by …)
  * variant="field"   → full-width form control (matches form inputs)
  */
@@ -175,6 +180,7 @@ export default function Select({
         )}
       >
         {prefix && <span className="shrink-0 whitespace-nowrap text-slate-400 max-[359px]:hidden dark:text-zinc-500">{prefix}</span>}
+        {selected?.icon && <span className="flex shrink-0 items-center">{selected.icon}</span>}
         <span
           className={cn(
             "min-w-0 flex-1 truncate",
@@ -221,9 +227,17 @@ export default function Select({
                   data-highlighted={i === highlight}
                   onPointerMove={() => i !== highlight && setHighlight(i)}
                   onClick={() => choose(i)}
-                  className={cn("dd-item cursor-pointer select-none", opt.disabled && "pointer-events-none opacity-40")}
+                  className={cn("dd-item cursor-pointer select-none", opt.disabled && "pointer-events-none opacity-40", opt.className)}
                 >
-                  <span className="min-w-0 flex-1 truncate">{opt.label}</span>
+                  {opt.icon && <span className="flex shrink-0 items-center">{opt.icon}</span>}
+                  {opt.description ? (
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{opt.label}</span>
+                      <span className="block truncate text-[12px] font-normal text-slate-500 dark:text-zinc-400">{opt.description}</span>
+                    </span>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate">{opt.label}</span>
+                  )}
                   <Check
                     className={cn("h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")}
                     strokeWidth={2.4}

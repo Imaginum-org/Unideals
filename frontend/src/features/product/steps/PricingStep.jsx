@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, BadgePercent, Building2, CheckCircle2, IndianRupee, MapPin, Plus, ShieldCheck, Sparkles, Wallet } from "lucide-react";
+import { AlertTriangle, BadgePercent, Building2, CheckCircle2, IndianRupee, MapPin, Plus, ShieldCheck, Wallet } from "lucide-react";
 import Select from "../../../components/ui/Select.jsx";
 import PriceInsights from "../components/PriceInsights.jsx";
 import { useLabs } from "../../../services/labs.js";
@@ -194,14 +194,17 @@ const PricingStep = () => {
             <Field label="Your price" htmlFor="listing-price" required field="sellingPrice" error={errors.sellingPrice}>
               {priceInput("sellingPrice", "listing-price", suggested ? `e.g. ${suggested}` : "e.g. 800")}
               {showSuggestion && (
-                <button
-                  type="button"
-                  onClick={() => updateField("sellingPrice", String(suggested))}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-soft-strong)]"
-                >
-                  <Sparkles className="h-3 w-3" aria-hidden="true" />
-                  Typical resale: use ₹{suggested.toLocaleString("en-IN")}
-                </button>
+                <p className="mt-2 text-[12px] text-slate-500 dark:text-zinc-400">
+                  Rough estimate ₹{suggested.toLocaleString("en-IN")}{" "}
+                  <span className="text-slate-400 dark:text-zinc-500">(from original price, condition and age)</span>{" "}
+                  <button
+                    type="button"
+                    onClick={() => updateField("sellingPrice", String(suggested))}
+                    className="font-semibold text-[var(--accent-text)] hover:underline"
+                  >
+                    Use it
+                  </button>
+                </p>
               )}
             </Field>
             <Field
@@ -217,18 +220,20 @@ const PricingStep = () => {
           </div>
 
           {discount > 0 && (
-            <p className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-[13px] font-medium text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
-              <BadgePercent className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-emerald-700 dark:text-emerald-400">
+              <BadgePercent className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               Buyers will see <span className="font-bold">{discount}% off</span>, saving ₹{(original - selling).toLocaleString("en-IN")}.
             </p>
           )}
 
-          {/* Labs: smart price suggestion / demand meter (or locked teaser) */}
-          <div className="mt-4">
+          {/* Labs: price guide / demand (or a one-line locked hint). Kept
+              quieter than the price fields above it. */}
+          <div className="mt-3">
             <PriceInsights
               category={formData.category}
               condition={formData.condition}
               originalPrice={formData.originalPrice}
+              purchaseDate={formData.purchaseDate}
               estimate={suggested}
               currentPrice={formData.sellingPrice}
               onUsePrice={(value) => updateField("sellingPrice", String(value))}
@@ -359,7 +364,7 @@ const PricingStep = () => {
               className={`mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent-ring)] peer-focus-visible:ring-offset-1 ${
                 formData.termsAccepted
                   ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                  : `bg-white text-transparent dark:bg-white/10 ${errors.termsAccepted ? "border-red-400" : "border-slate-300 hover:border-slate-400 dark:border-white/25"}`
+                  : `bg-white text-transparent dark:bg-zinc-100 ${errors.termsAccepted ? "border-red-400" : "border-slate-300 hover:border-slate-400 dark:border-zinc-400"}`
               }`}
             >
               <svg viewBox="0 0 12 12" className="h-3 w-3">

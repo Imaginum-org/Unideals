@@ -1104,17 +1104,21 @@ const ChatPanel = ({ embedded = false }) => {
   );
 
   // ---- deal actions (seller / buyer) ----
-  const runDealAction = async (fn, successMsg) => {
+  // successMsg: text, or (deal) => text. rethrow: let the caller show the
+  // error inline (handover code entry) instead of a toast.
+  const runDealAction = async (fn, successMsg, { rethrow = false } = {}) => {
     if (!selectedId || busy) return;
     setBusy(true);
     try {
       const d = await fn();
-      setDeal(d);
+      if (d) setDeal(d);
       // Only the new system chip(s) since our last message.
       await catchUp(selectedId);
       scheduleList();
-      if (successMsg) toast.success(successMsg);
+      const text = typeof successMsg === "function" ? successMsg(d) : successMsg;
+      if (text) toast.success(text);
     } catch (err) {
+      if (rethrow) throw err;
       toast.error(err?.response?.data?.message || "Action failed");
     } finally {
       setBusy(false);
@@ -1940,9 +1944,17 @@ const ChatPanel = ({ embedded = false }) => {
                       open={dealOpen}
                       onToggle={() => setDealOpen((v) => !v)}
                       onConfirmDeal={(amt) => runDealAction(() => chatApi.confirmDeal(selectedId, amt), "Deal locked")}
-                      onSchedulePickup={(d, loc) => runDealAction(() => chatApi.schedulePickup(selectedId, d, loc), "Pickup set")}
-                      onPayment={() => runDealAction(() => chatApi.confirmPayment(selectedId), "Payment confirmed")}
-                      onReceived={() => runDealAction(() => chatApi.confirmItemReceived(selectedId), "Done. Enjoy your buy.")}
+                      onSchedulePickup={(d, t, loc) => runDealAction(() => chatApi.schedulePickup(selectedId, d, loc, t), "Pickup set")}
+                      onRevealCode={() => chatApi.getHandoverCode(selectedId)}
+                      onVerifyCode={(code) => runDealAction(() => chatApi.verifyHandover(selectedId, code), "Deal complete", { rethrow: true })}
+                      onMarkDone={() =>
+                        runDealAction(
+                          () => chatApi.markDealDone(selectedId),
+                          (d) => (d?.status === "completed" ? "Deal complete" : "Marked as done. Waiting for them to confirm."),
+                        )
+                      }
+                      onClearDone={(reason) => runDealAction(() => chatApi.clearDoneRequest(selectedId, reason), reason ? "Sent. Sort it out in the chat." : "Updated")}
+                      onNoShow={() => runDealAction(() => chatApi.reportNoShow(selectedId), "No-show reported. The deal is cancelled.")}
                       onRevert={() => runDealAction(() => chatApi.revertDeal(selectedId, deal?.status), "Step undone")}
                     />
                   </div>

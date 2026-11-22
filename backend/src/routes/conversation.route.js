@@ -10,6 +10,8 @@ import {
   confirmDealSchema,
   schedulePickupSchema,
   cancelDealSchema,
+  handoverCodeSchema,
+  doneProblemSchema,
 } from "../validations/deal.validation.js";
 import {
   createConversation,
@@ -36,6 +38,11 @@ import {
   confirmItemReceived,
   cancelDeal,
   revertDealStage,
+  getHandoverCode,
+  verifyHandoverCode,
+  markDealDone,
+  clearDoneRequest,
+  reportNoShow,
 } from "../controllers/deal.controller.js";
 
 const router = express.Router();
@@ -147,6 +154,22 @@ router.post(
 );
 router.post("/:id/confirm", auth, dealActionLimiter, validate(confirmDealSchema), confirmDeal);
 router.post("/:id/pickup", auth, dealActionLimiter, validate(schedulePickupSchema), schedulePickup);
+// Handover: buyer shows a code, seller enters it. Code entry has its own
+// tight limit on top of the per-deal lockout (5 wrong codes = 15 min).
+const handoverLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: perAccount,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many code attempts, wait a minute" },
+});
+router.get("/:id/handover-code", auth, listLimiter, getHandoverCode);
+router.post("/:id/handover", auth, handoverLimiter, validate(handoverCodeSchema), verifyHandoverCode);
+router.post("/:id/done", auth, dealActionLimiter, markDealDone);
+router.post("/:id/done/clear", auth, dealActionLimiter, validate(doneProblemSchema), clearDoneRequest);
+router.post("/:id/no-show", auth, dealActionLimiter, reportNoShow);
+// Older app versions: the two-button flow.
 router.post("/:id/payment-confirm", auth, dealActionLimiter, confirmPayment);
 router.post("/:id/item-received", auth, dealActionLimiter, confirmItemReceived);
 router.post("/:id/cancel", auth, dealActionLimiter, validate(cancelDealSchema), cancelDeal);

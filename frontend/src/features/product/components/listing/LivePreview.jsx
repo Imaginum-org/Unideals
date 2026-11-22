@@ -1,66 +1,66 @@
-import { ImageIcon, Eye } from "lucide-react";
+import { useMemo } from "react";
+import { Eye } from "lucide-react";
 import useProductListing from "../../hooks/useProductListing";
-import { PRODUCT_CATEGORY_OPTIONS, PRODUCT_CONDITION_OPTIONS } from "../../constants/productOptions.js";
+import { useUser } from "../../../../context/useUserContext.jsx";
+import ProductCard from "../ProductCard.jsx";
 import { CARD } from "./ListingKit.jsx";
-import { isSpecHidden } from "../../utils/listingSmarts.js";
 import { cn } from "../../../../utils/cn.js";
 
-const labelOf = (opts, v) => opts.find((o) => o.value === v)?.label || "";
-const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-
 /**
- * Live card preview: roughly what buyers will see in the feed, updating as
- * the seller types. Placeholders show what is still missing.
+ * Buyer preview: the real feed ProductCard, fed from the form as the seller
+ * types, so it always looks exactly like what buyers will see (including
+ * the seller's own name, avatar, plan badge, rating and verified tick).
+ * Display-only: inert, so it can't be clicked, focused or wishlisted.
  */
 export default function LivePreview({ className }) {
   const { formData } = useProductListing();
-  const cover = formData.imagePreviews?.[0]?.preview;
-  const selling = Number(formData.sellingPrice || 0);
-  const original = Number(formData.originalPrice || 0);
-  const off = original > selling && selling > 0 ? Math.round(((original - selling) / original) * 100) : 0;
-  const category = labelOf(PRODUCT_CATEGORY_OPTIONS, formData.category);
-  const condition = labelOf(PRODUCT_CONDITION_OPTIONS, formData.condition);
+  const { userDetails } = useUser();
+
+  const product = useMemo(() => {
+    const cover = formData.imagePreviews?.[0]?.preview || formData.imagePreviews?.[0]?.url;
+    return {
+      _id: "listing-preview",
+      title: String(formData.title || "").trim() || "Your listing title",
+      images: cover ? [{ url: cover }] : [],
+      category: formData.category || "",
+      selling_price: Number(formData.sellingPrice || 0),
+      original_price: Number(formData.originalPrice || 0),
+      isGirlsOnly: Boolean(formData.isGirlsOnly),
+      seller_id: {
+        _id: userDetails?._id,
+        name: userDetails?.name || "You",
+        avatar: userDetails?.avatar,
+        subscription: userDetails?.subscription,
+        rating: userDetails?.rating,
+        is_college_verified: userDetails?.is_college_verified,
+      },
+    };
+  }, [
+    formData.imagePreviews,
+    formData.title,
+    formData.category,
+    formData.sellingPrice,
+    formData.originalPrice,
+    formData.isGirlsOnly,
+    userDetails?._id,
+    userDetails?.name,
+    userDetails?.avatar,
+    userDetails?.subscription,
+    userDetails?.rating,
+    userDetails?.is_college_verified,
+  ]);
 
   return (
-    <section className={cn(CARD, "p-4", className)} aria-label="Live preview">
+    <section className={cn(CARD, "p-4", className)} aria-label="Buyer preview">
       <p className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
         <Eye className="h-3.5 w-3.5" aria-hidden="true" />
         Buyer preview
       </p>
-      <div className="overflow-hidden rounded-xl border border-neutral-100 dark:border-neutral-800">
-        <div className="relative aspect-[6/5] bg-neutral-100 dark:bg-white/5">
-          {cover ? (
-            <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-slate-400 dark:text-zinc-500">
-              <ImageIcon className="h-7 w-7" aria-hidden="true" />
-              <span className="text-[12px] font-medium">Cover photo</span>
-            </div>
-          )}
-          {off > 0 && (
-            <span className="absolute left-2 top-2 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[11px] font-bold text-white">
-              {off}% off
-            </span>
-          )}
-        </div>
-        <div className="space-y-1.5 p-3">
-          <p className="truncate text-[11.5px] font-semibold uppercase tracking-wide text-[var(--accent-text)]">
-            {category || <span className="text-slate-300 dark:text-zinc-600">Category</span>}
-          </p>
-          <p className={cn("line-clamp-2 text-[14px] font-semibold leading-snug", formData.title ? "text-slate-900 dark:text-white" : "text-slate-300 dark:text-zinc-600")}>
-            {formData.title || "Your listing title"}
-          </p>
-          <div className="flex items-baseline gap-2">
-            <span className={cn("text-[16px] font-bold", selling ? "text-slate-900 dark:text-white" : "text-slate-300 dark:text-zinc-600")}>
-              {selling ? inr(selling) : "₹ —"}
-            </span>
-            {off > 0 && <span className="text-[12px] text-slate-400 line-through">{inr(original)}</span>}
-          </div>
-          {condition && !isSpecHidden(formData.category, "condition") && (
-            <p className="text-[12px] text-slate-500 dark:text-zinc-400">{condition}</p>
-          )}
-        </div>
+      {/* inert: the card's link, chat and wishlist buttons do nothing here. */}
+      <div inert="" aria-hidden="true" className="pointer-events-none select-none">
+        <ProductCard product={product} />
       </div>
+      <p className="mt-2.5 text-center text-[11.5px] text-slate-400 dark:text-zinc-500">How your listing appears in the feed</p>
     </section>
   );
 }

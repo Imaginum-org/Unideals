@@ -20,6 +20,11 @@
   .dd-panel {
     @apply overflow-hidden rounded-2xl border border-neutral-200 bg-[#F7F8FA] shadow-[0_14px_34px_rgba(15,23,42,0.12)] dark:border-neutral-800 dark:bg-[#1A1D20] dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)];
   }
+  /* Very light blush on girls-only rows. Declared before .dd-item so the
+     hover / highlighted backgrounds below still win on these rows. */
+  .dd-item-girls {
+    @apply bg-pink-50/60 dark:bg-pink-500/[0.05];
+  }
   .dd-item {
     @apply flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13.5px] font-medium text-[#4B5563] outline-none transition-colors duration-150 hover:bg-[#4B45FF]/10 hover:text-[#2E40DC] active:bg-[#4B45FF]/[0.15] dark:text-neutral-200 dark:hover:bg-[#4B45FF]/20 dark:hover:text-[#C3C9FF] dark:active:bg-[#4B45FF]/25;
   }
@@ -998,4 +1003,50 @@ html[data-chat-thread] .tabbar-spacer {
 @keyframes netInTop {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
+}
+
+/* Checkboxes: one look everywhere. The browser default renders dark when
+   unchecked (dark colour-scheme), so draw our own: near-white box, brand
+   colour + white tick when checked. In @layer base so size/margin
+   utilities on the element still apply. Visually hidden inputs (sr-only,
+   used with custom boxes) are left alone. */
+@layer base {
+  input[type="checkbox"]:not(.sr-only) {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    margin: 0;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 0.3rem;
+    background-color: #ffffff;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 78% 78%;
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  input[type="checkbox"]:not(.sr-only):hover {
+    border-color: #94a3b8;
+  }
+  .dark input[type="checkbox"]:not(.sr-only) {
+    background-color: #f4f4f5;
+    border-color: #a1a1aa;
+  }
+  input[type="checkbox"]:not(.sr-only):checked,
+  .dark input[type="checkbox"]:not(.sr-only):checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6 9.5 3.6' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  input[type="checkbox"]:not(.sr-only):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-soft-strong);
+  }
+  input[type="checkbox"]:not(.sr-only):disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 }

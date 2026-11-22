@@ -19,6 +19,8 @@ How Unideals is deployed and what to verify before (and right after) a productio
   - `NODE_ENV=production`. This turns on Secure + `SameSite=None` cookies and drops the localhost CORS origins.
   - `FRONTEND_URL` / `ADMIN_FRONTEND_URL` set to the exact production origins (https, no trailing slash). Anything else is rejected by CORS.
   - `SECRET_KEY_ACCESS_TOKEN` and `SECRET_KEY_REFRESH_TOKEN`: long, random and **different**. Rotating them logs everyone out.
+  - `HANDOVER_CODE_SECRET`: long and random, used for the 4-digit deal handover codes. Optional (falls back to `SECRET_KEY_ACCESS_TOKEN`), but set it so rotating login secrets doesn't change open codes. See [handover-code.md](../features/handover-code.md).
+  - `ADMIN_STATS_CACHE_MS`: optional, default `30000`. How long admin summary counts are cached.
   - `GOOGLE_REDIRECT_URI` points at the production API callback.
 - The app sets `trust proxy` to 1, which matches Render's single proxy hop. Revisit it if you add a CDN or load balancer in front, or per-IP rate limits will key on the proxy.
 - Run **one instance** unless you have read the scaling notes in [performance-optimisations.md](../architecture/performance-optimisations.md#5-notes-and-next-steps-not-done-only-worth-it-at-higher-scale). The cron jobs, in-process caches and Socket.IO rooms assume a single process.

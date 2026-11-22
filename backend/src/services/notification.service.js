@@ -294,6 +294,18 @@ export const notifyDealCancelled = ({ productTitle, cancellerName, recipientId }
     actionLabel: "View Details",
   });
 
+// Handover flow events (mark as done, auto-complete, meetup follow-up,
+// expiry, no-show). One helper: the copy is decided by deal.service.js.
+export const notifyDealEvent = ({ recipientId, conversationId, title, message, actionLabel = "Open chat" }) =>
+  sendDirect({
+    recipientId,
+    type: "order",
+    title,
+    message,
+    actionUrl: chatPath(conversationId),
+    actionLabel,
+  });
+
 // ---- Wishlist ----
 
 /**

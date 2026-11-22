@@ -5,14 +5,15 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
+  Clock3,
   Handshake,
   MapPin,
-  Package,
   ShoppingCart,
   Undo2,
   Wallet,
 } from "lucide-react";
 import { dealStatusBadge } from "../utils/dealStage.js";
+import HandoverPanel from "./HandoverPanel.jsx";
 
 const STAGES = ["Deal Confirmed", "Pickup Scheduled", "Completed"];
 
@@ -31,12 +32,16 @@ const stageIndex = (status) => {
 };
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+// Local "YYYY-MM-DD" / "HH:MM" for prefilling the reschedule form.
+const pad = (n) => String(n).padStart(2, "0");
+const localDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const localTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 /**
  * Deal lifecycle card, matches the design spec:
  * Deal Progress header + amount pill, 3-stage stepper, then the
  * role-gated action for the current stage (confirm / schedule /
- * payment / item-received / complete).
+ * finish with the handover code, see HandoverPanel).
  */
 const DealProgress = ({
   deal,
@@ -48,8 +53,11 @@ const DealProgress = ({
   onToggle,
   onConfirmDeal,
   onSchedulePickup,
-  onPayment,
-  onReceived,
+  onRevealCode,
+  onVerifyCode,
+  onMarkDone,
+  onClearDone,
+  onNoShow,
   onRevert,
 }) => {
   const status = deal?.status || "negotiating";
@@ -57,6 +65,9 @@ const DealProgress = ({
   const [amount, setAmount] = useState(String(deal?.current_price ?? ""));
   const [scheduling, setScheduling] = useState(false);
   const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  // "Already met up?" on a confirmed deal with no pickup set.
+  const [finishing, setFinishing] = useState(false);
   const [location, setLocation] = useState(defaultLocation || "");
   // Zomato-style delivery celebration: plays once when the stage flips to
   // completed (both sides see it via the same status update), skipped for
@@ -98,6 +109,7 @@ const DealProgress = ({
   useEffect(() => {
     setUndoArmed(false);
     setScheduling(false);
+    setFinishing(false);
   }, [status]);
   const UNDO_COPY = {
     deal_confirmed: { label: "Release reservation", hint: "Back to negotiating. The item is available to others again." },
@@ -106,8 +118,12 @@ const DealProgress = ({
   };
   const undo = isSeller && onRevert ? UNDO_COPY[status] : null;
 
-  const pickupDate = deal?.pickup?.scheduled_date
-    ? new Date(deal.pickup.scheduled_date).toLocaleDateString("en-IN")
+  const pickupAt = deal?.pickup?.scheduled_date ? new Date(deal.pickup.scheduled_date) : null;
+  const pickupDate = pickupAt
+    ? pickupAt.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })
+    : "";
+  const pickupTime = pickupAt && deal?.pickup?.time_set
+    ? pickupAt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })
     : "";
   const pickupLoc =
     deal?.pickup?.location?.address_line ||
@@ -124,6 +140,11 @@ const DealProgress = ({
       {pickupDate && (
         <span className="inline-flex items-center gap-1.5">
           <CalendarDays size={14} className="text-slate-400" /> {pickupDate}
+        </span>
+      )}
+      {pickupTime && (
+        <span className="inline-flex items-center gap-1.5">
+          <Clock3 size={14} className="text-slate-400" /> {pickupTime}
         </span>
       )}
       {pickupLoc && (
@@ -143,10 +164,11 @@ const DealProgress = ({
     // Rescheduling starts from the current values; first-time scheduling
     // starts from the seller's listing pickup point.
     if (deal?.pickup?.scheduled_date) {
-      try {
-        setDate(new Date(deal.pickup.scheduled_date).toISOString().slice(0, 10));
-      } catch {
-        // keep empty
+      const at = new Date(deal.pickup.scheduled_date);
+      if (!Number.isNaN(at.getTime())) {
+        // Date-only meetups are stored as UTC midnight of that day.
+        setDate(deal.pickup.time_set ? localDay(at) : at.toISOString().slice(0, 10));
+        setTime(deal.pickup.time_set ? localTime(at) : "");
       }
     }
     const existing = deal?.pickup?.location?.address_line || deal?.pickup?.location?.city || "";
@@ -162,27 +184,38 @@ const DealProgress = ({
   }, [scheduleNonce]);
 
   const scheduleForm = (
-    <div className="grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-[150px_120px_minmax(0,1fr)]">
       <input
         type="date"
         value={date}
-        min={new Date().toISOString().slice(0, 10)}
+        min={localDay(new Date())}
         onChange={(e) => setDate(e.target.value)}
         aria-label="Pickup date"
+        className={`${field} [color-scheme:light] dark:[color-scheme:dark]`}
+      />
+      <input
+        type="time"
+        value={time}
+        onChange={(e) => setTime(e.target.value)}
+        aria-label="Pickup time (optional)"
+        title="Time (optional)"
         className={`${field} [color-scheme:light] dark:[color-scheme:dark]`}
       />
       <input
         value={location}
         onChange={(e) => setLocation(e.target.value)}
         aria-label="Pickup location"
-        className={field}
+        className={`${field} col-span-2 sm:col-span-1`}
         placeholder="Pickup spot, e.g. Library entrance"
       />
-      <div className="flex gap-2 sm:col-span-2">
+      <p className="col-span-2 text-[11.5px] text-slate-500 sm:col-span-3 dark:text-zinc-400">
+        Pick a public spot on campus. Adding a time helps you both turn up.
+      </p>
+      <div className="col-span-2 flex gap-2 sm:col-span-3">
         <button
           type="button"
           disabled={busy || !date || !location.trim()}
-          onClick={() => onSchedulePickup?.(date, location.trim())}
+          onClick={() => onSchedulePickup?.(date, time, location.trim())}
           className={`${primary} flex-1`}
         >
           {status === "pickup_scheduled" ? "Update pickup" : "Confirm pickup"}
@@ -309,8 +342,20 @@ const DealProgress = ({
 
           {/* DEAL_CONFIRMED */}
           {status === "deal_confirmed" && (
-            <div className="mt-3">
-              {isSeller ? (
+            <div className="mt-3 space-y-2.5">
+              {finishing ? (
+                <HandoverPanel
+                  deal={deal}
+                  isSeller={isSeller}
+                  busy={busy}
+                  onRevealCode={onRevealCode}
+                  onVerifyCode={onVerifyCode}
+                  onMarkDone={onMarkDone}
+                  onClearDone={onClearDone}
+                  onNoShow={onNoShow}
+                  onReschedule={null}
+                />
+              ) : isSeller ? (
                 scheduling ? (
                   scheduleForm
                 ) : (
@@ -321,53 +366,36 @@ const DealProgress = ({
               ) : (
                 <p className={note}>Deal confirmed. The seller is setting up the pickup.</p>
               )}
-            </div>
-          )}
-
-          {/* PICKUP_SCHEDULED */}
-          {status === "pickup_scheduled" && (
-            <div className="mt-3 space-y-2.5">
-              {meta}
-              {isSeller ? (
-                scheduling ? (
-                  scheduleForm
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={busy} onClick={() => onPayment?.()} className={`${primary} flex-1`}>
-                      <Wallet size={15} /> Payment received
-                    </button>
-                    <button
-                      type="button"
-                      onClick={openSchedule}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 px-3.5 text-[13px] font-semibold text-slate-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-zinc-200 dark:hover:bg-white/5"
-                    >
-                      <CalendarDays size={14} /> Reschedule
-                    </button>
-                  </div>
-                )
-              ) : (
-                <p className={note}>Meet up, pay at the spot, and you&apos;re almost done.</p>
+              {!scheduling && (
+                <button
+                  type="button"
+                  onClick={() => setFinishing((v) => !v)}
+                  className="inline-flex min-h-[32px] items-center rounded-md px-1 text-[12.5px] font-semibold text-[var(--accent-text)] hover:underline"
+                >
+                  {finishing ? (isSeller ? "Back to scheduling" : "Back") : "Already met up? Finish the deal"}
+                </button>
               )}
             </div>
           )}
 
-          {/* PAYMENT_CONFIRMED */}
-          {status === "payment_confirmed" && (
+          {/* PICKUP_SCHEDULED / PAYMENT_CONFIRMED (legacy): finish at the meetup */}
+          {(status === "pickup_scheduled" || status === "payment_confirmed") && (
             <div className="mt-3 space-y-2.5">
-              {meta}
-              {!isSeller ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" disabled={busy} onClick={() => onReceived?.()} className={`${primary} flex-1`}>
-                    <Package size={15} /> I received the item
-                  </button>
-                  {paidChip}
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  {paidChip}
-                  <span className="text-[12.5px] text-slate-500 dark:text-zinc-400">Waiting for the buyer to confirm they got it.</span>
-                </div>
-              )}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {meta}
+                {status === "payment_confirmed" && paidChip}
+              </div>
+              {isSeller && scheduling ? scheduleForm : <HandoverPanel
+                  deal={deal}
+                  isSeller={isSeller}
+                  busy={busy}
+                  onRevealCode={onRevealCode}
+                  onVerifyCode={onVerifyCode}
+                  onMarkDone={onMarkDone}
+                  onClearDone={onClearDone}
+                  onNoShow={onNoShow}
+                  onReschedule={openSchedule}
+                />}
             </div>
           )}
 

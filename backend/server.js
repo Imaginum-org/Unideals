@@ -30,6 +30,7 @@ import { scheduleExpireSubscriptions } from "./src/jobs/expireSubscriptions.job.
 import { scheduleDispatchNotifications } from "./src/jobs/dispatchScheduledNotifications.job.js";
 import { scheduleEmailAlerts } from "./src/jobs/emailAlerts.job.js";
 import { scheduleSweepVoiceFiles } from "./src/jobs/sweepVoiceFiles.job.js";
+import { scheduleDealFollowups } from "./src/jobs/dealFollowups.job.js";
 import { startScheduledJobs } from "./src/jobs/jobRegistry.js";
 import { cloudinaryMissing } from "./src/utils/cloudinary.js";
 import { initSockets } from "./src/sockets/index.js";
@@ -55,6 +56,7 @@ const startServer = async () => {
     scheduleDispatchNotifications();
     scheduleEmailAlerts();
     scheduleSweepVoiceFiles();
+    scheduleDealFollowups();
     // Start every job defined above (records runs for the admin console).
     startScheduledJobs();
     // Plan-rank backfill for listings (search ranking perk); idempotent.
