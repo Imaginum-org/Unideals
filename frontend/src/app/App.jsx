@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "../components/ui/Toast.jsx";
 import NetworkStatusBanner from "../components/ui/NetworkStatusBanner.jsx";
 import PlanLimitDialog from "../components/ui/PlanLimitDialog.jsx";
+import RatingGate from "../features/user/components/RatingGate.jsx";
 import { toast } from "../components/ui/toast.js";
 import AppRoutes from "./routes.jsx";
 import usePrefetch from "./usePrefetch.js";
@@ -101,6 +102,7 @@ function App() {
       </NotificationProvider>
       <Toaster />
       <PlanLimitDialog />
+      <RatingGate />
       <NetworkStatusBanner />
     </div>
   );

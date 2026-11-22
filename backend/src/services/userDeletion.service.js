@@ -86,11 +86,11 @@ export const deleteUserPermanently = async ({ userId, actor, confirmEmail, reaso
   const deals = conversationIds.length ? await Deal.find({ conversation_id: { $in: conversationIds } }).select("_id").lean() : [];
   const dealIds = idsOf(deals);
 
-  // Sellers whose rating includes a review from (or about) this user.
+  // Other users whose rating includes a review from (or about) this user.
   const reviews = await Review.find({ $or: [{ buyer_id: uid }, { seller_id: uid }, ...(dealIds.length ? [{ deal_id: { $in: dealIds } }] : [])] })
-    .select("seller_id")
+    .select("seller_id buyer_id")
     .lean();
-  const sellersToRerate = [...new Set(reviews.map((r) => String(r.seller_id)).filter((id) => id !== String(uid)))];
+  const sellersToRerate = [...new Set(reviews.flatMap((r) => [String(r.seller_id), String(r.buyer_id)]).filter((id) => id !== String(uid)))];
 
   // Images are removed after the records, so "still used elsewhere" checks
   // don't count the rows being deleted.

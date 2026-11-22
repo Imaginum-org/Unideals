@@ -10,7 +10,7 @@ import { PRODUCT_CONDITION_OPTIONS } from "../../constants/productOptions.js";
  *   ?min=500&max=2000                 price (either side optional)
  *   ?posted=1|7|30                    posted within N days
  *   ?offers=0                         include fixed-price items too
- *                                     ("Open to offers" is ticked by default)
+ *                                     ("Open to negotiate" is ticked by default)
  *   ?sort=…                           page-specific sort keys
  *
  * `preserve` lists params a "Clear all" must keep (tab, q, category…).
@@ -103,7 +103,7 @@ export default function useBrowseFilters({ sortOptions, defaultSort, preserve = 
   };
 
   const hasPrice = minPrice != null || maxPrice != null;
-  // "Open to offers" is the default, so only the other filters count as active.
+  // "Open to negotiate" is the default, so only the other filters count as active.
   const activeCount = conditions.length + (hasPrice ? 1 : 0) + (posted ? 1 : 0);
 
   const priceLabel = hasPrice
@@ -126,7 +126,7 @@ export default function useBrowseFilters({ sortOptions, defaultSort, preserve = 
       label: POSTED_OPTIONS.find((p) => p.value === posted)?.label,
       onRemove: () => setPosted(""),
     },
-    offersOnly && { key: "offers", label: "Open to offers", onRemove: () => setOffersOnly(false) },
+    offersOnly && { key: "offers", label: "Open to negotiate", onRemove: () => setOffersOnly(false) },
   ].filter(Boolean);
 
   // API params (feed + search share the same names).

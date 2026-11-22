@@ -47,7 +47,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: "Can I negotiate the price?",
-        a: "Yes, if the seller marked the listing “Open to offers”. In chat, tap the ₹ button to send an offer. The seller can accept, decline or send a counter offer. Fixed-price listings don't accept offers.",
+        a: "Yes, if the seller marked the listing “Open to negotiate”. In chat, tap the ₹ button to send an offer. The seller can accept, decline or send a counter offer. Fixed-price listings don't accept offers.",
       },
       {
         q: "What does “Reserved” mean?",
@@ -98,7 +98,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: "How do I get more views on my listing?",
-        a: "Use a clear title (brand + model), 3 good photos in daylight, an honest description and a fair price. Listings open to offers get more chats. You can also boost a listing to show it near the top of the feed.",
+        a: "Use a clear title (brand + model), 3 good photos in daylight, an honest description and a fair price. Listings open to negotiation get more chats. You can also boost a listing to show it near the top of the feed.",
       },
     ],
   },

@@ -77,10 +77,11 @@ await test("can't rate before the deal is complete", async () => {
   await deals.confirmDeal({ conversationId: id, userId: S, amount: 800 });
   await assert.rejects(() => reviews.createReview({ conversationId: id, userId: Bu, rating: 5 }), /once the deal is complete/);
 });
-await test("only the buyer can rate, with 1-5 whole stars", async () => {
+await test("only the deal's buyer or seller can rate, with 1-5 whole stars", async () => {
   const id = await mkThread();
   await complete(id, 800);
-  await assert.rejects(() => reviews.createReview({ conversationId: id, userId: S, rating: 5 }), /Only the buyer/);
+  const stranger = await mkUser();
+  await assert.rejects(() => reviews.createReview({ conversationId: id, userId: String(stranger._id), rating: 5 }), /Only the buyer or seller/);
   await assert.rejects(() => reviews.createReview({ conversationId: id, userId: Bu, rating: 6 }), /1 to 5/);
   await assert.rejects(() => reviews.createReview({ conversationId: id, userId: Bu, rating: 4.5 }), /1 to 5/);
 });
@@ -151,6 +152,69 @@ await test("completed purchases count as buys, and locked badges report progress
   const hunter = g.locked_badges.find((l) => l.badge_id === "deal_hunter");
   assert.deepEqual(hunter.progress, { current: 3, required: 5 });
   assert.ok(!g.locked_badges.some((l) => l.badge_id === "first_buy"), "earned badges are not locked");
+});
+
+console.log("\nTwo-way ratings + popup queue");
+await test("both sides see a completed deal in their pending list until they rate", async () => {
+  const id = await mkThread();
+  await complete(id, 700);
+  const sp = await reviews.getPendingReviews(S);
+  const bp = await reviews.getPendingReviews(Bu);
+  const sItem = sp.find((x) => String(x.conversationId) === id);
+  const bItem = bp.find((x) => String(x.conversationId) === id);
+  assert.equal(sItem.role, "seller");
+  assert.equal(sItem.otherParty.name, buyer.name);
+  assert.equal(bItem.role, "buyer");
+  assert.equal(bItem.otherParty.name, seller.name);
+  // Buyer rates: gone from the buyer's list, still on the seller's.
+  await reviews.createReview({ conversationId: id, userId: Bu, rating: 5 });
+  assert.ok(!(await reviews.getPendingReviews(Bu)).some((x) => String(x.conversationId) === id));
+  assert.ok((await reviews.getPendingReviews(S)).some((x) => String(x.conversationId) === id));
+});
+await test("seller rates the buyer; the buyer's rating updates and the seller can't rate twice", async () => {
+  const before = (await User.findById(S).select("rating").lean()).rating;
+  const pending = await reviews.getPendingReviews(S);
+  for (const item of pending) await reviews.createReview({ conversationId: String(item.conversationId), userId: S, rating: 4 });
+  assert.equal((await reviews.getPendingReviews(S)).length, 0);
+  const bRating = (await User.findById(Bu).select("rating").lean()).rating;
+  assert.equal(bRating.count, pending.length);
+  assert.equal(bRating.avg, 4);
+  const sumB = await reviews.getRatingSummary(Bu);
+  assert.equal(sumB.recent[0].reviewer_role, "seller");
+  assert.equal(sumB.recent[0].reviewer.name, seller.name);
+  await assert.rejects(() => reviews.createReview({ conversationId: String(pending[0].conversationId), userId: S, rating: 5 }), /already rated/);
+  // Seller's own rating only counts ratings the seller received.
+  const after = (await User.findById(S).select("rating").lean()).rating;
+  assert.deepEqual(after, before, "rating the buyer doesn't change the seller's own rating");
+});
+await test("deals older than the window aren't asked about", async () => {
+  const id = await mkThread();
+  await complete(id, 600);
+  await Deal.updateOne({ conversation_id: id }, { $set: { completed_at: new Date(Date.now() - (reviews.PENDING_WINDOW_DAYS + 1) * 864e5) } });
+  assert.ok(!(await reviews.getPendingReviews(Bu)).some((x) => String(x.conversationId) === id));
+});
+await test("orders feed shows the seller's own rating of the buyer", async () => {
+  const { data: orders } = await getUserOrders({ userId: S, role: "selling", status: "completed" });
+  assert.ok(orders.some((o) => o.myRating === 4));
+});
+await test("legacy buyer reviews (no reviewer fields) count as the buyer's, and the old deal-only unique index heals", async () => {
+  const id = await mkThread();
+  await complete(id, 650);
+  const deal = await Deal.findOne({ conversation_id: id }).lean();
+  // Old schema: unique on deal_id alone, and no reviewer fields. (Clear the
+  // two-way rows first: the old index can't even be built over them.)
+  await Review.deleteMany({});
+  await Review.collection.createIndex({ deal_id: 1 }, { unique: true, name: "deal_id_1" });
+  await Review.collection.insertOne({
+    deal_id: deal._id, conversation_id: deal.conversation_id, seller_id: seller._id, buyer_id: buyer._id,
+    rating: 3, comment: "", product_title: "", createdAt: new Date(), updatedAt: new Date(),
+  });
+  assert.ok(!(await reviews.getPendingReviews(Bu)).some((x) => String(x.conversationId) === id), "legacy row = buyer already rated");
+  await assert.rejects(() => reviews.createReview({ conversationId: id, userId: Bu, rating: 5 }), /already rated/);
+  // Seller can still rate the buyer even though deal_id_1 exists.
+  await reviews.createReview({ conversationId: id, userId: S, rating: 5 });
+  const idx = await Review.collection.indexes();
+  assert.ok(!idx.some((i) => i.name === "deal_id_1"), "old index dropped");
 });
 
 await mongoose.disconnect();

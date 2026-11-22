@@ -831,14 +831,14 @@ const finalizeDeal = async ({ conversation, deal, method, actorId = null }) => {
     }).catch(() => {});
   } else if (method === "auto") {
     tell(conversation.buyer_id, `Your deal for "${title}" was completed automatically. Rate the seller from the chat.`);
-    tell(conversation.seller_id, `Your deal for "${title}" was completed automatically.`);
+    tell(conversation.seller_id, `Your deal for "${title}" was completed automatically. Rate the buyer to finish up.`);
   } else if (actorId) {
     const other = otherPartyOf(conversation, actorId);
     tell(
       other,
       String(other) === String(conversation.buyer_id)
         ? `Handover confirmed for "${title}". Enjoy it, and rate the seller from the chat.`
-        : `The buyer confirmed the deal for "${title}". Nice sale!`,
+        : `The buyer confirmed the deal for "${title}". Nice sale! Rate the buyer to finish up.`,
     );
   }
 

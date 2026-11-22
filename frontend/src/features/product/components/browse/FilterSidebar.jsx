@@ -291,7 +291,7 @@ export default function FilterSidebar({ filters, priceBounds, hideHeader = false
           className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left"
         >
           <span>
-            <span className="block text-[13.5px] text-slate-700 dark:text-zinc-200">Open to offers</span>
+            <span className="block text-[13.5px] text-slate-700 dark:text-zinc-200">Open to negotiate</span>
             <span className="block text-[12px] text-slate-400 dark:text-zinc-500">Sellers accepting a lower price</span>
           </span>
           <span

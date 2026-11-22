@@ -70,6 +70,22 @@ For when the code can't be used, for example no network or a flat phone.
 | `POST /api/conversations/:id/no-show` | either | After the meetup time: cancel and record the no-show |
 | `POST /api/conversations/:id/payment-confirm`, `/item-received` | seller / buyer | Old flow, kept for older app versions |
 
+## Ratings after a deal
+
+Once a deal completes (any way, including auto-complete), both sides must rate the other: the buyer rates the seller and the seller rates the buyer, 1–5 stars plus an optional comment.
+
+- **Popup:** `RatingGate` (mounted in `App.jsx`) shows a popup that can't be dismissed: no close button, no Escape, no backdrop tap. It opens the moment the deal completes (socket `conversation:updated` / `deal:updated` with status `completed`), on login, and on tab focus (at most once a minute). Several unrated deals are asked one after another. It stays out of the way on the auth, legal and phone-upload pages.
+- **Which deals:** `GET /api/reviews/pending` returns completed deals from the last 30 days (`PENDING_WINDOW_DAYS`) that the user hasn't rated, oldest first, 5 at a time. Deals whose other side deleted their account are skipped.
+- **Storage:** one `Review` per side per deal (`reviewer_id`, `reviewee_id`, `reviewer_role`; unique on `{ deal_id, reviewer_id }`). Reviews from before two-way ratings have no reviewer fields and count as buyer → seller.
+- **Shown rating:** `User.rating` `{ avg, count }` is every rating the user has received, as buyer and as seller. Cards, profiles and badges read it.
+- **Deploy:** run `npm run indexes` once so the old unique index on `deal_id` alone is dropped. If it hasn't been run, the first seller review drops that index itself and retries.
+
+| Method & path | Who | Does |
+|---|---|---|
+| `POST /api/reviews` `{ conversationId, rating, comment? }` | buyer or seller | Rate the other side of a completed deal, once |
+| `GET /api/reviews/pending` | signed in | Deals still waiting for my rating |
+| `GET /api/reviews/me`, `/api/reviews/user/:id` | signed in | Rating summary: average, count, distribution, latest reviews |
+
 ## Background job
 
 `deal-followups` runs every 15 minutes and appears in the admin console under Jobs. It handles auto-complete, follow-ups and expiry, in batches of 100.

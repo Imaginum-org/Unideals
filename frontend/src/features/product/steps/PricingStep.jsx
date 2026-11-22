@@ -244,10 +244,10 @@ const PricingStep = () => {
         <FormSection icon={Wallet} title="Payment" description="How buyers can pay you at pickup.">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[14px] font-semibold text-slate-900 dark:text-white">Open to offers</p>
+              <p className="text-[14px] font-semibold text-slate-900 dark:text-white">Open to negotiate</p>
               <p className="mt-0.5 text-[13px] text-slate-500 dark:text-zinc-400">Let buyers send you a price in chat.</p>
             </div>
-            <Switch checked={Boolean(formData.negotiable)} onChange={(v) => updateField("negotiable", v)} label="Open to offers" />
+            <Switch checked={Boolean(formData.negotiable)} onChange={(v) => updateField("negotiable", v)} label="Open to negotiate" />
           </div>
           <div className="mt-2 min-h-[20px]" aria-live="polite">
             <AnimatePresence mode="wait" initial={false}>
@@ -267,7 +267,7 @@ const PricingStep = () => {
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 )}
                 {formData.negotiable
-                  ? "Listings open to offers usually get more chats."
+                  ? "Listings open to negotiation usually get more chats."
                   : "Fixed price: fewer buyers reach out, but no haggling."}
               </motion.p>
             </AnimatePresence>

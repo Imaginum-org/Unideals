@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, CheckCircle2, ChevronRight, MapPin, MessageSquareText, XCircle } from "lucide-react";
 import { ORDER_STEPS, dealStatusToStep, dealStatusBadge } from "../../chat/utils/dealStage.js";
@@ -9,6 +9,7 @@ import { productPath } from "../../../utils/productPath.js";
 import { CARD, FLUSH_ON_PHONE, btnDanger, btnSecondary } from "./account/AccountKit.jsx";
 import { cn } from "../../../utils/cn.js";
 import RateSellerDialog, { Star, StarRow } from "./RateSellerDialog.jsx";
+import { DEAL_RATED_EVENT } from "./RatingGate.jsx";
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
@@ -30,6 +31,15 @@ const OrderDealCard = ({ order, onChanged }) => {
   const isCompleted = status === "completed";
   const isActive = step >= 1 && step <= 3;
   const buying = order?.role === "buying";
+
+  // Rated from the post-deal popup while this page was open.
+  useEffect(() => {
+    const onRated = (e) => {
+      if (e.detail?.conversationId === String(order?.conversationId)) setMyRating(e.detail.rating);
+    };
+    window.addEventListener(DEAL_RATED_EVENT, onRated);
+    return () => window.removeEventListener(DEAL_RATED_EVENT, onRated);
+  }, [order?.conversationId]);
 
   const product = order?.product || {};
   const rawImage = product?.images?.[0]?.url || product?.images?.[0];
@@ -171,14 +181,14 @@ const OrderDealCard = ({ order, onChanged }) => {
             Completed
           </span>
         )}
-        {isCompleted && buying && (myRating ? (
+        {isCompleted && (myRating ? (
           <span className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-500 dark:text-zinc-400">
             You rated <StarRow value={myRating} size="h-3.5 w-3.5" />
           </span>
         ) : (
           <button type="button" onClick={() => setRateOpen(true)} className={btnSecondary}>
             <Star filled className="h-4 w-4 text-amber-400" />
-            Rate seller
+            {buying ? "Rate seller" : "Rate buyer"}
           </button>
         ))}
         {product?._id && (
@@ -196,7 +206,8 @@ const OrderDealCard = ({ order, onChanged }) => {
         open={rateOpen}
         onClose={() => setRateOpen(false)}
         conversationId={order?.conversationId}
-        sellerName={otherName}
+        otherName={otherName}
+        otherRole={buying ? "seller" : "buyer"}
         productTitle={product?.title}
         onRated={(n) => {
           setMyRating(n);

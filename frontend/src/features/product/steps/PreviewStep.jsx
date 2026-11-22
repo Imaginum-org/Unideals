@@ -416,7 +416,7 @@ const PreviewStep = () => {
               )}
             </div>
             <p className="mt-1 text-[12.5px] text-slate-500 dark:text-zinc-400">
-              {formData.negotiable ? "Open to offers" : "Fixed price"}
+              {formData.negotiable ? "Open to negotiate" : "Fixed price"}
               {paymentLabel && <> · {paymentLabel}</>}
             </p>
 
