@@ -33,6 +33,15 @@ const userSchema = new Schema(
       minlength: [8, "Password must be at least 8 characters"],
     },
 
+    // false = the account only has the random password made at Google
+    // sign-up, so the user can't sign in with email + password (or confirm
+    // account deletion) until they set one. true once they sign up with a
+    // password, reset it, or sign in with it. Missing on older accounts =
+    // unknown (they predate this flag).
+    password_set: {
+      type: Boolean,
+    },
+
     avatar: {
       _id: false,
       url: {
@@ -410,6 +419,15 @@ const userSchema = new Schema(
 );
 
 userSchema.index({ status: 1 });
+// Admin user list (newest first) and sign-up counts by date.
+userSchema.index({ role: 1, createdAt: -1 });
+// Hourly attention count of pending gender requests: only pending rows.
+userSchema.index(
+  { "genderChangeRequest.status": 1 },
+  { partialFilterExpression: { "genderChangeRequest.status": "pending" } },
+);
+// Daily digest budget: users emailed recently (null = never, not indexed).
+userSchema.index({ email_digest_sent_at: 1 }, { partialFilterExpression: { email_digest_sent_at: { $type: "date" } } });
 // Campus leaderboard: top XP on one campus, sorted by the index.
 userSchema.index({ campus_id: 1, "gamification.total_xp": -1 });
 

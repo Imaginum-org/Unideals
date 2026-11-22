@@ -5,7 +5,9 @@ import Message from "../models/message.model.js";
 import Report from "../models/Report.model.js";
 import ChatCooldown from "../models/ChatCooldown.model.js";
 import User from "../models/User.model.js";
-import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS } from "../config/constants.js";
+import { MESSAGE_TYPE, MESSAGE_STATUS, REPORT_REASONS, REPORT_STATUS, VOICE_LIMITS, CHAT_IMAGE_LIMITS, MESSAGE_REACTIONS } from "../config/constants.js";
+import { chatImageUrl, cloudinaryConfigured, isOwnChatImage, verifyUploadResponse } from "../utils/cloudinary.js";
+import { getFileDetails, isInVoiceFolderOf, isValidFileId } from "../utils/imagekit.js";
 import { AppError } from "../utils/appError.js";
 import { emitToConversation, emitToUser } from "../utils/socket.js";
 import { screenText, BLOCKED_PLACEHOLDER } from "../utils/profanity.js";
@@ -280,17 +282,260 @@ export const sendTextMessage = async ({ conversationId, senderId, text, replyTo 
   return payload;
 };
 
+// Quote target must be a non-system message inside THIS conversation.
+const resolveReplyTo = async (conversation, replyTo) => {
+  if (!replyTo) return null;
+  if (!mongoose.Types.ObjectId.isValid(replyTo)) throw new AppError("Invalid reply reference", 400);
+  const quoted = await Message.findById(replyTo).select("conversation_id message_type").lean();
+  if (!quoted || String(quoted.conversation_id) !== String(conversation._id)) {
+    throw new AppError("Replied message not found in this chat", 400);
+  }
+  if (quoted.message_type === MESSAGE_TYPE.SYSTEM) throw new AppError("Cannot reply to system messages", 400);
+  return quoted._id;
+};
+
+// Shared tail of every user send: preview + unread bump, realtime, push.
+const publishSent = async ({ conversation, message, senderId, receiverId, preview, type }) => {
+  const activityAt = new Date();
+  const unreadSide = String(conversation.buyer_id) === String(receiverId) ? "buyer" : "seller";
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    {
+      $set: {
+        last_message: preview,
+        last_message_type: type,
+        last_message_sender: senderId,
+        last_activity_at: activityAt,
+      },
+      $inc: { [`unread_count.${unreadSide}`]: 1 },
+    },
+  );
+  const [payload] = await attachReplies([toClientMessage(message)]);
+  emitToConversation(conversation._id, "message:new", payload);
+  emitToUser(receiverId, "conversation:updated", {
+    conversationId: String(conversation._id),
+    last_message: preview,
+    last_activity_at: activityAt,
+  });
+  try {
+    const sender = await loadAuthUser(User, senderId);
+    notifyNewMessage({
+      conversationId: conversation._id,
+      senderId,
+      receiverId,
+      senderName: sender?.name || "A user",
+      textSnippet: preview,
+    });
+  } catch {
+    // never break sending if notification fails
+  }
+  return payload;
+};
+
+/**
+ * Chat photo (Cloudinary). The browser uploaded with a server-signed,
+ * server-chosen public_id in the sender's own folder; here we only verify
+ * Cloudinary's response signature locally (no Admin API call), so a client
+ * can't invent or borrow an image. Caption goes through the same abuse
+ * screen as text. Rate limits live on the route.
+ */
+export const sendImageMessage = async ({ conversationId, senderId, publicId, version, signature, width = 0, height = 0, caption = "", replyTo = null }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) throw new AppError("Invalid conversation ID", 400);
+  if (!cloudinaryConfigured()) throw new AppError("Photo sharing isn't available right now", 503);
+  const ver = Number(version);
+  if (!isOwnChatImage(publicId, senderId) || !Number.isInteger(ver) || ver <= 0) {
+    throw new AppError("Invalid photo", 400);
+  }
+  if (!verifyUploadResponse({ publicId, version: ver, signature })) throw new AppError("Invalid photo", 403);
+  const cleanCaption = String(caption || "").trim().slice(0, CHAT_IMAGE_LIMITS.MAX_CAPTION);
+
+  await assertNotCoolingDown(senderId);
+
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation || !conversation.is_active) throw new AppError("Conversation not found", 404);
+  assertParticipant(conversation, senderId);
+  const receiverId = otherPartyOf(conversation, senderId);
+  const replyToId = await resolveReplyTo(conversation, replyTo);
+
+  const screen = cleanCaption ? screenText(cleanCaption) : { flagged: false };
+  const dim = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
+  let message;
+  try {
+    message = await Message.create({
+      conversation_id: conversation._id,
+      sender_id: senderId,
+      receiver_id: receiverId,
+      message_type: MESSAGE_TYPE.IMAGE,
+      text: cleanCaption,
+      message_status: MESSAGE_STATUS.SENT,
+      reply_to: replyToId,
+      image: { url: chatImageUrl(publicId, ver), public_id: publicId, version: ver, width: dim(width), height: dim(height) },
+      ...(screen.flagged
+        ? { is_flagged: true, flag_reason: screen.matched || "inappropriate_content", flagged_at: new Date() }
+        : {}),
+    });
+  } catch (err) {
+    if (err?.code === 11000) throw new AppError("This photo was already sent", 409);
+    throw err;
+  }
+  if (screen.flagged) {
+    fileAutoReport({ conversation, senderId, receiverId, excerpt: cleanCaption });
+    try {
+      await registerStrike(senderId);
+    } catch {
+      // ignore
+    }
+  }
+
+  const preview = screen.flagged
+    ? BLOCKED_PLACEHOLDER
+    : cleanCaption
+      ? `📷 ${cleanCaption.slice(0, 480)}`
+      : "📷 Photo";
+  return publishSent({ conversation, message, senderId, receiverId, preview, type: MESSAGE_TYPE.IMAGE });
+};
+
+/**
+ * React to a message (or clear your reaction with emoji = null).
+ * One conversation read (participant check) + ONE atomic pipeline update
+ * that drops this user's old reaction and appends the new one, so rapid
+ * taps or both people reacting at once can never duplicate or lose
+ * entries. The filter also pins the message to this conversation and
+ * skips system/flagged messages. Broadcast is the small new array only.
+ */
+export const setReaction = async ({ conversationId, messageId, userId, emoji = null }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+    throw new AppError("Invalid message", 400);
+  }
+  if (emoji !== null && !MESSAGE_REACTIONS.includes(emoji)) throw new AppError("Unsupported reaction", 400);
+
+  const conversation = await Conversation.findById(conversationId).select("buyer_id seller_id").lean();
+  if (!conversation) throw new AppError("Conversation not found", 404);
+  assertParticipant(conversation, userId);
+
+  const me = new mongoose.Types.ObjectId(String(userId));
+  const others = { $filter: { input: { $ifNull: ["$reactions", []] }, cond: { $ne: ["$$this.user_id", me] } } };
+  const updated = await Message.findOneAndUpdate(
+    {
+      _id: messageId,
+      conversation_id: conversation._id,
+      message_type: { $ne: MESSAGE_TYPE.SYSTEM },
+      is_flagged: { $ne: true },
+    },
+    [{ $set: { reactions: emoji ? { $concatArrays: [others, [{ user_id: me, emoji }]] } : others } }],
+    { returnDocument: "after", updatePipeline: true, projection: { reactions: 1 } },
+  ).lean();
+  if (!updated) throw new AppError("Message not found", 404);
+
+  const reactions = updated.reactions || [];
+  emitToConversation(conversation._id, "message:reaction", {
+    conversationId: String(conversation._id),
+    messageId: String(messageId),
+    reactions,
+  });
+  return reactions;
+};
+
+const fmtClock = (ms) => {
+  const s = Math.max(1, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+// ImageKit may label a WebM/MP4 audio-only file as video/*.
+const VOICE_MIME_RE = /^(audio\/[a-z0-9.+-]+|video\/(webm|mp4))$/i;
+
+/**
+ * Voice note. The client records, uploads straight to ImageKit (signed,
+ * into its own /voice folder, tag "voice"), then sends only the fileId.
+ * Nothing about the file is trusted from the client: owner folder, size,
+ * type and URL come from ImageKit's record (one API call), and the
+ * partial-unique index on audio.file_id stops a file being sent twice.
+ * Bandwidth never touches this server. Rate limits live on the route
+ * (per account, minute/hour/day) on top of the shared abuse cooldown.
+ */
+export const sendVoiceMessage = async ({ conversationId, senderId, fileId, durationMs, peaks = [], replyTo = null }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw new AppError("Invalid conversation ID", 400);
+  }
+  if (!isValidFileId(fileId)) throw new AppError("Invalid voice note", 400);
+  const duration = Math.round(Number(durationMs));
+  if (!Number.isFinite(duration) || duration < VOICE_LIMITS.MIN_DURATION_MS) {
+    throw new AppError("Voice note is too short", 400);
+  }
+  if (duration > VOICE_LIMITS.MAX_DURATION_MS + 1500) {
+    throw new AppError("Voice notes can be up to 2 minutes", 400);
+  }
+
+  await assertNotCoolingDown(senderId);
+
+  // Cheap DB checks before the external call.
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation || !conversation.is_active) {
+    throw new AppError("Conversation not found", 404);
+  }
+  assertParticipant(conversation, senderId);
+  const receiverId = otherPartyOf(conversation, senderId);
+  if (await Message.exists({ "audio.file_id": fileId })) {
+    throw new AppError("This voice note was already sent", 409);
+  }
+
+  const replyToId = await resolveReplyTo(conversation, replyTo);
+
+  let file;
+  try {
+    file = await getFileDetails(fileId);
+  } catch {
+    throw new AppError("Voice note upload not found. Please record it again.", 400);
+  }
+  const endpoint = String(process.env.IMAGEKIT_URL_ENDPOINT || "").replace(/\/+$/, "");
+  if (!isInVoiceFolderOf(file?.filePath, senderId)) throw new AppError("Invalid voice note", 403);
+  if (!(Number(file?.size) > 0) || Number(file.size) > VOICE_LIMITS.MAX_BYTES) {
+    throw new AppError("Voice note is too large", 413);
+  }
+  if (file?.mime && !VOICE_MIME_RE.test(file.mime)) throw new AppError("Unsupported audio format", 415);
+  if (!endpoint || !String(file?.url || "").startsWith(`${endpoint}/`)) throw new AppError("Invalid voice note", 400);
+
+  // Waveform: at most PEAKS bars, each an integer 0–100.
+  const cleanPeaks = (Array.isArray(peaks) ? peaks : [])
+    .slice(0, VOICE_LIMITS.PEAKS)
+    .map((v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0))));
+
+  let message;
+  try {
+    message = await Message.create({
+      conversation_id: conversation._id,
+      sender_id: senderId,
+      receiver_id: receiverId,
+      message_type: MESSAGE_TYPE.AUDIO,
+      text: "Voice message",
+      message_status: MESSAGE_STATUS.SENT,
+      reply_to: replyToId,
+      audio: {
+        url: file.url,
+        file_id: fileId,
+        duration_ms: Math.min(duration, VOICE_LIMITS.MAX_DURATION_MS),
+        mime: file.mime || "",
+        size: Number(file.size) || 0,
+        peaks: cleanPeaks,
+      },
+    });
+  } catch (err) {
+    if (err?.code === 11000) throw new AppError("This voice note was already sent", 409);
+    throw err;
+  }
+
+  const preview = `🎤 Voice message (${fmtClock(message.audio.duration_ms)})`;
+  return publishSent({ conversation, message, senderId, receiverId, preview, type: MESSAGE_TYPE.AUDIO });
+};
+
 /**
  * Paginated messages, oldest -> newest for rendering.
  * `before` = ObjectId cursor; loads older messages.
  */
-export const getMessages = async ({ conversationId, userId, limit = 50, before = null }) => {
+export const getMessages = async ({ conversationId, userId, limit = 50, before = null, after = null }) => {
   if (!mongoose.Types.ObjectId.isValid(conversationId)) {
     throw new AppError("Invalid conversation ID", 400);
   }
-  const conversation = await Conversation.findById(conversationId).select(
-    "buyer_id seller_id",
-  );
+  const conversation = await Conversation.findById(conversationId).select("buyer_id seller_id").lean();
   if (!conversation) throw new AppError("Conversation not found", 404);
   assertParticipant(conversation, userId);
 
@@ -303,12 +548,24 @@ export const getMessages = async ({ conversationId, userId, limit = 50, before =
       throw new AppError("Invalid message cursor", 400);
     }
     filter._id = { $lt: new mongoose.Types.ObjectId(before) };
+  } else if (after) {
+    // Incremental catch-up (safety-net polls, post-action refresh): only
+    // messages newer than the client's last one. Usually zero rows, so the
+    // reply/receipt work below is skipped too.
+    if (!mongoose.Types.ObjectId.isValid(after)) {
+      throw new AppError("Invalid message cursor", 400);
+    }
+    filter._id = { $gt: new mongoose.Types.ObjectId(after) };
   }
 
   const docs = await Message.find(filter)
-    .sort({ _id: -1 })
+    .sort({ _id: after && !before ? 1 : -1 })
     .limit(lim)
     .lean();
+  if (after && !before) {
+    docs.reverse(); // keep the newest-first shape the code below expects
+    if (!docs.length) return { messages: [], hasMore: false };
+  }
   // Mask flagged originals, clients never see abusive text, moderators do.
   let ordered = docs.reverse().map((m) =>
     m.is_flagged ? { ...m, text: BLOCKED_PLACEHOLDER } : m,
@@ -372,13 +629,16 @@ export const markConversationRead = async ({ conversationId, userId, receipt = t
   if (!mongoose.Types.ObjectId.isValid(conversationId)) {
     throw new AppError("Invalid conversation ID", 400);
   }
-  const conversation = await Conversation.findById(conversationId);
+  const conversation = await Conversation.findById(conversationId)
+    .select("buyer_id seller_id unread_count")
+    .lean();
   if (!conversation) throw new AppError("Conversation not found", 404);
   assertParticipant(conversation, userId);
 
   const now = new Date();
   const target = receipt === false ? MESSAGE_STATUS.DELIVERED : MESSAGE_STATUS.READ;
-  await Message.updateMany(
+  const side = String(conversation.buyer_id) === String(userId) ? "buyer" : "seller";
+  const res = await Message.updateMany(
     {
       conversation_id: conversation._id,
       receiver_id: userId,
@@ -387,14 +647,15 @@ export const markConversationRead = async ({ conversationId, userId, receipt = t
     { $set: { message_status: target, delivered_at: now, ...(receipt === false ? {} : { read_at: now }) } },
   );
 
-  if (String(conversation.buyer_id) === String(userId)) {
-    conversation.unread_count.buyer = 0;
-  } else {
-    conversation.unread_count.seller = 0;
+  // One atomic write, and only when there is something to clear (opening a
+  // thread that's already read costs a single indexed updateMany, no save).
+  if ((conversation.unread_count?.[side] || 0) !== 0) {
+    await Conversation.updateOne({ _id: conversation._id }, { $set: { [`unread_count.${side}`]: 0 } });
+    conversation.unread_count = { ...(conversation.unread_count || {}), [side]: 0 };
   }
-  await conversation.save();
 
-  if (receipt !== false) {
+  // Nothing changed: no broadcast (the peer would only re-render).
+  if (receipt !== false && res.modifiedCount > 0) {
     emitToConversation(conversation._id, "message:read", {
       conversationId: String(conversation._id),
       readBy: String(userId),

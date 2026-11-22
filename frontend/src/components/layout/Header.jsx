@@ -38,6 +38,7 @@ import { publishChatUnread, useChatUnread } from "../../services/chatUnread.js";
 import { timeAgo } from "../../features/chat/components/ConversationCard.jsx";
 import { avatarUrl, formatName } from "../../features/chat/utils/display.js";
 import { levelProgress, rankName, RANK_CONFIG, xpToNextLevel } from "../../utils/badgeConfig.js";
+import RankEmblem from "../../features/user/components/RankEmblem.jsx";
 import { useNotification } from "../../context/NotificationContext.jsx";
 import {
   formatNotificationTime,
@@ -186,7 +187,6 @@ const ProfileDropdown = ({
         const xpToNext = g.xp_to_next_level ?? xpToNextLevel(totalXp);
         const badgeCount = (g.badges || []).length;
         const rankColor = rankMeta.color;
-        const rankIcon = rankMeta.icon;
         return (
           <Link
             to="/achievements"
@@ -195,7 +195,7 @@ const ProfileDropdown = ({
           >
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
-                <span className="text-base leading-none">{rankIcon}</span>
+                <RankEmblem title={rankKey} color={rankColor} size={20} className="shrink-0" />
                 <span className="text-[12px] font-extrabold" style={{ color: rankColor }}>{rank}</span>
                 <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-neutral-100 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-300">
                   Lv. {level}

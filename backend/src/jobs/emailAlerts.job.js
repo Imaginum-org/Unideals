@@ -2,7 +2,7 @@ import { defineJob } from "./jobRegistry.js";
 import { sendStaffAttentionAlerts, sendUnreadDigests } from "../services/emailAlerts.service.js";
 
 // Both no-op unless EMAIL_ALERTS_ENABLED=true (see emailAlerts.service.js).
-// Cron times are in the server's timezone; hosts usually run UTC.
+// Cron times are UTC (JOBS_TIMEZONE in jobRegistry.js).
 export const scheduleEmailAlerts = () => {
   defineJob({
     key: "email-unread-digest",

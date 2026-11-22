@@ -43,11 +43,11 @@ export const FAQ_CATEGORIES = [
     questions: [
       {
         q: "How do I buy something?",
-        a: "Open the listing and tap “Chat with seller”. Ask your questions, agree on a price, and the seller confirms the deal. Then you meet on campus, check the item and pay at pickup.",
+        a: "Open the listing and tap “Chat with seller”. Ask your questions, agree on a price, and the seller confirms the deal. Then you meet on campus, check the item, pay, and show the seller your handover code to finish the deal.",
       },
       {
         q: "Can I negotiate the price?",
-        a: "Yes, if the seller marked the listing “Open to offers”. In chat, tap the ₹ button to send an offer. The seller can accept, decline or send a counter offer. Fixed-price listings don't accept offers.",
+        a: "Yes, if the seller marked the listing “Open to negotiate”. In chat, tap the ₹ button to send an offer. The seller can accept, decline or send a counter offer. Fixed-price listings don't accept offers.",
       },
       {
         q: "What does “Reserved” mean?",
@@ -63,7 +63,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: "Can I return an item after buying it?",
-        a: "There's no platform return system, because deals happen directly between students. Always inspect the item before you pay. Once you mark an item as received, the deal is complete.",
+        a: "There's no platform return system, because deals happen directly between students. Always inspect the item before you pay. Once you share your handover code (or both of you confirm the deal), it's complete.",
       },
     ],
   },
@@ -98,7 +98,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: "How do I get more views on my listing?",
-        a: "Use a clear title (brand + model), 3 good photos in daylight, an honest description and a fair price. Listings open to offers get more chats. You can also boost a listing to show it near the top of the feed.",
+        a: "Use a clear title (brand + model), 3 good photos in daylight, an honest description and a fair price. Listings open to negotiation get more chats. You can also boost a listing to show it near the top of the feed.",
       },
     ],
   },
@@ -109,7 +109,19 @@ export const FAQ_CATEGORIES = [
     questions: [
       {
         q: "What are the steps of a deal?",
-        a: "1) Agree on a price in chat. 2) The seller confirms the deal, which reserves the item for you. 3) The seller sets a pickup time and place. 4) You meet, pay, and the seller confirms payment. 5) You confirm you received the item, and the deal is complete.",
+        a: "1) Agree on a price in chat. 2) The seller confirms the deal, which reserves the item for you. 3) The seller sets the pickup day, place and (optionally) time. 4) You meet, check the item and pay. 5) The buyer shows their 4-digit handover code and the seller enters it. The deal is complete.",
+      },
+      {
+        q: "What is the handover code?",
+        a: "A 4-digit code the buyer sees in the deal card (tap “Show handover code”). Buyers: show it only after you've checked the item and paid, and never send it in chat. Sellers: enter it once you have the money. A correct code completes the deal in one step.",
+      },
+      {
+        q: "What if we can't use the code?",
+        a: "Either of you can tap “Can't use the code? Mark as done”. The other person confirms it (the deal completes) or taps “There's a problem”. If they don't reply within 48 hours, the deal completes automatically.",
+      },
+      {
+        q: "What if the other person doesn't show up?",
+        a: "Once the meetup time has passed, the deal card shows “didn't show up”. Tapping it twice cancels the deal and frees the item. The seller can also reschedule instead. If nobody finishes the deal, the reservation ends on its own about a week after the meetup.",
       },
       {
         q: "How do I pay the seller?",
@@ -121,7 +133,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: "Can a deal step be undone?",
-        a: "Yes, sellers can undo one step at a time from the deal card in chat: release a reservation, clear a pickup plan, or mark a payment as not received. Completed deals are final.",
+        a: "Yes, sellers can undo one step at a time from the deal card in chat: release a reservation or clear a pickup plan. Rescheduling keeps the same handover code. Completed deals are final.",
       },
       {
         q: "How do I cancel a deal?",

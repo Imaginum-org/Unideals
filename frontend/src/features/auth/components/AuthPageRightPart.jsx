@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import ThemeToggle from "../../../components/ui/ThemeToggle.jsx";
 import AuthPanelShape from "/auth_page_left_side.webp";
-import HomepagePreview from "/auth_left_card_image.webp";
+import AuthShowcase from "./AuthShowcase.jsx";
 
 function AuthPageRightPart() {
   return (
@@ -68,9 +68,9 @@ function AuthPageRightPart() {
               gap-[clamp(1.5rem,4vh,4rem)] /* <-- ADDED: Gap shrinks automatically on short screens! */
               max-w-[min(22rem,90%)]
               md:max-w-[min(24rem,88%)]
-              lg:max-w-[min(26rem,82%)]
-              xl:max-w-[min(26rem,78%)]
-              2xl:max-w-[min(32rem,72%)]
+              lg:max-w-[min(28rem,84%)]
+              xl:max-w-[min(30rem,80%)]
+              2xl:max-w-[min(34rem,72%)]
               3xl:max-w-[min(40rem,55vw)]
             "
           >
@@ -103,59 +103,9 @@ function AuthPageRightPart() {
               </p>
             </section>
 
-            {/* ── Preview card ── */}
-            <section
-              className="
-                w-full shrink-0 
-                rounded-2xl bg-[#F7F8FA]
-                p-[0.6rem]
-                md:p-[0.75rem]
-                shadow-[0_1.25rem_3.75rem_rgba(18,18,120,0.22)]
-              "
-            >
-              {/* Screenshot */}
-              <div className="overflow-hidden rounded-lg border border-zinc-200 shadow-[inset_0_-0.125rem_1rem_rgba(56,56,236,0.25)]">
-                <div
-                  className="relative w-full"
-                  style={{ paddingBottom: "53.2%" }}
-                >
-                  <img
-                    src={HomepagePreview}
-                    alt="Unideals marketplace preview"
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
-                </div>
-              </div>
-
-              {/* Card footer */}
-              <div className="pt-2 pb-1 pl-1 font-figtree md:pt-3">
-                <h3
-                  className="
-                    font-semibold leading-tight text-black
-                    text-[0.9rem]
-                    md:text-[1rem]
-                    lg:text-[1.1rem]
-                    xl:text-[1.2rem]
-                    2xl:text-[1.3rem]
-                    3xl:text-[1.45rem]
-                  "
-                >
-                  CampusMart
-                </h3>
-                <p
-                  className="
-                    mt-0.5 leading-snug text-neutral-400
-                    text-[0.72rem]
-                    md:text-[0.78rem]
-                    lg:text-[0.82rem]
-                    xl:text-[0.88rem]
-                    2xl:text-[0.95rem]
-                    3xl:text-[1.05rem]
-                  "
-                >
-                  Everything students need. Buy. Sell. Repeat.
-                </p>
-              </div>
+            {/* ── Live product preview (was a static screenshot) ── */}
+            <section className="w-full shrink-0">
+              <AuthShowcase />
             </section>
           </div>
         </div>

@@ -458,6 +458,13 @@ export const deleteConversation = async ({ conversationId, userId }) => {
 
   await conversation.save();
 
+  // Both sides gone: nobody can reach its voice notes / photos any more, free them.
+  if (conversation.deleted_for?.buyer && conversation.deleted_for?.seller) {
+    import("./voiceCleanup.service.js")
+      .then((m) => Promise.allSettled([m.deleteConversationVoiceFiles(conversation._id), m.deleteConversationImages(conversation._id)]))
+      .catch(() => {});
+  }
+
   return conversation;
 };
 

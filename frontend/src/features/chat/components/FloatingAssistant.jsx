@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -308,9 +308,9 @@ const WelcomeHero = ({ name, onPick }) => (
           key={title}
           type="button"
           onClick={() => onPick(prompt)}
-          className="group flex flex-col items-start gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-[0_10px_24px_-14px_rgba(79,70,229,.5)] dark:border-zinc-800 dark:bg-[#1B1D22] dark:hover:border-indigo-500/50"
+          className="group flex flex-col items-start gap-2.5 rounded-xl border border-slate-200/80 bg-white p-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-[#4A4DFE]/40 hover:shadow-[0_8px_20px_-12px_rgba(74,77,254,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4A4DFE]/40 dark:border-zinc-800 dark:bg-[#1B1D22] dark:hover:border-[#4A4DFE]/50"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-50 to-sky-50 text-indigo-600 transition group-hover:from-indigo-500 group-hover:to-sky-500 group-hover:text-white dark:from-indigo-500/15 dark:to-sky-500/10 dark:text-indigo-300">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF0FF] text-[#4A4DFE] ring-1 ring-inset ring-[#4A4DFE]/10 transition group-hover:bg-[#4A4DFE] group-hover:text-white dark:bg-[#4A4DFE]/15 dark:text-indigo-300">
             <Icon className="h-4 w-4" />
           </span>
           <span>
@@ -336,7 +336,7 @@ const WelcomeHero = ({ name, onPick }) => (
   </div>
 );
 
-/* ── Thought cloud above the launcher ──
+/* ── Nudge card above the launcher ──
    "Thinks" (animated dots), then types a short line, and cycles through a few
    prompts before settling on "Ask me anything". Click opens the assistant;
    the × hides it for the rest of the session. */
@@ -365,70 +365,15 @@ const ThinkingDots = () => (
   </span>
 );
 
-// Cloud geometry. The cloud is a union of circles over a body rect, drawn
-// twice: first with a stroke (only its outer edge stays visible), then
-// filled on top, so it gets one clean rim. Width follows the longest line.
-// Geometry is in viewBox units; CLOUD_SCALE shrinks it on screen.
-const CLOUD_H = 90;
-const CLOUD_MIN_W = 176;
-const CLOUD_SCALE = 0.8;
-const cloudShapes = (w) => {
-  const bigR = Math.min(29, 25 + (w - CLOUD_MIN_W) * 0.04);
-  return {
-    rect: { x: 30, y: 38, width: w - 60, height: 44 },
-    circles: [
-      // top puffs: small, big, medium
-      { cx: w * 0.29, cy: 43, r: 19 },
-      { cx: w * 0.5, cy: 35, r: bigR },
-      { cx: w * 0.72, cy: 42, r: 21 },
-      // round ends
-      { cx: 30, cy: 60, r: 24 },
-      { cx: w - 30, cy: 61, r: 23 },
-      // gently scalloped base
-      { cx: w * 0.3, cy: 70, r: 18 },
-      { cx: w * 0.5, cy: 72, r: 18 },
-      { cx: w * 0.7, cy: 70, r: 18 },
-    ],
-  };
-};
 
-const CloudShapes = ({ shapes, ...props }) => (
-  <g {...props}>
-    <rect {...shapes.rect} />
-    {shapes.circles.map((c) => (
-      <circle key={`${c.cx}-${c.cy}`} {...c} />
-    ))}
-  </g>
-);
-
-const SPARKLE_PATH = "M5 0c.5 2.6 1.6 3.7 4.2 4.2C6.6 4.7 5.5 5.8 5 8.4 4.5 5.8 3.4 4.7.8 4.2 3.4 3.7 4.5 2.6 5 0z";
-
+// Launcher nudge: a compact popover card (avatar, name, one typed line)
+// anchored to the launcher by a small caret. Fixed width, so it never
+// grows or jumps while a line is typed.
 const ThoughtCloud = ({ lines, reducedMotion, onOpen, onDismiss }) => {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState(reducedMotion ? "shown" : "thinking");
   const [chars, setChars] = useState(0);
-  const [textWidth, setTextWidth] = useState(140);
-  const sizerRef = useRef(null);
-  const uid = useId().replace(/:/g, "");
   const linesKey = lines.join("|");
-
-  // Size the cloud to the longest line once, so it doesn't grow while typing.
-  useLayoutEffect(() => {
-    const el = sizerRef.current;
-    if (!el) return undefined;
-    const measure = () => setTextWidth(Math.ceil(el.getBoundingClientRect().width));
-    measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    observer?.observe(el); // re-measure once the web font loads
-    return () => observer?.disconnect();
-  }, [linesKey]);
-
-  // On-screen size; the shapes are drawn at 1/CLOUD_SCALE of it.
-  const width = Math.round(Math.max(CLOUD_MIN_W * CLOUD_SCALE, textWidth + 58));
-  const height = Math.round(CLOUD_H * CLOUD_SCALE);
-  const viewW = width / CLOUD_SCALE;
-  const shapes = cloudShapes(viewW);
-  const bigPuff = shapes.circles[1];
   const isLast = index >= lines.length - 1;
   const line = lines[Math.min(index, lines.length - 1)] || "";
 
@@ -460,84 +405,41 @@ const ThoughtCloud = ({ lines, reducedMotion, onOpen, onDismiss }) => {
 
   const text = phase === "shown" || reducedMotion ? line : line.slice(0, chars);
 
-  // Shared paint: a soft top-to-bottom gradient and a hairline rim.
-  const fill = `url(#${uid}-fill)`;
-  const rim = "[stroke:rgba(74,77,254,0.16)] dark:[stroke:rgba(255,255,255,0.09)]";
-  const shadow =
-    "[filter:drop-shadow(0_12px_20px_rgba(74,77,254,0.2))_drop-shadow(0_2px_3px_rgba(15,23,42,0.07))] dark:[filter:drop-shadow(0_12px_22px_rgba(0,0,0,0.45))]";
-
   return (
     <motion.div
-      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.8 }}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.85 }}
-      transition={{ type: "spring", stiffness: 280, damping: 22 }}
-      style={{ transformOrigin: "bottom right", width }}
-      className="group/cloud absolute bottom-full right-0 mb-6"
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 420, damping: 32 }}
+      style={{ transformOrigin: "bottom right" }}
+      className="group/cloud absolute bottom-full right-0 mb-3 w-[244px] max-w-[calc(100vw-1.5rem)]"
     >
-      {/* invisible: every line stacked in one cell, so its width is the longest */}
-      <span
-        ref={sizerRef}
-        aria-hidden="true"
-        className="pointer-events-none invisible absolute left-0 top-0 inline-grid whitespace-nowrap text-[12.5px] font-semibold tracking-tight"
-      >
-        {lines.map((l) => (
-          <span key={l} className="[grid-area:1/1]">
-            {l}
-          </span>
-        ))}
-      </span>
-
-      <motion.div
-        animate={reducedMotion ? undefined : { y: [0, -3, 0] }}
-        transition={reducedMotion ? undefined : { duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
-        whileHover={reducedMotion ? undefined : { scale: 1.03 }}
-        style={{ transformOrigin: "bottom right" }}
-        className="relative"
-      >
-        <svg
-          width={width}
-          height={height}
-          viewBox={`0 0 ${viewW} ${CLOUD_H}`}
-          aria-hidden="true"
-          className={`block overflow-visible ${shadow}`}
-        >
-          <defs>
-            <linearGradient id={`${uid}-fill`} x1="0" y1="0" x2="0" y2={CLOUD_H} gradientUnits="userSpaceOnUse">
-              <stop offset="0" className="[stop-color:#FFFFFF] dark:[stop-color:#30344A]" />
-              <stop offset="1" className="[stop-color:#F1F2FF] dark:[stop-color:#23262F]" />
-            </linearGradient>
-            <linearGradient id={`${uid}-spark`} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#6366F1" />
-              <stop offset="1" stopColor="#0EA5E9" />
-            </linearGradient>
-          </defs>
-          <CloudShapes shapes={shapes} fill="none" strokeWidth="2" className={rim} />
-          <CloudShapes shapes={shapes} fill={fill} />
-          {/* a little sparkle riding on the cloud */}
-          <path
-            d={SPARKLE_PATH}
-            fill={`url(#${uid}-spark)`}
-            transform={`translate(${bigPuff.cx + bigPuff.r * 0.72} ${bigPuff.cy - bigPuff.r - 2})`}
-            style={reducedMotion ? undefined : { animation: "ai-twinkle 1.8s ease-in-out infinite alternate" }}
-          />
-        </svg>
-
+      <div className="relative rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_44px_-18px_rgba(15,23,42,0.28),0_2px_6px_-2px_rgba(15,23,42,0.06)] dark:border-zinc-800 dark:bg-[#1B1D22] dark:shadow-[0_18px_44px_-14px_rgba(0,0,0,0.6)]">
         <button
           type="button"
           onClick={onOpen}
-          style={{ top: 36 * CLOUD_SCALE, height: (CLOUD_H - 40) * CLOUD_SCALE }}
-          className="absolute inset-x-5 flex items-center justify-center whitespace-nowrap rounded-full text-[12.5px] font-semibold tracking-tight text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4A4DFE]/50 dark:text-white"
+          className="flex w-full items-center gap-3 rounded-2xl py-3 pl-3 pr-8 text-left transition-colors hover:bg-slate-50/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4A4DFE]/40 dark:hover:bg-white/[0.03]"
           aria-label={`${line} Open Unideals AI`}
         >
-          {phase === "thinking" ? (
-            <ThinkingDots />
-          ) : (
-            <span aria-live="polite">
-              {text}
-              {phase === "typing" && <span className="ml-0.5 inline-block h-[13px] w-[2px] translate-y-[2px] animate-pulse rounded-full bg-[#4A4DFE]" />}
+          <span className="relative shrink-0">
+            <BrandMark className="h-9 w-9" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-[#1B1D22]" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[11.5px] font-medium text-slate-500 dark:text-zinc-400">Unideals AI</span>
+            <span className="flex h-5 items-center text-[13.5px] font-semibold tracking-tight text-slate-900 dark:text-white">
+              {phase === "thinking" ? (
+                <ThinkingDots />
+              ) : (
+                <span aria-live="polite" className="truncate">
+                  {text}
+                  {phase === "typing" && (
+                    <span className="ml-0.5 inline-block h-[13px] w-[2px] translate-y-[2px] animate-pulse rounded-full bg-[#4A4DFE]" />
+                  )}
+                </span>
+              )}
             </span>
-          )}
+          </span>
         </button>
         <button
           type="button"
@@ -546,30 +448,16 @@ const ThoughtCloud = ({ lines, reducedMotion, onOpen, onDismiss }) => {
             onDismiss();
           }}
           aria-label="Hide this tip"
-          style={{ left: 2, top: 24 }}
-          className="absolute flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white opacity-100 shadow-md ring-2 ring-white transition hover:bg-slate-900 sm:opacity-0 sm:group-hover/cloud:opacity-100 dark:bg-zinc-200 dark:text-zinc-900 dark:ring-[#23262F]"
+          className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4A4DFE]/40 sm:opacity-0 sm:group-hover/cloud:opacity-100 sm:focus-visible:opacity-100 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
         >
-          <X className="h-3 w-3" />
+          <X className="h-3.5 w-3.5" />
         </button>
-      </motion.div>
-
-      {/* the trail of little puffs leading down to the launcher */}
-      <svg
-        width="34"
-        height="26"
-        viewBox="0 0 34 26"
-        aria-hidden="true"
-        className={`absolute -bottom-[22px] right-4 overflow-visible ${shadow}`}
-      >
-        <g className={rim} strokeWidth="1.6" fill="none">
-          <circle cx="15" cy="6" r="5.5" />
-          <circle cx="25" cy="17.5" r="3.2" />
-        </g>
-        <g className="fill-[#F4F5FF] dark:fill-[#272A34]">
-          <circle cx="15" cy="6" r="5.5" />
-          <circle cx="25" cy="17.5" r="3.2" />
-        </g>
-      </svg>
+        {/* caret pointing at the launcher */}
+        <span
+          aria-hidden="true"
+          className="absolute -bottom-[6px] right-[22px] h-3 w-3 rotate-45 rounded-[3px] border-b border-r border-slate-200/80 bg-white dark:border-zinc-800 dark:bg-[#1B1D22]"
+        />
+      </div>
     </motion.div>
   );
 };
@@ -669,6 +557,17 @@ const FloatingAssistant = () => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPanelVisible, themeMenuOpen]);
+
+  // Phones: the panel is a full-screen sheet, so the page behind must not scroll.
+  useEffect(() => {
+    if (!isPanelVisible || typeof window === "undefined") return undefined;
+    if (!window.matchMedia?.("(max-width: 639px)").matches) return undefined;
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = overflow;
+    };
+  }, [isPanelVisible]);
 
   // The theme menu never outlives the panel.
   useEffect(() => {
@@ -1138,10 +1037,10 @@ const FloatingAssistant = () => {
             {...panelMotion}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
             style={{ transformOrigin: "bottom right" }}
-            className="relative mb-3 flex h-[min(680px,calc(100dvh-var(--tabbar-h,0px)-6rem))] w-[calc(100vw-24px)] max-w-[420px] flex-col overflow-hidden rounded-[28px] border border-slate-200/70 bg-[#F8F9FC] shadow-[0_32px_80px_-24px_rgba(30,27,75,0.38),0_0_0_1px_rgba(30,27,75,0.03)] dark:border-zinc-800 dark:bg-[#111215]"
+            className="fixed inset-0 z-[80] flex h-[100dvh] w-full flex-col overflow-hidden bg-[#F7F8FA] sm:relative sm:inset-auto sm:z-auto sm:mb-3 sm:h-[min(700px,calc(100dvh-7.5rem))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:shadow-[0_24px_64px_-20px_rgba(15,23,42,0.30),0_4px_12px_-4px_rgba(15,23,42,0.08)] lg:w-[420px] dark:bg-[#111215] sm:dark:border-zinc-800 sm:dark:shadow-[0_24px_64px_-16px_rgba(0,0,0,0.7)]"
           >
             {/* Header */}
-            <header className="relative z-10 flex items-center justify-between gap-2 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur-xl dark:border-zinc-800 dark:bg-[#16181C]/90">
+            <header className="relative z-10 flex items-center justify-between gap-2 border-b border-slate-200/70 bg-white px-3 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] sm:px-4 sm:py-3 dark:border-zinc-800 dark:bg-[#16181C]">
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className="relative h-10 w-10 shrink-0">
                   <MorphMark fontSize={24} className="h-10 w-10" />
@@ -1149,8 +1048,8 @@ const FloatingAssistant = () => {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <h2 className="truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">Unideals AI</h2>
-                    <span className="rounded-md bg-gradient-to-r from-indigo-500 to-sky-500 px-1.5 py-[1px] text-[9.5px] font-bold uppercase tracking-wider text-white">Beta</span>
+                    <h2 className="truncate text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white">Unideals AI</h2>
+                    <span className="rounded-md bg-slate-100 px-1.5 py-[1px] text-[10px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-white/10">Beta</span>
                   </div>
                   <p className="truncate text-[11.5px] font-medium text-slate-500 dark:text-zinc-400">
                     {isTyping ? "Typing…" : "Your campus shopping buddy"}
@@ -1170,7 +1069,7 @@ const FloatingAssistant = () => {
                   <button
                     type="button"
                     onClick={() => setHistoryOpen(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 sm:h-8 sm:w-8 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                     aria-label="Recent chats"
                     title="Recent chats"
                   >
@@ -1181,7 +1080,7 @@ const FloatingAssistant = () => {
                   <button
                     type="button"
                     onClick={resetChat}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 sm:h-8 sm:w-8 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                     aria-label="Start a new chat"
                     title="New chat"
                   >
@@ -1191,7 +1090,7 @@ const FloatingAssistant = () => {
                 <button
                   type="button"
                   onClick={() => setIsMinimized(true)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 sm:h-8 sm:w-8 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                   aria-label="Minimize assistant"
                   title="Minimize (Esc)"
                 >
@@ -1200,7 +1099,7 @@ const FloatingAssistant = () => {
                 <button
                   type="button"
                   onClick={endChat}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 dark:text-zinc-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-rose-50 sm:h-8 sm:w-8 hover:text-rose-600 dark:text-zinc-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
                   aria-label="End chat and close assistant"
                   title="End chat"
                 >
@@ -1230,7 +1129,7 @@ const FloatingAssistant = () => {
                 return (
                   <div key={message.id || `${message.sender}-${index}`} className={`animate-chat-in flex flex-col ${isUser ? "items-end" : "items-start"}`}>
                     {isUser ? (
-                      <div className="max-w-[85%] rounded-[20px] rounded-br-md bg-gradient-to-br from-indigo-600 to-blue-600 px-3.5 py-2.5 text-[14px] leading-relaxed text-white shadow-[0_8px_20px_-12px_rgba(67,56,202,.7)]">
+                      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[#4A4DFE] px-3.5 py-2.5 text-[14px] leading-relaxed text-white">
                         {message.mediaPreview && (
                           <img src={message.mediaPreview} alt="Uploaded for the assistant" className="mb-2 max-h-40 rounded-xl object-cover" />
                         )}
@@ -1244,10 +1143,10 @@ const FloatingAssistant = () => {
                         <BrandMark className="mt-0.5 h-7 w-7" />
                         <div className="min-w-0 flex-1">
                           <div
-                            className={`w-fit max-w-full rounded-[20px] rounded-tl-md px-3.5 py-2.5 text-[14px] leading-relaxed ${
+                            className={`w-fit max-w-full rounded-2xl rounded-tl-md px-3.5 py-2.5 text-[14px] leading-relaxed ${
                               message.isError
                                 ? "border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
-                                : "border border-slate-200/80 bg-white text-slate-700 shadow-[0_6px_20px_-16px_rgba(15,23,42,.35)] dark:border-zinc-800 dark:bg-[#1B1D22] dark:text-zinc-200"
+                                : "border border-slate-200/80 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-zinc-800 dark:bg-[#1B1D22] dark:text-zinc-200"
                             }`}
                           >
                             <RichText text={message.text} />
@@ -1324,7 +1223,7 @@ const FloatingAssistant = () => {
             </div>
 
             {/* Composer */}
-            <div className="relative border-t border-slate-200/70 bg-white/90 px-3 pb-2.5 pt-2.5 backdrop-blur-xl dark:border-zinc-800 dark:bg-[#16181C]/95">
+            <div className="relative border-t border-slate-200/70 bg-white px-3 pb-[max(0.625rem,env(safe-area-inset-bottom))] pt-2.5 sm:pb-2.5 dark:border-zinc-800 dark:bg-[#16181C]">
               <AnimatePresence>
                 {cameraMenuOpen && (
                   <motion.div
@@ -1369,7 +1268,7 @@ const FloatingAssistant = () => {
 
               <form
                 onSubmit={handleSubmit}
-                className="flex items-end gap-1 rounded-[22px] border border-slate-200 bg-slate-50 p-1.5 transition focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 dark:border-zinc-800 dark:bg-[#1B1D22] dark:focus-within:border-indigo-500/40"
+                className="flex items-end gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition focus-within:border-[#4A4DFE]/50 focus-within:ring-4 focus-within:ring-[#4A4DFE]/10 dark:border-zinc-800 dark:bg-[#1B1D22] dark:focus-within:border-[#4A4DFE]/50"
               >
                 <button
                   type="button"
@@ -1405,7 +1304,7 @@ const FloatingAssistant = () => {
                 <button
                   type="submit"
                   disabled={(!input.trim() && !mediaPreview) || isTyping}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-[0_6px_16px_-6px_rgba(79,70,229,.8)] transition hover:brightness-110 disabled:from-slate-300 disabled:to-slate-300 disabled:shadow-none dark:disabled:from-zinc-700 dark:disabled:to-zinc-700"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#4A4DFE] text-white transition hover:bg-[#3B3EF0] disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-500"
                   aria-label="Send message"
                 >
                   <ArrowUp className="h-[18px] w-[18px]" strokeWidth={2.5} />
@@ -1540,11 +1439,11 @@ const FloatingAssistant = () => {
             whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
             whileTap={prefersReducedMotion ? undefined : { scale: 0.94 }}
             transition={{ type: "spring", stiffness: 420, damping: 24 }}
-            className="relative flex h-14 w-14 items-center justify-center rounded-full border border-slate-200/80 bg-white shadow-[0_12px_32px_-10px_rgba(74,77,254,0.45)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#4A4DFE]/30 dark:border-zinc-700 dark:bg-[#16181C]"
+            className="relative flex h-14 w-14 items-center justify-center rounded-full border border-slate-200/80 bg-white shadow-[0_10px_28px_-10px_rgba(15,23,42,0.35),0_2px_6px_-2px_rgba(15,23,42,0.08)] transition-shadow hover:shadow-[0_14px_34px_-10px_rgba(74,77,254,0.45)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#4A4DFE]/30 dark:border-zinc-700 dark:bg-[#16181C]"
             aria-label={hasConversation ? "Continue chat with Unideals AI" : "Open Unideals AI assistant"}
           >
             {/* soft brand halo */}
-            <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#4A4DFE]/25 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:animate-none" />
+            
             <Wordmark
               markOnly
               active={!(launcherHover || launcherPulse)}

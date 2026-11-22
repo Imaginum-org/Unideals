@@ -15,6 +15,16 @@ const feedMetaCache = createTtlCache({ max: 2000 });
 const COUNT_TTL_MS = 30 * 1000;
 // Feed pages (no search). Cleared on any listing write (Product model hooks).
 const FEED_PAGE_TTL_MS = 15 * 1000;
+
+// Ranking clock. Recency scores used to be computed against the exact
+// request time, so page 2 of an infinite scroll was ranked a few seconds
+// "later" than page 1: decaying recency reshuffled the order between the
+// two requests, listings slid across the page boundary, and the client's
+// de-dupe silently dropped repeats (short, random-looking pages, some
+// listings never shown). Snapping to a 10-minute bucket gives every page
+// of a scroll the same ranking.
+const RANK_CLOCK_MS = 10 * 60 * 1000;
+const rankClock = () => new Date(Math.floor(Date.now() / RANK_CLOCK_MS) * RANK_CLOCK_MS);
 const PRICE_META_TTL_MS = 60 * 1000;
 const cachedCount = (pipeline) =>
   feedMetaCache.memo(`count:${keyOf(pipeline)}`, COUNT_TTL_MS, async () => {
@@ -30,7 +40,7 @@ const sellerLookup = {
     localField: "seller_id",
     foreignField: "_id",
     as: "seller",
-    pipeline: [{ $project: { name: 1, avatar: 1, subscription: 1, is_college_verified: 1 } }],
+    pipeline: [{ $project: { name: 1, avatar: 1, subscription: 1, role: 1, is_college_verified: 1 } }],
   },
 };
 import Conversation from "../models/conversation.model.js";
@@ -52,6 +62,7 @@ import {
   canViewGirlsFeed,
   canSeeGirlsProduct,
   girlsCornerError,
+  assertCanListGirlsOnly,
   GIRLS_ERRORS,
 } from "../utils/girlsCorner.js";
 
@@ -338,16 +349,16 @@ export const createProduct = async (data, user) => {
   // Girls Corner 🌸 — seller opt-in guard. Coerce + strip snapshot (server-set).
   // Girls-only categories auto-enable Girl-only (seller is told in the UI).
   delete data.sellerGenderSnapshot;
+  const confirmNotFemale = data.confirmNotFemale;
+  delete data.confirmNotFemale;
   if (isGirlsOnlyCategory(data.category)) {
     data.isGirlsOnly = true;
   }
   const wantsGirlsOnly = data.isGirlsOnly === true || data.isGirlsOnly === "true";
   data.isGirlsOnly = Boolean(wantsGirlsOnly);
   if (data.isGirlsOnly) {
-    if (!isEligibleGender(user.gender)) {
-      throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
-    }
-    data.sellerGenderSnapshot = "female";
+    assertCanListGirlsOnly(user, confirmNotFemale);
+    if (isEligibleGender(user.gender)) data.sellerGenderSnapshot = "female";
   }
 
   // Plan entitlement: cap active (listed, visible) listings per tier.
@@ -517,7 +528,7 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
   page = Math.min(page, 1000);
 
   const skip = (page - 1) * limit;
-  const now = new Date();
+  const now = rankClock();
 
   // Base filter, campus first: legacy campus-less listings are excluded
   // from every feed (their sellers assign campus via the onboarding gate).
@@ -658,20 +669,26 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
       ...(typeof search === "string" && search.trim() ? { relevanceScore: -1 } : {}),
       score: -1,
       createdAt: -1,
+      _id: -1,
     },
 
+    // _id breaks ties: Mongo doesn't guarantee an order for equal keys, so
+    // without it equal-scored listings could swap between page requests.
     latest: {
       createdAt: -1,
+      _id: -1,
     },
 
     price_low: {
       selling_price: 1,
       createdAt: -1,
+      _id: -1,
     },
 
     price_high: {
       selling_price: -1,
       createdAt: -1,
+      _id: -1,
     },
   };
 
@@ -716,6 +733,8 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
         "seller.name": 1,
         "seller.avatar": 1,
         "seller.subscription": 1,
+        "seller.role": 1,
+        "seller.is_college_verified": 1,
       },
     },
   );
@@ -737,13 +756,14 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
 
   // Feed pages without a text search are identical for everyone with the
   // same filters (viewer-specific rules are already in baseMatch), so share
-  // them for a few seconds. `now` only shifts recency scores by seconds.
+  // them for a few seconds. The rank clock is in the key so a cached page
+  // is never mixed with pages ranked against a different clock bucket.
   const isSearch = typeof search === "string" && search.trim();
   const loadPage = () => Product.aggregate(pipeline);
   const [products, total, priceMeta] = await Promise.all([
     isSearch
       ? loadPage()
-      : feedPageCache.memo(`feed:${keyOf({ baseMatch, sort: safeSort, skip, limit })}`, FEED_PAGE_TTL_MS, loadPage),
+      : feedPageCache.memo(`feed:${keyOf({ baseMatch, sort: safeSort, skip, limit, at: now.getTime() })}`, FEED_PAGE_TTL_MS, loadPage),
     cachedCount(totalPipeline),
     feedMetaCache.memo(`price:${keyOf(priceMetaPipeline)}`, PRICE_META_TTL_MS, () =>
       Product.aggregate(priceMetaPipeline),
@@ -1186,7 +1206,7 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
   const stemClauses = stemVariants(rawTokens);
   const matchedCategories = detectCategories(sanitizedQuery);
 
-  const now = new Date();
+  const now = rankClock();
 
   // Base visibility filter + whitelisted facet filters.
   const baseMatch = {
@@ -1365,10 +1385,10 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
   const allowedSorts = ["relevant", "latest", "price_low", "price_high"];
   const safeSort = allowedSorts.includes(sort) ? sort : "relevant";
   const sortStage = {
-    relevant: { finalScore: -1, createdAt: -1 },
-    latest: { createdAt: -1 },
-    price_low: { selling_price: 1, createdAt: -1 },
-    price_high: { selling_price: -1, createdAt: -1 },
+    relevant: { finalScore: -1, createdAt: -1, _id: -1 },
+    latest: { createdAt: -1, _id: -1 },
+    price_low: { selling_price: 1, createdAt: -1, _id: -1 },
+    price_high: { selling_price: -1, createdAt: -1, _id: -1 },
   }[safeSort];
 
   pipeline.push({ $sort: sortStage });
@@ -1648,6 +1668,8 @@ export const updateProduct = async (productId, userId, data = {}) => {
   // Girls Corner 🌸 — everyone→girls-only needs female; widening always allowed.
   // Moving into a girls-only category auto-enables Girl-only (and needs
   // female); listings already in one can never be widened to everyone.
+  const confirmNotFemale = updates.confirmNotFemale;
+  delete updates.confirmNotFemale;
   const mergedCategory = updates.category ?? product.category;
   if (isGirlsOnlyCategory(mergedCategory)) {
     updates.isGirlsOnly = true;
@@ -1661,17 +1683,17 @@ export const updateProduct = async (productId, userId, data = {}) => {
     }
     if (updates.isGirlsOnly && !product.isGirlsOnly) {
       const { default: UserModel } = await import("../models/User.model.js");
-      const editor = await UserModel.findById(userId).select("gender").lean();
-      if (!isEligibleGender(editor?.gender)) throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
-      updates.sellerGenderSnapshot = "female";
+      const editor = await UserModel.findById(userId).select("gender role").lean();
+      assertCanListGirlsOnly(editor, confirmNotFemale);
+      if (isEligibleGender(editor?.gender)) updates.sellerGenderSnapshot = "female";
     }
   } else if (isGirlsOnlyCategory(mergedCategory) && !product.isGirlsOnly) {
     // Category changed into a girls-only one without touching the flag.
     const { default: UserModel } = await import("../models/User.model.js");
-    const editor = await UserModel.findById(userId).select("gender").lean();
-    if (!isEligibleGender(editor?.gender)) throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
+    const editor = await UserModel.findById(userId).select("gender role").lean();
+    assertCanListGirlsOnly(editor, confirmNotFemale);
     updates.isGirlsOnly = true;
-    updates.sellerGenderSnapshot = "female";
+    if (isEligibleGender(editor?.gender)) updates.sellerGenderSnapshot = "female";
   }
   assertImageHost(updates.images);
   await assertPickupSnapshot(updates.pickup_address_snapshot, userId);
@@ -1880,14 +1902,15 @@ export const relistProduct = async (productId, userId) => {
   // Relisting reactivates against the plan cap, same rule as creation.
   const { default: UserModel } = await import("../models/User.model.js");
   const owner = await UserModel.findById(product.seller_id)
-    .select("subscription gender")
+    .select("subscription gender role")
     .lean();
-  // Girls Corner 🌸 — relist re-checks female for girls-only.
+  // Girls Corner 🌸 — relist re-checks female for girls-only (admins
+  // already confirmed when they first listed it).
   // Girls-only categories auto-carry the flag (incl. legacy docs).
   if (isGirlsOnlyCategory(product.category)) {
     product.isGirlsOnly = true;
   }
-  if (product.isGirlsOnly && !isEligibleGender(owner?.gender)) {
+  if (product.isGirlsOnly && !isEligibleGender(owner?.gender) && owner?.role !== "admin") {
     throw girlsCornerError("NOT_ELIGIBLE_GIRLS_ONLY");
   }
   const listingLimit = getListingLimit(owner?.subscription);

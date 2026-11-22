@@ -268,9 +268,13 @@ const campusList = async (ids) => {
 
 /** Everything the access page needs. */
 export const getAccessOverview = async (user) => {
-  const policy = await getSupportPolicy();
   const isAdmin = user?.role === USER_ROLES.ADMIN;
-  const mine = await accessFor(user);
+  const [policy, mine, staff, campuses] = await Promise.all([
+    getSupportPolicy(),
+    accessFor(user),
+    isAdmin ? listSupportStaff() : null,
+    isAdmin ? campusList() : null,
+  ]);
   return {
     features: ACCESS_FEATURES,
     adminOnly: ADMIN_ONLY_ACTIONS,
@@ -287,8 +291,8 @@ export const getAccessOverview = async (user) => {
           supportCampuses: policy.campuses,
           updatedAt: policy.updatedAt,
           updatedBy: policy.updatedBy,
-          staff: await listSupportStaff(),
-          campuses: await campusList(),
+          staff,
+          campuses,
         }
       : {}),
   };

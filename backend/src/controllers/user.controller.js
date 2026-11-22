@@ -8,7 +8,7 @@ import { safeErrorMessage } from "../utils/response.js";
 import { computeLevel, xpToNextLevel, levelProgress, computeAndAwardBadges, scheduleBadgeRecompute } from "../services/badgeService.js";
 import { clearAuthCookies } from "../services/auth.service.js";
 import { getInsights } from "../services/insights.service.js";
-import { campusDomainsFor, getCollegeStatus, sendCollegeOtp, verifyCollegeOtp } from "../services/collegeVerification.service.js";
+import { autoVerifyFromAccountEmail, campusDomainsFor, getCollegeStatus, sendCollegeOtp, verifyCollegeOtp } from "../services/collegeVerification.service.js";
 import {
   cancelGenderRequest,
   deleteIdCard,
@@ -64,6 +64,17 @@ export const getUserProfile = async (req, res) => {
 
     // Explicit boolean (lean() skips schema defaults on older accounts), so
     // the client can tell "not verified" from "not loaded yet".
+    // Signed in with their college email (verified inbox or Google)? Then
+    // they already proved it: grant the tick without the Settings OTP.
+    try {
+      if (await autoVerifyFromAccountEmail(user)) {
+        user.is_college_verified = true;
+        user.college_email = String(user.email).trim().toLowerCase();
+        user.college_verified_at = new Date();
+      }
+    } catch {
+      // best-effort; the Settings flow still works
+    }
     user.is_college_verified = Boolean(user.is_college_verified);
     // Whether this campus supports college email verification yet (VIT
     // campuses do; other colleges once their student domain is added).

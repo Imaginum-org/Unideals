@@ -1,7 +1,8 @@
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import ScrollToTop from "../components/layout/ScrollToTop.jsx";
-import "../services/authInterceptor.js";
+import axiosInstance from "../services/authInterceptor.js";
+import { startNetworkMonitor } from "../services/networkStatus.js";
 import "../styles/index.css";
 import App from "./App.jsx";
 import { ThemeProvider } from "../context/ThemeContext.jsx";
@@ -27,6 +28,10 @@ try {
 } catch {
   // never block boot over a hint
 }
+
+// Passive connection-health watcher (no polling, no API calls): powers the
+// "you're offline / your internet is slow" banner.
+startNetworkMonitor(axiosInstance);
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>

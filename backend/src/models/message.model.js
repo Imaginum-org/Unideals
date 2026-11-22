@@ -42,6 +42,54 @@ const messageSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Voice note (message_type "audio"). The file is on ImageKit in the
+    // sender's own folder; url comes from ImageKit's record, never the client.
+    audio: {
+      type: new mongoose.Schema(
+        {
+          url: { type: String, required: true },
+          file_id: { type: String, required: true },
+          duration_ms: { type: Number, required: true },
+          mime: { type: String, default: "" },
+          size: { type: Number, default: 0 },
+          peaks: { type: [Number], default: [] },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
+
+    // Chat photo (message_type "image"), stored on Cloudinary. public_id +
+    // version were verified against Cloudinary's signed upload response.
+    image: {
+      type: new mongoose.Schema(
+        {
+          url: { type: String, required: true },
+          public_id: { type: String, required: true },
+          version: { type: Number, required: true },
+          width: { type: Number, default: 0 },
+          height: { type: Number, default: 0 },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
+
+    // Reactions: at most one per participant (a chat has two), so this
+    // array never holds more than 2 tiny entries. Set/cleared atomically.
+    reactions: {
+      type: [
+        new mongoose.Schema(
+          {
+            user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+            emoji: { type: String, required: true },
+          },
+          { _id: false },
+        ),
+      ],
+      default: undefined,
+    },
+
     // Reference to deal (for offer/system messages)
     deal_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -143,6 +191,19 @@ messageSchema.index({
   receiver_id: 1,
   message_status: 1,
 });
+
+// One upload = one message (blocks replaying a fileId), and lets the orphan
+// sweep check "is this file used?" with an index hit.
+messageSchema.index(
+  { "audio.file_id": 1 },
+  { unique: true, partialFilterExpression: { "audio.file_id": { $exists: true } } },
+);
+
+// One upload = one message; also the "is this photo used?" lookup for the sweep.
+messageSchema.index(
+  { "image.public_id": 1 },
+  { unique: true, partialFilterExpression: { "image.public_id": { $exists: true } } },
+);
 
 const Message = mongoose.model("Message", messageSchema);
 

@@ -1,4 +1,5 @@
 import * as adminUserService from "../services/admin.user.service.js";
+import { cachedAdminStat, viewKey } from "../utils/adminStatsCache.js";
 import * as accessService from "../services/access.service.js";
 import * as auditLogService from "../services/auditLog.service.js";
 import * as userDeletionService from "../services/userDeletion.service.js";
@@ -75,7 +76,7 @@ export const updateUserRole = async (req, res) => {
 
 export const getUserStats = async (req, res) => {
   try {
-    const stats = await adminUserService.getUserStats(req.campusScope);
+    const stats = await cachedAdminStat(`userStats:${viewKey(req.campusScope)}`, () => adminUserService.getUserStats(req.campusScope));
     return sendSuccess(res, "User stats fetched successfully", { data: stats });
   } catch (error) {
     return sendFailure(res, error);

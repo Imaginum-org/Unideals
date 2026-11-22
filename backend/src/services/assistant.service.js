@@ -739,7 +739,7 @@ const buildListingDetailsReply = async (ref) => {
   const was = p.original_price > p.selling_price ? ` (was ${formatRupees(p.original_price)})` : "";
   const summary = String(p.description || "").replace(/\s+/g, " ").trim();
   return {
-    reply: `**${p.title}**: ${formatRupees(p.selling_price)}${was}${p.conditionLabel ? `, ${p.conditionLabel.toLowerCase()}` : ""}. ${p.is_negotiable ? "The seller is open to offers." : "The price is fixed."}${summary ? `\n${summary.slice(0, 220)}${summary.length > 220 ? "…" : ""}` : ""}`,
+    reply: `**${p.title}**: ${formatRupees(p.selling_price)}${was}${p.conditionLabel ? `, ${p.conditionLabel.toLowerCase()}` : ""}. ${p.is_negotiable ? "The seller is open to negotiation." : "The price is fixed."}${summary ? `\n${summary.slice(0, 220)}${summary.length > 220 ? "…" : ""}` : ""}`,
     intent: "product_details",
     products: [p],
     productCards: [p],

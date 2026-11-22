@@ -159,6 +159,11 @@ reportSchema.index({
   status: 1,
 });
 
+// Reports about one item: the auto-hide threshold count when a student
+// reports a listing, plus the admin drawers, queue actions and scope checks.
+// Without it every one of those scanned the whole collection.
+reportSchema.index({ target_id: 1, target_model: 1, status: 1 });
+
 const Report = mongoose.model("Report", reportSchema);
 
 export default Report;

@@ -2,7 +2,8 @@ import imageCompression from "browser-image-compression";
 
 export const compressImage = async (
   file,
-  { maxSizeMB = 0.8, maxWidthOrHeight = 1600, initialQuality = 0.8 } = {},
+  // fileType: optional output format (e.g. "image/webp"); default keeps the input type.
+  { maxSizeMB = 0.8, maxWidthOrHeight = 1600, initialQuality = 0.8, fileType } = {},
 ) => {
   //   const options = {
   //     maxSizeMB: 1,
@@ -16,6 +17,7 @@ export const compressImage = async (
     maxWidthOrHeight,
     useWebWorker: true,
     initialQuality,
+    ...(fileType ? { fileType } : {}),
   };
   try {
     const compressedFile = await imageCompression(file, options);

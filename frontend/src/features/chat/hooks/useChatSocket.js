@@ -26,6 +26,7 @@ export const useChatSocket = ({
   onPresence,
   onStatus,
   onListUpdate,
+  onReaction,
   enabled = true,
 }) => {
   const socketRef = useRef(null);
@@ -39,6 +40,7 @@ export const useChatSocket = ({
     onPresence,
     onStatus,
     onListUpdate,
+    onReaction,
   };
 
   // Shared connection + stable listeners for the lifetime of the chat page.
@@ -57,6 +59,7 @@ export const useChatSocket = ({
       "deal:updated": ({ deal } = {}) => handlersRef.current.onDeal?.(deal),
       "message:delivered": (info) => handlersRef.current.onDelivered?.(info),
       "message:read": (info) => handlersRef.current.onRead?.(info),
+      "message:reaction": (info) => handlersRef.current.onReaction?.(info),
       typing: (info) => handlersRef.current.onTyping?.(info),
       "presence:update": (info) => handlersRef.current.onPresence?.(info),
       "conversation:updated": (info) => handlersRef.current.onListUpdate?.(info),

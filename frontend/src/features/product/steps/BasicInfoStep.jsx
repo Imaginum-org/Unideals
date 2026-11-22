@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, FileText, Lock, SlidersHorizontal, Sparkles } from "lucide-react";
 import useProductListing from "../hooks/useProductListing";
 import {
@@ -11,9 +11,11 @@ import {
 } from "../constants/productOptions";
 import { useUser } from "../../../context/useUserContext.jsx";
 import { normalizeMultiline } from "../../../utils/text.js";
+import { cn } from "../../../utils/cn.js";
 import { validateBasicInfo } from "../validations";
 import Select from "../../../components/ui/Select.jsx";
 import VisibilitySelector from "../components/VisibilitySelector.jsx";
+import CategoryGlyph from "../components/CategoryGlyph.jsx";
 import {
   AutoTag,
   ChoiceChips,
@@ -66,9 +68,16 @@ const BasicInfoStep = () => {
     setAuto((a) => ({ ...a, [field]: true }));
   };
 
+  // Girl-only follows the category the seller picks: a girls-only category
+  // turns it on, any other category turns it off. They can still switch it
+  // back on for a regular category afterwards (VisibilitySelector).
+  const syncGirlsOnly = (category) => {
+    const girls = GIRLS_ONLY_CATEGORIES.includes(category);
+    if (girls !== Boolean(formData.isGirlsOnly)) updateField("isGirlsOnly", girls);
+  };
   const handleCategoryChange = (value) => {
     setManual("category", value || "");
-    if (GIRLS_ONLY_CATEGORIES.includes(value)) updateField("isGirlsOnly", true);
+    if (value) syncGirlsOnly(value);
   };
 
   // Title → category / brand / colour, only into EMPTY fields (never
@@ -77,7 +86,7 @@ const BasicInfoStep = () => {
     const g = guessFromTitle(formData.title, { allowedCategories });
     if (g.category && !formData.category) {
       setAutoValue("category", g.category);
-      if (GIRLS_ONLY_CATEGORIES.includes(g.category)) updateField("isGirlsOnly", true);
+      syncGirlsOnly(g.category);
     }
     if (g.brand && !String(formData.brand || "").trim()) setAutoValue("brand", g.brand.slice(0, 100));
     const category = formData.category || g.category;
@@ -122,9 +131,61 @@ const BasicInfoStep = () => {
   }, [hasExtras]);
 
   const writeDescription = () => {
-    const text = draftDescription(formData, usageLabel);
-    if (text) setAutoValue("description", text.slice(0, DESC_MAX));
+    // Asked for a draft: keep it in step with the fields again.
+    descTouched.current = false;
+    const text = draftDescription(formData, usageLabel).slice(0, DESC_MAX);
+    if (text) {
+      lastAutoDesc.current = text;
+      setAutoValue("description", text);
+    }
   };
+
+  // Auto-draft: once title, condition and purchase date are filled, write
+  // the description, and keep it in step while those change. It only ever
+  // replaces an empty box or the exact text it wrote last time, so a
+  // restored draft, an edited listing or anything the seller typed is never
+  // overwritten. The seller's first keystroke stops it (even clearing the
+  // box to write their own); "Write it for me" turns it back on.
+  const descTouched = useRef(false);
+  const lastAutoDesc = useRef("");
+  const draftReady = String(formData.title || "").trim().length >= 3 && Boolean(formData.condition) && Boolean(formData.purchaseDate);
+  useEffect(() => {
+    const current = String(formData.description || "");
+    const ours = !current.trim() || current === lastAutoDesc.current;
+    if (!draftReady || descTouched.current || !ours) return undefined;
+    // Short pause so typing the title doesn't rewrite it on every key.
+    const t = setTimeout(() => {
+      const text = draftDescription(formData, usageLabel).slice(0, DESC_MAX);
+      if (text && text !== formData.description) {
+        lastAutoDesc.current = text;
+        setAutoValue("description", text);
+      }
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftReady, formData.title, formData.condition, formData.purchaseDate, usageLabel, formData.brand, formData.color, formData.category]);
+
+  const conditionInfo = PRODUCT_CONDITION_OPTIONS.find((o) => o.value === formData.condition)?.description;
+  // Dropdown rows: line icon + one-line description; girls-only categories
+  // carry a very light blush tint.
+  const categorySelectOptions = categoryOptions.map((o) => ({
+    value: o.value,
+    label: o.label,
+    description: o.description,
+    icon: (
+      <span
+        className={cn(
+          "grid h-8 w-8 place-items-center rounded-lg",
+          o.girlsOnly
+            ? "bg-pink-100/70 text-pink-700 dark:bg-pink-500/10 dark:text-pink-300"
+            : "bg-neutral-100 text-slate-600 dark:bg-white/[0.06] dark:text-zinc-300",
+        )}
+      >
+        <CategoryGlyph value={o.value} className="h-[18px] w-[18px]" />
+      </span>
+    ),
+    className: o.girlsOnly ? "dd-item-girls" : undefined,
+  }));
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -164,7 +225,7 @@ const BasicInfoStep = () => {
             <Select
               value={formData.category}
               onChange={handleCategoryChange}
-              options={categoryOptions.map((o) => ({ value: o.value, label: o.label }))}
+              options={categorySelectOptions}
               placeholder="Select a category"
               ariaLabel="Category"
               invalid={Boolean(errors.category)}
@@ -182,7 +243,11 @@ const BasicInfoStep = () => {
             required
             field="description"
             error={errors.description}
-            hint="What's included, how it's been used, any flaws."
+            hint={
+              descTouched.current || String(formData.description || "").trim()
+                ? "What's included, how it's been used, any flaws."
+                : "Fills in by itself once you add the title, condition and purchase date."
+            }
             counter={<Counter value={descLength} max={DESC_MAX} />}
           >
             <div className="relative">
@@ -191,7 +256,10 @@ const BasicInfoStep = () => {
                 rows={4}
                 maxLength={DESC_MAX}
                 value={formData.description}
-                onChange={(e) => setManual("description", e.target.value)}
+                onChange={(e) => {
+                  descTouched.current = true;
+                  setManual("description", e.target.value);
+                }}
                 // Tidy on blur (not per keystroke, so typing a space or a new
                 // paragraph never fights the cursor). Server normalises too.
                 onBlur={(e) => {
@@ -199,7 +267,7 @@ const BasicInfoStep = () => {
                   if (clean !== e.target.value) updateField("description", clean);
                 }}
                 placeholder="e.g. Bought in Aug 2024, used for one semester. Comes with the original cover and manual. Small scratch on the back."
-                className={`${inputClass(errors.description)} min-h-[120px] resize-y py-3 pb-12 leading-relaxed`}
+                className={`${inputClass(errors.description)} h-40 resize-none overflow-y-auto py-3 leading-relaxed sm:h-44 ${String(formData.description || "").trim() ? "" : "pb-12"}`}
               />
               {!String(formData.description || "").trim() && (
                 <button
@@ -215,7 +283,7 @@ const BasicInfoStep = () => {
               )}
             </div>
             {auto.description && (
-              <p className="mt-1.5 text-[12.5px] text-[var(--accent-text)]">Drafted from your details. Edit anything that isn&apos;t right.</p>
+              <p className="mt-1.5 text-[12.5px] text-[var(--accent-text)]">Written from your title, condition and purchase date. Edit anything that isn&apos;t right.</p>
             )}
           </Field>
         </div>
@@ -240,6 +308,12 @@ const BasicInfoStep = () => {
               invalid={Boolean(errors.condition)}
               disabled={Boolean(fixedCondition)}
             />
+            {conditionInfo && (
+              <p aria-live="polite" className="mt-2 flex items-start gap-1.5 text-[12.5px] leading-relaxed text-slate-500 dark:text-zinc-400">
+                <span aria-hidden="true" className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[var(--accent)]" />
+                {conditionInfo}
+              </p>
+            )}
           </Field>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

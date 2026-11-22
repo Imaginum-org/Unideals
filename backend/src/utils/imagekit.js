@@ -44,6 +44,38 @@ export const getFileDetails = async (fileId) => {
 // handoff) use it too, so the folder path is the ownership proof.
 export const userUploadFolder = (userId) => `unideals/${String(userId)}`;
 
+// Voice notes live in a subfolder of the user's own folder and carry the
+// "voice" tag (the orphan sweep lists files by that tag).
+export const VOICE_TAG = "voice";
+export const userVoiceFolder = (userId) => `${userUploadFolder(userId)}/voice`;
+const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
+export const isInVoiceFolderOf = (filePath, userId) => {
+  const id = String(userId || "");
+  if (!OBJECT_ID_RE.test(id)) return false;
+  const path = String(filePath || "").replace(/^\/+/, "").toLowerCase();
+  return path.startsWith(`unideals/${id.toLowerCase()}/voice/`);
+};
+
+/** Delete many files in one API call per 100 (best effort, never throws). */
+export const bulkDeleteImages = async (fileIds = []) => {
+  const ids = [...new Set(fileIds.filter(isValidFileId))];
+  if (!ids.length) return 0;
+  try {
+    const imagekit = getImagekit();
+    for (let i = 0; i < ids.length; i += 100) await imagekit.bulkDeleteFiles(ids.slice(i, i + 100));
+    return ids.length;
+  } catch (error) {
+    console.error("Bulk delete failed:", error.message);
+    return 0;
+  }
+};
+
+/** One page of ImageKit files carrying a tag, oldest first. */
+export const listTaggedFiles = async (tag, { limit = 1000, skip = 0 } = {}) => {
+  const imagekit = getImagekit();
+  return imagekit.listFiles({ tags: tag, sort: "ASC_CREATED", limit, skip });
+};
+
 const USER_FOLDER_RE = /^\/?unideals\/([a-f0-9]{24})\//i;
 
 /**

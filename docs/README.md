@@ -18,6 +18,8 @@ Everything beyond the top-level [README](../README.md) lives here. Keep each doc
 |---|---|
 | [features/subscriptions-and-monetization.md](features/subscriptions-and-monetization.md) | **Source of truth** for plans (Free / Pro / Pro+), Founder vs semester pricing, boosts and add-ons. Mirrored by `backend/src/config/subscriptionPlans.js` and the pricing page |
 | [features/gamification-badges-and-levels.md](features/gamification-badges-and-levels.md) | XP, rank tiers, badge catalogue, data models and endpoints |
+| [features/handover-code.md](features/handover-code.md) | The 4-digit handover code in depth: buyer and seller screens, how the code is made and checked, lockout, every edge case, API errors, support guide |
+| [features/deal-handover.md](features/deal-handover.md) | Finishing a deal at the meetup: handover code, "mark as done" with 48h auto-complete, no-shows, follow-up job, API |
 | [features/girls-corner.md](features/girls-corner.md) | Girls Corner 🌸: women-only listing space, gender confirmation, privacy rules, edge cases, rollout |
 | [features/rent-and-borrow.md](features/rent-and-borrow.md) | Rent & Borrow: lend, share or request small things inside a hostel block; offline payments; behind `RENT_ENABLED`; how to remove it |
 
@@ -34,5 +36,6 @@ Everything beyond the top-level [README](../README.md) lives here. Keep each doc
 | [changelog/2026-09-security-hardening-and-bug-fixes.md](changelog/2026-09-security-hardening-and-bug-fixes.md) | 2026-09-19 full-stack hardening + 2026-10-02 update (Razorpay integration, auth, CORS, sanitisation) |
 | [changelog/2026-11-full-audit-and-fixes.md](changelog/2026-11-full-audit-and-fixes.md) | 2026-11-08 second full audit (authorization gaps, data leaks, races) and the UI/payment updates that followed |
 | [changelog/2026-11-db-and-jobs-optimisation.md](changelog/2026-11-db-and-jobs-optimisation.md) | 2026-11-16 database, query, index and background-job optimisation for multi-instance scale, plus the index-sync deploy steps |
+| [changelog/2026-11-admin-routes-optimisation.md](changelog/2026-11-admin-routes-optimisation.md) | 2026-11-22 admin routes: orders/listings/users lists paged in MongoDB, dashboard 26 → 10 queries, admin stats and access cache, new indexes |
 
 New fix logs go in `changelog/` as `YYYY-MM-<short-topic>.md`.

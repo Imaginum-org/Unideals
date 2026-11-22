@@ -161,6 +161,114 @@ await test("Pro+: boosts last 7 days", async () => {
   assert.ok(hours > 167 && hours <= 168.1, `duration ${hours}h`);
 });
 
+console.log("\nExact plan caps (no more than promised)");
+const expireAll = (u) =>
+  mongoose.model("Boost").updateMany({ user_id: u._id }, { $set: { expires_at: new Date(Date.now() - 1000) } });
+await test("Pro+: exactly 5 boosts/month, the 6th is refused", async () => {
+  const u = await mkUser("pro_plus");
+  const items = [];
+  for (let i = 0; i < 6; i += 1) items.push(await mkProduct(u, { title: `Pro plus boost item ${i}` }));
+  for (let i = 0; i < 5; i += 1) {
+    await boostSvc.createBoost({ productId: items[i]._id, user: u.toObject() });
+    await expireAll(u);
+  }
+  await assert.rejects(boostSvc.createBoost({ productId: items[5]._id, user: u.toObject() }), /Monthly boost limit/i);
+  const summary = await boostSvc.getBoostSummary(u.toObject());
+  assert.equal(summary.monthlyLimit, 5);
+  assert.equal(summary.monthlyUsed, 5);
+  assert.equal(summary.monthlyRemaining, 0);
+});
+await test("Pro+: at most 3 boosts live at once", async () => {
+  const u = await mkUser("pro_plus");
+  const items = [];
+  for (let i = 0; i < 4; i += 1) items.push(await mkProduct(u, { title: `Live cap item ${i}` }));
+  for (let i = 0; i < 3; i += 1) await boostSvc.createBoost({ productId: items[i]._id, user: u.toObject() });
+  await assert.rejects(boostSvc.createBoost({ productId: items[3]._id, user: u.toObject() }), /Active boost limit/i);
+});
+await test("Pro: exactly 25 live listings, the 26th is refused", async () => {
+  const u = await mkUser("pro");
+  for (let i = 0; i < 25; i += 1) await mkProduct(u, { title: `Pro cap item ${i} unique` });
+  await assert.rejects(
+    productSvc.createProduct(
+      { title: "Pro twenty sixth listing", description: "A valid description text.", category: "electronics", condition: "like_new", selling_price: 300, original_price: 600, images: img, status: "listed", payment_preference: "both", pickup_address_snapshot: { address_line: "Main Gate", city: "Vellore" } },
+      u.toObject(),
+    ),
+    /Listing limit reached \(25/,
+  );
+});
+await test("Free: relisting an 11th item is refused", async () => {
+  const u = await mkUser("base_user");
+  for (let i = 0; i < 10; i += 1) await mkProduct(u, { title: `Free relist item ${i}` });
+  const extra = await mkProduct(u, { title: "Free relist extra", status: "unlisted" });
+  await assert.rejects(productSvc.relistProduct(extra._id, u._id), /Listing limit reached \(10/);
+});
+await test("Pro: the 101st wishlist save is refused", async () => {
+  const seller = await mkUser("base_user");
+  const buyer = await mkUser("pro");
+  const items = [];
+  for (let i = 0; i < 101; i += 1) items.push(await mkProduct(seller, { title: `Pro wish ${i} unique` }));
+  await User.updateOne({ _id: buyer._id }, { $set: { wishlist: items.slice(0, 100).map((p) => p._id) } });
+  const req = { userId: buyer._id, user: { ...buyer.toObject(), wishlist: undefined }, body: { productId: String(items[100]._id) } };
+  const { statusCode, body } = await callCtl(wishlistCtl.addToWishlist, req);
+  assert.equal(statusCode, 403, JSON.stringify(body));
+});
+
+console.log("\nLevel-reward boost credits");
+await test("Free user with 2 reward credits gets exactly 2 boosts", async () => {
+  const u = await mkUser("base_user", { gamification: { boost_credits: 2 } });
+  const items = [];
+  for (let i = 0; i < 3; i += 1) items.push(await mkProduct(u, { title: `Reward boost item ${i}` }));
+  const first = await boostSvc.createBoost({ productId: items[0]._id, user: u.toObject() });
+  assert.equal(first.usage.usedRewardCredit, true);
+  await expireAll(u);
+  await boostSvc.createBoost({ productId: items[1]._id, user: u.toObject() });
+  await expireAll(u);
+  await assert.rejects(boostSvc.createBoost({ productId: items[2]._id, user: u.toObject() }), /Monthly boost limit/i);
+  const left = (await User.findById(u._id).lean()).gamification.boost_credits;
+  assert.equal(left, 0);
+});
+await test("Pro uses its 2 plan boosts first, then 1 reward credit", async () => {
+  const u = await mkUser("pro", { gamification: { boost_credits: 1 } });
+  const items = [];
+  for (let i = 0; i < 4; i += 1) items.push(await mkProduct(u, { title: `Pro reward item ${i}` }));
+  for (let i = 0; i < 2; i += 1) {
+    const r = await boostSvc.createBoost({ productId: items[i]._id, user: u.toObject() });
+    assert.equal(r.usage.usedRewardCredit, false);
+    await expireAll(u);
+  }
+  assert.equal((await User.findById(u._id).lean()).gamification.boost_credits, 1);
+  const third = await boostSvc.createBoost({ productId: items[2]._id, user: u.toObject() });
+  assert.equal(third.usage.usedRewardCredit, true);
+  await expireAll(u);
+  await assert.rejects(boostSvc.createBoost({ productId: items[3]._id, user: u.toObject() }), /Monthly boost limit/i);
+  const summary = await boostSvc.getBoostSummary(u.toObject());
+  assert.equal(summary.monthlyUsed, 2);
+  assert.equal(summary.rewardCredits, 0);
+});
+await test("A refused reward boost (live cap) keeps the credit", async () => {
+  const u = await mkUser("base_user", { gamification: { boost_credits: 3 } });
+  const a = await mkProduct(u, { title: "Cap keeps credit a" });
+  const b = await mkProduct(u, { title: "Cap keeps credit b" });
+  await boostSvc.createBoost({ productId: a._id, user: u.toObject() });
+  await assert.rejects(boostSvc.createBoost({ productId: b._id, user: u.toObject() }), /Active boost limit/i);
+  assert.equal((await User.findById(u._id).lean()).gamification.boost_credits, 2);
+});
+
+console.log("\nRefund downgrade");
+await test("Plan refund revokes plan boosts but keeps paid add-on boosts", async () => {
+  const subSvc = await import(B + "src/services/subscription.service.js");
+  const u = await mkUser("pro_plus");
+  const planItem = await mkProduct(u, { title: "Refund plan boost" });
+  const addonItem = await mkProduct(u, { title: "Refund addon boost" });
+  await boostSvc.createBoost({ productId: planItem._id, user: u.toObject() });
+  await boostSvc.applyPurchasedBoost({ productId: addonItem._id, user: u.toObject(), durationHours: 72 });
+  await subSvc.downgradeToFree(u._id, "test");
+  const [p1, p2] = await Promise.all([Product.findById(planItem._id).lean(), Product.findById(addonItem._id).lean()]);
+  assert.equal(p1.is_boosted, false, "plan boost revoked");
+  assert.equal(p2.is_boosted, true, "add-on kept");
+  assert.equal((await User.findById(u._id).lean()).subscription, "base_user");
+});
+
 console.log("\nSearch ranking (Normal / Higher / Highest)");
 await Product.deleteMany({});
 const free = await mkUser("base_user");

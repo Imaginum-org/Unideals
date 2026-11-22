@@ -162,6 +162,32 @@ await test("says 'not enough data' instead of guessing from 1-2 listings", async
   assert.equal(r.confidence, null);
 });
 
+const yearsAgo = (y) => new Date(Date.now() - y * 365.25 * 864e5).toISOString().slice(0, 10);
+await test("accounts for age: an older item is suggested lower than a newer one", async () => {
+  freshCampus = new mongoose.Types.ObjectId();
+  // Comparables: 1-year-old items listed at 60% of new.
+  for (let i = 0; i < 5; i += 1) {
+    await mkProduct(other, { price: 600, original: 1000, campus_id: freshCampus, attributes: { purchase_date: yearsAgo(1) } });
+  }
+  const newer = await insights({ userId: me._id, condition: "like_new", originalPrice: 1000, purchaseDate: yearsAgo(0.1) });
+  const same = await insights({ userId: me._id, condition: "like_new", originalPrice: 1000, purchaseDate: yearsAgo(1) });
+  const older = await insights({ userId: me._id, condition: "like_new", originalPrice: 1000, purchaseDate: yearsAgo(4) });
+  assert.equal(same.suggestion.suggested, 600, "same age as the market = market price");
+  assert.ok(newer.suggestion.suggested > same.suggestion.suggested, `newer ${newer.suggestion.suggested}`);
+  assert.ok(older.suggestion.suggested < same.suggestion.suggested, `older ${older.suggestion.suggested}`);
+  assert.equal(older.ageAdjusted, true);
+});
+await test("without a purchase date, age is left out (same as before)", async () => {
+  const r = await insights({ userId: me._id, condition: "like_new", originalPrice: 1000 });
+  assert.equal(r.suggestion.suggested, 600);
+  assert.equal(r.ageAdjusted, false);
+});
+await test("ageFactor ignores nonsense dates", () => {
+  assert.equal(labs.ageFactor("not-a-date"), null);
+  assert.equal(labs.ageFactor(new Date(Date.now() + 30 * 864e5)), null, "future");
+  assert.equal(labs.ageFactor(yearsAgo(20)), 0.6, "floored");
+});
+
 await test("rejects an invalid category", async () => {
   await assert.rejects(labs.getPriceInsights({ campusId: campus._id, category: "weapons" }), /valid category/);
 });
@@ -208,6 +234,14 @@ await test("counts new buyer chats on listings in the category (old chats don't 
   const r = await insights({ userId: me._id, includeDemand: true });
   assert.equal(r.demand.chats30, 3);
   assert.equal(r.demand.live, 5);
+});
+
+await test("the seller's own live listings aren't counted as competition", async () => {
+  freshCampus = new mongoose.Types.ObjectId();
+  for (let i = 0; i < 3; i += 1) await mkProduct(other, { price: 500, original: 1000, campus_id: freshCampus });
+  for (let i = 0; i < 2; i += 1) await mkProduct(me, { price: 500, original: 1000, campus_id: freshCampus });
+  const r = await insights({ userId: me._id, includeDemand: true });
+  assert.equal(r.demand.live, 3);
 });
 
 await test("demand isn't included unless asked (Pro vs Pro+)", async () => {

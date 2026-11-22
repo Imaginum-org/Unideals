@@ -16,7 +16,6 @@ import { AccountLayout, CARD, FLUSH_ON_PHONE, btnPrimary, btnSecondary } from ".
 import { cn } from "../../../utils/cn.js";
 import VerifiedTick, { TickIcon } from "../../../components/common/VerifiedTick.jsx";
 import CollegeVerifyPrompt from "../components/overview/CollegeVerifyPrompt.jsx";
-import CampusBanner from "../components/overview/CampusBanner.jsx";
 import { ratingWeather } from "../components/overview/ratingWeather.js";
 import RentProfileCard from "../../rent/components/RentProfileCard.jsx"; // [rent]
 
@@ -122,6 +121,9 @@ function ProfileOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // "Needs your attention" shows 3 rows; the rest sit behind "Show more".
+  const [showAllTodo, setShowAllTodo] = useState(false);
+
   const listing = useMemo(() => {
     const st = (p) => (p.status || "").toLowerCase();
     return {
@@ -207,7 +209,7 @@ function ProfileOverview() {
   ].filter(Boolean);
 
   const ratingCount = ratings?.count || 0;
-  // Jenkins-style build weather for the buyer rating: clear sun when buyers
+  // Jenkins-style build weather for your rating: clear sun when people
   // are happy, clouds rolling in as it drops.
   const weather = !numbersLoading && ratingCount ? ratingWeather(ratings.avg) : null;
   const statCells = [
@@ -243,7 +245,22 @@ function ProfileOverview() {
       <div className="flex flex-col gap-4 sm:gap-5">
         {/* ── Profile header ── */}
         <section className={cn(CARD, FLUSH_ON_PHONE, "overflow-hidden max-sm:-mt-4")}>
-          <CampusBanner />
+          <div className="brand-surface h-28 overflow-hidden sm:h-36" aria-hidden="true">
+            {/* Light from the top-right: one wide, soft radial wash (no visible
+                shapes or edges), a faint diagonal sheen, and a 1px highlight on
+                the top edge. The wordmark is lit from the same corner. */}
+            <span
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(90% 130% at 100% 0%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0) 62%), linear-gradient(115deg, rgba(255,255,255,0) 42%, rgba(255,255,255,0.07) 58%, rgba(255,255,255,0) 74%)",
+              }}
+            />
+            <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-white/0 via-white/25 to-white/50" />
+            <p className="pointer-events-none absolute -bottom-[0.18em] right-3 select-none bg-gradient-to-bl from-white/70 via-white/25 to-white/[0.06] bg-clip-text text-[clamp(3.6rem,12vw,7.5rem)] font-extrabold leading-none tracking-[-0.04em] text-transparent sm:right-6">
+              unideals
+            </p>
+          </div>
 
           <div className="flex flex-col gap-4 px-4 pb-4 sm:flex-row sm:items-end sm:justify-between sm:px-6 sm:pb-5">
             <div className="flex min-w-0 items-end gap-4">
@@ -310,7 +327,7 @@ function ProfileOverview() {
             </div>
           </div>
 
-          {/* Buyer rating */}
+          {/* Your rating: from buyers you sold to and sellers you bought from */}
           <div className="flex flex-col gap-2 border-t border-neutral-100 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6 sm:px-6 dark:border-neutral-800">
             <div className="flex shrink-0 items-center gap-3">
               <span className="inline-flex items-center gap-2">
@@ -331,7 +348,7 @@ function ProfileOverview() {
               <div>
                 <StarRow value={ratingCount ? ratings.avg : 0} size="h-4 w-4" />
                 <p className="mt-0.5 text-[12px] text-slate-500 dark:text-zinc-400">
-                  {ratingCount ? `Buyer rating · ${ratingCount} review${ratingCount === 1 ? "" : "s"}` : "Buyer rating"}
+                  {ratingCount ? `Your rating · ${ratingCount} review${ratingCount === 1 ? "" : "s"}` : "Your rating"}
                 </p>
               </div>
             </div>
@@ -339,16 +356,37 @@ function ProfileOverview() {
               <figure className="min-w-0 flex-1 border-slate-200 sm:border-l sm:pl-6 dark:border-neutral-700">
                 <blockquote className="truncate text-[13px] text-slate-700 dark:text-zinc-200">“{ratings.recent[0].comment}”</blockquote>
                 <figcaption className="truncate text-[11.5px] text-slate-400 dark:text-zinc-500">
-                  {ratings.recent[0].buyer?.name || "A buyer"}
+                  {(ratings.recent[0].reviewer || ratings.recent[0].buyer)?.name || "A student"}
+                  {ratings.recent[0].reviewer_role === "seller" ? " (seller)" : " (buyer)"}
                   {ratings.recent[0].product_title ? ` · ${ratings.recent[0].product_title}` : ""}
                 </figcaption>
               </figure>
             ) : (
               <p className="min-w-0 flex-1 text-[12.5px] text-slate-500 sm:border-l sm:border-slate-200 sm:pl-6 dark:text-zinc-400 dark:sm:border-neutral-700">
-                {weather ? weather.hint : "Buyers rate you after a completed deal. Good ratings help you sell faster."}
+                {weather ? weather.hint : "After every completed deal, buyers rate you as a seller and sellers rate you as a buyer. Good ratings help you deal faster."}
               </p>
             )}
           </div>
+        </section>
+
+        {/* ── Key numbers ── */}
+        <section className={cn(CARD, FLUSH_ON_PHONE, "grid grid-cols-2 overflow-hidden lg:grid-cols-4")}>
+          {statCells.map((s, i) => (
+            <Link
+              key={s.label}
+              to={s.to}
+              className={cn(
+                "group relative px-4 py-4 transition-colors hover:bg-neutral-50/70 sm:px-5 dark:hover:bg-white/[0.02]",
+                i % 2 === 1 && "border-l border-neutral-100 dark:border-neutral-800",
+                i >= 2 && "border-t border-neutral-100 lg:border-l lg:border-t-0 dark:border-neutral-800",
+              )}
+            >
+              <span className="absolute inset-x-0 top-0 h-0.5 scale-x-0 bg-[var(--accent)] transition-transform group-hover:scale-x-100" aria-hidden="true" />
+              <p className="text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">{s.label}</p>
+              <p className="mt-1 truncate text-[24px] font-semibold leading-none tracking-tight tabular-nums text-slate-900 sm:text-[26px] dark:text-white">{s.value}</p>
+              <p className="mt-1.5 truncate text-[12px] text-slate-400 dark:text-zinc-500">{s.sub}</p>
+            </Link>
+          ))}
         </section>
 
         {/* ── Needs your attention: one small card per pending action ── */}
@@ -361,7 +399,7 @@ function ProfileOverview() {
               <span className="text-[12.5px] tabular-nums text-slate-400 dark:text-zinc-500">{todo.length}</span>
             </div>
             <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {todo.map((t) => {
+              {(showAllTodo ? todo : todo.slice(0, 3)).map((t) => {
                 const Icon = t.icon;
                 return (
                   <li key={t.key}>
@@ -385,6 +423,20 @@ function ProfileOverview() {
                 );
               })}
             </ul>
+            {todo.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAllTodo((v) => !v)}
+                aria-expanded={showAllTodo}
+                className="flex w-full items-center justify-center gap-1 border-t border-neutral-100 px-4 py-2.5 text-[12.5px] font-medium text-slate-500 transition-colors hover:bg-neutral-50 hover:text-slate-900 focus-visible:bg-neutral-50 focus-visible:outline-none dark:border-neutral-800 dark:text-zinc-400 dark:hover:bg-white/[0.03] dark:hover:text-white"
+              >
+                {showAllTodo ? "Show less" : `Show ${todo.length - 3} more`}
+                <ChevronRight
+                  className={cn("h-4 w-4 transition-transform", showAllTodo ? "-rotate-90" : "rotate-90")}
+                  aria-hidden="true"
+                />
+              </button>
+            )}
           </section>
         )}
 
@@ -421,26 +473,6 @@ function ProfileOverview() {
             </ol>
           </section>
         )}
-
-        {/* ── Key numbers ── */}
-        <section className={cn(CARD, FLUSH_ON_PHONE, "grid grid-cols-2 overflow-hidden lg:grid-cols-4")}>
-          {statCells.map((s, i) => (
-            <Link
-              key={s.label}
-              to={s.to}
-              className={cn(
-                "group relative px-4 py-4 transition-colors hover:bg-neutral-50/70 sm:px-5 dark:hover:bg-white/[0.02]",
-                i % 2 === 1 && "border-l border-neutral-100 dark:border-neutral-800",
-                i >= 2 && "border-t border-neutral-100 lg:border-l lg:border-t-0 dark:border-neutral-800",
-              )}
-            >
-              <span className="absolute inset-x-0 top-0 h-0.5 scale-x-0 bg-[var(--accent)] transition-transform group-hover:scale-x-100" aria-hidden="true" />
-              <p className="text-[12.5px] font-medium text-slate-500 dark:text-zinc-400">{s.label}</p>
-              <p className="mt-1 truncate text-[24px] font-semibold leading-none tracking-tight tabular-nums text-slate-900 sm:text-[26px] dark:text-white">{s.value}</p>
-              <p className="mt-1.5 truncate text-[12px] text-slate-400 dark:text-zinc-500">{s.sub}</p>
-            </Link>
-          ))}
-        </section>
 
         {/* Phones: every account destination + log out (sidebar is md+ only) */}
         <div className="md:hidden">

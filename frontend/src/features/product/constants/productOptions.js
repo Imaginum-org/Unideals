@@ -151,18 +151,16 @@ export const othersLast = (options) => [
   ...options.filter((o) => o.value === "others"),
 ];
 
+// description: one line shown under the chips for the chosen condition.
 export const PRODUCT_CONDITION_OPTIONS = [
-  { value: "brand_new", label: "Brand New" },
-
-  { value: "like_new", label: "Like New" },
-
-  { value: "gently_used", label: "Gently Used" },
-
-  { value: "well_used", label: "Well Used" },
-
+  { value: "brand_new", label: "Brand New", description: "Never used. Unopened, or still with tags." },
+  { value: "like_new", label: "Like New", description: "Used a few times. No marks or signs of wear." },
+  { value: "gently_used", label: "Gently Used", description: "Used with care. Light wear, works perfectly." },
+  { value: "well_used", label: "Well Used", description: "Clearly used. Visible wear, but works fine." },
   {
     value: "for_parts_or_not_working",
     label: "For Parts or Not Working",
+    description: "Damaged or not working. Sold as-is for parts or repair.",
   },
 ];
 

@@ -193,49 +193,83 @@ export const renderEmail = ({
 };
 
 /**
- * One-time-code email (college email verification). Same shell as
- * renderEmail, with a large spaced-out code in place of the button.
- * All inputs are pre-escaped; `code` is digits only.
+ * One-time-code email (college email verification), in a calm SaaS style:
+ * neutral canvas, white card, small logo, left-aligned copy, the code as six
+ * separate digit boxes (easy to read and to type), one action button and
+ * quiet security copy. Table layout + inline styles only (Gmail, Apple Mail,
+ * Outlook). All inputs are pre-escaped; `code` is digits only.
  */
-export const renderOtpEmail = ({ title, greeting, message, code, expiry, expiryNote, siteUrl, preheader }) => {
+export const renderOtpEmail = ({ title, greeting, message, code, expiry, expiryNote, siteUrl, preheader, ctaLabel, ctaUrl }) => {
   const year = new Date().getFullYear();
+  const INK = "#0F172A";
+  const BODY = "#475569";
+  const MUTED = "#94A3B8";
+  const LINE = "#E2E8F0";
+  // 6 × 42px boxes + 6px gaps = 282px: fits a 360px phone inside the card
+  // padding without media queries (which some mail apps ignore).
+  const digits = String(code)
+    .split("")
+    .map(
+      (d, i, all) =>
+        `<td align="center" valign="middle" width="42" height="52" style="width:42px;height:52px;background:#F8FAFC;border:1px solid ${LINE};border-radius:10px;color:${INK};font-size:24px;line-height:52px;font-weight:700;font-family:'SFMono-Regular',Menlo,Consolas,'Courier New',monospace;">${d}</td>${
+          i < all.length - 1 ? `<td width="6" style="width:6px;font-size:0;line-height:0;">&nbsp;</td>` : ""
+        }`,
+    )
+    .join("");
+
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="color-scheme" content="light only" /><title>${title}</title></head>
-<body style="margin:0;padding:0;background:#F5F6FF;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${preheader}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F6FF;font-family:${FONT};"><tr><td align="center" style="padding:24px 12px;">
-  <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;background:#FFFFFF;border:1px solid #E8EAFE;border-radius:14px;overflow:hidden;">
-    ${header("brand")}
-    <tr><td align="center" style="padding:24px 28px 4px;">
-      ${hero(envelopeIllustration)}
-      <h1 style="margin:0;color:#11183D;font-size:22px;line-height:1.25;letter-spacing:-.4px;font-weight:800;">${title}</h1>
-      <div style="width:32px;height:3px;margin:12px auto 14px;background:#C7C9FF;border-radius:3px;font-size:0;line-height:0;">&nbsp;</div>
-      <p style="margin:0 0 6px;color:#253052;font-size:15px;line-height:1.5;">${greeting}</p>
-      <p style="margin:0 auto;max-width:380px;color:#596785;font-size:14px;line-height:1.6;">${message}</p>
-    </td></tr>
-    <tr><td align="center" style="padding:18px 28px 20px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background:#F8F9FF;border:1px solid #E1E5F4;border-radius:12px;"><tr>
-        <td align="center" style="padding:14px 26px;color:#11183D;font-size:30px;line-height:1;font-weight:800;letter-spacing:10px;font-family:'SFMono-Regular',Consolas,'Courier New',monospace;">${code}</td>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="color-scheme" content="light only" /><meta name="supported-color-schemes" content="light only" /><title>${title}</title></head>
+<body style="margin:0;padding:0;background:#F4F5F7;-webkit-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${preheader}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F5F7;font-family:${FONT};"><tr><td align="center" style="padding:32px 12px 24px;">
+
+  <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:520px;">
+    <!-- Logo -->
+    <tr><td style="padding:0 4px 20px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="vertical-align:middle;padding-right:8px;"><img src="${LOGO_URL}" alt="" width="26" height="26" style="display:block;border:0;" /></td>
+        <td style="vertical-align:middle;color:${INK};font-size:18px;font-weight:700;letter-spacing:-.3px;">Unideals</td>
       </tr></table>
-      <p style="margin:10px 0 0;color:#7480A0;font-size:12.5px;line-height:1.5;">Enter this code on the Verification page in Settings.</p>
     </td></tr>
-    <tr><td style="padding:0 24px 20px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F2F2FF;border-radius:10px;"><tr>
-        <td width="58" valign="middle" style="padding:12px 0 12px 14px;">${clockIcon}</td>
-        <td valign="middle" style="padding:12px 14px 12px 0;color:#667392;font-size:12.5px;line-height:1.5;">
-          <span style="color:#182044;font-size:13px;">This code expires in <strong>${expiry}</strong>.</span><br/>${expiryNote}
+
+    <!-- Card -->
+    <tr><td style="background:#FFFFFF;border:1px solid ${LINE};border-radius:14px;padding:32px 24px 28px;">
+      <h1 style="margin:0 0 16px;color:${INK};font-size:22px;line-height:1.3;letter-spacing:-.3px;font-weight:700;">${title}</h1>
+      <p style="margin:0 0 8px;color:${INK};font-size:15px;line-height:1.6;">${greeting}</p>
+      <p style="margin:0 0 28px;color:${BODY};font-size:15px;line-height:1.6;">${message}</p>
+
+      <p style="margin:0 0 10px;color:${MUTED};font-size:12px;line-height:1.4;font-weight:600;letter-spacing:.6px;text-transform:uppercase;">Your verification code</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px;"><tr>${digits}</tr></table>
+      <p style="margin:0 0 28px;color:${BODY};font-size:13.5px;line-height:1.5;">This code expires in <strong style="color:${INK};">${expiry}</strong> and can only be used once.</p>
+
+      ${
+        ctaUrl
+          ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;"><tr>
+        <td align="center" bgcolor="${BRAND}" style="border-radius:10px;">
+          <a href="${ctaUrl}" target="_blank" style="display:inline-block;padding:12px 22px;color:#FFFFFF;font-size:14.5px;line-height:1.2;font-weight:600;text-decoration:none;border-radius:10px;">${ctaLabel}</a>
         </td>
-      </tr></table>
+      </tr></table>`
+          : ""
+      }
+
+      <div style="height:1px;background:${LINE};font-size:0;line-height:0;margin:0 0 20px;">&nbsp;</div>
+      <p style="margin:0;color:${MUTED};font-size:13px;line-height:1.6;">${expiryNote}</p>
     </td></tr>
-    <tr><td align="center" style="padding:16px 24px 18px;border-top:1px solid #EEF0FA;color:#8290AF;">
-      <p style="margin:0 0 8px;font-size:11.5px;line-height:1.6;">&#169; ${year} Unideals. All rights reserved.<br/>India</p>
-      <p style="margin:0;font-size:11.5px;line-height:1.6;">
-        <a href="${siteUrl}/privacy-policy" style="color:#3838EC;text-decoration:none;">Privacy Policy</a>
-        <span style="padding:0 8px;color:#AAB2CC;">&#8226;</span>
-        <a href="${siteUrl}/termscondition" style="color:#3838EC;text-decoration:none;">Terms of Service</a>
+
+    <!-- Footer -->
+    <tr><td style="padding:24px 4px 0;color:${MUTED};font-size:12px;line-height:1.7;">
+      <p style="margin:0 0 6px;">Unideals &#183; The campus marketplace for students &#183; India</p>
+      <p style="margin:0 0 6px;">
+        <a href="${siteUrl}/privacy-policy" style="color:${MUTED};text-decoration:underline;">Privacy</a>
+        <span style="padding:0 6px;">&#183;</span>
+        <a href="${siteUrl}/termscondition" style="color:${MUTED};text-decoration:underline;">Terms</a>
+        <span style="padding:0 6px;">&#183;</span>
+        <a href="${siteUrl}/contact" style="color:${MUTED};text-decoration:underline;">Help</a>
       </p>
+      <p style="margin:0;">&#169; ${year} Unideals. You received this because a verification code was requested for your account.</p>
     </td></tr>
   </table>
+
 </td></tr></table>
 </body></html>`;
 };

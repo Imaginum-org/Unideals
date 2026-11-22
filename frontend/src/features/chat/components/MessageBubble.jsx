@@ -1,7 +1,10 @@
-import { memo, useRef } from "react";
-import { Check, CheckCheck, Copy, Reply, RotateCcw, ShieldAlert, X } from "lucide-react";
+import { memo, useCallback, useRef, useState } from "react";
+import { Check, CheckCheck, Copy, Reply, RotateCcw, ShieldAlert, SmilePlus, X } from "lucide-react";
 import { toast } from "../../../components/ui/toast.js";
 import { formatName } from "../utils/display.js";
+import VoiceNote from "./VoiceNote.jsx";
+import ChatPhoto from "./ChatPhoto.jsx";
+import { ReactionChips, ReactionPicker } from "./MessageReactions.jsx";
 
 export const fmtTime = (iso) => {
   try {
@@ -89,6 +92,7 @@ const MessageBubble = ({
   onCounter,
   onReply,
   onJumpTo,
+  onReact,
   acting,
   isLastOfGroup = true,
   query = "",
@@ -97,16 +101,29 @@ const MessageBubble = ({
   const pressTimer = useRef(null);
   const repliable = msg?.message_type !== "system" && !msg?.is_flagged;
   const copyable = msg?.message_type === "text" && !msg?.is_flagged;
+  // Saved (non-optimistic) user messages can be reacted to.
+  const reactable = repliable && Boolean(onReact) && !String(msg?._id || "").startsWith("temp-");
+  const [picker, setPicker] = useState(null); // null | "hover" | "press"
+  const closePicker = useCallback(() => setPicker(null), []);
+  const myReaction = (msg?.reactions || []).find((r) => String(r.user_id) === String(myId))?.emoji || null;
+  const pick = useCallback(
+    (emoji) => {
+      setPicker(null);
+      onReact?.(msg, emoji);
+    },
+    [onReact, msg],
+  );
 
   const onTouchStart = (e) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    if (copyable) {
+    if (reactable || copyable) {
       clearTimeout(pressTimer.current);
       pressTimer.current = setTimeout(() => {
         touchStart.current = null;
-        copyText(msg.text);
         navigator.vibrate?.(10);
-      }, 500);
+        if (reactable) setPicker("press");
+        else copyText(msg.text);
+      }, 450);
     }
   };
   const onTouchMove = (e) => {
@@ -135,6 +152,18 @@ const MessageBubble = ({
         isMine ? "right-full mr-1.5" : "left-full ml-1.5"
       }`}
     >
+      {reactable && (
+        <button
+          type="button"
+          onClick={() => setPicker((v) => (v ? null : "hover"))}
+          aria-label="React"
+          title="React"
+          aria-expanded={Boolean(picker)}
+          className="grid size-7 place-items-center rounded-full text-slate-500 hover:bg-neutral-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+        >
+          <SmilePlus size={14} />
+        </button>
+      )}
       <button
         type="button"
         onClick={() => onReply?.(msg)}
@@ -157,6 +186,24 @@ const MessageBubble = ({
       )}
     </div>
   ) : null;
+
+  const Picker = picker ? (
+    <ReactionPicker
+      isMine={isMine}
+      mine={myReaction}
+      onPick={pick}
+      onClose={closePicker}
+      onCopy={
+        picker === "press" && copyable
+          ? () => {
+              setPicker(null);
+              copyText(msg.text);
+            }
+          : null
+      }
+    />
+  ) : null;
+  const Chips = <ReactionChips reactions={msg?.reactions} myId={myId} isMine={isMine} onToggle={(e) => onReact?.(msg, e)} />;
 
   const QuoteBlock = msg?.reply ? (
     <button
@@ -208,6 +255,7 @@ const MessageBubble = ({
       <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
         <div className="relative w-[260px] max-w-[85%]">
           {Toolbar}
+          {Picker}
           <div
             className={`overflow-hidden rounded-2xl border shadow-sm ${
               isMine
@@ -258,6 +306,7 @@ const MessageBubble = ({
               </div>
             </div>
           </div>
+          {Chips}
         </div>
       </div>
     );
@@ -278,10 +327,78 @@ const MessageBubble = ({
     );
   }
 
+  if (msg?.message_type === "image" && msg.image?.url && !msg.is_flagged) {
+    return (
+      <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
+        <div className="relative max-w-[86%] md:max-w-[70%]">
+          {Toolbar}
+          {Picker}
+          <div
+            className={`relative p-1 shadow-[0_1px_1px_rgba(15,23,42,0.06)] ${
+              isMine
+                ? "bg-[#E8E8FD] text-slate-900 dark:bg-[#2E2F6B] dark:text-zinc-100"
+                : "bg-white text-slate-900 ring-1 ring-black/[0.04] dark:bg-[#1F2226] dark:text-zinc-100 dark:ring-white/5"
+            } ${isLastOfGroup ? (isMine ? "rounded-2xl rounded-br-md" : "rounded-2xl rounded-bl-md") : "rounded-2xl"}`}
+          >
+            {QuoteBlock && <div className="px-1.5 pt-1">{QuoteBlock}</div>}
+            <div className="relative">
+              <ChatPhoto image={msg.image} alt={msg.text || "Photo"} />
+              {!msg.text && (
+                <span className="pointer-events-none absolute bottom-1.5 right-1.5 flex select-none items-center gap-[3px] rounded-full bg-black/45 px-1.5 py-0.5 text-[10.5px] leading-none text-white backdrop-blur-sm">
+                  {fmtTime(msg.createdAt)}
+                  {isMine && <Ticks status={msg.message_status} />}
+                </span>
+              )}
+            </div>
+            {msg.text && (
+              <div className="max-w-[min(16.5rem,64vw)] break-words px-2 pb-1 pt-1.5 text-[14px] leading-[20px] [overflow-wrap:anywhere]">
+                <span className="whitespace-pre-wrap">
+                  <RichText text={msg.text} query={query} />
+                </span>
+                <span className="float-right ml-2 mt-[7px] flex select-none items-center gap-[3px] text-[10.5px] leading-none text-slate-500/80 dark:text-zinc-400">
+                  {fmtTime(msg.createdAt)}
+                  {isMine && <Ticks status={msg.message_status} />}
+                </span>
+              </div>
+            )}
+          </div>
+          {Chips}
+        </div>
+      </div>
+    );
+  }
+
+  if (msg?.message_type === "audio" && msg.audio?.url) {
+    return (
+      <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
+        <div className="relative max-w-[86%] md:max-w-[70%]">
+          {Toolbar}
+          {Picker}
+          <div
+            className={`relative px-2.5 pb-1.5 pt-2 shadow-[0_1px_1px_rgba(15,23,42,0.06)] ${
+              isMine
+                ? "bg-[#E8E8FD] text-slate-900 dark:bg-[#2E2F6B] dark:text-zinc-100"
+                : "bg-white text-slate-900 ring-1 ring-black/[0.04] dark:bg-[#1F2226] dark:text-zinc-100 dark:ring-white/5"
+            } ${isLastOfGroup ? (isMine ? "rounded-2xl rounded-br-md" : "rounded-2xl rounded-bl-md") : "rounded-2xl"}`}
+          >
+            {QuoteBlock}
+            <VoiceNote audio={msg.audio} isMine={isMine} />
+            <span className="mt-0.5 flex select-none items-center justify-end gap-[3px] text-[10.5px] leading-none text-slate-500/80 dark:text-zinc-400">
+              {fmtTime(msg.createdAt)}
+              {isMine && <Ticks status={msg.message_status} />}
+            </span>
+          </div>
+          {Chips}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div {...touch} className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}>
       <div className="relative max-w-[82%] md:max-w-[70%]">
         {Toolbar}
+          {Picker}
         <div
           className={`relative break-words px-3 pb-1.5 pt-1.5 text-[14px] leading-[20px] shadow-[0_1px_1px_rgba(15,23,42,0.06)] [overflow-wrap:anywhere] ${
             isMine
@@ -298,6 +415,7 @@ const MessageBubble = ({
             {isMine && <Ticks status={msg.message_status} />}
           </span>
         </div>
+        {Chips}
       </div>
     </div>
   );

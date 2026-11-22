@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { rateSeller } from "../api/reviewApi.js";
+import { rateDeal } from "../api/reviewApi.js";
 import { toast } from "../../../components/ui/toast.js";
 import { btnPrimary, btnSecondary } from "./account/AccountKit.jsx";
 import { cn } from "../../../utils/cn.js";
@@ -31,8 +31,21 @@ export function StarRow({ value = 0, size = "h-4 w-4", className }) {
   );
 }
 
-/** Buyer rates the seller after a completed deal. */
-export default function RateSellerDialog({ open, onClose, conversationId, sellerName, productTitle, onRated }) {
+/** Rate the other side of a completed deal: the seller (default) or the buyer.
+ *  `required`: no close button, Escape or backdrop tap; the only way out is
+ *  to submit a rating (used by the post-deal RatingGate). */
+export default function RateSellerDialog({
+  open,
+  onClose,
+  conversationId,
+  sellerName,
+  otherName = sellerName,
+  otherRole = "seller",
+  productTitle,
+  onRated,
+  required = false,
+  queueNote,
+}) {
   const [stars, setStars] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
@@ -43,10 +56,11 @@ export default function RateSellerDialog({ open, onClose, conversationId, seller
     setStars(0);
     setHover(0);
     setComment("");
+    if (required) return undefined;
     const onKey = (e) => e.key === "Escape" && onClose?.();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, required, conversationId]);
 
   if (!open) return null;
   const shown = hover || stars;
@@ -55,11 +69,17 @@ export default function RateSellerDialog({ open, onClose, conversationId, seller
     if (!stars) return;
     setSaving(true);
     try {
-      await rateSeller(conversationId, stars, comment);
+      await rateDeal(conversationId, stars, comment);
       toast.success("Thanks! Your rating helps other students.");
       onRated?.(stars);
       onClose?.();
     } catch (err) {
+      // Already rated (another tab/device): treat it as done.
+      if (err?.response?.status === 409) {
+        onRated?.(stars);
+        onClose?.();
+        return;
+      }
       toast.error(err?.response?.data?.message || "Could not save your rating");
     } finally {
       setSaving(false);
@@ -67,22 +87,34 @@ export default function RateSellerDialog({ open, onClose, conversationId, seller
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={required ? undefined : onClose}
+    >
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Rate the seller"
+        aria-label={`Rate the ${otherRole}`}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-t-3xl border border-neutral-200 bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] font-figtree shadow-2xl sm:rounded-3xl dark:border-neutral-800 dark:bg-[#1A1D20]"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-[17px] font-semibold text-slate-900 dark:text-white">Rate {sellerName || "the seller"}</h2>
+            {required && (
+              <p className="mb-1 text-[11.5px] font-semibold uppercase tracking-wider text-[var(--accent-text)]">
+                Deal complete 🎉{queueNote ? ` · ${queueNote}` : ""}
+              </p>
+            )}
+            <h2 className="text-[17px] font-semibold text-slate-900 dark:text-white">
+              {required ? `How was ${otherName || `the ${otherRole}`} as a ${otherRole}?` : `Rate ${otherName || `the ${otherRole}`}`}
+            </h2>
             {productTitle && <p className="truncate text-[13px] text-slate-500 dark:text-zinc-400">For {productTitle}</p>}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-slate-400 hover:bg-neutral-100 hover:text-slate-700 dark:hover:bg-white/5">
-            <X className="h-[18px] w-[18px]" />
-          </button>
+          {!required && (
+            <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-slate-400 hover:bg-neutral-100 hover:text-slate-700 dark:hover:bg-white/5">
+              <X className="h-[18px] w-[18px]" />
+            </button>
+          )}
         </div>
 
         <div className="mt-5 flex flex-col items-center" onMouseLeave={() => setHover(0)}>
@@ -113,16 +145,23 @@ export default function RateSellerDialog({ open, onClose, conversationId, seller
             value={comment}
             onChange={(e) => setComment(e.target.value.slice(0, 300))}
             rows={3}
-            placeholder="On time, item as described, easy to deal with…"
+            placeholder={otherRole === "buyer" ? "On time, polite, paid as agreed…" : "On time, item as described, easy to deal with…"}
             className="mt-1 w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2 text-[14px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--accent)] dark:border-neutral-700 dark:bg-white/5 dark:text-white"
           />
           <span className="block text-right text-[11px] tabular-nums text-slate-400">{comment.length}/300</span>
         </label>
 
+        {required && (
+          <p className="mt-1 text-[12px] text-slate-500 dark:text-zinc-400">
+            Ratings are shown on profiles and listings, so every student knows who they&apos;re dealing with.
+          </p>
+        )}
         <div className="mt-3 flex gap-2">
-          <button type="button" onClick={onClose} className={cn(btnSecondary, "flex-1")}>
-            Later
-          </button>
+          {!required && (
+            <button type="button" onClick={onClose} className={cn(btnSecondary, "flex-1")}>
+              Later
+            </button>
+          )}
           <button type="button" onClick={submit} disabled={!stars || saving} className={cn(btnPrimary, "flex-1")}>
             {saving ? "Saving…" : "Submit rating"}
           </button>

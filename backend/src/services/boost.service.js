@@ -1,12 +1,45 @@
 import Boost from "../models/Boost.model.js";
 import Product from "../models/Product.model.js";
+import User from "../models/User.model.js";
 import { PRODUCT_STATUS } from "../config/constants.js";
 import { getBoostPlanRules } from "../config/boostPlans.js";
 
-// Quota filter: purchased add-ons (isAddon:true) never consume monthly or
-// active quota slots — the payment is the entitlement. $ne:true keeps
-// legacy docs without the field counted as quota.
-const QUOTA_FILTER = { isAddon: { $ne: true } };
+// Monthly quota: only plan boosts count. Purchased add-ons (isAddon) and
+// level-reward boosts (isReward) are paid for separately. $ne:true keeps
+// legacy docs without the fields counted as quota.
+const MONTHLY_FILTER = { isAddon: { $ne: true }, isReward: { $ne: true } };
+// Live-boost cap (anti-spam): plan and reward boosts share it; purchased
+// add-ons never take a slot.
+const ACTIVE_FILTER = { isAddon: { $ne: true } };
+
+const quotaCounts = (userId, start, end) =>
+  Promise.all([
+    Boost.countDocuments({ user_id: userId, ...MONTHLY_FILTER, createdAt: { $gte: start, $lt: end } }),
+    Boost.countDocuments({ user_id: userId, ...ACTIVE_FILTER, status: "active", expires_at: { $gt: new Date() } }),
+  ]);
+
+const rewardCreditsOf = async (userId) =>
+  (await User.findById(userId).select("gamification.boost_credits").lean())?.gamification?.boost_credits || 0;
+
+// Atomically take one level-reward credit; false when the balance is 0.
+const spendRewardCredit = async (userId) =>
+  Boolean(
+    await User.findOneAndUpdate(
+      { _id: userId, "gamification.boost_credits": { $gte: 1 } },
+      { $inc: { "gamification.boost_credits": -1 } },
+      { returnDocument: "after", projection: { _id: 1 } },
+    ),
+  );
+
+const refundRewardCredit = (userId) =>
+  User.updateOne({ _id: userId }, { $inc: { "gamification.boost_credits": 1 } });
+
+const limitError = (message, code) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  error.code = code;
+  return error;
+};
 
 const campusMismatchError = () => {
   const error = new Error("Boosts are limited to your own campus listings.");
@@ -23,9 +56,15 @@ const assertSameCampus = (product, user) => {
     throw campusMismatchError();
   }
 };
+// Calendar month in India time (UTC+5:30), whatever the server timezone,
+// so monthly boosts reset at midnight IST on the 1st.
+const IST_OFFSET_MS = 330 * 60 * 1000;
 const getMonthWindow = (date = new Date()) => {
-  const start = new Date(date.getFullYear(), date.getMonth(), 1);
-  const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+  const ist = new Date(date.getTime() + IST_OFFSET_MS);
+  const y = ist.getUTCFullYear();
+  const m = ist.getUTCMonth();
+  const start = new Date(Date.UTC(y, m, 1) - IST_OFFSET_MS);
+  const end = new Date(Date.UTC(y, m + 1, 1) - IST_OFFSET_MS);
 
   return { start, end };
 };
@@ -37,20 +76,10 @@ export const getBoostSummary = async (user) => {
 
   const rules = getBoostPlanRules(user.subscription);
   const { start, end } = getMonthWindow();
-  const now = new Date();
 
-  const [monthlyUsed, activeBoosts] = await Promise.all([
-    Boost.countDocuments({
-      user_id: user._id,
-      ...QUOTA_FILTER,
-      createdAt: { $gte: start, $lt: end },
-    }),
-    Boost.countDocuments({
-      user_id: user._id,
-      ...QUOTA_FILTER,
-      status: "active",
-      expires_at: { $gt: now },
-    }),
+  const [[monthlyUsed, activeBoosts], rewardCredits] = await Promise.all([
+    quotaCounts(user._id, start, end),
+    rewardCreditsOf(user._id),
   ]);
 
   return {
@@ -61,6 +90,8 @@ export const getBoostSummary = async (user) => {
     activeBoosts,
     maxActiveBoosts: rules.maxActiveBoosts,
     activeBoostSlotsRemaining: Math.max(rules.maxActiveBoosts - activeBoosts, 0),
+    // Level-reward credits, spent only after the monthly plan boosts.
+    rewardCredits,
     durationHours: rules.durationHours,
     monthEndsAt: end,
   };
@@ -124,26 +155,27 @@ export const createBoost = async ({ productId, user }) => {
   const rules = getBoostPlanRules(tier);
   const { start, end } = getMonthWindow();
 
-  const [monthlyUsage, activeBoosts] = await Promise.all([
-    Boost.countDocuments({
-      user_id: user._id,
-      ...QUOTA_FILTER,
-      createdAt: { $gte: start, $lt: end },
-    }),
-    Boost.countDocuments({
-      user_id: user._id,
-      ...QUOTA_FILTER,
-      status: "active",
-      expires_at: { $gt: new Date() },
-    }),
-  ]);
-
-  if (monthlyUsage >= rules.monthlyLimit) {
-    throw new Error(`Monthly boost limit reached for your plan`);
-  }
+  const [monthlyUsage, activeBoosts] = await quotaCounts(user._id, start, end);
 
   if (activeBoosts >= rules.maxActiveBoosts) {
-    throw new Error(`Active boost limit reached for your plan`);
+    throw limitError(
+      rules.maxActiveBoosts === 1
+        ? "Active boost limit reached: you already have a boost running. Start the next one when it ends."
+        : `Active boost limit reached: you can run ${rules.maxActiveBoosts} boosts at a time on your plan.`,
+      "BOOST_ACTIVE_LIMIT",
+    );
+  }
+
+  // Plan boosts first. Once this month's are used up, a level-reward
+  // credit pays for it instead (taken atomically, refunded on rollback).
+  const useReward = monthlyUsage >= rules.monthlyLimit;
+  if (useReward && !(await spendRewardCredit(user._id))) {
+    throw limitError(
+      rules.monthlyLimit > 0
+        ? `Monthly boost limit reached: you have used all ${rules.monthlyLimit} boosts on your plan this month.`
+        : "Monthly boost limit reached: your plan does not include free boosts. Upgrade, or buy a one-time boost.",
+      "BOOST_MONTHLY_LIMIT",
+    );
   }
 
   const startsAt = new Date();
@@ -161,8 +193,10 @@ export const createBoost = async ({ productId, user }) => {
       expires_at: expiresAt,
       duration_hours: rules.durationHours,
       isAddon: false,
+      isReward: useReward,
     });
   } catch (err) {
+    if (useReward) await refundRewardCredit(user._id).catch(() => {});
     // Handle duplicate/race gracefully
     if (err.code === 11000) {
       throw new Error("This product is already boosted");
@@ -175,46 +209,33 @@ export const createBoost = async ({ productId, user }) => {
   product.boost_tier = tier;
   await product.save();
 
-  // Post-create re-check to bound parallel-race over-grant.
-  // If limits are now exceeded, roll back this boost.
-  // Quota window is the calendar month (spec): simpler to reason about and
-  // matches the summary display. A rolling-30d window would change
-  // monthEndsAt semantics, so it is intentionally not used.
-  const [monthlyAfter, activeAfter] = await Promise.all([
-    Boost.countDocuments({
-      user_id: user._id,
-      ...QUOTA_FILTER,
-      createdAt: { $gte: start, $lt: end },
-    }),
-    Boost.countDocuments({
-      user_id: user._id,
-      ...QUOTA_FILTER,
-      status: "active",
-      expires_at: { $gt: new Date() },
-    }),
-  ]);
+  // Post-create re-check to bound parallel-race over-grant: if a limit is
+  // now exceeded, roll this boost back (and give the reward credit back).
+  // Quota window is the calendar month (IST), matching the summary display.
+  const [monthlyAfter, activeAfter] = await quotaCounts(user._id, start, end);
 
-  if (
-    monthlyAfter > rules.monthlyLimit ||
-    activeAfter > rules.maxActiveBoosts
-  ) {
+  if ((!useReward && monthlyAfter > rules.monthlyLimit) || activeAfter > rules.maxActiveBoosts) {
     await Promise.allSettled([
       Boost.deleteOne({ _id: boost._id }),
       Product.updateOne(
         { _id: product._id, boost_expires_at: expiresAt },
         { $set: { is_boosted: false }, $unset: { boost_expires_at: "", boost_tier: "" } },
       ),
+      useReward ? refundRewardCredit(user._id) : null,
     ]);
-    throw new Error("Boost limit reached for your plan. Please try later.");
+    throw limitError("Boost limit reached for your plan. Please try later.", "BOOST_LIMIT");
   }
+
+  const monthlyUsed = useReward ? monthlyUsage : monthlyUsage + 1;
 
   return {
     boost,
     product,
     usage: {
       monthlyLimit: rules.monthlyLimit,
-      monthlyUsed: monthlyUsage + 1,
-      monthlyRemaining: Math.max(rules.monthlyLimit - monthlyUsage - 1, 0),
+      monthlyUsed,
+      monthlyRemaining: Math.max(rules.monthlyLimit - monthlyUsed, 0),
+      usedRewardCredit: useReward,
       maxActiveBoosts: rules.maxActiveBoosts,
       activeBoosts: activeBoosts + 1,
       activeBoostSlotsRemaining: Math.max(

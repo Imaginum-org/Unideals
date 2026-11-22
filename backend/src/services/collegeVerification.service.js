@@ -83,11 +83,15 @@ const statusOf = (user, allowedDomains = []) => ({
 });
 
 export const getCollegeStatus = async (userId) => {
-  const user = await User.findById(userId)
-    .select("is_college_verified college_email college_verified_at campus_id +college_email_otp")
-    .populate("campus_id", "slug name email_domains")
-    .lean();
+  const load = () =>
+    User.findById(userId)
+      .select("email is_email_verified is_college_verified college_email college_verified_at campus_id +college_email_otp")
+      .populate("campus_id", "slug name email_domains")
+      .lean();
+  let user = await load();
   if (!user) throw new AppError("User not found", 404);
+  // Signed in with their college email: verified on the spot (see below).
+  if (await autoVerifyFromAccountEmail(user)) user = await load();
   return statusOf(user, campusDomainsFor(user.campus_id));
 };
 
@@ -219,4 +223,31 @@ export const verifyCollegeOtp = async (userId, rawCode) => {
   }
 
   return { verified: true, email: maskEmail(otp.email), verifiedAt };
+};
+
+/**
+ * Automatic tick: someone whose sign-in email *is* their college email
+ * (email/password with a verified inbox, or Google, which proves the inbox)
+ * already showed they own it, so they get verified without the OTP step.
+ * Runs whenever the profile loads, so it also applies once a campus is
+ * picked. Personal addresses never match (campusDomainsFor drops them), so
+ * everyone else still verifies from Settings. Returns true when it verified.
+ */
+export const autoVerifyFromAccountEmail = async (user) => {
+  if (!user?._id || user.is_college_verified || !user.is_email_verified) return false;
+  const email = normalizeEmail(user.email);
+  if (!EMAIL_RE.test(email)) return false;
+  const allowed = campusDomainsFor(user.campus_id && typeof user.campus_id === "object" ? user.campus_id : null);
+  if (!allowed.some((d) => matchesDomain(domainOf(email), d))) return false;
+  try {
+    const res = await User.updateOne(
+      { _id: user._id, is_college_verified: { $ne: true } },
+      { $set: { is_college_verified: true, college_email: email, college_verified_at: new Date(), college_email_otp: null } },
+    );
+    return res.modifiedCount > 0;
+  } catch (err) {
+    // Same college email already verified on another account: leave this one alone.
+    if (err?.code === 11000) return false;
+    throw err;
+  }
 };

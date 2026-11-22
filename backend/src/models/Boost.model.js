@@ -43,6 +43,13 @@ const boostSchema = new Schema(
       default: false,
       index: true,
     },
+    // true = paid for with a level-reward credit (gamification.boost_credits),
+    // not with the plan's monthly quota. Excluded from the monthly count but
+    // still counts toward the live-boost cap.
+    isReward: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
       enum: ["active", "expired"],

@@ -105,6 +105,12 @@ notificationSchema.index(
   { recipient_id: 1, group_key: 1, is_read: 1 },
   { partialFilterExpression: { group_key: { $type: "string" } } },
 );
+// Daily unread-email digest: only unread personal rows are indexed, so the
+// grouping scan stays proportional to what's actually pending.
+notificationSchema.index(
+  { sent_at: 1 },
+  { partialFilterExpression: { is_broadcast: false, status: "sent", is_read: false } },
+);
 // Broadcast feed / admin history.
 notificationSchema.index({ is_broadcast: 1, status: 1, target_audience: 1, sent_at: -1 });
 

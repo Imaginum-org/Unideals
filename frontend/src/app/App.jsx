@@ -1,11 +1,15 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "../components/ui/Toast.jsx";
+import NetworkStatusBanner from "../components/ui/NetworkStatusBanner.jsx";
+import PlanLimitDialog from "../components/ui/PlanLimitDialog.jsx";
+import RatingGate from "../features/user/components/RatingGate.jsx";
 import { toast } from "../components/ui/toast.js";
 import AppRoutes from "./routes.jsx";
 import usePrefetch from "./usePrefetch.js";
 import { useUser } from "../context/useUserContext.jsx";
 import { NotificationProvider } from "../context/NotificationContext.jsx";
+import { FEMALE_ONLY_THEMES, useTheme } from "../context/ThemeContext.jsx";
 
 // Prefixes that require a session (must mirror ProtectedLayout in
 // routes.jsx). A dead session on any other page clears state silently
@@ -36,7 +40,7 @@ const isProtectedPath = (pathname = "") =>
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { clearUserData, isLoggedIn } = useUser();
+  const { clearUserData, isLoggedIn, userDetails } = useUser();
   usePrefetch();
 
   // Refs so the one-time event listeners always see fresh values.
@@ -85,12 +89,23 @@ function App() {
     };
   }, [clearUserData, navigate]);
 
+  // Rose / Lavender are offered to female students only. If the signed-in
+  // profile says otherwise (e.g. a shared device), fall back to light.
+  const { theme, setTheme } = useTheme();
+  const gender = userDetails?.gender;
+  useEffect(() => {
+    if (gender && gender !== "female" && FEMALE_ONLY_THEMES.includes(theme)) setTheme("light");
+  }, [gender, theme, setTheme]);
+
   return (
     <div className="App">
       <NotificationProvider>
         <AppRoutes />
       </NotificationProvider>
       <Toaster />
+      <PlanLimitDialog />
+      <RatingGate />
+      <NetworkStatusBanner />
     </div>
   );
 }

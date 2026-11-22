@@ -4,6 +4,7 @@ import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedLayout from "../layouts/ProtectedLayout.jsx";
 import PublicOnlyRoute from "../layouts/PublicOnlyRoute.jsx";
 import BrandLoader from "../components/ui/BrandLoader.jsx";
+import { useRentConfig } from "../features/rent/hooks/useRentConfig.js"; // [rent]
 
 // Lazy import that survives stale chunks. After a deploy (or when the Vite
 // dev cache is rebuilt), a tab opened earlier asks for chunk URLs that no
@@ -89,6 +90,7 @@ const Myorders = page(() => import("../features/user/pages/Myorders.jsx"));
 const ContactUs = page(() => import("../features/user/pages/ContactUs.jsx"));
 const FAQ = page(() => import("../features/help/pages/FAQ.jsx"));
 const VideoGuides = page(() => import("../features/help/pages/VideoGuides.jsx"));
+const Rentals = page(() => import("../features/rentals/pages/Rentals.jsx"));
 const Termscondition = page(() => import("../features/user/pages/Termscondition.jsx"));
 const PrivacyPolicy = page(() => import("../features/legal/pages/PrivacyPolicy.jsx"));
 const Chat = page(() => import("../features/chat/pages/Chat.jsx"));
@@ -104,6 +106,13 @@ const RentBooking = page(() => import("../features/rent/pages/RentBooking.jsx"))
 const RentRentals = page(() => import("../features/rent/pages/RentRentals.jsx"));
 // Old activity links (notifications, bookmarks) land on Profile → Rentals.
 const RentActivityRedirect = () => <Navigate to={`/rentals${useLocation().search}`} replace />;
+// /rentals is shared with the "coming soon" Rentals page: the live
+// Profile → Rentals while Rent & Borrow is on, the placeholder while it's off.
+const RentalsRoute = () => {
+  const rent = useRentConfig();
+  if (rent.loading) return <BrandLoader size="full" />;
+  return rent.enabled ? <RentRentals /> : <Rentals />;
+};
 
 // Path prefix → page, used by prefetchRoute(). First match wins, so longer
 // prefixes ("/profileoverview") come before shorter ones ("/profile").
@@ -132,7 +141,7 @@ const PREFETCH_TABLE = [
   ["/contact", ContactUs],
   ["/faq", FAQ],
   ["/guides", VideoGuides],
-  // [rent]
+  // [rent] "/rentals" was ["/rentals", Rentals]; it now goes through RentalsRoute
   ["/rent/booking/", RentBooking],
   ["/rentals", RentRentals],
   ["/rent/new", RentPostForm],
@@ -208,6 +217,7 @@ export default function AppRoutes() {
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/achievements" element={<Achievements />} />
             <Route path="/guides" element={<VideoGuides />} />
+            <Route path="/rentals" element={<RentalsRoute />} /> {/* [rent] was <Rentals /> */}
             <Route path="/badge" element={<Navigate to="/achievements" replace />} />
             <Route path="/myorders" element={<Myorders />} />
             <Route path="/chat" element={<Chat />} />
@@ -220,7 +230,6 @@ export default function AppRoutes() {
             <Route path="/rent/new" element={<RentPostForm />} />
             <Route path="/rent/edit/:id" element={<RentPostForm />} />
             <Route path="/rent/activity" element={<RentActivityRedirect />} />
-            <Route path="/rentals" element={<RentRentals />} />
             <Route path="/rent/booking/:id" element={<RentBooking />} />
             <Route path="/rent/:id" element={<RentPostDetail />} />
           </Route>

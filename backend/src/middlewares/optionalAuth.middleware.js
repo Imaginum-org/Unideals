@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
+import { isSessionActive } from "../utils/sessionCache.js";
 import { USER_STATUS } from "../config/constants.js";
 
 const optionalAuth = async (req, res, next) => {
@@ -20,7 +21,7 @@ const optionalAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
     const user = await User.findById(decoded.id).select("-password -refresh_token").lean();
     
-    if (!user || user.status !== USER_STATUS.ACTIVE) {
+    if (!user || user.status !== USER_STATUS.ACTIVE || (decoded.sid && !(await isSessionActive(decoded.sid)))) {
       req.user = null;
       req.userId = null;
       return next();

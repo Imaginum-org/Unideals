@@ -324,7 +324,9 @@ export const toggleWishlist = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-    const isAlreadyInWishlist = user.wishlist.some(
+    // Accounts created outside the app (scripts, migrations) may have no
+    // wishlist array at all: treat that as empty instead of crashing.
+    const isAlreadyInWishlist = (user.wishlist || []).some(
       (id) => id.toString() === productId.toString(),
     );
 

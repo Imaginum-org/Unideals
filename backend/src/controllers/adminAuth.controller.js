@@ -4,6 +4,7 @@ import {
   loginWithPassword,
   refreshSession,
   revokeRefreshToken,
+  revokeSessionByToken,
   sanitizeAuthUser,
   setAuthCookies,
 } from "../services/auth.service.js";
@@ -78,7 +79,9 @@ export const adminRefreshToken = async (req, res) => {
 
 export const adminLogout = async (req, res) => {
   try {
-    await revokeRefreshToken(req.userId);
+    // Sign out this browser only; no cookie means sign out everywhere.
+    if (req.cookies?.refreshToken) await revokeSessionByToken(req.cookies.refreshToken);
+    else await revokeRefreshToken(req.userId);
     clearAuthCookies(res);
 
     return res.status(200).json({

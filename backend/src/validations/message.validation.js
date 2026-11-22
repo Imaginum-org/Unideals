@@ -25,3 +25,25 @@ export const listMessagesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   before: z.string().trim().optional(),
 });
+
+export const sendVoiceSchema = z.object({
+  fileId: z.string().trim().min(1).max(256).regex(/^[A-Za-z0-9_\-/]+$/, "Invalid voice note"),
+  durationMs: z.coerce.number().int().min(1).max(125000),
+  peaks: z.array(z.coerce.number().min(0).max(100)).max(48).optional(),
+  replyTo: objectId.optional(),
+});
+
+export const sendImageSchema = z.object({
+  publicId: z.string().trim().min(1).max(255).regex(/^[A-Za-z0-9_\-/]+$/, "Invalid photo"),
+  version: z.coerce.number().int().positive(),
+  signature: z.string().trim().regex(/^[a-f0-9]{40}$/i, "Invalid photo"),
+  width: z.coerce.number().int().min(0).max(20000).optional(),
+  height: z.coerce.number().int().min(0).max(20000).optional(),
+  caption: z.string().trim().max(1000, "Caption too long").optional(),
+  replyTo: objectId.optional(),
+});
+
+export const reactionSchema = z.object({
+  // null clears your reaction; the allowed set is enforced in the service.
+  emoji: z.string().trim().max(16).nullable(),
+});

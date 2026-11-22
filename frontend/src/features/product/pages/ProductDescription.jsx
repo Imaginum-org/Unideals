@@ -47,7 +47,7 @@ import {
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
 import VerifiedTick from "../../../components/common/VerifiedTick.jsx";
 import EmptyState from "../../../components/ui/EmptyState.jsx";
-import LimitModal from "../../../components/ui/LimitModal.jsx";
+import { isPlanLimitError } from "../../../services/planLimit.js";
 import ReportUserModal from "../../chat/components/ReportUserModal.jsx";
 import Seo from "../../../components/Seo.jsx";
 import { canonicalFor } from "../../../components/seo/routeSeo.js";
@@ -276,7 +276,6 @@ const ProductDescription = () => {
   const [reportTarget, setReportTarget] = useState(null); // null | "product" | "user"
   const [reportBusy, setReportBusy] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
-  const [limitInfo, setLimitInfo] = useState(null);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const productRef = useRef(null);
@@ -480,7 +479,6 @@ const ProductDescription = () => {
       const added = await toggleWishlist(product._id, product);
       toast.success(added ? "Saved to wishlist" : "Removed from wishlist", { id: "wishlist-toast" });
     } catch (error) {
-      const code = error?.response?.data?.code;
       const message = error?.response?.data?.message || error?.message || "Failed to update wishlist";
       // Only a real 401 means "log in"; message text is never trusted for this.
       if (error?.response?.status === 401) {
@@ -488,8 +486,8 @@ const ProductDescription = () => {
         toast.error("Please log in to use your wishlist");
         return;
       }
-      if (code === "WISHLIST_LIMIT" || /wishlist limit/i.test(message)) setLimitInfo({ message });
-      else toast.error(message, { id: "wishlist-error" });
+      // Wishlist cap: the app-wide plan dialog is already open.
+      if (!isPlanLimitError(error)) toast.error(message, { id: "wishlist-error" });
     } finally {
       setWishlistLoading(false);
     }
@@ -920,7 +918,6 @@ const ProductDescription = () => {
           onClose={closeReport}
           onSubmit={submitReport}
         />
-        {limitInfo && <LimitModal title="Wishlist is full" message={limitInfo.message} onClose={() => setLimitInfo(null)} />}
         <ImageLightbox
           open={isLightboxOpen}
           images={images}

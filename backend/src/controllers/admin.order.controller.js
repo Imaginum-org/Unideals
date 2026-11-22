@@ -1,4 +1,5 @@
 import * as adminOrderService from "../services/admin.order.service.js";
+import { cachedAdminStat, viewKey } from "../utils/adminStatsCache.js";
 import { safeErrorMessage } from "../utils/response.js";
 
 const sendSuccess = (res, message, payload, statusCode = 200) =>
@@ -27,7 +28,7 @@ export const getOrders = async (req, res) => {
 
 export const getOrderStats = async (req, res) => {
   try {
-    const stats = await adminOrderService.getAdminOrderStats(req.campusScope);
+    const stats = await cachedAdminStat(`orderStats:${viewKey(req.campusScope)}`, () => adminOrderService.getAdminOrderStats(req.campusScope));
     return sendSuccess(res, "Order stats fetched successfully", { data: stats });
   } catch (error) {
     return sendFailure(res, error);

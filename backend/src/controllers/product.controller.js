@@ -103,6 +103,7 @@ export const createProduct = async (req, res) => {
     // Preserve Girls Corner codes (403/429) exactly for frontend gating.
     const girlsCodes = new Set([
       "NOT_ELIGIBLE_GIRLS_ONLY",
+      "ADMIN_CONFIRM_GIRLS_ONLY",
       "GIRLS_CORNER_RESTRICTED",
       "GENDER_LOCKED",
     ]);

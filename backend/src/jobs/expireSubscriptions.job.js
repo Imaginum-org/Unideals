@@ -6,15 +6,15 @@ import { expireDueSubscriptions } from "../services/subscription.service.js";
 /**
  * Expiry Job: downgrade expired semester subscriptions to Free.
  * Founder (lifetime) rows are skipped inside expireDueSubscriptions.
- * Runs daily at 3 AM (after the 2 AM product-cleanup job).
+ * Runs daily at 3 AM IST (after the 2 AM product-cleanup job).
  */
 export const scheduleExpireSubscriptions = () => {
   defineJob({
     key: "expire-subscriptions",
     name: "Expire subscriptions",
     description: "Moves users whose Pro / Pro+ plan has ended back to the free plan.",
-    schedule: "0 3 * * *",
-    scheduleLabel: "Daily at 03:00",
+    schedule: "30 21 * * *",
+    scheduleLabel: "Daily at 03:00 IST (21:30 UTC)",
     run: () => expireDueSubscriptions(),
   });
 
@@ -22,8 +22,8 @@ export const scheduleExpireSubscriptions = () => {
     key: "expire-payment-orders",
     name: "Expire abandoned payments",
     description: "Marks payment orders that were created but never paid within 24 hours as expired.",
-    schedule: "15 3 * * *",
-    scheduleLabel: "Daily at 03:15",
+    schedule: "45 21 * * *",
+    scheduleLabel: "Daily at 03:15 IST (21:45 UTC)",
     run: async () => {
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const result = await Payment.updateMany(

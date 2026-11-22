@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import auth from "../middlewares/auth.middleware.js";
 import requireRoles from "../middlewares/role.middleware.js";
 import { USER_ROLES } from "../config/constants.js";
+import { clearAdminStatsCache } from "../utils/adminStatsCache.js";
 
 // Auth controllers
 import {
@@ -89,6 +90,13 @@ import {
 } from "../controllers/notification.controller.js";
 
 const router = express.Router();
+
+// Staff writes (suspend, resolve, edit campus...) clear the cached summary
+// counts, so the person who acted sees the result straight away.
+router.use((req, res, next) => {
+  if (req.method !== "GET") res.on("finish", () => res.statusCode < 400 && clearAdminStatsCache());
+  next();
+});
 
 // Auth 
 // Privileged login: strict brute-force protection.

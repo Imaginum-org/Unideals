@@ -9,7 +9,8 @@ import { PRODUCT_CONDITION_OPTIONS } from "../../constants/productOptions.js";
  *   ?condition=like_new,gently_used   multi-select
  *   ?min=500&max=2000                 price (either side optional)
  *   ?posted=1|7|30                    posted within N days
- *   ?offers=1                         open to offers only
+ *   ?offers=0                         include fixed-price items too
+ *                                     ("Open to negotiate" is ticked by default)
  *   ?sort=…                           page-specific sort keys
  *
  * `preserve` lists params a "Clear all" must keep (tab, q, category…).
@@ -53,7 +54,7 @@ export default function useBrowseFilters({ sortOptions, defaultSort, preserve = 
     [minPrice, maxPrice] = [maxPrice, minPrice];
   }
   const posted = POSTED_VALUES.has(rawPosted) ? rawPosted : "";
-  const offersOnly = params.get("offers") === "1";
+  const offersOnly = params.get("offers") !== "0";
   const sort = sortOptions.some((o) => o.value === rawSort) ? rawSort : defaultSort;
 
   const update = useCallback(
@@ -84,7 +85,7 @@ export default function useBrowseFilters({ sortOptions, defaultSort, preserve = 
     update({ min: a ?? "", max: b ?? "" });
   };
   const setPosted = (value) => update({ posted: value });
-  const setOffersOnly = (on) => update({ offers: on ? "1" : "" });
+  const setOffersOnly = (on) => update({ offers: on ? "" : "0" });
   const setSort = (value) => update({ sort: value === defaultSort ? "" : value });
 
   const clearAll = () => {
@@ -102,7 +103,8 @@ export default function useBrowseFilters({ sortOptions, defaultSort, preserve = 
   };
 
   const hasPrice = minPrice != null || maxPrice != null;
-  const activeCount = conditions.length + (hasPrice ? 1 : 0) + (posted ? 1 : 0) + (offersOnly ? 1 : 0);
+  // "Open to negotiate" is the default, so only the other filters count as active.
+  const activeCount = conditions.length + (hasPrice ? 1 : 0) + (posted ? 1 : 0);
 
   const priceLabel = hasPrice
     ? minPrice != null && maxPrice != null
@@ -124,7 +126,7 @@ export default function useBrowseFilters({ sortOptions, defaultSort, preserve = 
       label: POSTED_OPTIONS.find((p) => p.value === posted)?.label,
       onRemove: () => setPosted(""),
     },
-    offersOnly && { key: "offers", label: "Open to offers", onRemove: () => setOffersOnly(false) },
+    offersOnly && { key: "offers", label: "Open to negotiate", onRemove: () => setOffersOnly(false) },
   ].filter(Boolean);
 
   // API params (feed + search share the same names).

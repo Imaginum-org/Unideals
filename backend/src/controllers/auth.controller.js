@@ -5,7 +5,7 @@ import { OAuth2Client } from "google-auth-library";
 import userModel from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 import generatedAccessToken from "../utils/generatedAccessToken.js";
-import generatedRefreshToken from "../utils/generatedRefreshToken.js";
+import generatedRefreshToken, { sessionIdOf } from "../utils/generatedRefreshToken.js";
 import verifyEmailTempplate from "../utils/templates/verifyEmailTemplate.js";
 import forgotPaswordTemplate from "../utils/templates/forgotPaswordTemplate.js";
 import { USER_STATUS } from "../config/constants.js";
@@ -14,7 +14,7 @@ import {
   loginWithPassword,
   refreshSession,
   revokeRefreshToken,
-  revokeRefreshTokenByToken,
+  revokeSessionByToken,
   sanitizeAuthUser,
   setAuthCookies,
 } from "../services/auth.service.js";
@@ -202,6 +202,7 @@ const findOrCreateGoogleUser = async (payload, { googleGender = null } = {}) => 
       name,
       email,
       password: hashedPassword,
+      password_set: false,
       avatar: picture ? { url: picture } : undefined,
       is_email_verified: true,
       verifyTokenEmail: "",
@@ -232,6 +233,7 @@ const findOrCreateGoogleUser = async (payload, { googleGender = null } = {}) => 
       // ownership, so discard that unproven password and any sessions.
       user.is_email_verified = true;
       user.password = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+      user.password_set = false;
       user.verifyTokenEmail = "";
       user.verifyTokenEmailExpiry = null;
       user.tokenVersion = (user.tokenVersion || 0) + 1;
@@ -326,6 +328,7 @@ export const registerUserController = async (req, res) => {
       // and log in once the real owner clicked the verification link.
       await userModel.findByIdAndUpdate(existingUser._id, {
         password: await bcrypt.hash(password, 10),
+        password_set: true,
         verifyTokenEmail: hashedVerifyToken,
         verifyTokenEmailExpiry: verifyExpiry,
         $inc: { tokenVersion: 1 },
@@ -360,6 +363,7 @@ export const registerUserController = async (req, res) => {
       name,
       email,
       password: hashedPassword,
+      password_set: true,
       verifyTokenEmail: hashedVerifyToken,
       verifyTokenEmailExpiry: verifyExpiry,
       is_email_verified: false,
@@ -584,8 +588,8 @@ export const googleOneTapController = async (req, res) => {
     user.last_login_date = new Date();
     await user.save();
 
-    const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0);
     const refreshToken = await generatedRefreshToken(user._id, user.tokenVersion || 0);
+    const accessToken = await generatedAccessToken(user._id, user.tokenVersion || 0, sessionIdOf(refreshToken));
 
     const tokens = issueSession(req, res, accessToken, refreshToken);
 
@@ -667,8 +671,8 @@ export const exchangeGoogleOAuthCodeController = async (req, res) => {
     freshUser.last_login_date = new Date();
     await freshUser.save();
 
-    const accessToken = await generatedAccessToken(freshUser._id, freshUser.tokenVersion || 0);
     const refreshToken = await generatedRefreshToken(freshUser._id, freshUser.tokenVersion || 0);
+    const accessToken = await generatedAccessToken(freshUser._id, freshUser.tokenVersion || 0, sessionIdOf(refreshToken));
 
     const tokens = issueSession(req, res, accessToken, refreshToken);
 
@@ -725,8 +729,8 @@ export const pollGoogleOAuthController = async (req, res) => {
     }
     freshUser.last_login_date = new Date();
     await freshUser.save();
-    const accessToken = await generatedAccessToken(freshUser._id, freshUser.tokenVersion || 0);
     const refreshToken = await generatedRefreshToken(freshUser._id, freshUser.tokenVersion || 0);
+    const accessToken = await generatedAccessToken(freshUser._id, freshUser.tokenVersion || 0, sessionIdOf(refreshToken));
     const tokens = issueSession(req, res, accessToken, refreshToken);
     return res.status(200).json({
       message: "Google login successful",
@@ -840,15 +844,19 @@ export const checkEmailVerificationController = async (req, res) => {
 
 export const logoutUser = async (req, res) => {
   try {
-    // Prefer authenticated userId, fallback to refresh-cookie lookup
-    // so legacy GET /logoutUser (no auth middleware) still revokes server-side.
+    // Sign out THIS device only (other phones/laptops stay signed in).
+    // Without a refresh token to identify the device, fall back to signing
+    // the account out everywhere, which is the safe default.
     const mobile = isMobileClient(req);
-    if (req.userId) {
+    const token = mobile
+      ? typeof req.body?.refreshToken === "string"
+        ? req.body.refreshToken
+        : null
+      : req.cookies?.refreshToken || null;
+    if (token) {
+      await revokeSessionByToken(token);
+    } else if (req.userId) {
       await revokeRefreshToken(req.userId);
-    } else if (mobile && typeof req.body?.refreshToken === "string") {
-      await revokeRefreshTokenByToken(req.body.refreshToken);
-    } else if (!mobile && req.cookies?.refreshToken) {
-      await revokeRefreshTokenByToken(req.cookies.refreshToken);
     }
     clearAuthCookies(res);
 
@@ -1031,6 +1039,7 @@ export const resetPasswordController = async (req, res) => {
 
     await userModel.findByIdAndUpdate(user._id, {
       password: hashedPassword,
+      password_set: true,
       reset_password_token: "",
       reset_password_expiry: null,
       // Clicking the emailed reset link proves inbox ownership.

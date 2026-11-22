@@ -6,8 +6,8 @@ import {
   CircleHelp,
   Crown,
   FileText,
-  Handshake,
   Heart,
+  KeyRound,
   LifeBuoy,
   LogOut,
   Package,
@@ -34,7 +34,7 @@ const GROUPS = [
     items: [
       { to: "/myorders", label: "Orders", icon: Package },
       { to: "/productlisted", label: "My listings", icon: ShoppingBag },
-      { to: "/rentals", label: "Rentals", icon: Handshake, rentOnly: true }, // [rent]
+      { to: "/rentals", label: "Rentals", icon: KeyRound, soon: true, rent: true }, // [rent] flag: drops "Soon" once Rent & Borrow is on
       { to: "/wishlist", label: "Wishlist", icon: Heart },
       { to: "/notification", label: "Notifications", icon: Bell, badgeKey: "notif" },
     ],
@@ -58,7 +58,7 @@ const GROUPS = [
   },
 ];
 
-function Row({ to, label, icon: Icon, badge }) {
+function Row({ to, label, icon: Icon, badge, soon = false }) {
   return (
     <Link
       to={to}
@@ -66,6 +66,11 @@ function Row({ to, label, icon: Icon, badge }) {
     >
       <Icon className="h-[17px] w-[17px] shrink-0 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-slate-800 dark:text-zinc-100">{label}</span>
+      {soon && (
+        <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--accent-text)]">
+          Soon
+        </span>
+      )}
       {badge > 0 && (
         <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#FF3B30] px-1.5 text-[11px] font-bold text-white">
           {badge > 99 ? "99+" : badge}
@@ -111,8 +116,13 @@ export default function MobileAccountMenu() {
             {group.title}
           </h2>
           <div className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200/80 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-[#1A1D20]">
-            {group.items.filter((item) => !item.rentOnly || rentEnabled).map((item) => ( // [rent] filter
-              <Row key={item.to} {...item} badge={item.badgeKey === "notif" ? unreadCount : 0} />
+            {group.items.map((item) => (
+              <Row
+                key={item.to}
+                {...item}
+                soon={item.soon && !(item.rent && rentEnabled)} // [rent]
+                badge={item.badgeKey === "notif" ? unreadCount : 0}
+              />
             ))}
           </div>
         </section>
