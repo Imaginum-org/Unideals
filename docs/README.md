@@ -33,5 +33,6 @@ Everything beyond the top-level [README](../README.md) lives here. Keep each doc
 | [changelog/2026-09-security-hardening-and-bug-fixes.md](changelog/2026-09-security-hardening-and-bug-fixes.md) | 2026-09-19 full-stack hardening + 2026-10-02 update (Razorpay integration, auth, CORS, sanitisation) |
 | [changelog/2026-11-full-audit-and-fixes.md](changelog/2026-11-full-audit-and-fixes.md) | 2026-11-08 second full audit (authorization gaps, data leaks, races) and the UI/payment updates that followed |
 | [changelog/2026-11-db-and-jobs-optimisation.md](changelog/2026-11-db-and-jobs-optimisation.md) | 2026-11-16 database, query, index and background-job optimisation for multi-instance scale, plus the index-sync deploy steps |
+| [changelog/2026-11-admin-routes-optimisation.md](changelog/2026-11-admin-routes-optimisation.md) | 2026-11-22 admin routes: orders/listings/users lists paged in MongoDB, dashboard 26 → 10 queries, admin stats and access cache, new indexes |
 
 New fix logs go in `changelog/` as `YYYY-MM-<short-topic>.md`.
