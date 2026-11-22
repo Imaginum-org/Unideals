@@ -15,6 +15,16 @@ const feedMetaCache = createTtlCache({ max: 2000 });
 const COUNT_TTL_MS = 30 * 1000;
 // Feed pages (no search). Cleared on any listing write (Product model hooks).
 const FEED_PAGE_TTL_MS = 15 * 1000;
+
+// Ranking clock. Recency scores used to be computed against the exact
+// request time, so page 2 of an infinite scroll was ranked a few seconds
+// "later" than page 1: decaying recency reshuffled the order between the
+// two requests, listings slid across the page boundary, and the client's
+// de-dupe silently dropped repeats (short, random-looking pages, some
+// listings never shown). Snapping to a 10-minute bucket gives every page
+// of a scroll the same ranking.
+const RANK_CLOCK_MS = 10 * 60 * 1000;
+const rankClock = () => new Date(Math.floor(Date.now() / RANK_CLOCK_MS) * RANK_CLOCK_MS);
 const PRICE_META_TTL_MS = 60 * 1000;
 const cachedCount = (pipeline) =>
   feedMetaCache.memo(`count:${keyOf(pipeline)}`, COUNT_TTL_MS, async () => {
@@ -518,7 +528,7 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
   page = Math.min(page, 1000);
 
   const skip = (page - 1) * limit;
-  const now = new Date();
+  const now = rankClock();
 
   // Base filter, campus first: legacy campus-less listings are excluded
   // from every feed (their sellers assign campus via the onboarding gate).
@@ -659,20 +669,26 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
       ...(typeof search === "string" && search.trim() ? { relevanceScore: -1 } : {}),
       score: -1,
       createdAt: -1,
+      _id: -1,
     },
 
+    // _id breaks ties: Mongo doesn't guarantee an order for equal keys, so
+    // without it equal-scored listings could swap between page requests.
     latest: {
       createdAt: -1,
+      _id: -1,
     },
 
     price_low: {
       selling_price: 1,
       createdAt: -1,
+      _id: -1,
     },
 
     price_high: {
       selling_price: -1,
       createdAt: -1,
+      _id: -1,
     },
   };
 
@@ -740,13 +756,14 @@ export const getAllProducts = async (query, campusId, viewerGender = null, viewe
 
   // Feed pages without a text search are identical for everyone with the
   // same filters (viewer-specific rules are already in baseMatch), so share
-  // them for a few seconds. `now` only shifts recency scores by seconds.
+  // them for a few seconds. The rank clock is in the key so a cached page
+  // is never mixed with pages ranked against a different clock bucket.
   const isSearch = typeof search === "string" && search.trim();
   const loadPage = () => Product.aggregate(pipeline);
   const [products, total, priceMeta] = await Promise.all([
     isSearch
       ? loadPage()
-      : feedPageCache.memo(`feed:${keyOf({ baseMatch, sort: safeSort, skip, limit })}`, FEED_PAGE_TTL_MS, loadPage),
+      : feedPageCache.memo(`feed:${keyOf({ baseMatch, sort: safeSort, skip, limit, at: now.getTime() })}`, FEED_PAGE_TTL_MS, loadPage),
     cachedCount(totalPipeline),
     feedMetaCache.memo(`price:${keyOf(priceMetaPipeline)}`, PRICE_META_TTL_MS, () =>
       Product.aggregate(priceMetaPipeline),
@@ -1189,7 +1206,7 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
   const stemClauses = stemVariants(rawTokens);
   const matchedCategories = detectCategories(sanitizedQuery);
 
-  const now = new Date();
+  const now = rankClock();
 
   // Base visibility filter + whitelisted facet filters.
   const baseMatch = {
@@ -1368,10 +1385,10 @@ export const searchProducts = async (queryOrOptions = {}, campusId, viewerGender
   const allowedSorts = ["relevant", "latest", "price_low", "price_high"];
   const safeSort = allowedSorts.includes(sort) ? sort : "relevant";
   const sortStage = {
-    relevant: { finalScore: -1, createdAt: -1 },
-    latest: { createdAt: -1 },
-    price_low: { selling_price: 1, createdAt: -1 },
-    price_high: { selling_price: -1, createdAt: -1 },
+    relevant: { finalScore: -1, createdAt: -1, _id: -1 },
+    latest: { createdAt: -1, _id: -1 },
+    price_low: { selling_price: 1, createdAt: -1, _id: -1 },
+    price_high: { selling_price: -1, createdAt: -1, _id: -1 },
   }[safeSort];
 
   pipeline.push({ $sort: sortStage });

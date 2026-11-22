@@ -1,7 +1,7 @@
 import { memo, forwardRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { FaStar, FaCrown } from "react-icons/fa";
-import { Heart } from "lucide-react";
+import { Heart, ImageIcon } from "lucide-react";
 import { useWishlist } from "../../../context/WishlistContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { ikCard, ikCardSrcSet } from "../../../utils/imageTransform.js";
@@ -113,6 +113,10 @@ const ProductCard = memo(
         // height as a normal one (subtle border only), so grid rows never
         // stretch and normal cards never inherit slack above the footer.
         showBoostBar = false,
+        // Listing-form buyer preview: shows a "Cover photo" placeholder
+        // until one is added, and drops the hover actions and the seller /
+        // location footer (the seller already knows who they are).
+        preview = false,
       },
       ref,
     ) => {
@@ -331,6 +335,7 @@ const ProductCard = memo(
           onClick={handleClick}
           className={`
 group
+block
 relative
 w-full
 overflow-hidden
@@ -386,6 +391,12 @@ ${tierStyles.cardShadow}
             )}
             {/* IMAGE SECTION */}
             <div className="pc-media relative w-full aspect-[6/5] overflow-hidden rounded-xl">
+              {preview && !rawImage ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-neutral-100 text-slate-400 dark:bg-white/5 dark:text-zinc-500">
+                  <ImageIcon className="h-7 w-7" aria-hidden="true" />
+                  <span className="text-[12px] font-medium">Cover photo</span>
+                </div>
+              ) : (
               <img
                 loading="lazy"
                 decoding="async"
@@ -399,6 +410,7 @@ ${tierStyles.cardShadow}
 ease-[cubic-bezier(0.22,1,0.36,1)]
 group-hover:scale-[1.05]"
               />
+              )}
 
               {/* Hot deal: server-granted, time-boxed (see utils/hotDeal.js).
                   Top-left, opposite the wishlist heart. */}
@@ -408,6 +420,7 @@ group-hover:scale-[1.05]"
 
               {/* Chat with seller: centred pill that slides up over the
                   photo on hover (desktop); phones open the listing instead. */}
+              {!preview && (
               <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex translate-y-4 scale-95 justify-center opacity-0 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:opacity-100">
                 <button
                   type="button"
@@ -423,6 +436,7 @@ group-hover:scale-[1.05]"
                   <span>{isOwnListing ? "View listing" : "Chat with seller"}</span>
                 </button>
               </div>
+              )}
 
               {/* BOOSTED STATE is signalled by the top bar above (rocket +
                   live countdown) instead of a photo overlay, so the card
@@ -430,6 +444,7 @@ group-hover:scale-[1.05]"
 
               {/* WISHLIST — always visible on touch; on desktop it reveals on
                   hover, and stays put once the item is saved. */}
+              {!preview && (
               <div
                 className={`absolute right-2.5 top-2.5 z-20 transition-all duration-300 ease-out ${
                   inWishlist
@@ -456,6 +471,7 @@ group-hover:scale-[1.05]"
                   )}
                 </button>
               </div>
+              )}
             </div>
 
             {/* CONTENT SECTION */}
@@ -505,6 +521,7 @@ group-hover:scale-[1.05]"
               </div>
 
               {/* FOOTER (Avatar, Rating & Location) */}
+              {!preview && (
               <div className="mt-auto pt-4">
               <div className="flex min-w-0 items-center gap-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
                 {/* Left Side: Avatar & Name */}
@@ -555,6 +572,7 @@ group-hover:scale-[1.05]"
                 )}
               </div>
               </div>
+              )}
             </div>
           </div>
         </Link>
