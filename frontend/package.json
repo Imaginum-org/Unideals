@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "echo \"Add Prettier here\""
+    "format": "echo \"Add Prettier here\"",
+    "test:network": "node tests/networkStatus.test.mjs"
   },
   "keywords": [
     "react",

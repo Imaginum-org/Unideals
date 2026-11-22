@@ -118,3 +118,8 @@ dist
 .pnp.*
 
 # End of https://mrkandreev.name/snippets/gitignore-generator/#Node
+# Load-test fixtures/results (local only)
+loadtest/.fixtures.json
+loadtest/results.json
+loadtest/sockets.json
+loadtest/*.log

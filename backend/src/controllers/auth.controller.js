@@ -202,6 +202,7 @@ const findOrCreateGoogleUser = async (payload, { googleGender = null } = {}) => 
       name,
       email,
       password: hashedPassword,
+      password_set: false,
       avatar: picture ? { url: picture } : undefined,
       is_email_verified: true,
       verifyTokenEmail: "",
@@ -232,6 +233,7 @@ const findOrCreateGoogleUser = async (payload, { googleGender = null } = {}) => 
       // ownership, so discard that unproven password and any sessions.
       user.is_email_verified = true;
       user.password = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+      user.password_set = false;
       user.verifyTokenEmail = "";
       user.verifyTokenEmailExpiry = null;
       user.tokenVersion = (user.tokenVersion || 0) + 1;
@@ -326,6 +328,7 @@ export const registerUserController = async (req, res) => {
       // and log in once the real owner clicked the verification link.
       await userModel.findByIdAndUpdate(existingUser._id, {
         password: await bcrypt.hash(password, 10),
+        password_set: true,
         verifyTokenEmail: hashedVerifyToken,
         verifyTokenEmailExpiry: verifyExpiry,
         $inc: { tokenVersion: 1 },
@@ -360,6 +363,7 @@ export const registerUserController = async (req, res) => {
       name,
       email,
       password: hashedPassword,
+      password_set: true,
       verifyTokenEmail: hashedVerifyToken,
       verifyTokenEmailExpiry: verifyExpiry,
       is_email_verified: false,
@@ -1035,6 +1039,7 @@ export const resetPasswordController = async (req, res) => {
 
     await userModel.findByIdAndUpdate(user._id, {
       password: hashedPassword,
+      password_set: true,
       reset_password_token: "",
       reset_password_expiry: null,
       // Clicking the emailed reset link proves inbox ownership.

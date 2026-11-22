@@ -182,6 +182,11 @@ export const loginWithPassword = async ({
     throw error;
   }
 
+  // A correct password proves one is set (backfills older accounts).
+  if (user.password_set !== true) {
+    userModel.updateOne({ _id: user._id }, { $set: { password_set: true } }).catch(() => {});
+  }
+
   // Verification gate AFTER correct password only — wrong-password probes
   // can no longer learn verified/unverified status.
   if (!user.is_email_verified) {

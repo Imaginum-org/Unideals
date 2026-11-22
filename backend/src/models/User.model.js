@@ -33,6 +33,15 @@ const userSchema = new Schema(
       minlength: [8, "Password must be at least 8 characters"],
     },
 
+    // false = the account only has the random password made at Google
+    // sign-up, so the user can't sign in with email + password (or confirm
+    // account deletion) until they set one. true once they sign up with a
+    // password, reset it, or sign in with it. Missing on older accounts =
+    // unknown (they predate this flag).
+    password_set: {
+      type: Boolean,
+    },
+
     avatar: {
       _id: false,
       url: {

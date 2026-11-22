@@ -1,6 +1,7 @@
 import axios from "axios";
 import instance from "./axiosInstance";
 import { getRefreshTokenUrl } from "../features/auth/api/authApi";
+import { maybeShowPlanLimit } from "./planLimit.js";
 
 let isRefreshing = false;
 let refreshSubscribers = [];
@@ -71,6 +72,11 @@ instance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const responseData = error.response?.data;
+
+    // Plan caps (listings, wishlist, boosts): one app-wide upgrade dialog.
+    if (maybeShowPlanLimit(error)) {
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 403 && responseData?.accountBlocked) {
       clearStoredAuth();

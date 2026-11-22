@@ -5,7 +5,7 @@ import { Heart } from "lucide-react";
 import { useWishlist } from "../../../context/WishlistContext.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { ikCard, ikCardSrcSet } from "../../../utils/imageTransform.js";
-import LimitModal from "../../../components/ui/LimitModal.jsx";
+import { isPlanLimitError } from "../../../services/planLimit.js";
 import { toast } from "../../../components/ui/toast.js";
 import { IoLocationOutline } from "react-icons/io5";
 import AvatarComponent from "../../../components/common/AvatarComponent.jsx";
@@ -121,7 +121,6 @@ const ProductCard = memo(
       const { campus } = useCampus();
       const { userDetails } = useUser();
       const [loading, setLoading] = useState(false);
-      const [limitInfo, setLimitInfo] = useState(null);
       const navigate = useNavigate();
 
       // Hooks must run unconditionally (rules-of-hooks): the null guard
@@ -268,7 +267,6 @@ const ProductCard = memo(
           );
         } catch (error) {
           const status = error?.response?.status;
-          const code = error?.response?.data?.code;
           const message =
             error?.response?.data?.message ||
             error?.message ||
@@ -283,12 +281,8 @@ const ProductCard = memo(
             toast.error("Please log in to use your wishlist");
             return;
           }
-          // Wishlist cap hit: upgrade modal instead of a dead-end toast.
-          if (code === "WISHLIST_LIMIT" || /wishlist limit/i.test(message)) {
-            setLimitInfo({ message });
-          } else {
-            toast.error(message);
-          }
+          // Wishlist cap hit: the app-wide plan dialog is already open.
+          if (!isPlanLimitError(error)) toast.error(message);
         } finally {
           setLoading(false);
         }
@@ -564,13 +558,6 @@ group-hover:scale-[1.05]"
             </div>
           </div>
         </Link>
-        {limitInfo && (
-          <LimitModal
-            title="Wishlist is full"
-            message={limitInfo.message}
-            onClose={() => setLimitInfo(null)}
-          />
-        )}
       </>
       );
     },

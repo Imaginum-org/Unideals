@@ -16,7 +16,7 @@ import {
   PRODUCT_PAYMENT_OPTIONS,
   PRODUCT_USAGE_OPTIONS,
 } from "../constants/productOptions";
-import LimitModal from "../../../components/ui/LimitModal.jsx";
+import { isPlanLimitError, showPlanLimit } from "../../../services/planLimit.js";
 import BrandLoader from "../../../components/ui/BrandLoader.jsx";
 import { useCampus } from "../../../context/CampusContext.jsx";
 import { useUser } from "../../../context/useUserContext.jsx";
@@ -33,7 +33,6 @@ const PreviewStep = () => {
   const { updateUserDetails, userDetails } = useUser();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [publishStage, setPublishStage] = useState("");
-  const [limitInfo, setLimitInfo] = useState(null);
   // Admin (not Female) listing in Girls Corner: ask once per submit.
   const [girlsConfirm, setGirlsConfirm] = useState(null); // { resolve } while open
 
@@ -64,7 +63,7 @@ const PreviewStep = () => {
       if (limit == null || products == null) return true;
       const active = products.filter((p) => ["listed", "active"].includes((p.status || "").toLowerCase())).length;
       if (active >= limit) {
-        setLimitInfo({ message: `You've reached your plan's listing limit (${limit} active). Upgrade to list more.` });
+        showPlanLimit({ code: "LISTING_LIMIT" });
         return false;
       }
       return true;
@@ -196,10 +195,9 @@ const PreviewStep = () => {
   };
 
   const showError = (error, fallback) => {
-    const code = error?.response?.data?.code;
     const message = error?.response?.data?.message || error?.message || fallback;
-    if (code === "LISTING_LIMIT" || /listing limit/i.test(message)) setLimitInfo({ message });
-    else toast.error(message);
+    // Listing cap: the app-wide plan dialog is already open.
+    if (!isPlanLimitError(error)) toast.error(message);
   };
 
   /**
@@ -553,9 +551,6 @@ const PreviewStep = () => {
         />
       </div>
 
-      {limitInfo && (
-        <LimitModal title="You're out of listings" message={limitInfo.message} onClose={() => setLimitInfo(null)} />
-      )}
 
       {girlsConfirm && (
         <div

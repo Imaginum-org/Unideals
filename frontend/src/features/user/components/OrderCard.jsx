@@ -7,7 +7,7 @@ import RelistProductModal from "../../product/components/RelistProductModal.jsx"
 import { deleteProduct, unlistProduct, relistProduct, getProductById } from "../../product/api/productApi.js";
 import { createPaymentOrder, verifyPayment } from "../../payment/api/paymentApi.js";
 import { useRazorpayCheckout } from "../../payment/hooks/useRazorpayCheckout.js";
-import LimitModal from "../../../components/ui/LimitModal.jsx";
+import { isPlanLimitError } from "../../../services/planLimit.js";
 import { toast } from "../../../components/ui/toast.js";
 import { productPath } from "../../../utils/productPath.js";
 import { CARD, FLUSH_ON_PHONE, btnPrimary } from "./account/AccountKit.jsx";
@@ -56,7 +56,6 @@ const OrderCard = ({
   const [isRelisting, setIsRelisting] = useState(false);
   const [isBoosting, setIsBoosting] = useState(false);
   const [buyingAddon, setBuyingAddon] = useState(null);
-  const [limitInfo, setLimitInfo] = useState(null);
   // Local paint guarantee: set on purchase success so the boosted visuals
   // appear instantly even if the parent list merge is delayed or skipped.
   // Cleared automatically once parent props reflect the boost.
@@ -137,15 +136,10 @@ const OrderCard = ({
         if (onProductRelisted) onProductRelisted(orderId);
       }
     } catch (error) {
-      const code = error?.response?.data?.code;
       const message =
         error?.response?.data?.message || "Failed to relist product";
-      // Relisting reactivates against the plan cap: show upgrade modal.
-      if (code === "LISTING_LIMIT" || /listing limit/i.test(message)) {
-        setLimitInfo({ message });
-      } else {
-        toast.error(message);
-      }
+      // Relisting counts against the plan cap: the plan dialog is open.
+      if (!isPlanLimitError(error)) toast.error(message);
     } finally {
       setIsRelisting(false);
     }
@@ -164,14 +158,8 @@ const OrderCard = ({
         toast.success(res.data.message || "Product boosted successfully");
       }
     } catch (error) {
-      const status = error?.response?.status;
-      const msg = error?.response?.data?.message || "Failed to boost product";
-      // Quota exhausted (403): paid options are visible below + upgrade link.
-      if (status === 403 || /limit reached/i.test(msg)) {
-        toast.error("Boost quota exhausted. Buy an extra boost or upgrade below");
-      } else {
-        toast.error(msg);
-      }
+      // Boost caps open the app-wide plan dialog (one-time boost + upgrade).
+      if (!isPlanLimitError(error)) toast.error(error?.response?.data?.message || "Failed to boost product");
     } finally {
       setIsBoosting(false);
     }
@@ -420,7 +408,6 @@ const OrderCard = ({
         productName={name}
         isLoading={isRelisting}
       />
-      {limitInfo && <LimitModal title="You're out of listings" message={limitInfo.message} onClose={() => setLimitInfo(null)} />}
     </article>
   );
 };

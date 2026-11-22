@@ -144,6 +144,8 @@ function ProductListed() {
           ...res.data.data.usage,
         }));
       }
+      // Reward credits may have been spent: re-read the exact balances.
+      fetchBoostSummary();
     }
 
     return res;
@@ -185,7 +187,11 @@ function ProductListed() {
           label="Boosts left"
           value={boostSummary ? `${boostSummary.monthlyRemaining}/${boostSummary.monthlyLimit}` : "—"}
           tone="amber"
-          hint={boostSummary ? `${boostSummary.activeBoosts}/${boostSummary.maxActiveBoosts} running` : undefined}
+          hint={
+            boostSummary
+              ? `${boostSummary.activeBoosts}/${boostSummary.maxActiveBoosts} running${boostSummary.rewardCredits ? ` · +${boostSummary.rewardCredits} reward` : ""}`
+              : undefined
+          }
         />
       </div>
 

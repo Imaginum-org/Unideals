@@ -681,6 +681,47 @@
   --accent-soft: rgba(109, 109, 245, 0.14);
   --accent-soft-strong: rgba(109, 109, 245, 0.24);
 }
+/* ── Subtle light themes (Settings → Appearance, female students).
+   Light mode only: a muted accent plus a barely-there tint on page and
+   panel surfaces. Declared before .girls-mode so Girls Corner's pink
+   still wins while it is switched on. ── */
+.theme-rose {
+  --accent: #b2456c;
+  --accent-hover: #983a5c;
+  --accent-text: #a63e63;
+  --accent-soft: rgba(178, 69, 108, 0.08);
+  --accent-soft-strong: rgba(178, 69, 108, 0.14);
+  --accent-ring: rgba(178, 69, 108, 0.32);
+  --theme-page: #fffcfc;
+  --theme-surface: #fbf6f7;
+}
+.theme-lavender {
+  --accent: #6d55c4;
+  --accent-hover: #5c46ad;
+  --accent-text: #6149b8;
+  --accent-soft: rgba(109, 85, 196, 0.08);
+  --accent-soft-strong: rgba(109, 85, 196, 0.14);
+  --accent-ring: rgba(109, 85, 196, 0.32);
+  --theme-page: #fdfcff;
+  --theme-surface: #f7f6fc;
+}
+:is(.theme-rose, .theme-lavender):not(.dark) body {
+  background-color: var(--theme-page);
+}
+:is(.theme-rose, .theme-lavender):not(.dark) .bg-\[\#F7F8FA\],
+:is(.theme-rose, .theme-lavender):not(.dark) .bg-\[\#F7F9FD\] {
+  background-color: var(--theme-surface) !important;
+}
+:is(.theme-rose, .theme-lavender):not(.dark):not(.girls-mode) :is(.bg-\[\#4B45FF\], .bg-\[\#4A4DFE\], .bg-\[\#3838EC\], .bg-\[\#2E4BFF\]) {
+  background-color: var(--accent) !important;
+}
+:is(.theme-rose, .theme-lavender):not(.dark):not(.girls-mode) :is(.text-\[\#4B45FF\], .text-\[\#2E40DC\], .text-\[\#2E4BFF\], .text-\[\#3838EC\]) {
+  color: var(--accent-text) !important;
+}
+:is(.theme-rose, .theme-lavender):not(.girls-mode) :is(.border-\[\#4B45FF\], .ring-\[\#3838EC\]) {
+  border-color: var(--accent) !important;
+}
+
 .girls-mode {
   --accent: #db2777;
   --accent-hover: #be185d;
@@ -943,4 +984,18 @@ html[data-chat-thread] .tabbar-spacer {
 @media (prefers-reduced-motion: reduce) {
   .cj-pulse { display: none; }
   .cj-stop-num { transition: none; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes netIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes netInTop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
 }

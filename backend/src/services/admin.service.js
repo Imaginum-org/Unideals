@@ -233,7 +233,7 @@ export const getUserDetails = async (userId) => {
   const [user, listingsCount, recentProducts, reportCount] = await Promise.all([
     User.findOne({ _id: userId, role: { $in: [USER_ROLES.USER, USER_ROLES.SUPPORT] } })
       .select(
-        "name email avatar mobile gender genderSource role status campus_id subscription createdAt last_login_date gamification is_college_verified college_verified_at email_digest_enabled email_digest_sent_at",
+        "name email avatar mobile gender genderSource role status campus_id subscription createdAt last_login_date gamification is_college_verified college_verified_at email_digest_enabled email_digest_sent_at password_set",
       )
       .populate("campus_id", "name short_name slug")
       .lean(),
@@ -262,6 +262,9 @@ export const getUserDetails = async (userId) => {
     // Verified tick only; the college address itself is never shown to staff.
     isCollegeVerified: Boolean(user.is_college_verified),
     collegeVerifiedAt: user.college_verified_at || null,
+    // false = Google-only account, no password set yet. null = unknown
+    // (account predates the flag). Never the password itself.
+    passwordSet: typeof user.password_set === "boolean" ? user.password_set : null,
     // Unread-notification email digest (emailAlerts.service.js).
     emailDigestEnabled: user.email_digest_enabled !== false,
     emailDigestSentAt: user.email_digest_sent_at || null,

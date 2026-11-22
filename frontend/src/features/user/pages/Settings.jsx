@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Mail,
   MapPin,
+  Palette,
   Phone,
   Plus,
   ShieldCheck,
@@ -44,8 +45,10 @@ import {
 import GenderChangeRequest from "../components/GenderChangeRequest.jsx";
 import CollegeVerification from "../components/CollegeVerification.jsx";
 import ButtonLoader from "../../../components/ui/ButtonLoader.jsx";
+import VerifiedTick from "../../../components/common/VerifiedTick.jsx";
+import AppearanceSettings from "../components/AppearanceSettings.jsx";
 
-const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "College email"];
+const tabs = ["Profile", "Security", "Pickup Spots", "Chat", "Appearance", "College email"];
 
 // Section nav: what each section is for (shown in the sidebar + as the
 // section subtitle).
@@ -54,6 +57,7 @@ const SECTION_META = {
   Security: { icon: Lock, hint: "Password and sign-in" },
   "Pickup Spots": { icon: MapPin, hint: "Where buyers meet you" },
   Chat: { icon: MessageCircle, hint: "Read receipts, typing and wallpaper" },
+  Appearance: { icon: Palette, hint: "Theme for this device" },
   "College email": { icon: BadgeCheck, hint: "Get the verified tick so buyers know you're a real student." },
 };
 
@@ -535,6 +539,15 @@ function Settings() {
     },
   ];
 
+  // Same rule as the Overview page: unverified, and their campus supports it.
+  const canVerifyCollege =
+    userDetails?.is_college_verified === false && userDetails?.college_verification_available === true;
+  const collegeEmailValue = userDetails?.is_college_verified
+    ? userDetails?.college_email || "Verified"
+    : userDetails?.college_verification_available === false
+      ? "Coming soon for your campus"
+      : "Not added";
+
   const currentCampusSlug =
     (typeof userDetails?.campus_id === "object" && userDetails.campus_id?.slug) || activeCampus?.slug || "";
   const campusChanged = Boolean(campusSlug) && campusSlug !== currentCampusSlug;
@@ -606,9 +619,21 @@ function Settings() {
                 className="rounded-xl object-cover"
               />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-1.5">
                   <p className="truncate text-[16px] font-semibold text-slate-900 dark:text-white">{userDetails?.name || "User"}</p>
-                  {userDetails?.is_email_verified && <BadgeCheck className="h-4 w-4 text-emerald-500" aria-label="Verified" />}
+                  {(userDetails?.is_college_verified || canVerifyCollege) && (
+                    <VerifiedTick
+                      verified={Boolean(userDetails.is_college_verified)}
+                      showUnverified
+                      size="md"
+                      title={userDetails.is_college_verified ? "You're a verified student" : undefined}
+                      description={
+                        userDetails.is_college_verified
+                          ? "Everyone sees this verified tick next to your name. It tells buyers you confirmed your college email."
+                          : undefined
+                      }
+                    />
+                  )}
                 </div>
                 <p className="text-[13px] text-slate-500 dark:text-zinc-400">
                   {activeCampus?.short_name || activeCampus?.name || "Campus not set"} · {formatMemberSince(userDetails?.createdAt)}
@@ -698,6 +723,37 @@ function Settings() {
                 );
               })}
 
+              {/* College email: added and verified in its own section */}
+              <li className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:gap-6">
+                  <p className="shrink-0 text-[13px] font-medium text-slate-500 sm:w-36 sm:pt-px dark:text-zinc-400">College email</p>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={cn(
+                        "flex min-w-0 items-center gap-1.5 text-[14px] font-medium",
+                        userDetails?.is_college_verified ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-zinc-400",
+                      )}
+                    >
+                      <span className="min-w-0 break-all">{collegeEmailValue}</span>
+                      {userDetails?.is_college_verified && <VerifiedTick verified size="sm" />}
+                    </p>
+                    {canVerifyCollege && (
+                      <p className="mt-0.5 text-[12.5px] text-slate-500 dark:text-zinc-400">Verify it to get the verified tick next to your name.</p>
+                    )}
+                  </div>
+                </div>
+                {userDetails?.college_verification_available !== false && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("College email")}
+                    disabled={editingField !== null}
+                    className={cn(linkBtn, "shrink-0 pt-5 sm:pt-0")}
+                  >
+                    {userDetails?.is_college_verified ? "View" : "Add"}
+                  </button>
+                )}
+              </li>
+
               {/* Gender: set once, then changes need admin approval */}
               <li className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:gap-6">
@@ -764,7 +820,7 @@ function Settings() {
         </div>
       )}
 
-      {activeTab === "Security" && <SecuritySettings email={userDetails?.email} />}
+      {activeTab === "Security" && <SecuritySettings email={userDetails?.email} passwordSet={userDetails?.password_set} />}
 
       {activeTab === "Pickup Spots" && (
         <div className="flex flex-col gap-4">
@@ -850,6 +906,8 @@ function Settings() {
           }}
         />
       )}
+
+      {activeTab === "Appearance" && <AppearanceSettings gender={userDetails?.gender} />}
 
       {activeTab === "College email" && (
         <div className="flex flex-col gap-4 sm:gap-5">

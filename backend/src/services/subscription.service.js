@@ -196,12 +196,24 @@ export const downgradeToFree = async (userId, reason = "downgrade") => {
     // best-effort
   }
   try {
+    // Only boosts the plan paid for. One-time add-ons were bought
+    // separately (₹29/₹49), so a plan refund must not take them away.
     const { default: Boost } = await import("../models/Boost.model.js");
-    await Boost.deleteMany({ user_id: userId, status: "active" });
-    await Product.updateMany(
-      { seller_id: userId, is_boosted: true },
-      { $set: { is_boosted: false }, $unset: { boost_expires_at: "", boost_tier: "" } },
-    );
+    const planBoosts = await Boost.find({ user_id: userId, status: "active", isAddon: { $ne: true } })
+      .select("_id product_id expires_at")
+      .lean();
+    if (planBoosts.length) {
+      await Boost.deleteMany({ _id: { $in: planBoosts.map((b) => b._id) } });
+      // Unboost only listings whose live boost was one of these.
+      await Product.updateMany(
+        {
+          seller_id: userId,
+          is_boosted: true,
+          $or: planBoosts.map((b) => ({ _id: b.product_id, boost_expires_at: b.expires_at })),
+        },
+        { $set: { is_boosted: false }, $unset: { boost_expires_at: "", boost_tier: "" } },
+      );
+    }
   } catch {
     // best-effort
   }

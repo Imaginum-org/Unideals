@@ -143,6 +143,7 @@ export const changeAdminPassword = async (userId, { currentPassword, newPassword
     {
       $set: {
         password: hashed,
+        password_set: true,
         refresh_token: null,
         refresh_token_prev: null,
         refresh_token_prev_expires_at: null,
